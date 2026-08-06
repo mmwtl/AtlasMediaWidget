@@ -43,16 +43,14 @@ final class TransportButton extends View {
         super.onDraw(canvas);
         float width = getWidth();
         float height = getHeight();
-        float alpha = isEnabled() ? 1f : 0.34f;
+        float alpha = isEnabled() ? 1f : 0.62f;
         int background = prominent ? Ui.ACCENT : 0xD9333333;
         if (isPressed() && isEnabled()) background = prominent ? 0xFF91A8B3 : 0xFF465158;
         paint.setColor(background);
         paint.setAlpha(Math.round(255 * alpha));
-        canvas.drawRoundRect(0, 0, width, height,
-                prominent ? width / 2f : Ui.dp(getContext(), 18),
-                prominent ? height / 2f : Ui.dp(getContext(), 18), paint);
+        canvas.drawRoundRect(0, 0, width, height, width / 2f, height / 2f, paint);
 
-        paint.setColor(prominent ? Ui.BACKGROUND : Ui.PRIMARY);
+        paint.setColor(Ui.PRIMARY);
         paint.setAlpha(Math.round(255 * alpha));
         float cx = width / 2f;
         float cy = height / 2f;
