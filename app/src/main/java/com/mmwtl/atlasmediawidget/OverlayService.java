@@ -240,7 +240,7 @@ public final class OverlayService extends Service
                 Math.max(1, bounds.width() - Ui.dp(this, 32)), this);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
-                WindowManager.LayoutParams.WRAP_CONTENT,
+                candidate.cardHeight(),
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
@@ -303,6 +303,7 @@ public final class OverlayService extends Service
                 && snapshot.artworkUri.equals(loadedArtworkUri)) return;
         loadedArtworkRevision = snapshot.artworkRevision;
         loadedArtworkUri = snapshot.artworkUri;
+        if (card != null) card.setArtwork(null);
         artworkLoader.load(snapshot.artworkUri, snapshot.generation, snapshot.artworkRevision);
     }
 
@@ -324,8 +325,7 @@ public final class OverlayService extends Service
     private void clampPosition(WindowManager.LayoutParams params, MediaCardView target, Rect bounds) {
         params.x = Math.max(bounds.left,
                 Math.min(params.x, Math.max(bounds.left, bounds.right - target.cardWidth())));
-        int measuredHeight = target.getMeasuredHeight();
-        int height = measuredHeight > 0 ? measuredHeight : Ui.dp(this, 480);
+        int height = target.cardHeight();
         params.y = Math.max(bounds.top,
                 Math.min(params.y, Math.max(bounds.top, bounds.bottom - height)));
     }
