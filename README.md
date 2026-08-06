@@ -6,7 +6,8 @@
 ## Короткий вывод
 
 Сделать кастомную карточку можно. Практичный первый вариант — не настоящий `AppWidget`, а overlay
-по модели AtlasAppWidget. Системный лаунчер ГУ жёстко закрепляет OEM-провайдер
+по модели AtlasAppWidget, получающий данные от установленного GInputBridge. Системный лаунчер ГУ
+жёстко закрепляет OEM-провайдер
 `com.geely.mediawidget.customwidget.SourceBigWidgetProvider`, поэтому нет подтверждения, что он
 позволит штатно разместить сторонний `AppWidgetProvider` в той же области.
 
@@ -19,45 +20,41 @@
 - поддерживаемые transport actions;
 - URI/bitmap обложки, если источник их действительно публикует и разрешает чтение.
 
-Схема уже используется в соседнем GInputBridge: `MediaSessionManager` даёт активные
-`MediaController`, а `MediaController.Callback` сообщает изменения metadata/playback state.
-Отдельный `OneOS MediaCenterManager` сообщает текущий аппаратный источник. Последняя часть важна:
-радио, Bluetooth и сторонний стриминг могут одновременно держать живые сессии, и выбор просто
-«первой playing session» иногда будет неверным.
+Эту работу уже выполняет GInputBridge: `MediaSessionManager` даёт ему активные `MediaController`,
+`MediaController.Callback` сообщает metadata/playback state, а `OneOS MediaCenterManager` — текущий
+аппаратный источник. Поэтому в AtlasMediaWidget не нужно дублировать notification listener и OneOS
+Binder, пока хватает внешнего API GInputBridge.
 
 ## Рекомендуемая схема
 
 ```text
-NotificationListenerService
+MediaSession + OneOS
         │
         ▼
-MediaSessionManager ── active sessions / reconnect
+   GInputBridge
+        │ broadcast API
+        ▼
+GInputBridgeMediaSource
+        │ snapshot reducer / stale timeout
+        ▼
+foreground overlay service
         │
         ▼
-MediaController callbacks ── metadata / playback / artwork
-        │
-        ├──────────────┐
-        ▼              ▼
-OneOS source       session selector
-(optional)         + state reducer
-        │              │
-        └──────┬───────┘
-               ▼
-      foreground overlay service
-               ▼
-          custom media view
+ custom media view
 ```
 
 Рекомендуемый порядок прототипа:
 
-1. Поднять overlay и собственный `NotificationListenerService`.
-2. Показать все активные сессии и проверить реальные пакеты/поля на ГУ для Radio, Bluetooth,
-   USB, проекции и сторонних плееров.
-3. Добавить OneOS source arbitration минимальным адаптером либо временно получать
-   `AUDIO_SOURCE_CHANGED` от GInputBridge.
-4. Только после измерений решать, нужен ли прямой OneOS Binder в этом APK.
+1. Поднять overlay и `GInputBridgeMediaSource`, принимающий `PLAYBACK_METADATA`,
+   `PLAYBACK_STATE` и `AUDIO_SOURCE_CHANGED`.
+2. При старте/возврате из сна отправлять explicit broadcast `REQUEST_PLAYBACK_INFO` в пакет
+   `com.salat.gbinder` и применять timeout к ответу.
+3. Проверить реальные поля/обложки на ГУ для Radio, Bluetooth, USB, проекции и сторонних плееров.
+4. Если не хватает source snapshot, duration/progress, controls или доступной обложки, расширить
+   версионированный API GInputBridge; прямой OneOS Binder оставить последним вариантом.
 
 Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).
+Текущий контракт GInputBridge: [docs/ginputbridge-api.md](docs/ginputbridge-api.md).
 
 ## Почему это может быть стабильнее OEM-карточки
 
@@ -65,11 +62,13 @@ OneOS source       session selector
 периодического восстановления почти не было. Своя реализация может делать немедленный snapshot,
 повторную идемпотентную подписку и редкую сверку состояния без убийства системных процессов.
 
-Но обычный APK не имеет статуса `persistent` и OEM-привилегий штатного виджета. Поэтому по
+Но обычный APK не имеет статуса `persistent` и OEM-привилегий штатного виджета. Кроме того,
+AtlasMediaWidget становится зависим от живого процесса и настроек GInputBridge. Поэтому по
 интеграции с лаунчером и выживаемости процесса он изначально слабее; foreground service,
 разрешённый автозапуск и корректный reconnect только уменьшают этот разрыв. По полноте данных он
-будет не хуже лишь для тех источников, которые публикуют полноценную `MediaSession`, либо после
-добавления OneOS-адаптера.
+будет не хуже лишь в пределах данных, которые GInputBridge отдаёт наружу. Текущий API не передаёт
+duration/position/actions и не гарантирует читаемость `coverUri`, поэтому для полного паритета его
+придётся немного расширить.
 
 ## Официальные Android API
 

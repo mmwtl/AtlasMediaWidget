@@ -8,7 +8,8 @@ These instructions apply to the entire repository.
 
 AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait automotive head
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
-proven shell and lifecycle approach from AtlasAppWidget, while owning its media state pipeline.
+proven shell and lifecycle approach from AtlasAppWidget. GInputBridge is installed on the target
+head unit and its broadcast API is the primary media-data source for the first implementation.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -20,9 +21,10 @@ provider has been demonstrated on the real head unit.
 
 - Keep confirmed device behavior, Android API facts, and implementation assumptions visibly
   separate in documentation and reviews.
-- Treat `../GInputBridge` as the local reference for public `MediaSessionManager` access and OneOS
-  integration. Reuse only the smallest necessary concepts or interfaces; do not copy its entire
-  `com_geely` module into this repository.
+- Treat `../GInputBridge` as the source of truth for its external broadcast contract. Do not infer
+  extras or behavior from UI text alone; verify them against the sender/receiver implementation.
+- Do not copy GInputBridge's `MediaSessionManager` collectors or its entire `com_geely` module into
+  this repository while its installed API satisfies the requirement.
 - Treat the decompiled OEM APKs as firmware-specific evidence, not as a stable public API.
 - Target the tested Android 11 head unit first. Do not generalize OEM Binder behavior to other
   firmware versions without a device test.
@@ -42,16 +44,18 @@ provider has been demonstrated on the real head unit.
 
 ## Media-state behavior
 
-- Use an enabled `NotificationListenerService` with `MediaSessionManager.getActiveSessions()` for
-  public media sessions. Do not request or claim ordinary access to the privileged
-  `MEDIA_CONTENT_CONTROL` permission.
-- Subscribe both to active-session list changes and to each selected `MediaController.Callback`.
-  Pull an immediate snapshot after connecting, after a source change, after wake, and when the
-  overlay becomes visible; callbacks alone are not sufficient recovery.
-- Use the OneOS current audio source, when available, to arbitrate between simultaneous Radio,
-  Bluetooth, USB, projection, and streaming sessions. Falling back to the first playing or most
-  recently updated session is acceptable only when the OEM source is unavailable.
-- Keep OEM/OneOS access behind an interface so a public-media-session-only build remains possible.
+- Consume GInputBridge `PLAYBACK_METADATA`, `PLAYBACK_STATE`, and `AUDIO_SOURCE_CHANGED` events
+  through one adapter. Send a package-targeted `REQUEST_PLAYBACK_INFO` on process start, after wake,
+  and when the overlay becomes visible.
+- Validate the required GInputBridge settings during setup: Media runtime, External API runtime,
+  Send media session data, Broadcast intents, and notification access. Report a specific missing
+  prerequisite instead of silently showing cached data.
+- The current `REQUEST_PLAYBACK_INFO` response does not include current audio source, playback
+  position, duration, actions, or guaranteed-readable artwork. Keep these fields optional and do
+  not synthesize them from stale values.
+- Keep the GInputBridge adapter behind an interface. A direct `NotificationListenerService` plus
+  optional OneOS adapter is a fallback only if the external API proves insufficient.
+- Do not request or claim ordinary access to the privileged `MEDIA_CONTENT_CONTROL` permission.
 - Perform Binder calls off the main thread. Use bounded retries with backoff, generation/session
   IDs for asynchronous artwork, and idempotent listener registration.
 - Never keep stale playback state indefinitely. After a bounded reconciliation failure, show an

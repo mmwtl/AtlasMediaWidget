@@ -16,8 +16,8 @@
 
 | Вариант | Что получаем | Главные минусы | Оценка |
 |---|---|---|---|
-| Overlay + собственный notification listener | Независимая UI-карточка, metadata и controls всех корректно опубликованных медиасессий | Нужны overlay, Usage Access, notification access и foreground service; без OneOS возможен неверный выбор среди нескольких сессий | Лучший первый прототип |
-| Overlay + broadcast от GInputBridge | Быстрый доступ к уже собранным metadata, playback state и текущему source | Жёсткая зависимость от второго APK и его настроек `fullBroadcast`/runtime modules; собственное восстановление ограничено | Полезен как временный диагностический режим |
+| Overlay + API GInputBridge | Metadata, coarse playback state и OneOS audio source без второй notification/OneOS подписки | Зависимость от второго APK и его настроек; текущему API не хватает цельного snapshot, progress/actions и надёжной передачи artwork | Рекомендуемый первый прототип |
+| Overlay + собственный notification listener | Независимая UI-карточка, metadata и controls всех корректно опубликованных медиасессий | Нужны отдельный notification access и дублирующие подписки; без OneOS возможен неверный выбор среди нескольких сессий | Резервный вариант |
 | Overlay + прямой OneOS adapter | Максимальная близость к OEM: source, radio frequency, BT/USB data и нативные controls | Непубличный firmware-specific API; совместимость после обновлений не гарантирована; большой `com_geely` модуль GInputBridge содержит около 491 файлов | Делать только минимальный адаптер после прототипа |
 | Настоящий сторонний `AppWidgetProvider` | Нативный AppWidget lifecycle и отсутствие overlay-окна | Нет доказательств, что OEM launcher даст добавить/закрепить его; `RemoteViews` ограничивает UI; остаётся зависимость от host Binder | Эксперимент, не основной путь |
 | Root/Magisk-модификация launcher config | Карточка в штатном слоте | Риск boot loop/несовместимости, подписи и обновления прошивки, сложное восстановление | Не рекомендуется для первой версии |
@@ -40,17 +40,19 @@ URI обложки может быть недоступен чужому UID; se
 использовать именно явно разрешённый notification listener, а не пытаться выдать permission через
 обычный runtime prompt.
 
+AtlasMediaWidget не обязан получать этот доступ напрямую: установленный GInputBridge уже выполняет
+роль брокера и отдаёт часть данных через broadcast API. Текущий контракт и его пробелы перечислены
+в [ginputbridge-api.md](ginputbridge-api.md).
+
 ## Выбор правильной сессии
 
 На ГУ недостаточно правила «первая сессия со state=PLAYING». Нужен детерминированный selector:
 
-1. Если OneOS сообщает текущий source, сначала сопоставить source с допустимыми package/session.
-2. Среди кандидатов выбрать `STATE_PLAYING`.
-3. Если играющего нет, выбрать кандидата с максимальным `lastPositionUpdateTime`.
-4. Если OneOS недоступен, применить тот же порядок ко всем сессиям и явно пометить source как
-   неподтверждённый.
-5. Не переключать UI на другой controller из-за запоздавшего artwork callback: каждый async result
-   должен содержать generation/session ID.
+При использовании GInputBridge выбор controller уже выполняется внутри него. AtlasMediaWidget
+должен объединять три независимых события — source, playback state и metadata — в один snapshot.
+Каждый snapshot получает локальные `receivedAt` и generation ID; поздний `coverUri` не должен
+перезаписывать более новый трек. Если API GInputBridge будет расширен, лучше передавать единый
+versioned snapshot с source и timestamps, чем пытаться синхронизировать три broadcasts.
 
 ## Надёжность против штатного виджета
 
@@ -71,6 +73,8 @@ URI обложки может быть недоступен чужому UID; se
 - публичная MediaSession содержит только то, что публикует источник;
 - OneOS API непубличен и привязан к конкретной прошивке;
 - после OTA могут поменяться Binder contract, package names или правила запуска фона.
+- при выбранной архитектуре сбой или отключённый runtime GInputBridge становится отдельной точкой
+  отказа.
 
 Итог: по визуальной отзывчивости и восстановлению callback-цепочки кастомная реализация может быть
 лучше. По системной интеграции и гарантии выживания процесса штатная карточка сильнее. По полноте
@@ -79,12 +83,15 @@ URI обложки может быть недоступен чужому UID; se
 
 ## Минимальные проверки прототипа на ГУ
 
-1. Выдать notification access и убедиться, что listener получает reconnect после перезапуска APK.
-2. Записать dump всех controller packages и metadata для Radio, Bluetooth, USB, CPAA/CarPlay и
+1. Включить в GInputBridge Media runtime, External API runtime, «Отправка данных медиасессии» и
+   «Широковещательные события»; убедиться, что его notification access активен.
+2. Проверить initial `REQUEST_PLAYBACK_INFO` после перезапуска только AtlasMediaWidget.
+3. Записать входящие metadata для Radio, Bluetooth, USB, CPAA/CarPlay и
    минимум двух сторонних плееров.
-3. Проверить play/pause/next/previous и наличие соответствующих `PlaybackState.actions`.
-4. Переключать источники при одновременно активных sessions и проверять OneOS arbitration.
-5. Выполнить cold boot, sleep/wake, restart launcher и restart только AtlasMediaWidget.
-6. На каждом сценарии проверять, что карточка либо восстанавливается сама, либо показывает
+4. Проверить readable `coverUri`; недоступный URI считать ожидаемым пробелом текущего API.
+5. Переключать источники при одновременно активных sessions и проверять `AUDIO_SOURCE_CHANGED`.
+6. Выполнить cold boot, sleep/wake, restart launcher, restart GInputBridge и restart только
+   AtlasMediaWidget.
+7. На каждом сценарии проверять, что карточка либо восстанавливается сама, либо показывает
    `disconnected`, но не остаётся бесконечно в старом состоянии.
-7. Измерить CPU/RAM и частоту Binder/update вызовов; reconcile не должен превращаться в частый poll.
+8. Измерить CPU/RAM и частоту update вызовов; reconcile не должен превращаться в частый poll.
