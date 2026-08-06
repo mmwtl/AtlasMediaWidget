@@ -16,7 +16,7 @@
 
 | Вариант | Что получаем | Главные минусы | Оценка |
 |---|---|---|---|
-| Overlay + полный Media Bridge GInputBridge | Единый source-aware backend, metadata, progress, artwork, sources и controls без второй notification/OneOS подписки | Требует доработки и совместимого релиза второго APK; GInputBridge становится точкой отказа | Рекомендуемый вариант |
+| Overlay + полный Media Bridge GInputBridge | Единый source-aware backend, metadata, progress, artwork, sources и controls без второй notification/OneOS подписки | Требует установки совместимой ветки `mediaapi`; GInputBridge становится точкой отказа; API открыт любому установленному APK | Рекомендуемый вариант |
 | Overlay + legacy broadcasts GInputBridge | Быстрый read-only прототип с metadata, coarse state и current-source events | Нет атомарности, controls, position/actions и гарантированно читаемой обложки | Только совместимость/диагностика |
 | Overlay + собственный notification listener | Независимая UI-карточка, metadata и controls всех корректно опубликованных медиасессий | Нужны отдельный notification access и дублирующие подписки; без OneOS возможен неверный выбор среди нескольких сессий | Резервный вариант |
 | Overlay + прямой OneOS adapter | Максимальная близость к OEM: source, radio frequency, BT/USB data и нативные controls | Непубличный firmware-specific API; совместимость после обновлений не гарантирована; большой `com_geely` модуль GInputBridge содержит около 491 файлов | Делать только минимальный адаптер после прототипа |

@@ -1,166 +1,161 @@
 # Полный Media Bridge между GInputBridge и AtlasMediaWidget
 
-## Решение
+Документ синхронизирован с реализацией GInputBridge в ветке `mediaapi`, protocol v1. Источник
+истины для wire-формата — `GInputBridge/docs/atlas-media-bridge.md` и
+`MediaBridgeContract.kt` той же ветки.
 
-GInputBridge — единственный медиабэкенд. Он выбирает активную сессию, объединяет публичный
-`MediaController` с OneOS MediaCenter, определяет доступность источников, исполняет команды и
-нормализует обложки. AtlasMediaWidget — тонкий UI-клиент: показывает snapshot, экстраполирует
-прогресс, управляет overlay и отправляет команды.
+## Разделение ответственности
 
-Размещать OneOS Binder, `NotificationListenerService` или вторую логику выбора сессии в
-AtlasMediaWidget не надо. Это создаст две конкурирующие callback-цепочки и разные ответы на вопрос,
-какой источник сейчас главный.
+GInputBridge — единственный медиабэкенд: выбирает активную сессию, объединяет `MediaController` с
+OneOS MediaCenter, определяет источники, выполняет команды и нормализует обложки.
+AtlasMediaWidget — UI-клиент: показывает atomic snapshot, экстраполирует progress, управляет
+overlay, переподключается после Binder death и отправляет команды.
 
-## Компоненты
+OneOS Binder, `NotificationListenerService` и вторая логика выбора сессии в AtlasMediaWidget не
+нужны. Они создали бы две конкурирующие callback-цепочки с разным понятием активного источника.
 
-### GInputBridge
+## Binding и модель доверия
 
-- `MediaStateHub` собирает MediaSession metadata/playback и состояние OneOS источников в один
-  immutable snapshot.
-- `MediaCommandRouter` содержит единственную source-aware реализацию transport/source команд. Её
-  используют и существующие физические действия GInputBridge, и новый IPC.
-- `ArtworkRepository` читает доступные GInputBridge bitmap/URI, уменьшает изображение, кэширует его
-  и публикует через `com.salat.gbinder.fileprovider` с временным read grant клиенту.
-- `MediaBridgeService` предоставляет аутентифицированный Messenger API, немедленный initial
-  snapshot и push-обновления.
-
-### AtlasMediaWidget
-
-- `GInputBridgeMediaSource` явно bind'ится к service, регистрирует reply Messenger и переподключается
-  после Binder death с bounded backoff.
-- reducer принимает только совместимые snapshots с generation не меньше уже применённого.
-- UI включает/отключает кнопки по capability mask; принятая команда остаётся pending до нового
-  подтверждающего snapshot либо timeout.
-- progress ticker работает только локально и только когда карточка видима и состояние движется.
-- overlay service, HOME visibility, положение/размер и настройки принадлежат AtlasMediaWidget.
-
-## Почему Messenger, а не broadcasts или общий AAR
-
-Messenger даёт двусторонний канал, `replyTo`, `Message.sendingUid`, упорядоченную обработку и
-Binder-death без общего скомпилированного интерфейса между двумя репозиториями. Payload состоит из
-primitive/String/Bundle/ArrayList<Bundle>, а `protocolVersion` защищает от несовместимых релизов.
-
-AIDL также возможен, но потребует синхронно распространять общий contract-модуль либо дублировать
-Parcelable/AIDL. Для одного клиента и невысокой частоты событий это лишняя связность. Broadcast API
-остаётся для старых интеграций, но не используется для команд полного виджета.
-
-## Wire protocol v1
-
-Клиент делает explicit bind к компоненту GInputBridge. Точное имя service фиксируется после его
-реализации; поиск implicit intent запрещён.
-
-Сообщения клиент → service:
-
-| Код | Назначение | Обязательные поля |
-|---|---|---|
-| `REGISTER_CLIENT` | договориться о версии и подписаться | `minProtocolVersion`, `maxProtocolVersion`, `replyTo` |
-| `UNREGISTER_CLIENT` | снять подписку | — |
-| `GET_SNAPSHOT` | запросить сверку | `requestId` |
-| `EXECUTE_COMMAND` | выполнить действие | `requestId`, `command`, аргументы команды |
-
-Сообщения service → клиент:
-
-| Код | Назначение | Обязательные поля |
-|---|---|---|
-| `SNAPSHOT` | initial/reconcile/push состояние | snapshot ниже |
-| `COMMAND_RESULT` | результат приёма команды | `requestId`, `status`, `message?`, `generation` |
-| `PROTOCOL_ERROR` | несовместимая версия или malformed request | `requestId?`, `status`, `message` |
-
-`COMMAND_RESULT=ACCEPTED` означает, что backend принял действие, а не что устройство уже перешло в
-желаемое состояние. Источник истины — следующий snapshot/callback. Остальные статусы:
-`UNSUPPORTED`, `INVALID_ARGUMENT`, `NOT_READY`, `DENIED`, `FAILED`.
-
-## Snapshot
-
-Верхний уровень:
-
-- `protocolVersion`, монотонный `generation`, `createdAtElapsedRealtime`;
-- `backendStatus`: `READY`, `DEGRADED`, `DISCONNECTED`, `ERROR`; `backendError?`;
-- `currentAudioSource`, `currentAppSource?`;
-- `sources`: `ArrayList<Bundle>`;
-- `session`, `playback` и `artwork` как вложенные Bundle.
-
-Source descriptor:
-
-- стабильный `id`: `USB`, `BT`, `RADIO`, `CPAA`, `ONLINE`, `YUNTING`, `OTHER`, `UNKNOWN`;
-- `label`, `available`, `connected`, `selected`, `capabilities`;
-- optional `reasonUnavailable` для диагностики, но не для постоянного показа в основном UI.
-
-Session:
-
-- `ownerPackage`, `ownerAppName`, `mediaId?`, `title?`, `artist?`, `album?`, `mediaUri?`.
-
-Playback:
-
-- полный Android-compatible `state`, а не boolean;
-- `positionMs?`, `durationMs?`, `positionUpdatedAtElapsedRealtime?`, `speed`;
-- capability bitmask: `PLAY`, `PAUSE`, `TOGGLE`, `NEXT`, `PREVIOUS`, `SEEK_TO`, `SET_SOURCE`,
-  optional `OPEN_PLAYER`.
-
-Artwork:
-
-- `uri?`, `revision`, `width?`, `height?`, `fallbackKind`;
-- URI принадлежит FileProvider GInputBridge; Atlas получает `FLAG_GRANT_READ_URI_PERMISSION`;
-- полноразмерный Bitmap через Messenger не передаётся из-за Binder transaction limits;
-- ответ старой artwork-задачи применяется только при совпадении generation/media ID.
-
-Поля, которых источник не публикует, остаются отсутствующими. `0` не используется как замена
-неизвестной duration/position.
-
-## Прогресс
-
-GInputBridge присылает базовую позицию при смене track/state/speed, после seek и при редкой
-reconcile-проверке. Во время `PLAYING` AtlasMediaWidget вычисляет:
+Используется explicit bind:
 
 ```text
-displayPosition = basePosition
-  + (SystemClock.elapsedRealtime() - positionUpdatedAtElapsedRealtime) * speed
+action    = com.salat.gbinder.media.BIND
+package   = com.salat.gbinder
+component = com.salat.gbinder/com.salat.gbinder.media.bridge.MediaBridgeService
 ```
 
-Результат ограничивается диапазоном `0..duration`. При pause/buffering/error позиция не движется.
-Так UI остаётся плавным без IPC или broadcast каждую секунду.
+Service exported и намеренно открыт: permission, package allowlist и проверка signing certificate
+отсутствуют. Любой установленный APK может читать snapshots/artwork и отправлять команды. Это
+приемлемо только при принятом условии, что ГУ изолирована и владелец контролирует все установки.
 
-## Команды и маршрутизация
+`Message.sendingUid` используется GInputBridge только для получения package names, которым
+выдаётся временный read grant на artwork URI. Он не является проверкой доступа.
 
-- `PLAY`, `PAUSE`, `TOGGLE`, `NEXT`, `PREVIOUS` идут в существующий source-aware router.
-- Для Radio next/previous означают seek следующей/предыдущей станции; для media — смену трека.
-- `SEEK_TO(positionMs)` доступен только при соответствующем capability активного backend. Нельзя
-  показывать seek только потому, что duration известна.
-- `SET_SOURCE(sourceId)` использует OneOS `requestAudioSource`; callback нового current source
-  подтверждает завершение.
-- UI не пытается fallback'иться на собственный `MediaController`, если команда GInputBridge не
-  удалась: это нарушило бы единый выбор backend.
+Оставлять explicit component всё равно нужно: он исключает implicit resolution не того сервиса.
+Проверка `protocolVersion` также обязательна: это контроль совместимости, а не безопасность.
 
-## Безопасность
+## Messenger protocol v1
 
-Проверенные release APK GInputBridge и AtlasAppWidget подписаны разными сертификатами, поэтому
-`signature`-permission не защищает эту пару. Для каждого `REGISTER_CLIENT`, `GET_SNAPSHOT` и
-`EXECUTE_COMMAND` service обязан:
+Каждое client message содержит `protocolVersion: Int = 1`. `replyTo` обязателен для register,
+snapshot request и command. Поддерживаемый диапазон GInputBridge сейчас `[1,1]`.
 
-1. взять реальный `Message.sendingUid`, не UID из Bundle;
-2. получить все package этого UID и потребовать точный `com.mmwtl.atlasmediawidget`;
-3. проверить SHA-256 signing certificate по production allowlist;
-4. отклонить запрос при любой неоднозначности; rate-limit malformed/denied logging.
+Client → GInputBridge:
 
-Production не принимает debug certificate. Если в будущем оба APK будут намеренно подписываться
-одним ключом, поверх проверки можно добавить `signature`-permission, но менять ради этого ключ
-GInputBridge не требуется.
+| `what` | Имя | Поля |
+|---:|---|---|
+| 1 | `REGISTER` | `protocolVersion`, optional `requestId`, `replyTo` |
+| 2 | `UNREGISTER` | `protocolVersion`, `replyTo` |
+| 3 | `GET_SNAPSHOT` | `protocolVersion`, optional `requestId`, `replyTo` |
+| 4 | `COMMAND` | `protocolVersion`, непустой `requestId`, `command`, аргументы, `replyTo` |
+
+GInputBridge → client:
+
+| `what` | Имя | Назначение |
+|---:|---|---|
+| 100 | `REGISTERED` | версия принята; сразу после него приходит initial snapshot |
+| 101 | `SNAPSHOT` | initial, push или ответ на `GET_SNAPSHOT` |
+| 102 | `COMMAND_RESULT` | результат передачи команды backend |
+| 103 | `ERROR` | malformed request или несовместимая версия |
+
+Регистрация идемпотентна для одного reply Binder. Binder death автоматически снимает подписку.
+
+## Atomic snapshot
+
+`SNAPSHOT` — один плоский Bundle, а не несколько независимо обновляемых блоков:
+
+- `protocolVersion`, монотонный `generation`, Unix `timestamp`, optional `requestId`;
+- `backendConnected`, `backendErrorCode`, `backendErrorMessage`;
+- `audioSource`, `appSource`, `sources: ArrayList<Bundle>`;
+- `ownerPackage`, `ownerApp`, `mediaId`, `title`, `artist`, `album`;
+- `duration`, `position`, `updateElapsedRealtime`, `speed`;
+- `playbackState`, `playbackErrorCode`, `playbackErrorMessage`, `playbackActions`;
+- нормализованный `capabilities`;
+- GInputBridge-owned `artworkUri` и `artworkRevision`.
+
+Неизвестные `duration` и `position` равны `-1`, а не `0`. `timestamp` использует wall clock;
+позиция привязана к монотонному `SystemClock.elapsedRealtime()`.
+
+Каждый source descriptor содержит `id`, `connected`, `available`, `selected`, `capabilities`.
+Список v1 всегда содержит `UNKNOWN`, `USB`, `BT`, `RADIO`, `ONLINE`, `OTHER`, `YUNTING`, `CPAA`.
+USB/BT/CPAA обновляются OneOS callbacks, а не polling.
+
+## Capabilities и команды
+
+| Bit | Hex | Команда |
+|---:|---:|---|
+| 0 | `0x01` | `PLAY` |
+| 1 | `0x02` | `PAUSE` |
+| 2 | `0x04` | `TOGGLE` |
+| 3 | `0x08` | `NEXT` |
+| 4 | `0x10` | `PREVIOUS` |
+| 5 | `0x20` | `SEEK_TO` |
+| 6 | `0x40` | `SET_SOURCE` |
+
+Команды без аргументов: `PLAY`, `PAUSE`, `TOGGLE`, `NEXT`, `PREVIOUS`.
+
+`SEEK_TO` передаёт `position: Long >= 0`. Наличие duration не означает наличие capability seek.
+
+`SET_SOURCE` передаёт `source`, optional `appSource` и `autoplay` (default `true`). Повторный выбор
+уже активного source идемпотентен. Для CPAA playback-команды возвращают `NOT_SUPPORTED`, потому что
+CarPlay владеет media keys; переключение source разрешено.
+
+Для Radio next/previous означают поиск станции, для media — смену трека. AtlasMediaWidget не должен
+делать собственный fallback через `MediaController`: hardware keys и IPC уже используют единый
+`MediaCommandRouter` GInputBridge.
+
+`COMMAND_RESULT` содержит `requestId`, `status`, `message`, `generation`. Статусы v1:
+
+| Код | Имя |
+|---:|---|
+| 0 | `OK` |
+| 1 | `INVALID_REQUEST` |
+| 2 | `UNSUPPORTED_VERSION` |
+| 3 | `UNAUTHORIZED` — зарезервирован, открытый v1 не возвращает |
+| 4 | `UNKNOWN_COMMAND` |
+| 5 | `BACKEND_UNAVAILABLE` |
+| 6 | `NOT_SUPPORTED` |
+| 7 | `FAILED` |
+| 8 | `NOT_REGISTERED` |
+
+`OK` подтверждает передачу команды выбранному backend, но не изменение устройства. UI держит
+команду pending до подтверждающего snapshot либо timeout.
+
+## Progress
+
+GInputBridge не отправляет position каждую секунду. Только при `PLAYING` клиент вычисляет:
+
+```text
+estimated = position
+  + (SystemClock.elapsedRealtime() - updateElapsedRealtime) * speed
+```
+
+Если duration известна, результат ограничивается `0..duration`. На pause, buffering и error
+позиция не движется. После seek/state/track change приходит новая база; редкий `GET_SNAPSHOT`
+возвращает последний OneOS position tick без секундного IPC polling.
+
+## Artwork
+
+GInputBridge читает доступный bitmap/URI, уменьшает максимальную сторону до 512 px, сохраняет JPEG
+в private cache и публикует собственный `content://` FileProvider URI. Bitmap через Messenger не
+передаётся. При unregister/Binder death URI grant отзывается.
+
+AtlasMediaWidget связывает decode с `artworkRevision` и `generation`: поздний результат старого
+трека не должен перезаписать новую или уже очищенную обложку.
 
 ## Что проверять на ГУ
 
-1. Initial snapshot после cold boot, wake и рестарта каждого приложения по отдельности.
-2. Radio, BT, USB, CPAA, online и два сторонних MediaSession-плеера.
-3. Наличие/отсутствие каждой transport capability и корректный результат команды.
-4. Source availability при подключении/отключении USB, телефона и проекции.
-5. Обложку, замену трека, отзыв grants и отсутствие старой картинки после быстрых переключений.
-6. Progress до/после pause, seek, buffering и смены speed.
-7. Смерть Binder во время команды и восстановление без старого бесконечного состояния.
-8. CPU/RAM и отсутствие секундного IPC polling.
+1. Open bind/register/read/command и корректный отказ только при несовместимом protocol/формате.
+2. Reconnect после рестарта обоих процессов и sleep/wake без двойных callbacks.
+3. USB/BT/CPAA connect/disconnect и все source/appSource transitions.
+4. Radio/BT/USB/ONLINE/MediaSession transport commands и CPAA `NOT_SUPPORTED`.
+5. `SEEK_TO` с capability и без неё.
+6. Artwork URI, быструю смену трека и отзыв grant после disconnect.
+7. Progress после play/pause/seek и отсутствие ежесекундного Binder traffic.
+8. Очистку stale snapshot после OneOS disconnect.
 
-## Этапы внедрения
+## Этапы AtlasMediaWidget
 
-1. GInputBridge: чистые модели, state hub и command router с unit tests.
-2. GInputBridge: artwork cache/FileProvider и authenticated Messenger service.
-3. AtlasMediaWidget: protocol client, reducer, stale/reconnect и progress tests.
-4. AtlasMediaWidget: overlay UI, source selector и controls.
-5. Интеграционные тесты на реальной ГУ; legacy broadcasts оставить до успешного soak-test.
+1. Реализовать Messenger client, protocol parser, generation reducer и reconnect policy.
+2. Добавить artwork loader и локальный progress estimator с unit tests.
+3. Реализовать overlay, source selector и capability-driven controls.
+4. Проверить Android 11 ГУ; legacy broadcasts оставить только как диагностический fallback.

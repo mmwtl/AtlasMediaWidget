@@ -22,8 +22,9 @@ provider has been demonstrated on the real head unit.
 
 - Keep confirmed device behavior, Android API facts, and implementation assumptions visibly
   separate in documentation and reviews.
-- Treat `../GInputBridge` as the source of truth for its external broadcast contract. Do not infer
-  extras or behavior from UI text alone; verify them against the sender/receiver implementation.
+- Treat the `mediaapi` branch of `../GInputBridge` as the source of truth for its Messenger and
+  legacy broadcast contracts. Do not infer keys or behavior from UI text alone; verify them against
+  `MediaBridgeContract.kt`, the service implementation and the sender/receiver code.
 - Do not copy GInputBridge's `MediaSessionManager` collectors or its entire `com_geely` module into
   this repository while its installed API satisfies the requirement.
 - Treat the decompiled OEM APKs as firmware-specific evidence, not as a stable public API.
@@ -67,8 +68,10 @@ provider has been demonstrated on the real head unit.
 - Extrapolate a playing position locally from position, speed and `SystemClock.elapsedRealtime()`.
   Do not request one IPC update per second. A low-frequency reconciliation timer may run only while
   the overlay is visible or playback is expected, and must supplement rather than replace callbacks.
-- Send transport/source commands only through the authenticated bound service. The UI must respect
-  the capability mask and treat an accepted command as pending until a newer snapshot confirms it.
+- Send transport/source commands only through the explicit versioned bound service. The v1 service
+  is intentionally open on the isolated head unit; do not add client-side identity assumptions.
+  The UI must respect the capability mask and treat `OK` as command delivery, pending until a newer
+  snapshot confirms the resulting state.
 
 ## Version and artifact naming
 

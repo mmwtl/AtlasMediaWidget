@@ -34,7 +34,7 @@ MediaSession + OneOS
         ▼
    GInputBridge
  MediaStateHub + CommandRouter
-        │ authenticated bound service
+        │ open versioned bound service
         ▼
 GInputBridgeMediaSource
         │ snapshot reducer / stale timeout
@@ -45,11 +45,11 @@ foreground overlay service
  custom media view
 ```
 
-Рекомендуемый порядок реализации:
+GInputBridge backend уже реализован в ветке `mediaapi`. Следующий порядок относится к клиенту:
 
-1. В GInputBridge выделить единый `MediaStateHub`, `MediaCommandRouter` и кэш обложек.
-2. Добавить versioned bound-service API: snapshot subscription, commands и результаты.
-3. Поднять overlay и клиент `GInputBridgeMediaSource` с reconnect/stale-state логикой.
+1. Реализовать `GInputBridgeMediaSource`: Messenger protocol v1, reconnect и stale-state reducer.
+2. Добавить локальную экстраполяцию progress и generation-aware загрузку artwork.
+3. Поднять overlay, source selector и capability-driven controls.
 4. Проверить Radio, Bluetooth, USB, CPAA/CarPlay, online и сторонние плееры на реальной ГУ.
 
 Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).

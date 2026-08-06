@@ -91,14 +91,11 @@ AtlasMediaWidget может не знать source до следующего р�
 ## Почему не надо продолжать расширять broadcasts
 
 Добавление ещё одного `MEDIA_SNAPSHOT` broadcast решило бы только часть проблемы. Для полного UI
-нужны двусторонние команды, подтверждения, подписка, Binder-death/reconnect и проверка вызывающего
-UID. Поэтому целевой транспорт — explicit bound service, а не глобальные broadcasts.
+нужны двусторонние команды, подтверждения, подписка и Binder-death/reconnect. Поэтому целевой
+транспорт — explicit bound service, а не глобальные broadcasts.
 
-Release APK проверенных проектов подписаны разными сертификатами: GInputBridge имеет SHA-256
-`8499551068ecabd0b4af86ce6f95234bd5abf3efc150d8f4f7e6fb0f2f2f6443`, а AtlasAppWidget —
-`eaf9f1b2dc55db196b41c2c947964d6809a6c954d8aa7b45ad6d72133af0217e`. Поэтому
-`signature`-permission сама по себе не подходит. GInputBridge должен проверять `Message.sendingUid`,
-точный package клиента и allowlist SHA-256 сертификатов при регистрации и каждой команде.
-
-Эти digest — не секреты, но production allowlist должен задаваться явно. Debug-сертификат можно
-разрешать только в debug-сборке GInputBridge.
+Ветка GInputBridge `mediaapi` намеренно открывает v1 service без permission, package allowlist и
+проверки сертификата: на целевой изолированной ГУ устанавливаются только доверенные владельцем APK.
+Любое установленное приложение технически может читать snapshots/artwork и отправлять команды.
+`Message.sendingUid` используется только для выдачи URI grant пакету клиента. Это принятая модель
+развёртывания, а не свойство безопасности Android.
