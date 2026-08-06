@@ -61,13 +61,11 @@ final class TransportButton extends View {
             if (playing) drawPause(canvas, cx, cy, unit);
             else drawTriangle(canvas, cx - unit * 0.15f, cy, unit, true);
         } else if (type == Type.PREVIOUS) {
-            drawBar(canvas, cx - unit * 1.15f, cy, unit);
-            drawTriangle(canvas, cx - unit * 0.28f, cy, unit * 0.82f, false);
-            drawTriangle(canvas, cx + unit * 0.62f, cy, unit * 0.82f, false);
+            drawBar(canvas, cx - unit * 0.78f, cy, unit);
+            drawTriangle(canvas, cx + unit * 0.18f, cy, unit * 0.88f, false);
         } else {
-            drawTriangle(canvas, cx - unit * 0.62f, cy, unit * 0.82f, true);
-            drawTriangle(canvas, cx + unit * 0.28f, cy, unit * 0.82f, true);
-            drawBar(canvas, cx + unit * 1.15f, cy, unit);
+            drawTriangle(canvas, cx - unit * 0.18f, cy, unit * 0.88f, true);
+            drawBar(canvas, cx + unit * 0.78f, cy, unit);
         }
     }
 

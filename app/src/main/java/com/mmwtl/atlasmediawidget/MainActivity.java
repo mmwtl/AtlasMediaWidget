@@ -14,6 +14,8 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -25,6 +27,9 @@ public final class MainActivity extends Activity {
     private TextView bridgeStatus;
     private Button serviceButton;
     private Switch autoStart;
+    private RadioButton compactStyle;
+    private RadioButton squareStyle;
+    private boolean refreshingStyle;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -90,6 +95,30 @@ public final class MainActivity extends Activity {
         serviceParams.topMargin = Ui.dp(this, 18);
         root.addView(serviceCard, serviceParams);
         serviceCard.addView(text("Виджет", 20, Ui.PRIMARY, Typeface.BOLD));
+
+        TextView styleTitle = text("Формат карточки", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams styleTitleParams = fullWrap();
+        styleTitleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(styleTitle, styleTitleParams);
+        RadioGroup styleGroup = new RadioGroup(this);
+        styleGroup.setOrientation(RadioGroup.HORIZONTAL);
+        compactStyle = styleButton(CardStyle.COMPACT.label);
+        squareStyle = styleButton(CardStyle.SQUARE.label);
+        styleGroup.addView(compactStyle, new RadioGroup.LayoutParams(0,
+                RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
+        styleGroup.addView(squareStyle, new RadioGroup.LayoutParams(0,
+                RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
+        styleGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (refreshingStyle) return;
+            CardStyle selected = checkedId == compactStyle.getId()
+                    ? CardStyle.COMPACT : CardStyle.SQUARE;
+            prefs.putInt(Prefs.KEY_CARD_STYLE, selected.preferenceValue);
+            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                OverlayService.refreshStyle(this);
+            }
+        });
+        serviceCard.addView(styleGroup, fullWrap());
+
         serviceButton = actionButton("Запустить");
         serviceButton.setOnClickListener(v -> toggleService());
         serviceCard.addView(serviceButton, buttonParams());
@@ -107,7 +136,7 @@ public final class MainActivity extends Activity {
 
         TextView note = text(
                 "Карточка отображается только когда HOME находится на переднем плане. "
-                        + "Перетаскивание выполняется за верхнюю строку MEDIA.",
+                        + "Перетаскивание выполняется за кнопку ⋮ в правом верхнем углу.",
                 14, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams noteParams = fullWrap();
         noteParams.topMargin = Ui.dp(this, 24);
@@ -130,6 +159,12 @@ public final class MainActivity extends Activity {
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
         serviceButton.setEnabled(enabled || overlay && usage);
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
+        CardStyle style = CardStyle.fromPreference(
+                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+        refreshingStyle = true;
+        compactStyle.setChecked(style == CardStyle.COMPACT);
+        squareStyle.setChecked(style == CardStyle.SQUARE);
+        refreshingStyle = false;
         requestNotificationPermissionIfNeeded();
     }
 
@@ -205,6 +240,17 @@ public final class MainActivity extends Activity {
         button.setTextSize(16);
         button.setTextColor(Ui.PRIMARY);
         button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Ui.NESTED));
+        return button;
+    }
+
+    private RadioButton styleButton(String label) {
+        RadioButton button = new RadioButton(this);
+        button.setId(View.generateViewId());
+        button.setText(label);
+        button.setTextSize(16);
+        button.setTextColor(Ui.PRIMARY);
+        button.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        button.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
         return button;
     }
 

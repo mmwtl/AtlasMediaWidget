@@ -8,6 +8,7 @@ final class Prefs {
     static final String KEY_AUTO_START = "auto_start";
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
+    static final String KEY_CARD_STYLE = "card_style";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int BOOT_DELAY_SECONDS = 15;
 

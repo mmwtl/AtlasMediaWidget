@@ -27,6 +27,7 @@ public final class OverlayService extends Service
         implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener {
     static final String ACTION_START = "com.mmwtl.atlasmediawidget.action.START";
     static final String ACTION_STOP = "com.mmwtl.atlasmediawidget.action.STOP";
+    static final String ACTION_REFRESH_STYLE = "com.mmwtl.atlasmediawidget.action.REFRESH_STYLE";
     private static final String CHANNEL_ID = "atlas_media_widget_service";
     private static final int NOTIFICATION_ID = 2407;
     private static final int POLL_VISIBLE_MS = 1_000;
@@ -98,6 +99,10 @@ public final class OverlayService extends Service
         context.startService(new Intent(context, OverlayService.class).setAction(ACTION_STOP));
     }
 
+    static void refreshStyle(android.content.Context context) {
+        context.startService(new Intent(context, OverlayService.class).setAction(ACTION_REFRESH_STYLE));
+    }
+
     static boolean isRunning() {
         return running;
     }
@@ -127,6 +132,12 @@ public final class OverlayService extends Service
             prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, false);
             stopSelf();
             return START_NOT_STICKY;
+        }
+        if (intent != null && ACTION_REFRESH_STYLE.equals(intent.getAction())) {
+            hideCard();
+            main.removeCallbacks(foregroundPoll);
+            main.post(foregroundPoll);
+            return START_STICKY;
         }
         prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
         main.removeCallbacks(foregroundPoll);
@@ -236,8 +247,10 @@ public final class OverlayService extends Service
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkUri = "";
         Rect bounds = availableBounds();
+        CardStyle style = CardStyle.fromPreference(
+                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         MediaCardView candidate = new MediaCardView(this,
-                Math.max(1, bounds.width() - Ui.dp(this, 32)), this);
+                Math.max(1, bounds.width() - Ui.dp(this, 32)), style, this);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
                 candidate.cardHeight(),
