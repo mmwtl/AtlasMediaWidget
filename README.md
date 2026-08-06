@@ -1,7 +1,8 @@
 # Atlas Media Widget
 
-Исследовательский репозиторий кастомной медиакарточки для Android 11 ГУ. На этом этапе здесь
-зафиксирована архитектура и правила разработки; Android-приложение ещё не сгенерировано.
+Кастомная медиакарточка для Android 11 ГУ. Приложение рисует `TYPE_APPLICATION_OVERLAY` по
+проверенной lifecycle-схеме AtlasAppWidget и использует GInputBridge `mediaapi` protocol v1 как
+единственный медиабэкенд.
 
 ## Короткий вывод
 
@@ -52,6 +53,9 @@ GInputBridge backend уже реализован в ветке `mediaapi`. Сл�
 3. Поднять overlay, source selector и capability-driven controls.
 4. Проверить Radio, Bluetooth, USB, CPAA/CarPlay, online и сторонние плееры на реальной ГУ.
 
+Все четыре клиентских пункта реализованы в версии `1.0.0 (1)`. Проверки firmware-specific частей
+на реальной ГУ всё ещё обязательны.
+
 Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).
 Целевой полный контракт: [docs/full-media-bridge.md](docs/full-media-bridge.md).
 Текущий legacy-контракт GInputBridge: [docs/ginputbridge-api.md](docs/ginputbridge-api.md).
@@ -75,3 +79,33 @@ AtlasMediaWidget становится зависим от живого проц�
 - [MediaController](https://developer.android.com/reference/android/media/session/MediaController)
 - [NotificationListenerService](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
 - [App widgets](https://developer.android.com/develop/ui/views/appwidgets/overview)
+
+## Возможности приложения
+
+- atomic metadata/playback/source snapshots через Messenger;
+- обложка через временно разрешённый FileProvider URI GInputBridge;
+- локальный плавный progress без секундного Binder polling;
+- seek только при capability `SEEK_TO`;
+- previous/play-pause/next с source-aware маршрутизацией на стороне GInputBridge;
+- просмотр и переключение USB, Bluetooth, Radio, Online, Yunting и CPAA;
+- reconnect с bounded exponential backoff и очистка stale-состояния;
+- показ только поверх HOME, сохранение позиции, foreground service и отложенный boot start.
+
+## Требования на ГУ
+
+1. Установить GInputBridge из совместимой ветки `mediaapi` и включить его Media runtime.
+2. Оставить включённым notification access GInputBridge для публичных MediaSession-плееров.
+3. Разрешить AtlasMediaWidget отображение поверх окон и доступ к истории использования.
+4. Запустить виджет из настроек приложения; автозапуск включается отдельно.
+
+API `mediaapi` v1 намеренно открыт всем установленным APK. Это приемлемо только при контролируемой
+установке ПО на изолированной ГУ.
+
+## Сборка
+
+```sh
+ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelease
+```
+
+Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
+`1.0.0[1]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
