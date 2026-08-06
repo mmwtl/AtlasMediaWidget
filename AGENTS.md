@@ -9,7 +9,8 @@ These instructions apply to the entire repository.
 AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait automotive head
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
 proven shell and lifecycle approach from AtlasAppWidget. GInputBridge is installed on the target
-head unit and its broadcast API is the primary media-data source for the first implementation.
+head unit and its versioned bound-service API is the primary media backend. Its legacy broadcast
+API is a compatibility and diagnostics path, not the target transport for the full media UI.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -44,15 +45,18 @@ provider has been demonstrated on the real head unit.
 
 ## Media-state behavior
 
-- Consume GInputBridge `PLAYBACK_METADATA`, `PLAYBACK_STATE`, and `AUDIO_SOURCE_CHANGED` events
-  through one adapter. Send a package-targeted `REQUEST_PLAYBACK_INFO` on process start, after wake,
-  and when the overlay becomes visible.
-- Validate the required GInputBridge settings during setup: Media runtime, External API runtime,
-  Send media session data, Broadcast intents, and notification access. Report a specific missing
+- Consume the versioned GInputBridge Media Bridge service through one adapter. Bind using an
+  explicit component, register a reply Messenger, accept only a compatible protocol version, and
+  reconnect after Binder death with bounded backoff.
+- Keep the legacy `PLAYBACK_METADATA`, `PLAYBACK_STATE`, `AUDIO_SOURCE_CHANGED`, and
+  `REQUEST_PLAYBACK_INFO` broadcasts only as a temporary compatibility/diagnostics adapter.
+- Validate the required GInputBridge settings during setup: Media runtime, External API/Media
+  Bridge runtime, and notification access. Legacy `Send media session data`/`Broadcast intents`
+  settings are required only while the broadcast fallback is active. Report a specific missing
   prerequisite instead of silently showing cached data.
-- The current `REQUEST_PLAYBACK_INFO` response does not include current audio source, playback
-  position, duration, actions, or guaranteed-readable artwork. Keep these fields optional and do
-  not synthesize them from stale values.
+- The Media Bridge snapshot must include current and available sources, playback position,
+  duration, speed, actions and a read-granted artwork URI. Keep fields optional where the active
+  source genuinely does not provide them; do not synthesize missing data from stale values.
 - Keep the GInputBridge adapter behind an interface. A direct `NotificationListenerService` plus
   optional OneOS adapter is a fallback only if the external API proves insufficient.
 - Do not request or claim ordinary access to the privileged `MEDIA_CONTENT_CONTROL` permission.
@@ -60,8 +64,11 @@ provider has been demonstrated on the real head unit.
   IDs for asynchronous artwork, and idempotent listener registration.
 - Never keep stale playback state indefinitely. After a bounded reconciliation failure, show an
   explicit unavailable or disconnected state instead of silently presenting old metadata.
-- Do not poll aggressively. A low-frequency reconciliation timer may run only while the overlay is
-  visible or playback is expected, and must supplement rather than replace callbacks.
+- Extrapolate a playing position locally from position, speed and `SystemClock.elapsedRealtime()`.
+  Do not request one IPC update per second. A low-frequency reconciliation timer may run only while
+  the overlay is visible or playback is expected, and must supplement rather than replace callbacks.
+- Send transport/source commands only through the authenticated bound service. The UI must respect
+  the capability mask and treat an accepted command as pending until a newer snapshot confirms it.
 
 ## Version and artifact naming
 

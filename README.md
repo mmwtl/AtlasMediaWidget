@@ -5,8 +5,9 @@
 
 ## Короткий вывод
 
-Сделать кастомную карточку можно. Практичный первый вариант — не настоящий `AppWidget`, а overlay
-по модели AtlasAppWidget, получающий данные от установленного GInputBridge. Системный лаунчер ГУ
+Сделать кастомную карточку с источниками, обложкой, прогрессом и transport controls можно.
+Практичный вариант — не настоящий `AppWidget`, а overlay по модели AtlasAppWidget, получающий
+атомарное состояние и выполняющий команды через установленный GInputBridge. Системный лаунчер ГУ
 жёстко закрепляет OEM-провайдер
 `com.geely.mediawidget.customwidget.SourceBigWidgetProvider`, поэтому нет подтверждения, что он
 позволит штатно разместить сторонний `AppWidgetProvider` в той же области.
@@ -22,8 +23,8 @@
 
 Эту работу уже выполняет GInputBridge: `MediaSessionManager` даёт ему активные `MediaController`,
 `MediaController.Callback` сообщает metadata/playback state, а `OneOS MediaCenterManager` — текущий
-аппаратный источник. Поэтому в AtlasMediaWidget не нужно дублировать notification listener и OneOS
-Binder, пока хватает внешнего API GInputBridge.
+аппаратный источник. В GInputBridge уже есть source-aware маршрутизация play/pause/next/previous и
+переключения источников. Поэтому backend расширяется там, а AtlasMediaWidget остаётся UI-клиентом.
 
 ## Рекомендуемая схема
 
@@ -32,7 +33,8 @@ MediaSession + OneOS
         │
         ▼
    GInputBridge
-        │ broadcast API
+ MediaStateHub + CommandRouter
+        │ authenticated bound service
         ▼
 GInputBridgeMediaSource
         │ snapshot reducer / stale timeout
@@ -43,18 +45,16 @@ foreground overlay service
  custom media view
 ```
 
-Рекомендуемый порядок прототипа:
+Рекомендуемый порядок реализации:
 
-1. Поднять overlay и `GInputBridgeMediaSource`, принимающий `PLAYBACK_METADATA`,
-   `PLAYBACK_STATE` и `AUDIO_SOURCE_CHANGED`.
-2. При старте/возврате из сна отправлять explicit broadcast `REQUEST_PLAYBACK_INFO` в пакет
-   `com.salat.gbinder` и применять timeout к ответу.
-3. Проверить реальные поля/обложки на ГУ для Radio, Bluetooth, USB, проекции и сторонних плееров.
-4. Если не хватает source snapshot, duration/progress, controls или доступной обложки, расширить
-   версионированный API GInputBridge; прямой OneOS Binder оставить последним вариантом.
+1. В GInputBridge выделить единый `MediaStateHub`, `MediaCommandRouter` и кэш обложек.
+2. Добавить versioned bound-service API: snapshot subscription, commands и результаты.
+3. Поднять overlay и клиент `GInputBridgeMediaSource` с reconnect/stale-state логикой.
+4. Проверить Radio, Bluetooth, USB, CPAA/CarPlay, online и сторонние плееры на реальной ГУ.
 
 Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).
-Текущий контракт GInputBridge: [docs/ginputbridge-api.md](docs/ginputbridge-api.md).
+Целевой полный контракт: [docs/full-media-bridge.md](docs/full-media-bridge.md).
+Текущий legacy-контракт GInputBridge: [docs/ginputbridge-api.md](docs/ginputbridge-api.md).
 
 ## Почему это может быть стабильнее OEM-карточки
 
@@ -63,12 +63,11 @@ foreground overlay service
 повторную идемпотентную подписку и редкую сверку состояния без убийства системных процессов.
 
 Но обычный APK не имеет статуса `persistent` и OEM-привилегий штатного виджета. Кроме того,
-AtlasMediaWidget становится зависим от живого процесса и настроек GInputBridge. Поэтому по
-интеграции с лаунчером и выживаемости процесса он изначально слабее; foreground service,
-разрешённый автозапуск и корректный reconnect только уменьшают этот разрыв. По полноте данных он
-будет не хуже лишь в пределах данных, которые GInputBridge отдаёт наружу. Текущий API не передаёт
-duration/position/actions и не гарантирует читаемость `coverUri`, поэтому для полного паритета его
-придётся немного расширить.
+AtlasMediaWidget становится зависим от живого процесса GInputBridge. Поэтому по интеграции с
+лаунчером и выживаемости процесса он изначально слабее; foreground service, разрешённый автозапуск
+и корректный reconnect только уменьшают этот разрыв. По управлению и восстановлению состояния он
+может быть лучше OEM-карточки, если GInputBridge отдаёт цельный снимок и остаётся единственным
+владельцем OneOS/MediaSession callback-цепочки.
 
 ## Официальные Android API
 

@@ -1,8 +1,8 @@
-# Контракт GInputBridge для AtlasMediaWidget
+# Текущий legacy-контракт GInputBridge
 
-Контракт проверен по текущему исходному коду соседнего проекта GInputBridge. Он не версионирован,
-поэтому изменения actions/extras в GInputBridge должны сопровождаться обновлением этого документа и
-contract-тестов AtlasMediaWidget.
+Контракт проверен по текущему исходному коду соседнего проекта GInputBridge. Он остаётся полезным
+для обратной совместимости и диагностики, но недостаточен для полного интерактивного виджета.
+Целевой API описан в [full-media-bridge.md](full-media-bridge.md).
 
 ## Предварительные настройки GInputBridge
 
@@ -88,17 +88,17 @@ AtlasMediaWidget может не знать source до следующего р�
 - `BackgroundTaskReceiver` экспортирован без permission, поэтому команды GInputBridge может
   отправить любое установленное приложение. На закрытой ГУ риск ниже, но контракт всё равно слабый.
 
-## Рекомендуемое расширение GInputBridge
+## Почему не надо продолжать расширять broadcasts
 
-До реализации progress/controls лучше добавить один versioned `MEDIA_SNAPSHOT` с:
+Добавление ещё одного `MEDIA_SNAPSHOT` broadcast решило бы только часть проблемы. Для полного UI
+нужны двусторонние команды, подтверждения, подписка, Binder-death/reconnect и проверка вызывающего
+UID. Поэтому целевой транспорт — explicit bound service, а не глобальные broadcasts.
 
-- `schemaVersion`, `requestId`, `generatedAtElapsedRealtime`;
-- audio source, package/app name, media ID, title, artist, album;
-- playback state, position, duration, speed и actions;
-- artwork через собственный read-granted `content://` URI либо небольшой безопасно ограниченный
-  bitmap;
-- explicit target package `com.mmwtl.atlasmediawidget`.
+Release APK проверенных проектов подписаны разными сертификатами: GInputBridge имеет SHA-256
+`8499551068ecabd0b4af86ce6f95234bd5abf3efc150d8f4f7e6fb0f2f2f6443`, а AtlasAppWidget —
+`eaf9f1b2dc55db196b41c2c947964d6809a6c954d8aa7b45ad6d72133af0217e`. Поэтому
+`signature`-permission сама по себе не подходит. GInputBridge должен проверять `Message.sendingUid`,
+точный package клиента и allowlist SHA-256 сертификатов при регистрации и каждой команде.
 
-Запрос должен возвращать source, playback и metadata одним логическим снимком. Если Atlas-приложения
-подписываются одним ключом, broadcast/service желательно защитить signature permission. Иначе нужен
-явный allowlist пакета и документированная модель доверия.
+Эти digest — не секреты, но production allowlist должен задаваться явно. Debug-сертификат можно
+разрешать только в debug-сборке GInputBridge.

@@ -16,7 +16,8 @@
 
 | Вариант | Что получаем | Главные минусы | Оценка |
 |---|---|---|---|
-| Overlay + API GInputBridge | Metadata, coarse playback state и OneOS audio source без второй notification/OneOS подписки | Зависимость от второго APK и его настроек; текущему API не хватает цельного snapshot, progress/actions и надёжной передачи artwork | Рекомендуемый первый прототип |
+| Overlay + полный Media Bridge GInputBridge | Единый source-aware backend, metadata, progress, artwork, sources и controls без второй notification/OneOS подписки | Требует доработки и совместимого релиза второго APK; GInputBridge становится точкой отказа | Рекомендуемый вариант |
+| Overlay + legacy broadcasts GInputBridge | Быстрый read-only прототип с metadata, coarse state и current-source events | Нет атомарности, controls, position/actions и гарантированно читаемой обложки | Только совместимость/диагностика |
 | Overlay + собственный notification listener | Независимая UI-карточка, metadata и controls всех корректно опубликованных медиасессий | Нужны отдельный notification access и дублирующие подписки; без OneOS возможен неверный выбор среди нескольких сессий | Резервный вариант |
 | Overlay + прямой OneOS adapter | Максимальная близость к OEM: source, radio frequency, BT/USB data и нативные controls | Непубличный firmware-specific API; совместимость после обновлений не гарантирована; большой `com_geely` модуль GInputBridge содержит около 491 файлов | Делать только минимальный адаптер после прототипа |
 | Настоящий сторонний `AppWidgetProvider` | Нативный AppWidget lifecycle и отсутствие overlay-окна | Нет доказательств, что OEM launcher даст добавить/закрепить его; `RemoteViews` ограничивает UI; остаётся зависимость от host Binder | Эксперимент, не основной путь |
@@ -40,19 +41,18 @@ URI обложки может быть недоступен чужому UID; se
 использовать именно явно разрешённый notification listener, а не пытаться выдать permission через
 обычный runtime prompt.
 
-AtlasMediaWidget не обязан получать этот доступ напрямую: установленный GInputBridge уже выполняет
-роль брокера и отдаёт часть данных через broadcast API. Текущий контракт и его пробелы перечислены
-в [ginputbridge-api.md](ginputbridge-api.md).
+AtlasMediaWidget не должен получать этот доступ напрямую: установленный GInputBridge уже выполняет
+роль брокера и содержит нативную маршрутизацию команд. Целевой контракт описан в
+[full-media-bridge.md](full-media-bridge.md), текущий broadcast API — в
+[ginputbridge-api.md](ginputbridge-api.md).
 
 ## Выбор правильной сессии
 
 На ГУ недостаточно правила «первая сессия со state=PLAYING». Нужен детерминированный selector:
 
-При использовании GInputBridge выбор controller уже выполняется внутри него. AtlasMediaWidget
-должен объединять три независимых события — source, playback state и metadata — в один snapshot.
-Каждый snapshot получает локальные `receivedAt` и generation ID; поздний `coverUri` не должен
-перезаписывать более новый трек. Если API GInputBridge будет расширен, лучше передавать единый
-versioned snapshot с source и timestamps, чем пытаться синхронизировать три broadcasts.
+При использовании полного Media Bridge выбор controller выполняется внутри GInputBridge.
+AtlasMediaWidget получает уже единый snapshot. Каждый снимок имеет монотонный generation ID;
+поздняя обложка или результат команды не должны перезаписывать более новое состояние.
 
 ## Надёжность против штатного виджета
 
@@ -83,13 +83,12 @@ versioned snapshot с source и timestamps, чем пытаться синхро
 
 ## Минимальные проверки прототипа на ГУ
 
-1. Включить в GInputBridge Media runtime, External API runtime, «Отправка данных медиасессии» и
-   «Широковещательные события»; убедиться, что его notification access активен.
-2. Проверить initial `REQUEST_PLAYBACK_INFO` после перезапуска только AtlasMediaWidget.
-3. Записать входящие metadata для Radio, Bluetooth, USB, CPAA/CarPlay и
+1. Включить в GInputBridge Media runtime и убедиться, что его notification access активен.
+2. Проверить initial snapshot после bind и восстановление после смерти любого из двух процессов.
+3. Записать snapshots и command results для Radio, Bluetooth, USB, CPAA/CarPlay и
    минимум двух сторонних плееров.
-4. Проверить readable `coverUri`; недоступный URI считать ожидаемым пробелом текущего API.
-5. Переключать источники при одновременно активных sessions и проверять `AUDIO_SOURCE_CHANGED`.
+4. Проверить GInputBridge-owned `content://` artwork URI и отзыв старых grants.
+5. Переключать источники при одновременно активных sessions и проверять source list/selection.
 6. Выполнить cold boot, sleep/wake, restart launcher, restart GInputBridge и restart только
    AtlasMediaWidget.
 7. На каждом сценарии проверять, что карточка либо восстанавливается сама, либо показывает
