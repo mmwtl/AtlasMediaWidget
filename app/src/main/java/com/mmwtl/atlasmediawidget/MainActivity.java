@@ -37,6 +37,8 @@ public final class MainActivity extends Activity {
     private TextView sizeValue;
     private SeekBar widthSize;
     private SeekBar heightSize;
+    private TextView textGapValue;
+    private SeekBar textGap;
     private boolean refreshingStyle;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -161,6 +163,29 @@ public final class MainActivity extends Activity {
         };
         widthSize.setOnSeekBarChangeListener(sizeListener);
         heightSize.setOnSeekBarChangeListener(sizeListener);
+
+        serviceCard.addView(text("Дополнительный отступ текста от верхней строки",
+                14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        textGapValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        serviceCard.addView(textGapValue, fullWrap());
+        textGap = sizeSeekBar(0, Prefs.MAX_TEXT_GAP_DP);
+        textGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                    boolean fromUser) {
+                updateTextGapLabel();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (refreshingStyle) return;
+                prefs.putTextGap(currentStyle(), textGap.getProgress());
+                if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                    OverlayService.refreshStyle(MainActivity.this);
+                }
+            }
+        });
+        serviceCard.addView(textGap, fullWrap());
         Button resetSize = actionButton("Вернуть размер по умолчанию");
         resetSize.setOnClickListener(v -> {
             CardStyle current = currentStyle();
@@ -324,17 +349,23 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshSizeControls(CardStyle style) {
-        if (widthSize == null || heightSize == null) return;
+        if (widthSize == null || heightSize == null || textGap == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         widthSize.setProgress(clamp(prefs.cardWidthDp(style), MIN_WIDTH_DP, MAX_WIDTH_DP));
         heightSize.setProgress(clamp(prefs.cardHeightDp(style), MIN_HEIGHT_DP, MAX_HEIGHT_DP));
+        textGap.setProgress(prefs.textGapDp(style));
         updateSizeLabel();
+        updateTextGapLabel();
         refreshingStyle = previous;
     }
 
     private void updateSizeLabel() {
         sizeValue.setText(widthSize.getProgress() + " × " + heightSize.getProgress() + " dp");
+    }
+
+    private void updateTextGapLabel() {
+        textGapValue.setText("+" + textGap.getProgress() + " dp");
     }
 
     private LinearLayout.LayoutParams labelParams() {

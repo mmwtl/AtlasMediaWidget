@@ -262,7 +262,7 @@ public final class OverlayService extends Service
         int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
         MediaCardView candidate = new MediaCardView(this,
                 prefs.cardWidthDp(style), prefs.cardHeightDp(style),
-                maxWidth, maxHeight, style, this);
+                maxWidth, maxHeight, style, prefs.textGapDp(style), this);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
                 candidate.cardHeight(),

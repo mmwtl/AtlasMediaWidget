@@ -47,6 +47,7 @@ final class MediaCardView extends FrameLayout {
     private final float widthScale;
     private final float heightScale;
     private final float uiScale;
+    private final int textGapDp;
     private final ImageView artwork;
     private final ImageView artworkThumbnail;
     private final ImageView placeholder;
@@ -76,10 +77,12 @@ final class MediaCardView extends FrameLayout {
     private boolean hasMedia;
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
-            int maxWidthPx, int maxHeightPx, CardStyle style, Listener listener) {
+            int maxWidthPx, int maxHeightPx, CardStyle style, int textGapDp,
+            Listener listener) {
         super(context);
         this.listener = listener;
         this.style = style;
+        this.textGapDp = textGapDp;
         cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
                 Ui.dp(context, requestedWidthDp)));
         cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
@@ -91,7 +94,6 @@ final class MediaCardView extends FrameLayout {
         setMinimumHeight(cardHeight);
         setBackground(Ui.background(Ui.BACKGROUND, 26 * uiScale, context));
         setClipToOutline(true);
-        setElevation(d(12));
         setClickable(true);
         setOnClickListener(v -> listener.onOpenSource());
 
@@ -228,12 +230,9 @@ final class MediaCardView extends FrameLayout {
         next = new TransportButton(context, TransportButton.Type.NEXT);
         int sideSize = style == CardStyle.COMPACT ? 62 : 80;
         int playSize = style == CardStyle.COMPACT ? 74 : 98;
-        int gap = style == CardStyle.COMPACT ? 23 : 30;
-        controls.addView(previous, square(sideSize));
-        LinearLayout.LayoutParams playParams = square(playSize);
-        playParams.setMargins(d(gap), 0, d(gap), 0);
-        controls.addView(playPause, playParams);
-        controls.addView(next, square(sideSize));
+        controls.addView(previous, controlColumn(sideSize));
+        controls.addView(playPause, controlColumn(playSize));
+        controls.addView(next, controlColumn(sideSize));
         addView(controls);
 
         sourceChooser = new FrameLayout(context);
@@ -387,12 +386,12 @@ final class MediaCardView extends FrameLayout {
         if (compact && !hasMedia) {
             metadataParams = new LayoutParams(bx(345), LayoutParams.WRAP_CONTENT);
             metadataParams.leftMargin = bx(34);
-            metadataParams.topMargin = by(78);
+            metadataParams.topMargin = by(78 + textGapDp);
         } else {
             metadataParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
             metadataParams.leftMargin = bx(compact ? 24 : 30);
             metadataParams.rightMargin = bx(compact ? 24 : 30);
-            metadataParams.topMargin = by(compact ? 76 : 258);
+            metadataParams.topMargin = by((compact ? 76 : 258) + textGapDp);
         }
         metadataParams.gravity = Gravity.TOP | Gravity.START;
         metadata.setLayoutParams(metadataParams);
@@ -577,7 +576,9 @@ final class MediaCardView extends FrameLayout {
     private LayoutParams match() { return new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); }
     private LinearLayout.LayoutParams fullWrap() { return new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); }
     private LinearLayout.LayoutParams wrap() { return new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); }
-    private LinearLayout.LayoutParams square(int sizeDp) { int size = d(sizeDp); return new LinearLayout.LayoutParams(size, size); }
+    private LinearLayout.LayoutParams controlColumn(int heightDp) {
+        return new LinearLayout.LayoutParams(0, d(heightDp), 1f);
+    }
 
     private static String formatTime(long milliseconds) {
         if (milliseconds < 0L) return "–:––";
