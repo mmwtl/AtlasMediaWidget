@@ -49,7 +49,7 @@ final class MediaCardView extends FrameLayout {
     private final float uiScale;
     private final ImageView artwork;
     private final ImageView artworkThumbnail;
-    private final MusicPlaceholderView placeholder;
+    private final ImageView placeholder;
     private final LinearLayout sourcePill;
     private final SourceGlyphView sourceGlyph;
     private final TextView sourceLabel;
@@ -100,7 +100,13 @@ final class MediaCardView extends FrameLayout {
         artwork.setBackgroundColor(Ui.BACKGROUND);
         addView(artwork, match());
 
-        placeholder = new MusicPlaceholderView(context);
+        placeholder = new ImageView(context);
+        placeholder.setImageResource(R.drawable.ic_sound_wave);
+        placeholder.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        placeholder.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        placeholder.setAlpha(0.22f);
+        placeholder.setPadding(d(7), d(7), d(7), d(7));
+        placeholder.setContentDescription("Звуковая дорожка — обложка отсутствует");
         addView(placeholder);
 
         View scrim = new View(context);
