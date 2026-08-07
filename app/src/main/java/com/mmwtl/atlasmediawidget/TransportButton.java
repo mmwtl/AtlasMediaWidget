@@ -14,8 +14,6 @@ final class TransportButton extends ImageView {
     TransportButton(Context context, Type type) {
         super(context);
         this.type = type;
-        int padding = Ui.dp(context, type == Type.PLAY_PAUSE ? 13 : 11);
-        setPadding(padding, padding, padding, padding);
         setScaleType(ScaleType.FIT_CENTER);
         setImageTintMode(PorterDuff.Mode.SRC_IN);
         setImageTintList(new ColorStateList(

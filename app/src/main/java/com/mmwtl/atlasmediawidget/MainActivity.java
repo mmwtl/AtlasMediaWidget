@@ -39,6 +39,12 @@ public final class MainActivity extends Activity {
     private SeekBar heightSize;
     private TextView textGapValue;
     private SeekBar textGap;
+    private TextView controlPanelHeightValue;
+    private SeekBar controlPanelHeight;
+    private TextView controlIconScaleValue;
+    private SeekBar controlIconScale;
+    private TextView controlSpreadValue;
+    private SeekBar controlSpread;
     private boolean refreshingStyle;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -186,6 +192,70 @@ public final class MainActivity extends Activity {
             }
         });
         serviceCard.addView(textGap, fullWrap());
+
+        TextView controlsTitle = text("Панель управления", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams controlsTitleParams = fullWrap();
+        controlsTitleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(controlsTitle, controlsTitleParams);
+
+        serviceCard.addView(text("Высота нижней панели", 14,
+                Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        controlPanelHeightValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        serviceCard.addView(controlPanelHeightValue, fullWrap());
+        controlPanelHeight = sizeSeekBar(Prefs.MIN_CONTROL_PANEL_HEIGHT_DP,
+                Prefs.MAX_CONTROL_PANEL_HEIGHT_DP);
+        serviceCard.addView(controlPanelHeight, fullWrap());
+
+        serviceCard.addView(text("Размер иконок", 14,
+                Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        controlIconScaleValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        serviceCard.addView(controlIconScaleValue, fullWrap());
+        controlIconScale = sizeSeekBar(Prefs.MIN_CONTROL_ICON_SCALE_PERCENT,
+                Prefs.MAX_CONTROL_ICON_SCALE_PERCENT);
+        serviceCard.addView(controlIconScale, fullWrap());
+
+        serviceCard.addView(text("Разбежка боковых иконок от центра", 14,
+                Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        controlSpreadValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        serviceCard.addView(controlSpreadValue, fullWrap());
+        controlSpread = sizeSeekBar(Prefs.MIN_CONTROL_SPREAD_PERCENT,
+                Prefs.MAX_CONTROL_SPREAD_PERCENT);
+        SeekBar.OnSeekBarChangeListener controlListener = new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                    boolean fromUser) {
+                updateControlLabels();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (refreshingStyle) return;
+                CardStyle current = currentStyle();
+                prefs.putControlLayout(current, controlPanelHeight.getProgress(),
+                        controlIconScale.getProgress(), controlSpread.getProgress());
+                if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                    OverlayService.refreshStyle(MainActivity.this);
+                }
+            }
+        };
+        controlPanelHeight.setOnSeekBarChangeListener(controlListener);
+        controlIconScale.setOnSeekBarChangeListener(controlListener);
+        controlSpread.setOnSeekBarChangeListener(controlListener);
+        serviceCard.addView(controlSpread, fullWrap());
+
+        Button resetControls = actionButton("Вернуть панель по умолчанию");
+        resetControls.setOnClickListener(v -> {
+            CardStyle current = currentStyle();
+            prefs.putControlLayout(current, current.defaultControlPanelHeightDp,
+                    Prefs.DEFAULT_CONTROL_ICON_SCALE_PERCENT,
+                    Prefs.DEFAULT_CONTROL_SPREAD_PERCENT);
+            refreshSizeControls(current);
+            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                OverlayService.refreshStyle(this);
+            }
+        });
+        serviceCard.addView(resetControls, buttonParams());
+
         Button resetSize = actionButton("Вернуть размер по умолчанию");
         resetSize.setOnClickListener(v -> {
             CardStyle current = currentStyle();
@@ -349,14 +419,20 @@ public final class MainActivity extends Activity {
     }
 
     private void refreshSizeControls(CardStyle style) {
-        if (widthSize == null || heightSize == null || textGap == null) return;
+        if (widthSize == null || heightSize == null || textGap == null
+                || controlPanelHeight == null || controlIconScale == null
+                || controlSpread == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         widthSize.setProgress(clamp(prefs.cardWidthDp(style), MIN_WIDTH_DP, MAX_WIDTH_DP));
         heightSize.setProgress(clamp(prefs.cardHeightDp(style), MIN_HEIGHT_DP, MAX_HEIGHT_DP));
         textGap.setProgress(prefs.textGapDp(style));
+        controlPanelHeight.setProgress(prefs.controlPanelHeightDp(style));
+        controlIconScale.setProgress(prefs.controlIconScalePercent(style));
+        controlSpread.setProgress(prefs.controlSpreadPercent(style));
         updateSizeLabel();
         updateTextGapLabel();
+        updateControlLabels();
         refreshingStyle = previous;
     }
 
@@ -366,6 +442,12 @@ public final class MainActivity extends Activity {
 
     private void updateTextGapLabel() {
         textGapValue.setText("+" + textGap.getProgress() + " dp");
+    }
+
+    private void updateControlLabels() {
+        controlPanelHeightValue.setText(controlPanelHeight.getProgress() + " dp");
+        controlIconScaleValue.setText(controlIconScale.getProgress() + " %");
+        controlSpreadValue.setText(controlSpread.getProgress() + " % ширины");
     }
 
     private LinearLayout.LayoutParams labelParams() {

@@ -19,5 +19,7 @@ public final class CardStyleTest {
         assertEquals(300, CardStyle.COMPACT.defaultHeightDp);
         assertEquals(500, CardStyle.SQUARE.defaultWidthDp);
         assertEquals(500, CardStyle.SQUARE.defaultHeightDp);
+        assertEquals(84, CardStyle.COMPACT.defaultControlPanelHeightDp);
+        assertEquals(102, CardStyle.SQUARE.defaultControlPanelHeightDp);
     }
 }

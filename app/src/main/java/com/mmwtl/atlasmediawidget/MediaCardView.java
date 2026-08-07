@@ -65,10 +65,13 @@ final class MediaCardView extends FrameLayout {
     private final TextView elapsed;
     private final TextView duration;
     private final View divider;
-    private final LinearLayout controls;
+    private final FrameLayout controls;
     private final TransportButton previous;
     private final TransportButton playPause;
     private final TransportButton next;
+    private final int controlPanelHeightDp;
+    private final int controlIconScalePercent;
+    private final int controlSpreadPercent;
     private final List<MediaSource> availableSources = new ArrayList<>();
     private MediaSnapshot snapshot;
     private MediaSource.Id activeSource = MediaSource.Id.UNKNOWN;
@@ -78,11 +81,15 @@ final class MediaCardView extends FrameLayout {
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
             int maxWidthPx, int maxHeightPx, CardStyle style, int textGapDp,
-            Listener listener) {
+            int controlPanelHeightDp, int controlIconScalePercent,
+            int controlSpreadPercent, Listener listener) {
         super(context);
         this.listener = listener;
         this.style = style;
         this.textGapDp = textGapDp;
+        this.controlPanelHeightDp = controlPanelHeightDp;
+        this.controlIconScalePercent = controlIconScalePercent;
+        this.controlSpreadPercent = controlSpreadPercent;
         cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
                 Ui.dp(context, requestedWidthDp)));
         cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
@@ -223,16 +230,13 @@ final class MediaCardView extends FrameLayout {
         divider.setBackgroundColor(0x553B444C);
         addView(divider);
 
-        controls = new LinearLayout(context);
-        controls.setGravity(Gravity.CENTER);
+        controls = new FrameLayout(context);
         previous = new TransportButton(context, TransportButton.Type.PREVIOUS);
         playPause = new TransportButton(context, TransportButton.Type.PLAY_PAUSE);
         next = new TransportButton(context, TransportButton.Type.NEXT);
-        int sideSize = style == CardStyle.COMPACT ? 62 : 80;
-        int playSize = style == CardStyle.COMPACT ? 74 : 98;
-        controls.addView(previous, controlColumn(sideSize));
-        controls.addView(playPause, controlColumn(playSize));
-        controls.addView(next, controlColumn(sideSize));
+        controls.addView(previous);
+        controls.addView(playPause);
+        controls.addView(next);
         addView(controls);
 
         sourceChooser = new FrameLayout(context);
@@ -368,6 +372,8 @@ final class MediaCardView extends FrameLayout {
         boolean chooserVisible = sourceChooser.getVisibility() == VISIBLE;
         boolean showProgress = hasMedia && snapshot != null && snapshot.duration > 0L;
         boolean showThumbnail = compact && hasMedia && hasArtwork;
+        int panelHeight = Math.min(cardHeight, by(controlPanelHeightDp));
+        int controlsTop = Math.max(0, cardHeight - panelHeight);
 
         artworkThumbnail.setVisibility(showThumbnail ? VISIBLE : GONE);
         LinearLayout.LayoutParams textParams = (LinearLayout.LayoutParams)
@@ -401,7 +407,8 @@ final class MediaCardView extends FrameLayout {
         progressParams.gravity = Gravity.TOP;
         progressParams.leftMargin = bx(compact ? 20 : 26);
         progressParams.rightMargin = bx(compact ? 20 : 26);
-        progressParams.topMargin = by(compact ? 184 : 365);
+        progressParams.topMargin = Math.max(0,
+                controlsTop - by(compact ? 32 : 33));
         progressRow.setLayoutParams(progressParams);
         progressRow.setVisibility(!chooserVisible && showProgress ? VISIBLE : GONE);
 
@@ -409,16 +416,17 @@ final class MediaCardView extends FrameLayout {
         dividerParams.gravity = Gravity.TOP;
         dividerParams.leftMargin = bx(compact ? 28 : 30);
         dividerParams.rightMargin = bx(compact ? 28 : 30);
-        dividerParams.topMargin = by(compact ? 194 : 390);
+        dividerParams.topMargin = Math.max(0,
+                controlsTop - by(compact ? 22 : 8));
         divider.setLayoutParams(dividerParams);
         divider.setVisibility(!chooserVisible && !showProgress ? VISIBLE : GONE);
 
-        LayoutParams controlsParams = new LayoutParams(LayoutParams.MATCH_PARENT,
-                Math.max(d(compact ? 78 : 104), cardHeight - by(compact ? 216 : 398)));
+        LayoutParams controlsParams = new LayoutParams(LayoutParams.MATCH_PARENT, panelHeight);
         controlsParams.gravity = Gravity.TOP;
-        controlsParams.topMargin = by(compact ? 216 : 398);
+        controlsParams.topMargin = controlsTop;
         controls.setLayoutParams(controlsParams);
         controls.setVisibility(chooserVisible ? GONE : VISIBLE);
+        updateControlLayout(compact, panelHeight);
 
         LayoutParams chooserParams = new LayoutParams(LayoutParams.MATCH_PARENT,
                 Math.max(d(120), cardHeight - by(compact ? 63 : 68) - by(16)));
@@ -427,6 +435,32 @@ final class MediaCardView extends FrameLayout {
         chooserParams.rightMargin = bx(18);
         chooserParams.topMargin = by(compact ? 63 : 68);
         sourceChooser.setLayoutParams(chooserParams);
+    }
+
+    private void updateControlLayout(boolean compact, int panelHeight) {
+        float iconScale = controlIconScalePercent / 100f;
+        int maxButtonSize = Math.max(1, Math.round(panelHeight * 0.96f));
+        int sideSize = Math.min(maxButtonSize,
+                d((compact ? 62 : 80) * iconScale));
+        int playSize = Math.min(maxButtonSize,
+                d((compact ? 74 : 98) * iconScale));
+        layoutControl(previous, sideSize);
+        layoutControl(playPause, playSize);
+        layoutControl(next, sideSize);
+
+        float requestedOffset = cardWidth * controlSpreadPercent / 100f;
+        float maxOffset = Math.max(0f, cardWidth / 2f - sideSize / 2f - d(8));
+        float offset = Math.min(requestedOffset, maxOffset);
+        previous.setTranslationX(-offset);
+        playPause.setTranslationX(0f);
+        next.setTranslationX(offset);
+    }
+
+    private static void layoutControl(TransportButton button, int size) {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(size, size, Gravity.CENTER);
+        button.setLayoutParams(params);
+        int padding = Math.round(size * 0.15f);
+        button.setPadding(padding, padding, padding, padding);
     }
 
     private void renderSources(MediaSnapshot value) {
@@ -576,10 +610,6 @@ final class MediaCardView extends FrameLayout {
     private LayoutParams match() { return new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT); }
     private LinearLayout.LayoutParams fullWrap() { return new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); }
     private LinearLayout.LayoutParams wrap() { return new LinearLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); }
-    private LinearLayout.LayoutParams controlColumn(int heightDp) {
-        return new LinearLayout.LayoutParams(0, d(heightDp), 1f);
-    }
-
     private static String formatTime(long milliseconds) {
         if (milliseconds < 0L) return "–:––";
         long seconds = milliseconds / 1000L;
