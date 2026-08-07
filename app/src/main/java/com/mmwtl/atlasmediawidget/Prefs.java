@@ -9,6 +9,8 @@ final class Prefs {
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_CARD_STYLE = "card_style";
+    private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
+    private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int BOOT_DELAY_SECONDS = 15;
 
@@ -32,5 +34,20 @@ final class Prefs {
 
     void putInt(String key, int value) {
         preferences.edit().putInt(key, value).apply();
+    }
+
+    int cardWidthDp(CardStyle style) {
+        return getInt(KEY_CARD_WIDTH_PREFIX + style.preferenceValue, style.defaultWidthDp);
+    }
+
+    int cardHeightDp(CardStyle style) {
+        return getInt(KEY_CARD_HEIGHT_PREFIX + style.preferenceValue, style.defaultHeightDp);
+    }
+
+    void putCardSize(CardStyle style, int widthDp, int heightDp) {
+        preferences.edit()
+                .putInt(KEY_CARD_WIDTH_PREFIX + style.preferenceValue, widthDp)
+                .putInt(KEY_CARD_HEIGHT_PREFIX + style.preferenceValue, heightDp)
+                .apply();
     }
 }

@@ -17,11 +17,16 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
 public final class MainActivity extends Activity {
+    private static final int MIN_WIDTH_DP = 360;
+    private static final int MAX_WIDTH_DP = 900;
+    private static final int MIN_HEIGHT_DP = 220;
+    private static final int MAX_HEIGHT_DP = 900;
     private Prefs prefs;
     private TextView permissionStatus;
     private TextView bridgeStatus;
@@ -29,6 +34,9 @@ public final class MainActivity extends Activity {
     private Switch autoStart;
     private RadioButton compactStyle;
     private RadioButton squareStyle;
+    private TextView sizeValue;
+    private SeekBar widthSize;
+    private SeekBar heightSize;
     private boolean refreshingStyle;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -113,11 +121,56 @@ public final class MainActivity extends Activity {
             CardStyle selected = checkedId == compactStyle.getId()
                     ? CardStyle.COMPACT : CardStyle.SQUARE;
             prefs.putInt(Prefs.KEY_CARD_STYLE, selected.preferenceValue);
+            refreshSizeControls(selected);
             if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
                 OverlayService.refreshStyle(this);
             }
         });
         serviceCard.addView(styleGroup, fullWrap());
+
+        TextView sizeTitle = text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams sizeTitleParams = fullWrap();
+        sizeTitleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(sizeTitle, sizeTitleParams);
+        sizeValue = text("", 18, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams sizeValueParams = fullWrap();
+        sizeValueParams.topMargin = Ui.dp(this, 6);
+        serviceCard.addView(sizeValue, sizeValueParams);
+        serviceCard.addView(text("Ширина", 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        widthSize = sizeSeekBar(MIN_WIDTH_DP, MAX_WIDTH_DP);
+        serviceCard.addView(widthSize, fullWrap());
+        serviceCard.addView(text("Высота", 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        heightSize = sizeSeekBar(MIN_HEIGHT_DP, MAX_HEIGHT_DP);
+        serviceCard.addView(heightSize, fullWrap());
+        SeekBar.OnSeekBarChangeListener sizeListener = new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser) updateSizeLabel();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (refreshingStyle) return;
+                CardStyle current = currentStyle();
+                prefs.putCardSize(current, widthSize.getProgress(), heightSize.getProgress());
+                updateSizeLabel();
+                if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                    OverlayService.refreshStyle(MainActivity.this);
+                }
+            }
+        };
+        widthSize.setOnSeekBarChangeListener(sizeListener);
+        heightSize.setOnSeekBarChangeListener(sizeListener);
+        Button resetSize = actionButton("Вернуть размер по умолчанию");
+        resetSize.setOnClickListener(v -> {
+            CardStyle current = currentStyle();
+            prefs.putCardSize(current, current.defaultWidthDp, current.defaultHeightDp);
+            refreshSizeControls(current);
+            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                OverlayService.refreshStyle(this);
+            }
+        });
+        serviceCard.addView(resetSize, buttonParams());
 
         serviceButton = actionButton("Запустить");
         serviceButton.setOnClickListener(v -> toggleService());
@@ -136,7 +189,8 @@ public final class MainActivity extends Activity {
 
         TextView note = text(
                 "Карточка отображается только когда HOME находится на переднем плане. "
-                        + "Перетаскивание выполняется за кнопку ⋮ в правом верхнем углу.",
+                        + "Перетаскивание выполняется за кнопку ⋮ в правом верхнем углу. "
+                        + "Нажатие на свободную область открывает активный медиаисточник.",
                 14, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams noteParams = fullWrap();
         noteParams.topMargin = Ui.dp(this, 24);
@@ -164,6 +218,7 @@ public final class MainActivity extends Activity {
         refreshingStyle = true;
         compactStyle.setChecked(style == CardStyle.COMPACT);
         squareStyle.setChecked(style == CardStyle.SQUARE);
+        refreshSizeControls(style);
         refreshingStyle = false;
         requestNotificationPermissionIfNeeded();
     }
@@ -252,6 +307,44 @@ public final class MainActivity extends Activity {
         button.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
         button.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
         return button;
+    }
+
+    private SeekBar sizeSeekBar(int min, int max) {
+        SeekBar seekBar = new SeekBar(this);
+        seekBar.setMin(min);
+        seekBar.setMax(max);
+        seekBar.setProgressTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        seekBar.setThumbTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        return seekBar;
+    }
+
+    private CardStyle currentStyle() {
+        return CardStyle.fromPreference(
+                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+    }
+
+    private void refreshSizeControls(CardStyle style) {
+        if (widthSize == null || heightSize == null) return;
+        boolean previous = refreshingStyle;
+        refreshingStyle = true;
+        widthSize.setProgress(clamp(prefs.cardWidthDp(style), MIN_WIDTH_DP, MAX_WIDTH_DP));
+        heightSize.setProgress(clamp(prefs.cardHeightDp(style), MIN_HEIGHT_DP, MAX_HEIGHT_DP));
+        updateSizeLabel();
+        refreshingStyle = previous;
+    }
+
+    private void updateSizeLabel() {
+        sizeValue.setText(widthSize.getProgress() + " × " + heightSize.getProgress() + " dp");
+    }
+
+    private LinearLayout.LayoutParams labelParams() {
+        LinearLayout.LayoutParams params = fullWrap();
+        params.topMargin = Ui.dp(this, 10);
+        return params;
+    }
+
+    private static int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private TextView text(String value, float size, int color, int style) {

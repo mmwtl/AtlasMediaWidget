@@ -13,4 +13,11 @@ public final class CardStyleTest {
     @Test public void unknownStyleFallsBackToSquare() {
         assertEquals(CardStyle.SQUARE, CardStyle.fromPreference(99));
     }
+
+    @Test public void presetsKeepReferenceDimensions() {
+        assertEquals(500, CardStyle.COMPACT.defaultWidthDp);
+        assertEquals(300, CardStyle.COMPACT.defaultHeightDp);
+        assertEquals(500, CardStyle.SQUARE.defaultWidthDp);
+        assertEquals(500, CardStyle.SQUARE.defaultHeightDp);
+    }
 }

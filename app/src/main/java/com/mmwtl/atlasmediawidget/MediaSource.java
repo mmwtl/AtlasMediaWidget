@@ -27,6 +27,14 @@ final class MediaSource {
                 default -> "Неизвестно";
             };
         }
+
+        boolean isWidgetChoice() {
+            return this == BT || this == RADIO || this == USB || this == ONLINE;
+        }
+
+        Id displayId() {
+            return this == YUNTING ? ONLINE : this;
+        }
     }
 
     final Id id;

@@ -42,6 +42,7 @@ public final class OverlayService extends Service
     private ForegroundAppDetector foregroundDetector;
     private MediaBridgeClient bridge;
     private ArtworkLoader artworkLoader;
+    private MediaSourceLauncher mediaSourceLauncher;
     private MediaCardView card;
     private WindowManager.LayoutParams cardParams;
     private MediaBridgeClient.State bridgeState = MediaBridgeClient.State.CONNECTING;
@@ -112,6 +113,7 @@ public final class OverlayService extends Service
         prefs = new Prefs(this);
         windowManager = getSystemService(WindowManager.class);
         artworkLoader = new ArtworkLoader(this, this);
+        mediaSourceLauncher = new MediaSourceLauncher(this);
         bridge = new MediaBridgeClient(this, this);
         createNotificationChannel();
         Notification notification = buildNotification(0);
@@ -236,6 +238,13 @@ public final class OverlayService extends Service
         bridge.setSource(source);
     }
 
+    @Override public void onOpenSource() {
+        MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        if (!mediaSourceLauncher.open(visible) && card != null) {
+            card.showTransientStatus("Не удалось открыть источник", true);
+        }
+    }
+
     @Override public void onArtwork(long token, android.graphics.Bitmap bitmap) {
         if (card != null && card.isAttachedToWindow()) card.setArtwork(bitmap);
     }
@@ -249,8 +258,11 @@ public final class OverlayService extends Service
         Rect bounds = availableBounds();
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+        int maxWidth = Math.max(1, bounds.width() - Ui.dp(this, 32));
+        int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
         MediaCardView candidate = new MediaCardView(this,
-                Math.max(1, bounds.width() - Ui.dp(this, 32)), style, this);
+                prefs.cardWidthDp(style), prefs.cardHeightDp(style),
+                maxWidth, maxHeight, style, this);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
                 candidate.cardHeight(),

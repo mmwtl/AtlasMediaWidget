@@ -11,5 +11,5 @@
     <string name="bridge_disconnected">GInputBridge недоступен</string>
     <string name="bridge_connecting">Подключение к GInputBridge…</string>
     <string name="unknown_track">Ничего не воспроизводится</string>
-    <string name="empty_hint">Выберите источник или запустите музыку</string>
+    <string name="empty_hint">Выберите источник • включите звук</string>
 </resources>

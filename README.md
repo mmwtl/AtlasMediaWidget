@@ -51,9 +51,9 @@ GInputBridge backend уже реализован в ветке `mediaapi`. Сл�
 1. Реализовать `GInputBridgeMediaSource`: Messenger protocol v1, reconnect и stale-state reducer.
 2. Добавить локальную экстраполяцию progress и generation-aware загрузку artwork.
 3. Поднять overlay, source selector и capability-driven controls.
-4. Проверить Radio, Bluetooth, USB, CPAA/CarPlay, online и сторонние плееры на реальной ГУ.
+4. Проверить Radio, Bluetooth, USB, online и сторонние плееры на реальной ГУ.
 
-Все четыре клиентских пункта реализованы в версии `1.0.3 (4)`. Проверки firmware-specific частей
+Все четыре клиентских пункта реализованы в версии `1.0.4 (5)`. Проверки firmware-specific частей
 на реальной ГУ всё ещё обязательны.
 
 Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).
@@ -85,13 +85,16 @@ AtlasMediaWidget становится зависим от живого проц�
 - atomic metadata/playback/source snapshots через Messenger;
 - обложка через временно разрешённый FileProvider URI GInputBridge;
 - полноразмерная обложка как фон карточки с градиентом для читаемости текста;
-- выбираемые в настройках форматы 500×300 и 500×500 без перезапуска приложения;
+- пресеты 500×300 и 500×500, отдельная настройка ширины/высоты и адаптивное заполнение карточки;
 - крупная музыкальная заглушка справа, когда обложка отсутствует;
 - source/status pills, отдельные пустое и playing-состояния в обоих форматах;
 - локальный плавный progress без секундного Binder polling;
 - seek только при capability `SEEK_TO`;
-- previous/play-pause/next с source-aware маршрутизацией на стороне GInputBridge;
-- просмотр и переключение USB, Bluetooth, Radio, Online, Yunting и CPAA;
+- крупные previous/play-pause/next без подложки с source-aware маршрутизацией в GInputBridge;
+- крупная сетка выбора только USB, Bluetooth, Radio и Online с отдельными пиктограммами;
+- открытие активного online-приложения или штатного OEM media UI по нажатию на свободную область;
+- radio fallback в клиенте: выбранный источник не выглядит пустым, даже если старая версия
+  GInputBridge ещё не передала частоту и RDS-название;
 - reconnect с bounded exponential backoff и очистка stale-состояния;
 - показ только поверх HOME, сохранение позиции, foreground service и отложенный boot start.
 
@@ -112,4 +115,4 @@ ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelea
 ```
 
 Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.3[4]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+`1.0.4[5]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.

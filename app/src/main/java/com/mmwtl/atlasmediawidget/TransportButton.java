@@ -10,15 +10,13 @@ final class TransportButton extends View {
     enum Type { PREVIOUS, PLAY_PAUSE, NEXT }
 
     private final Type type;
-    private final boolean prominent;
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
     private boolean playing;
 
-    TransportButton(Context context, Type type, boolean prominent) {
+    TransportButton(Context context, Type type) {
         super(context);
         this.type = type;
-        this.prominent = prominent;
         setClickable(true);
         setFocusable(true);
         setContentDescription(switch (type) {
@@ -44,17 +42,11 @@ final class TransportButton extends View {
         float width = getWidth();
         float height = getHeight();
         float alpha = isEnabled() ? 1f : 0.62f;
-        int background = prominent ? Ui.ACCENT : 0xD9333333;
-        if (isPressed() && isEnabled()) background = prominent ? 0xFF91A8B3 : 0xFF465158;
-        paint.setColor(background);
-        paint.setAlpha(Math.round(255 * alpha));
-        canvas.drawRoundRect(0, 0, width, height, width / 2f, height / 2f, paint);
-
-        paint.setColor(Ui.PRIMARY);
+        paint.setColor(isPressed() && isEnabled() ? 0xFF9DC2D2 : Ui.PRIMARY);
         paint.setAlpha(Math.round(255 * alpha));
         float cx = width / 2f;
         float cy = height / 2f;
-        float unit = Math.min(width, height) * 0.22f;
+        float unit = Math.min(width, height) * 0.29f;
         if (type == Type.PLAY_PAUSE) {
             if (playing) drawPause(canvas, cx, cy, unit);
             else drawTriangle(canvas, cx - unit * 0.15f, cy, unit, true);
