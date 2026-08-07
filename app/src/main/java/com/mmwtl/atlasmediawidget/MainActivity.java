@@ -50,6 +50,8 @@ public final class MainActivity extends Activity {
     private SeekBar controlIconScale;
     private TextView controlSpreadValue;
     private SeekBar controlSpread;
+    private TextView controlBottomInsetValue;
+    private SeekBar controlBottomInset;
     private FrameLayout previewHost;
     private LabeledSeek topInsetSetting;
     private LabeledSeek contentInsetSetting;
@@ -283,6 +285,7 @@ public final class MainActivity extends Activity {
                     existing.controlPanelHeightDp,
                     existing.controlIconScalePercent,
                     existing.controlSpreadPercent,
+                    existing.controlBottomInsetDp,
                     defaults.topInsetDp,
                     defaults.contentInsetDp,
                     defaults.topRowTextSizeSp,
@@ -343,12 +346,20 @@ public final class MainActivity extends Activity {
         controlSpread.setOnSeekBarChangeListener(controlListener);
         serviceCard.addView(controlSpread, fullWrap());
 
+        serviceCard.addView(text("Дополнительный отступ иконок от нижней границы", 14,
+                Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        controlBottomInsetValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        serviceCard.addView(controlBottomInsetValue, fullWrap());
+        controlBottomInset = sizeSeekBar(0, Prefs.MAX_CONTROL_BOTTOM_INSET_DP);
+        controlBottomInset.setOnSeekBarChangeListener(controlListener);
+        serviceCard.addView(controlBottomInset, fullWrap());
+
         Button resetControls = actionButton("Вернуть панель по умолчанию");
         resetControls.setOnClickListener(v -> {
             CardStyle current = currentStyle();
             prefs.putControlLayout(current, current.defaultControlPanelHeightDp,
                     Prefs.DEFAULT_CONTROL_ICON_SCALE_PERCENT,
-                    Prefs.DEFAULT_CONTROL_SPREAD_PERCENT);
+                    Prefs.DEFAULT_CONTROL_SPREAD_PERCENT, 0);
             refreshSizeControls(current);
             if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
                 OverlayService.refreshStyle(this);
@@ -521,7 +532,8 @@ public final class MainActivity extends Activity {
     private void refreshSizeControls(CardStyle style) {
         if (widthSize == null || heightSize == null || textGap == null
                 || controlPanelHeight == null || controlIconScale == null
-                || controlSpread == null || topInsetSetting == null) return;
+                || controlSpread == null || controlBottomInset == null
+                || topInsetSetting == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
@@ -531,6 +543,7 @@ public final class MainActivity extends Activity {
         controlPanelHeight.setProgress(appearance.controlPanelHeightDp);
         controlIconScale.setProgress(appearance.controlIconScalePercent);
         controlSpread.setProgress(appearance.controlSpreadPercent);
+        controlBottomInset.setProgress(appearance.controlBottomInsetDp);
         topInsetSetting.seek.setProgress(appearance.topInsetDp);
         contentInsetSetting.seek.setProgress(appearance.contentInsetDp);
         topRowTextSetting.seek.setProgress(appearance.topRowTextSizeSp);
@@ -561,6 +574,7 @@ public final class MainActivity extends Activity {
         controlPanelHeightValue.setText(controlPanelHeight.getProgress() + " dp");
         controlIconScaleValue.setText(controlIconScale.getProgress() + " %");
         controlSpreadValue.setText(controlSpread.getProgress() + " % ширины");
+        controlBottomInsetValue.setText(controlBottomInset.getProgress() + " dp");
     }
 
     private void updateAppearanceLabels() {
@@ -583,6 +597,7 @@ public final class MainActivity extends Activity {
                 controlPanelHeight.getProgress(),
                 controlIconScale.getProgress(),
                 controlSpread.getProgress(),
+                controlBottomInset.getProgress(),
                 topInsetSetting.seek.getProgress(),
                 contentInsetSetting.seek.getProgress(),
                 topRowTextSetting.seek.getProgress(),

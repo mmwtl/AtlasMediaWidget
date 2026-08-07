@@ -15,6 +15,7 @@ final class Prefs {
     private static final String KEY_CONTROL_HEIGHT_PREFIX = "control_height_";
     private static final String KEY_CONTROL_ICON_SCALE_PREFIX = "control_icon_scale_";
     private static final String KEY_CONTROL_SPREAD_PREFIX = "control_spread_";
+    private static final String KEY_CONTROL_BOTTOM_INSET_PREFIX = "control_bottom_inset_";
     private static final String KEY_TOP_INSET_PREFIX = "top_inset_";
     private static final String KEY_CONTENT_INSET_PREFIX = "content_inset_";
     private static final String KEY_TOP_ROW_TEXT_SIZE_PREFIX = "top_row_text_size_";
@@ -36,6 +37,7 @@ final class Prefs {
     static final int MIN_CONTROL_SPREAD_PERCENT = 18;
     static final int MAX_CONTROL_SPREAD_PERCENT = 44;
     static final int DEFAULT_CONTROL_SPREAD_PERCENT = 33;
+    static final int MAX_CONTROL_BOTTOM_INSET_DP = 60;
     static final int MIN_TOP_INSET_DP = 4;
     static final int MAX_TOP_INSET_DP = 36;
     static final int MIN_CONTENT_INSET_DP = 12;
@@ -118,8 +120,13 @@ final class Prefs {
                 MAX_CONTROL_SPREAD_PERCENT);
     }
 
+    int controlBottomInsetDp(CardStyle style) {
+        return clamp(getInt(KEY_CONTROL_BOTTOM_INSET_PREFIX + style.preferenceValue, 0),
+                0, MAX_CONTROL_BOTTOM_INSET_DP);
+    }
+
     void putControlLayout(CardStyle style, int heightDp, int iconScalePercent,
-            int spreadPercent) {
+            int spreadPercent, int bottomInsetDp) {
         preferences.edit()
                 .putInt(KEY_CONTROL_HEIGHT_PREFIX + style.preferenceValue,
                         clamp(heightDp, MIN_CONTROL_PANEL_HEIGHT_DP,
@@ -130,6 +137,8 @@ final class Prefs {
                 .putInt(KEY_CONTROL_SPREAD_PREFIX + style.preferenceValue,
                         clamp(spreadPercent, MIN_CONTROL_SPREAD_PERCENT,
                                 MAX_CONTROL_SPREAD_PERCENT))
+                .putInt(KEY_CONTROL_BOTTOM_INSET_PREFIX + style.preferenceValue,
+                        clamp(bottomInsetDp, 0, MAX_CONTROL_BOTTOM_INSET_DP))
                 .apply();
     }
 
@@ -140,6 +149,7 @@ final class Prefs {
                 controlPanelHeightDp(style),
                 controlIconScalePercent(style),
                 controlSpreadPercent(style),
+                controlBottomInsetDp(style),
                 ranged(KEY_TOP_INSET_PREFIX, style, defaults.topInsetDp,
                         MIN_TOP_INSET_DP, MAX_TOP_INSET_DP),
                 ranged(KEY_CONTENT_INSET_PREFIX, style, defaults.contentInsetDp,
@@ -173,6 +183,8 @@ final class Prefs {
                 .putInt(KEY_CONTROL_SPREAD_PREFIX + style.preferenceValue,
                         clamp(value.controlSpreadPercent, MIN_CONTROL_SPREAD_PERCENT,
                                 MAX_CONTROL_SPREAD_PERCENT))
+                .putInt(KEY_CONTROL_BOTTOM_INSET_PREFIX + style.preferenceValue,
+                        clamp(value.controlBottomInsetDp, 0, MAX_CONTROL_BOTTOM_INSET_DP))
                 .putInt(KEY_TOP_INSET_PREFIX + style.preferenceValue,
                         clamp(value.topInsetDp, MIN_TOP_INSET_DP, MAX_TOP_INSET_DP))
                 .putInt(KEY_CONTENT_INSET_PREFIX + style.preferenceValue,

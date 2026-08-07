@@ -5,6 +5,7 @@ final class WidgetAppearance {
     final int controlPanelHeightDp;
     final int controlIconScalePercent;
     final int controlSpreadPercent;
+    final int controlBottomInsetDp;
     final int topInsetDp;
     final int contentInsetDp;
     final int topRowTextSizeSp;
@@ -16,14 +17,15 @@ final class WidgetAppearance {
     final int progressThicknessDp;
 
     WidgetAppearance(int textGapDp, int controlPanelHeightDp,
-            int controlIconScalePercent, int controlSpreadPercent, int topInsetDp,
-            int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
+            int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
+            int topInsetDp, int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
             int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
             int progressGapDp, int progressThicknessDp) {
         this.textGapDp = textGapDp;
         this.controlPanelHeightDp = controlPanelHeightDp;
         this.controlIconScalePercent = controlIconScalePercent;
         this.controlSpreadPercent = controlSpreadPercent;
+        this.controlBottomInsetDp = controlBottomInsetDp;
         this.topInsetDp = topInsetDp;
         this.contentInsetDp = contentInsetDp;
         this.topRowTextSizeSp = topRowTextSizeSp;
@@ -42,6 +44,7 @@ final class WidgetAppearance {
                 style.defaultControlPanelHeightDp,
                 Prefs.DEFAULT_CONTROL_ICON_SCALE_PERCENT,
                 Prefs.DEFAULT_CONTROL_SPREAD_PERCENT,
+                0,
                 compact ? 14 : 17,
                 compact ? 24 : 30,
                 compact ? 12 : 13,

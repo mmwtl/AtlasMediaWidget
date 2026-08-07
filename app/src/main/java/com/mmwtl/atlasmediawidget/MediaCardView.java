@@ -422,7 +422,9 @@ final class MediaCardView extends FrameLayout {
 
         LayoutParams controlsParams = new LayoutParams(LayoutParams.MATCH_PARENT, panelHeight);
         controlsParams.gravity = Gravity.TOP;
-        controlsParams.topMargin = controlsTop;
+        int controlBottomInset = Math.min(by(appearance.controlBottomInsetDp),
+                Math.max(0, controlsTop));
+        controlsParams.topMargin = controlsTop - controlBottomInset;
         controls.setLayoutParams(controlsParams);
         controls.setVisibility(chooserVisible ? GONE : VISIBLE);
         updateControlLayout(compact, panelHeight);

@@ -53,7 +53,7 @@ GInputBridge backend уже реализован в ветке `mediaapi`. Сл�
 3. Поднять overlay, source selector и capability-driven controls.
 4. Проверить Radio, Bluetooth, USB, online и сторонние плееры на реальной ГУ.
 
-Все четыре клиентских пункта реализованы в версии `1.0.11 (12)`. Проверки firmware-specific частей
+Все четыре клиентских пункта реализованы в версии `1.0.12 (13)`. Проверки firmware-specific частей
 на реальной ГУ всё ещё обязательны.
 
 Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).
@@ -94,7 +94,7 @@ AtlasMediaWidget становится зависим от живого проц�
 - предоставленные lossless WebP-иконки previous/play-pause/next без подложки с source-aware
   маршрутизацией в GInputBridge; next зеркально использует симметричную previous-иконку;
 - кнопки управления равномерно распределены по всей ширине карточки;
-- высота нижней панели, размер transport-иконок и их разбежка от центра регулируются отдельно
+- высота нижней панели, размер transport-иконок, их разбежка от центра и отступ от нижней границы регулируются отдельно
   для каждого формата карточки;
 - дополнительный отступ блока текста от верхней строки регулируется отдельно для каждого формата;
 - живой предпросмотр использует тот же `MediaCardView`, что и overlay, и обновляется при движении
@@ -125,4 +125,4 @@ ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelea
 ```
 
 Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.11[12]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+`1.0.12[13]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.

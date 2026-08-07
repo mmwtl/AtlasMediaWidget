@@ -33,5 +33,6 @@ public final class CardStyleTest {
         assertEquals(30, square.contentInsetDp);
         assertEquals(32, square.titleTextSizeSp);
         assertEquals(6, square.progressThicknessDp);
+        assertEquals(0, square.controlBottomInsetDp);
     }
 }
