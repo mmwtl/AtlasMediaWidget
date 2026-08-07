@@ -15,9 +15,19 @@ final class Prefs {
     private static final String KEY_CONTROL_HEIGHT_PREFIX = "control_height_";
     private static final String KEY_CONTROL_ICON_SCALE_PREFIX = "control_icon_scale_";
     private static final String KEY_CONTROL_SPREAD_PREFIX = "control_spread_";
+    private static final String KEY_TOP_INSET_PREFIX = "top_inset_";
+    private static final String KEY_CONTENT_INSET_PREFIX = "content_inset_";
+    private static final String KEY_TOP_ROW_TEXT_SIZE_PREFIX = "top_row_text_size_";
+    private static final String KEY_TITLE_TEXT_SIZE_PREFIX = "title_text_size_";
+    private static final String KEY_SUBTITLE_TEXT_SIZE_PREFIX = "subtitle_text_size_";
+    private static final String KEY_SUBTITLE_GAP_PREFIX = "subtitle_gap_";
+    private static final String KEY_TIME_TEXT_SIZE_PREFIX = "time_text_size_";
+    private static final String KEY_PROGRESS_GAP_PREFIX = "progress_gap_";
+    private static final String KEY_PROGRESS_THICKNESS_PREFIX = "progress_thickness_";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int BOOT_DELAY_SECONDS = 15;
-    static final int MAX_TEXT_GAP_DP = 32;
+    static final int MIN_TEXT_GAP_DP = -24;
+    static final int MAX_TEXT_GAP_DP = 48;
     static final int MIN_CONTROL_PANEL_HEIGHT_DP = 64;
     static final int MAX_CONTROL_PANEL_HEIGHT_DP = 150;
     static final int MIN_CONTROL_ICON_SCALE_PERCENT = 60;
@@ -26,6 +36,22 @@ final class Prefs {
     static final int MIN_CONTROL_SPREAD_PERCENT = 18;
     static final int MAX_CONTROL_SPREAD_PERCENT = 44;
     static final int DEFAULT_CONTROL_SPREAD_PERCENT = 33;
+    static final int MIN_TOP_INSET_DP = 4;
+    static final int MAX_TOP_INSET_DP = 36;
+    static final int MIN_CONTENT_INSET_DP = 12;
+    static final int MAX_CONTENT_INSET_DP = 60;
+    static final int MIN_TOP_ROW_TEXT_SIZE_SP = 9;
+    static final int MAX_TOP_ROW_TEXT_SIZE_SP = 20;
+    static final int MIN_TITLE_TEXT_SIZE_SP = 16;
+    static final int MAX_TITLE_TEXT_SIZE_SP = 44;
+    static final int MIN_SUBTITLE_TEXT_SIZE_SP = 10;
+    static final int MAX_SUBTITLE_TEXT_SIZE_SP = 30;
+    static final int MAX_SUBTITLE_GAP_DP = 18;
+    static final int MIN_TIME_TEXT_SIZE_SP = 9;
+    static final int MAX_TIME_TEXT_SIZE_SP = 24;
+    static final int MAX_PROGRESS_GAP_DP = 40;
+    static final int MIN_PROGRESS_THICKNESS_DP = 2;
+    static final int MAX_PROGRESS_THICKNESS_DP = 16;
 
     private final SharedPreferences preferences;
 
@@ -65,13 +91,13 @@ final class Prefs {
     }
 
     int textGapDp(CardStyle style) {
-        return Math.max(0, Math.min(MAX_TEXT_GAP_DP,
-                getInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue, 0)));
+        return clamp(getInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue, 0),
+                MIN_TEXT_GAP_DP, MAX_TEXT_GAP_DP);
     }
 
     void putTextGap(CardStyle style, int gapDp) {
         putInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue,
-                Math.max(0, Math.min(MAX_TEXT_GAP_DP, gapDp)));
+                clamp(gapDp, MIN_TEXT_GAP_DP, MAX_TEXT_GAP_DP));
     }
 
     int controlPanelHeightDp(CardStyle style) {
@@ -105,6 +131,77 @@ final class Prefs {
                         clamp(spreadPercent, MIN_CONTROL_SPREAD_PERCENT,
                                 MAX_CONTROL_SPREAD_PERCENT))
                 .apply();
+    }
+
+    WidgetAppearance appearance(CardStyle style) {
+        WidgetAppearance defaults = WidgetAppearance.defaults(style);
+        return new WidgetAppearance(
+                textGapDp(style),
+                controlPanelHeightDp(style),
+                controlIconScalePercent(style),
+                controlSpreadPercent(style),
+                ranged(KEY_TOP_INSET_PREFIX, style, defaults.topInsetDp,
+                        MIN_TOP_INSET_DP, MAX_TOP_INSET_DP),
+                ranged(KEY_CONTENT_INSET_PREFIX, style, defaults.contentInsetDp,
+                        MIN_CONTENT_INSET_DP, MAX_CONTENT_INSET_DP),
+                ranged(KEY_TOP_ROW_TEXT_SIZE_PREFIX, style, defaults.topRowTextSizeSp,
+                        MIN_TOP_ROW_TEXT_SIZE_SP, MAX_TOP_ROW_TEXT_SIZE_SP),
+                ranged(KEY_TITLE_TEXT_SIZE_PREFIX, style, defaults.titleTextSizeSp,
+                        MIN_TITLE_TEXT_SIZE_SP, MAX_TITLE_TEXT_SIZE_SP),
+                ranged(KEY_SUBTITLE_TEXT_SIZE_PREFIX, style, defaults.subtitleTextSizeSp,
+                        MIN_SUBTITLE_TEXT_SIZE_SP, MAX_SUBTITLE_TEXT_SIZE_SP),
+                ranged(KEY_SUBTITLE_GAP_PREFIX, style, defaults.subtitleGapDp,
+                        0, MAX_SUBTITLE_GAP_DP),
+                ranged(KEY_TIME_TEXT_SIZE_PREFIX, style, defaults.timeTextSizeSp,
+                        MIN_TIME_TEXT_SIZE_SP, MAX_TIME_TEXT_SIZE_SP),
+                ranged(KEY_PROGRESS_GAP_PREFIX, style, defaults.progressGapDp,
+                        0, MAX_PROGRESS_GAP_DP),
+                ranged(KEY_PROGRESS_THICKNESS_PREFIX, style, defaults.progressThicknessDp,
+                        MIN_PROGRESS_THICKNESS_DP, MAX_PROGRESS_THICKNESS_DP));
+    }
+
+    void putAppearance(CardStyle style, WidgetAppearance value) {
+        preferences.edit()
+                .putInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue,
+                        clamp(value.textGapDp, MIN_TEXT_GAP_DP, MAX_TEXT_GAP_DP))
+                .putInt(KEY_CONTROL_HEIGHT_PREFIX + style.preferenceValue,
+                        clamp(value.controlPanelHeightDp, MIN_CONTROL_PANEL_HEIGHT_DP,
+                                MAX_CONTROL_PANEL_HEIGHT_DP))
+                .putInt(KEY_CONTROL_ICON_SCALE_PREFIX + style.preferenceValue,
+                        clamp(value.controlIconScalePercent, MIN_CONTROL_ICON_SCALE_PERCENT,
+                                MAX_CONTROL_ICON_SCALE_PERCENT))
+                .putInt(KEY_CONTROL_SPREAD_PREFIX + style.preferenceValue,
+                        clamp(value.controlSpreadPercent, MIN_CONTROL_SPREAD_PERCENT,
+                                MAX_CONTROL_SPREAD_PERCENT))
+                .putInt(KEY_TOP_INSET_PREFIX + style.preferenceValue,
+                        clamp(value.topInsetDp, MIN_TOP_INSET_DP, MAX_TOP_INSET_DP))
+                .putInt(KEY_CONTENT_INSET_PREFIX + style.preferenceValue,
+                        clamp(value.contentInsetDp, MIN_CONTENT_INSET_DP,
+                                MAX_CONTENT_INSET_DP))
+                .putInt(KEY_TOP_ROW_TEXT_SIZE_PREFIX + style.preferenceValue,
+                        clamp(value.topRowTextSizeSp, MIN_TOP_ROW_TEXT_SIZE_SP,
+                                MAX_TOP_ROW_TEXT_SIZE_SP))
+                .putInt(KEY_TITLE_TEXT_SIZE_PREFIX + style.preferenceValue,
+                        clamp(value.titleTextSizeSp, MIN_TITLE_TEXT_SIZE_SP,
+                                MAX_TITLE_TEXT_SIZE_SP))
+                .putInt(KEY_SUBTITLE_TEXT_SIZE_PREFIX + style.preferenceValue,
+                        clamp(value.subtitleTextSizeSp, MIN_SUBTITLE_TEXT_SIZE_SP,
+                                MAX_SUBTITLE_TEXT_SIZE_SP))
+                .putInt(KEY_SUBTITLE_GAP_PREFIX + style.preferenceValue,
+                        clamp(value.subtitleGapDp, 0, MAX_SUBTITLE_GAP_DP))
+                .putInt(KEY_TIME_TEXT_SIZE_PREFIX + style.preferenceValue,
+                        clamp(value.timeTextSizeSp, MIN_TIME_TEXT_SIZE_SP,
+                                MAX_TIME_TEXT_SIZE_SP))
+                .putInt(KEY_PROGRESS_GAP_PREFIX + style.preferenceValue,
+                        clamp(value.progressGapDp, 0, MAX_PROGRESS_GAP_DP))
+                .putInt(KEY_PROGRESS_THICKNESS_PREFIX + style.preferenceValue,
+                        clamp(value.progressThicknessDp, MIN_PROGRESS_THICKNESS_DP,
+                                MAX_PROGRESS_THICKNESS_DP))
+                .apply();
+    }
+
+    private int ranged(String prefix, CardStyle style, int fallback, int min, int max) {
+        return clamp(getInt(prefix + style.preferenceValue, fallback), min, max);
     }
 
     private static int clamp(int value, int min, int max) {

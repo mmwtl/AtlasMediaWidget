@@ -9,10 +9,13 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -21,6 +24,8 @@ import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.util.Arrays;
 
 public final class MainActivity extends Activity {
     private static final int MIN_WIDTH_DP = 360;
@@ -45,7 +50,25 @@ public final class MainActivity extends Activity {
     private SeekBar controlIconScale;
     private TextView controlSpreadValue;
     private SeekBar controlSpread;
+    private FrameLayout previewHost;
+    private LabeledSeek topInsetSetting;
+    private LabeledSeek contentInsetSetting;
+    private LabeledSeek topRowTextSetting;
+    private LabeledSeek titleTextSetting;
+    private LabeledSeek subtitleTextSetting;
+    private LabeledSeek subtitleGapSetting;
+    private LabeledSeek timeTextSetting;
+    private LabeledSeek progressGapSetting;
+    private LabeledSeek progressThicknessSetting;
     private boolean refreshingStyle;
+
+    private final MediaCardView.Listener previewListener = new MediaCardView.Listener() {
+        @Override public boolean onDragTouch(View view, MotionEvent event) { return true; }
+        @Override public void onCommand(String command) {}
+        @Override public void onSeek(long positionMs) {}
+        @Override public void onSource(MediaSource.Id source) {}
+        @Override public void onOpenSource() {}
+    };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -136,6 +159,20 @@ public final class MainActivity extends Activity {
         });
         serviceCard.addView(styleGroup, fullWrap());
 
+        TextView previewTitle = text("Предпросмотр", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams previewTitleParams = fullWrap();
+        previewTitleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(previewTitle, previewTitleParams);
+        previewHost = new FrameLayout(this);
+        previewHost.setBackground(Ui.background(Ui.NESTED, 18, this));
+        previewHost.setPadding(Ui.dp(this, 8), Ui.dp(this, 8),
+                Ui.dp(this, 8), Ui.dp(this, 8));
+        previewHost.setContentDescription("Предпросмотр медиакарточки");
+        LinearLayout.LayoutParams previewParams = fullWrap();
+        previewParams.topMargin = Ui.dp(this, 8);
+        previewParams.height = Ui.dp(this, 1);
+        serviceCard.addView(previewHost, previewParams);
+
         TextView sizeTitle = text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams sizeTitleParams = fullWrap();
         sizeTitleParams.topMargin = Ui.dp(this, 14);
@@ -152,7 +189,10 @@ public final class MainActivity extends Activity {
         serviceCard.addView(heightSize, fullWrap());
         SeekBar.OnSeekBarChangeListener sizeListener = new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) updateSizeLabel();
+                if (fromUser) {
+                    updateSizeLabel();
+                    renderPreview();
+                }
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
@@ -170,28 +210,92 @@ public final class MainActivity extends Activity {
         widthSize.setOnSeekBarChangeListener(sizeListener);
         heightSize.setOnSeekBarChangeListener(sizeListener);
 
-        serviceCard.addView(text("Дополнительный отступ текста от верхней строки",
+        serviceCard.addView(text("Сдвиг блока текста по вертикали",
                 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
         textGapValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
         serviceCard.addView(textGapValue, fullWrap());
-        textGap = sizeSeekBar(0, Prefs.MAX_TEXT_GAP_DP);
+        textGap = sizeSeekBar(Prefs.MIN_TEXT_GAP_DP, Prefs.MAX_TEXT_GAP_DP);
         textGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress,
                     boolean fromUser) {
                 updateTextGapLabel();
+                if (fromUser) renderPreview();
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
 
             @Override public void onStopTrackingTouch(SeekBar seekBar) {
                 if (refreshingStyle) return;
-                prefs.putTextGap(currentStyle(), textGap.getProgress());
-                if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                    OverlayService.refreshStyle(MainActivity.this);
-                }
+                saveAppearance();
             }
         });
         serviceCard.addView(textGap, fullWrap());
+
+        TextView typographyTitle = text("Текст и отступы", 15,
+                Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams typographyTitleParams = fullWrap();
+        typographyTitleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(typographyTitle, typographyTitleParams);
+
+        topInsetSetting = addLabeledSeek(serviceCard, "Отступ верхней строки",
+                Prefs.MIN_TOP_INSET_DP, Prefs.MAX_TOP_INSET_DP);
+        contentInsetSetting = addLabeledSeek(serviceCard, "Боковой отступ контента",
+                Prefs.MIN_CONTENT_INSET_DP, Prefs.MAX_CONTENT_INSET_DP);
+        topRowTextSetting = addLabeledSeek(serviceCard, "Размер текста верхней строки",
+                Prefs.MIN_TOP_ROW_TEXT_SIZE_SP, Prefs.MAX_TOP_ROW_TEXT_SIZE_SP);
+        titleTextSetting = addLabeledSeek(serviceCard, "Размер названия",
+                Prefs.MIN_TITLE_TEXT_SIZE_SP, Prefs.MAX_TITLE_TEXT_SIZE_SP);
+        subtitleTextSetting = addLabeledSeek(serviceCard, "Размер исполнителя и альбома",
+                Prefs.MIN_SUBTITLE_TEXT_SIZE_SP, Prefs.MAX_SUBTITLE_TEXT_SIZE_SP);
+        subtitleGapSetting = addLabeledSeek(serviceCard, "Отступ подзаголовка",
+                0, Prefs.MAX_SUBTITLE_GAP_DP);
+        timeTextSetting = addLabeledSeek(serviceCard, "Размер времени",
+                Prefs.MIN_TIME_TEXT_SIZE_SP, Prefs.MAX_TIME_TEXT_SIZE_SP);
+        progressGapSetting = addLabeledSeek(serviceCard, "Отступ прогресса от панели",
+                0, Prefs.MAX_PROGRESS_GAP_DP);
+        progressThicknessSetting = addLabeledSeek(serviceCard, "Толщина линии прогресса",
+                Prefs.MIN_PROGRESS_THICKNESS_DP, Prefs.MAX_PROGRESS_THICKNESS_DP);
+        SeekBar.OnSeekBarChangeListener appearanceListener =
+                new SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                            boolean fromUser) {
+                        updateAppearanceLabels();
+                        if (fromUser) renderPreview();
+                    }
+
+                    @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                    @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                        if (!refreshingStyle) saveAppearance();
+                    }
+                };
+        bind(appearanceListener, topInsetSetting, contentInsetSetting, topRowTextSetting,
+                titleTextSetting, subtitleTextSetting, subtitleGapSetting, timeTextSetting,
+                progressGapSetting, progressThicknessSetting);
+
+        Button resetAppearance = actionButton("Вернуть текст и отступы по умолчанию");
+        resetAppearance.setOnClickListener(v -> {
+            CardStyle current = currentStyle();
+            WidgetAppearance defaults = WidgetAppearance.defaults(current);
+            WidgetAppearance existing = currentAppearance();
+            prefs.putAppearance(current, new WidgetAppearance(
+                    defaults.textGapDp,
+                    existing.controlPanelHeightDp,
+                    existing.controlIconScalePercent,
+                    existing.controlSpreadPercent,
+                    defaults.topInsetDp,
+                    defaults.contentInsetDp,
+                    defaults.topRowTextSizeSp,
+                    defaults.titleTextSizeSp,
+                    defaults.subtitleTextSizeSp,
+                    defaults.subtitleGapDp,
+                    defaults.timeTextSizeSp,
+                    defaults.progressGapDp,
+                    defaults.progressThicknessDp));
+            refreshSizeControls(current);
+            refreshOverlayIfRunning();
+        });
+        serviceCard.addView(resetAppearance, buttonParams());
 
         TextView controlsTitle = text("Панель управления", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams controlsTitleParams = fullWrap();
@@ -224,18 +328,14 @@ public final class MainActivity extends Activity {
             @Override public void onProgressChanged(SeekBar seekBar, int progress,
                     boolean fromUser) {
                 updateControlLabels();
+                if (fromUser) renderPreview();
             }
 
             @Override public void onStartTrackingTouch(SeekBar seekBar) {}
 
             @Override public void onStopTrackingTouch(SeekBar seekBar) {
                 if (refreshingStyle) return;
-                CardStyle current = currentStyle();
-                prefs.putControlLayout(current, controlPanelHeight.getProgress(),
-                        controlIconScale.getProgress(), controlSpread.getProgress());
-                if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                    OverlayService.refreshStyle(MainActivity.this);
-                }
+                saveAppearance();
             }
         };
         controlPanelHeight.setOnSeekBarChangeListener(controlListener);
@@ -421,19 +521,31 @@ public final class MainActivity extends Activity {
     private void refreshSizeControls(CardStyle style) {
         if (widthSize == null || heightSize == null || textGap == null
                 || controlPanelHeight == null || controlIconScale == null
-                || controlSpread == null) return;
+                || controlSpread == null || topInsetSetting == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
+        WidgetAppearance appearance = prefs.appearance(style);
         widthSize.setProgress(clamp(prefs.cardWidthDp(style), MIN_WIDTH_DP, MAX_WIDTH_DP));
         heightSize.setProgress(clamp(prefs.cardHeightDp(style), MIN_HEIGHT_DP, MAX_HEIGHT_DP));
-        textGap.setProgress(prefs.textGapDp(style));
-        controlPanelHeight.setProgress(prefs.controlPanelHeightDp(style));
-        controlIconScale.setProgress(prefs.controlIconScalePercent(style));
-        controlSpread.setProgress(prefs.controlSpreadPercent(style));
+        textGap.setProgress(appearance.textGapDp);
+        controlPanelHeight.setProgress(appearance.controlPanelHeightDp);
+        controlIconScale.setProgress(appearance.controlIconScalePercent);
+        controlSpread.setProgress(appearance.controlSpreadPercent);
+        topInsetSetting.seek.setProgress(appearance.topInsetDp);
+        contentInsetSetting.seek.setProgress(appearance.contentInsetDp);
+        topRowTextSetting.seek.setProgress(appearance.topRowTextSizeSp);
+        titleTextSetting.seek.setProgress(appearance.titleTextSizeSp);
+        subtitleTextSetting.seek.setProgress(appearance.subtitleTextSizeSp);
+        subtitleGapSetting.seek.setProgress(appearance.subtitleGapDp);
+        timeTextSetting.seek.setProgress(appearance.timeTextSizeSp);
+        progressGapSetting.seek.setProgress(appearance.progressGapDp);
+        progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
         updateSizeLabel();
         updateTextGapLabel();
         updateControlLabels();
+        updateAppearanceLabels();
         refreshingStyle = previous;
+        renderPreview();
     }
 
     private void updateSizeLabel() {
@@ -441,13 +553,132 @@ public final class MainActivity extends Activity {
     }
 
     private void updateTextGapLabel() {
-        textGapValue.setText("+" + textGap.getProgress() + " dp");
+        int value = textGap.getProgress();
+        textGapValue.setText((value > 0 ? "+" : "") + value + " dp");
     }
 
     private void updateControlLabels() {
         controlPanelHeightValue.setText(controlPanelHeight.getProgress() + " dp");
         controlIconScaleValue.setText(controlIconScale.getProgress() + " %");
         controlSpreadValue.setText(controlSpread.getProgress() + " % ширины");
+    }
+
+    private void updateAppearanceLabels() {
+        topInsetSetting.value.setText(topInsetSetting.seek.getProgress() + " dp");
+        contentInsetSetting.value.setText(contentInsetSetting.seek.getProgress() + " dp");
+        topRowTextSetting.value.setText(topRowTextSetting.seek.getProgress() + " sp");
+        titleTextSetting.value.setText(titleTextSetting.seek.getProgress() + " sp");
+        subtitleTextSetting.value.setText(subtitleTextSetting.seek.getProgress() + " sp");
+        subtitleGapSetting.value.setText(subtitleGapSetting.seek.getProgress() + " dp");
+        timeTextSetting.value.setText(timeTextSetting.seek.getProgress() + " sp");
+        progressGapSetting.value.setText(progressGapSetting.seek.getProgress() + " dp");
+        progressThicknessSetting.value.setText(
+                progressThicknessSetting.seek.getProgress() + " dp");
+    }
+
+    private WidgetAppearance currentAppearance() {
+        if (topInsetSetting == null) return prefs.appearance(currentStyle());
+        return new WidgetAppearance(
+                textGap.getProgress(),
+                controlPanelHeight.getProgress(),
+                controlIconScale.getProgress(),
+                controlSpread.getProgress(),
+                topInsetSetting.seek.getProgress(),
+                contentInsetSetting.seek.getProgress(),
+                topRowTextSetting.seek.getProgress(),
+                titleTextSetting.seek.getProgress(),
+                subtitleTextSetting.seek.getProgress(),
+                subtitleGapSetting.seek.getProgress(),
+                timeTextSetting.seek.getProgress(),
+                progressGapSetting.seek.getProgress(),
+                progressThicknessSetting.seek.getProgress());
+    }
+
+    private void saveAppearance() {
+        prefs.putAppearance(currentStyle(), currentAppearance());
+        renderPreview();
+        refreshOverlayIfRunning();
+    }
+
+    private void refreshOverlayIfRunning() {
+        if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+            OverlayService.refreshStyle(this);
+        }
+    }
+
+    private LabeledSeek addLabeledSeek(LinearLayout parent, String label, int min, int max) {
+        parent.addView(text(label, 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        TextView value = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        parent.addView(value, fullWrap());
+        SeekBar seek = sizeSeekBar(min, max);
+        parent.addView(seek, fullWrap());
+        return new LabeledSeek(value, seek);
+    }
+
+    private static void bind(SeekBar.OnSeekBarChangeListener listener,
+            LabeledSeek... settings) {
+        for (LabeledSeek setting : settings) setting.seek.setOnSeekBarChangeListener(listener);
+    }
+
+    private void renderPreview() {
+        if (previewHost == null || widthSize == null || topInsetSetting == null) return;
+        int configuredWidthDp = widthSize.getProgress();
+        int configuredHeightDp = heightSize.getProgress();
+        int maxWidthPx = Math.max(Ui.dp(this, 280),
+                getResources().getDisplayMetrics().widthPixels - Ui.dp(this, 112));
+        int maxHeightPx = Math.max(Ui.dp(this, 180), Math.min(Ui.dp(this, 520),
+                getResources().getDisplayMetrics().heightPixels / 2));
+        int configuredWidthPx = Ui.dp(this, configuredWidthDp);
+        int configuredHeightPx = Ui.dp(this, configuredHeightDp);
+        float scale = Math.min(1f, Math.min(
+                maxWidthPx / (float) configuredWidthPx,
+                maxHeightPx / (float) configuredHeightPx));
+
+        MediaCardView preview = new MediaCardView(this, configuredWidthDp, configuredHeightDp,
+                configuredWidthPx, configuredHeightPx, currentStyle(), currentAppearance(),
+                previewListener);
+        preview.renderSnapshot(previewSnapshot(), true);
+        preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+
+        previewHost.removeAllViews();
+        FrameLayout stage = new FrameLayout(this);
+        stage.addView(preview, new FrameLayout.LayoutParams(
+                preview.cardWidth(), preview.cardHeight()));
+        stage.setPivotX(preview.cardWidth() / 2f);
+        stage.setPivotY(0f);
+        stage.setScaleX(scale);
+        stage.setScaleY(scale);
+        FrameLayout.LayoutParams stageParams = new FrameLayout.LayoutParams(
+                preview.cardWidth(), preview.cardHeight(), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+        stageParams.topMargin = Ui.dp(this, 8);
+        previewHost.addView(stage, stageParams);
+        View touchBlocker = new View(this);
+        touchBlocker.setClickable(true);
+        previewHost.addView(touchBlocker, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        LinearLayout.LayoutParams hostParams = (LinearLayout.LayoutParams)
+                previewHost.getLayoutParams();
+        hostParams.height = Math.round(preview.cardHeight() * scale) + Ui.dp(this, 16);
+        previewHost.setLayoutParams(hostParams);
+    }
+
+    private MediaSnapshot previewSnapshot() {
+        long capabilities = MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_PAUSE
+                | MediaBridgeContract.CAP_TOGGLE | MediaBridgeContract.CAP_NEXT
+                | MediaBridgeContract.CAP_PREVIOUS | MediaBridgeContract.CAP_SEEK
+                | MediaBridgeContract.CAP_SET_SOURCE;
+        return new MediaSnapshot(
+                MediaBridgeContract.VERSION, 1L, System.currentTimeMillis(), true, 0, "",
+                MediaSource.Id.BT, "",
+                Arrays.asList(
+                        new MediaSource(MediaSource.Id.BT, true, true, true, capabilities),
+                        new MediaSource(MediaSource.Id.RADIO, true, true, false, capabilities),
+                        new MediaSource(MediaSource.Id.USB, true, true, false, capabilities),
+                        new MediaSource(MediaSource.Id.ONLINE, true, true, false, capabilities)),
+                "preview", "Bluetooth", "preview-track", "Ветер перемен",
+                "Кино", "Группа крови", 232_000L, 84_000L,
+                SystemClock.elapsedRealtime(), 1f, MediaSnapshot.STATE_PLAYING,
+                0, "", 0L, capabilities, "", 0L);
     }
 
     private LinearLayout.LayoutParams labelParams() {
@@ -483,5 +714,15 @@ public final class MainActivity extends Activity {
 
     private static String yesNo(boolean value) {
         return value ? "разрешено" : "не разрешено";
+    }
+
+    private static final class LabeledSeek {
+        final TextView value;
+        final SeekBar seek;
+
+        LabeledSeek(TextView value, SeekBar seek) {
+            this.value = value;
+            this.seek = seek;
+        }
     }
 }

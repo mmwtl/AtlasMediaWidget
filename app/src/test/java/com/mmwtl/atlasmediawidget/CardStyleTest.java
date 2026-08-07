@@ -22,4 +22,16 @@ public final class CardStyleTest {
         assertEquals(84, CardStyle.COMPACT.defaultControlPanelHeightDp);
         assertEquals(102, CardStyle.SQUARE.defaultControlPanelHeightDp);
     }
+
+    @Test public void appearanceDefaultsMatchReferenceLayouts() {
+        WidgetAppearance compact = WidgetAppearance.defaults(CardStyle.COMPACT);
+        WidgetAppearance square = WidgetAppearance.defaults(CardStyle.SQUARE);
+        assertEquals(14, compact.topInsetDp);
+        assertEquals(24, compact.contentInsetDp);
+        assertEquals(22, compact.titleTextSizeSp);
+        assertEquals(17, square.topInsetDp);
+        assertEquals(30, square.contentInsetDp);
+        assertEquals(32, square.titleTextSizeSp);
+        assertEquals(6, square.progressThicknessDp);
+    }
 }

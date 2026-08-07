@@ -47,7 +47,7 @@ final class MediaCardView extends FrameLayout {
     private final float widthScale;
     private final float heightScale;
     private final float uiScale;
-    private final int textGapDp;
+    private final WidgetAppearance appearance;
     private final ImageView artwork;
     private final ImageView artworkThumbnail;
     private final ImageView placeholder;
@@ -69,9 +69,6 @@ final class MediaCardView extends FrameLayout {
     private final TransportButton previous;
     private final TransportButton playPause;
     private final TransportButton next;
-    private final int controlPanelHeightDp;
-    private final int controlIconScalePercent;
-    private final int controlSpreadPercent;
     private final List<MediaSource> availableSources = new ArrayList<>();
     private MediaSnapshot snapshot;
     private MediaSource.Id activeSource = MediaSource.Id.UNKNOWN;
@@ -80,16 +77,12 @@ final class MediaCardView extends FrameLayout {
     private boolean hasMedia;
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
-            int maxWidthPx, int maxHeightPx, CardStyle style, int textGapDp,
-            int controlPanelHeightDp, int controlIconScalePercent,
-            int controlSpreadPercent, Listener listener) {
+            int maxWidthPx, int maxHeightPx, CardStyle style,
+            WidgetAppearance appearance, Listener listener) {
         super(context);
         this.listener = listener;
         this.style = style;
-        this.textGapDp = textGapDp;
-        this.controlPanelHeightDp = controlPanelHeightDp;
-        this.controlIconScalePercent = controlIconScalePercent;
-        this.controlSpreadPercent = controlSpreadPercent;
+        this.appearance = appearance;
         cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
                 Ui.dp(context, requestedWidthDp)));
         cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
@@ -144,27 +137,30 @@ final class MediaCardView extends FrameLayout {
         LinearLayout.LayoutParams dotParams = wrap();
         dotParams.leftMargin = d(7);
         sourcePill.addView(sourceDot, dotParams);
-        sourceLabel = text("MEDIA", style == CardStyle.COMPACT ? 12 : 13,
+        sourceLabel = text("MEDIA", appearance.topRowTextSizeSp,
                 Ui.PRIMARY, Typeface.BOLD);
         sourceLabel.setLetterSpacing(0.05f);
         LinearLayout.LayoutParams sourceTextParams = wrap();
         sourceTextParams.leftMargin = d(5);
         sourcePill.addView(sourceLabel, sourceTextParams);
         sourcePill.setOnClickListener(v -> toggleSourceChooser());
-        LayoutParams sourcePillParams = new LayoutParams(LayoutParams.WRAP_CONTENT, d(38));
+        LayoutParams sourcePillParams = new LayoutParams(LayoutParams.WRAP_CONTENT,
+                d(Math.max(38, appearance.topRowTextSizeSp + 24)));
         sourcePillParams.gravity = Gravity.TOP | Gravity.START;
-        sourcePillParams.leftMargin = bx(style == CardStyle.COMPACT ? 20 : 22);
-        sourcePillParams.topMargin = by(style == CardStyle.COMPACT ? 14 : 17);
+        sourcePillParams.leftMargin = bx(Math.max(8,
+                appearance.contentInsetDp - (style == CardStyle.COMPACT ? 4 : 8)));
+        sourcePillParams.topMargin = by(appearance.topInsetDp);
         addView(sourcePill, sourcePillParams);
 
-        statusPill = text("", style == CardStyle.COMPACT ? 10 : 11,
+        statusPill = text("", Math.max(8, appearance.topRowTextSizeSp - 2),
                 Ui.ERROR, Typeface.NORMAL);
         statusPill.setGravity(Gravity.CENTER);
         statusPill.setMaxLines(1);
         statusPill.setPadding(d(11), 0, d(11), 0);
-        LayoutParams statusParams = new LayoutParams(LayoutParams.WRAP_CONTENT, d(31));
+        LayoutParams statusParams = new LayoutParams(LayoutParams.WRAP_CONTENT,
+                d(Math.max(31, appearance.topRowTextSizeSp + 20)));
         statusParams.gravity = Gravity.TOP | Gravity.END;
-        statusParams.topMargin = by(style == CardStyle.COMPACT ? 17 : 20);
+        statusParams.topMargin = by(appearance.topInsetDp + 3);
         statusParams.rightMargin = bx(49);
         addView(statusPill, statusParams);
 
@@ -191,16 +187,16 @@ final class MediaCardView extends FrameLayout {
         textColumn.setOrientation(LinearLayout.VERTICAL);
         textColumn.setGravity(Gravity.CENTER_VERTICAL);
         title = text(getResources().getString(R.string.unknown_track),
-                style == CardStyle.COMPACT ? 22 : 32, Ui.PRIMARY, Typeface.BOLD);
+                appearance.titleTextSizeSp, Ui.PRIMARY, Typeface.BOLD);
         title.setMaxLines(2);
         title.setLineSpacing(d(2), 1.06f);
         title.setShadowLayer(d(2), 0, d(1), 0xB0000000);
         textColumn.addView(title, fullWrap());
-        subtitle = text("", style == CardStyle.COMPACT ? 15 : 20,
+        subtitle = text("", appearance.subtitleTextSizeSp,
                 0xFFAFB1B7, Typeface.NORMAL);
         subtitle.setMaxLines(1);
         LinearLayout.LayoutParams subtitleParams = fullWrap();
-        subtitleParams.topMargin = d(5);
+        subtitleParams.topMargin = d(appearance.subtitleGapDp);
         textColumn.addView(subtitle, subtitleParams);
         LinearLayout.LayoutParams textColumnParams = new LinearLayout.LayoutParams(
                 0, LayoutParams.WRAP_CONTENT, 1f);
@@ -210,17 +206,18 @@ final class MediaCardView extends FrameLayout {
 
         progressRow = new LinearLayout(context);
         progressRow.setGravity(Gravity.CENTER_VERTICAL);
-        elapsed = text("–:––", style == CardStyle.COMPACT ? 11 : 14,
+        elapsed = text("–:––", appearance.timeTextSizeSp,
                 Ui.SECONDARY, Typeface.NORMAL);
         progress = new SeekBar(context);
         progress.setMax(PROGRESS_MAX);
         progress.setPadding(d(6), 0, d(6), 0);
         progress.setSplitTrack(false);
-        configureProgressStyle(context, progress, uiScale);
-        duration = text("–:––", style == CardStyle.COMPACT ? 11 : 14,
+        configureProgressStyle(context, progress, uiScale, appearance.progressThicknessDp);
+        duration = text("–:––", appearance.timeTextSizeSp,
                 Ui.SECONDARY, Typeface.NORMAL);
         duration.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        int timeWidth = d(style == CardStyle.COMPACT ? 46 : 58);
+        int timeWidth = d(Math.max(style == CardStyle.COMPACT ? 46 : 58,
+                appearance.timeTextSizeSp * 3.6f));
         progressRow.addView(elapsed, new LinearLayout.LayoutParams(timeWidth, LayoutParams.WRAP_CONTENT));
         progressRow.addView(progress, new LinearLayout.LayoutParams(0, d(30), 1f));
         progressRow.addView(duration, new LinearLayout.LayoutParams(timeWidth, LayoutParams.WRAP_CONTENT));
@@ -372,7 +369,7 @@ final class MediaCardView extends FrameLayout {
         boolean chooserVisible = sourceChooser.getVisibility() == VISIBLE;
         boolean showProgress = hasMedia && snapshot != null && snapshot.duration > 0L;
         boolean showThumbnail = compact && hasMedia && hasArtwork;
-        int panelHeight = Math.min(cardHeight, by(controlPanelHeightDp));
+        int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
         int controlsTop = Math.max(0, cardHeight - panelHeight);
 
         artworkThumbnail.setVisibility(showThumbnail ? VISIBLE : GONE);
@@ -390,14 +387,16 @@ final class MediaCardView extends FrameLayout {
 
         LayoutParams metadataParams;
         if (compact && !hasMedia) {
-            metadataParams = new LayoutParams(bx(345), LayoutParams.WRAP_CONTENT);
-            metadataParams.leftMargin = bx(34);
-            metadataParams.topMargin = by(78 + textGapDp);
+            int left = bx(appearance.contentInsetDp + 10);
+            int width = Math.max(bx(180), cardWidth - left - bx(121));
+            metadataParams = new LayoutParams(width, LayoutParams.WRAP_CONTENT);
+            metadataParams.leftMargin = left;
+            metadataParams.topMargin = by(78 + appearance.textGapDp);
         } else {
             metadataParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            metadataParams.leftMargin = bx(compact ? 24 : 30);
-            metadataParams.rightMargin = bx(compact ? 24 : 30);
-            metadataParams.topMargin = by((compact ? 76 : 258) + textGapDp);
+            metadataParams.leftMargin = bx(appearance.contentInsetDp);
+            metadataParams.rightMargin = bx(appearance.contentInsetDp);
+            metadataParams.topMargin = by((compact ? 76 : 258) + appearance.textGapDp);
         }
         metadataParams.gravity = Gravity.TOP | Gravity.START;
         metadata.setLayoutParams(metadataParams);
@@ -405,19 +404,19 @@ final class MediaCardView extends FrameLayout {
 
         LayoutParams progressParams = new LayoutParams(LayoutParams.MATCH_PARENT, d(32));
         progressParams.gravity = Gravity.TOP;
-        progressParams.leftMargin = bx(compact ? 20 : 26);
-        progressParams.rightMargin = bx(compact ? 20 : 26);
+        progressParams.leftMargin = bx(Math.max(8, appearance.contentInsetDp - 4));
+        progressParams.rightMargin = bx(Math.max(8, appearance.contentInsetDp - 4));
         progressParams.topMargin = Math.max(0,
-                controlsTop - by(compact ? 32 : 33));
+                controlsTop - by((compact ? 32 : 33) + appearance.progressGapDp));
         progressRow.setLayoutParams(progressParams);
         progressRow.setVisibility(!chooserVisible && showProgress ? VISIBLE : GONE);
 
         LayoutParams dividerParams = new LayoutParams(LayoutParams.MATCH_PARENT, Math.max(1, d(1)));
         dividerParams.gravity = Gravity.TOP;
-        dividerParams.leftMargin = bx(compact ? 28 : 30);
-        dividerParams.rightMargin = bx(compact ? 28 : 30);
+        dividerParams.leftMargin = bx(appearance.contentInsetDp + (compact ? 4 : 0));
+        dividerParams.rightMargin = bx(appearance.contentInsetDp + (compact ? 4 : 0));
         dividerParams.topMargin = Math.max(0,
-                controlsTop - by(compact ? 22 : 8));
+                controlsTop - by((compact ? 22 : 8) + appearance.progressGapDp));
         divider.setLayoutParams(dividerParams);
         divider.setVisibility(!chooserVisible && !showProgress ? VISIBLE : GONE);
 
@@ -438,7 +437,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     private void updateControlLayout(boolean compact, int panelHeight) {
-        float iconScale = controlIconScalePercent / 100f;
+        float iconScale = appearance.controlIconScalePercent / 100f;
         int maxButtonSize = Math.max(1, Math.round(panelHeight * 0.96f));
         int sideSize = Math.min(maxButtonSize,
                 d((compact ? 62 : 80) * iconScale));
@@ -448,7 +447,7 @@ final class MediaCardView extends FrameLayout {
         layoutControl(playPause, playSize);
         layoutControl(next, sideSize);
 
-        float requestedOffset = cardWidth * controlSpreadPercent / 100f;
+        float requestedOffset = cardWidth * appearance.controlSpreadPercent / 100f;
         float maxOffset = Math.max(0f, cardWidth / 2f - sideSize / 2f - d(8));
         float offset = Math.min(requestedOffset, maxOffset);
         previous.setTranslationX(-offset);
@@ -571,25 +570,30 @@ final class MediaCardView extends FrameLayout {
         return background;
     }
 
-    private static void configureProgressStyle(Context context, SeekBar seekBar, float scale) {
+    private static void configureProgressStyle(Context context, SeekBar seekBar, float scale,
+            int thicknessDp) {
+        int trackHeight = Math.max(1, Math.round(Ui.dp(context, thicknessDp) * scale));
+        float radius = trackHeight / 2f;
         GradientDrawable track = new GradientDrawable();
         track.setColor(0x553C4148);
-        track.setCornerRadius(Ui.dp(context, 2));
+        track.setCornerRadius(radius);
         GradientDrawable fill = new GradientDrawable();
         fill.setColor(0xFF83AFC2);
-        fill.setCornerRadius(Ui.dp(context, 2));
+        fill.setCornerRadius(radius);
         ClipDrawable clippedFill = new ClipDrawable(fill, Gravity.START, ClipDrawable.HORIZONTAL);
         LayerDrawable layers = new LayerDrawable(new Drawable[]{track, clippedFill});
         layers.setId(0, android.R.id.background);
         layers.setId(1, android.R.id.progress);
-        int inset = Math.round(Ui.dp(context, 12) * scale);
+        int drawableHeight = Math.max(trackHeight, Math.round(Ui.dp(context, 30) * scale));
+        int inset = Math.max(0, (drawableHeight - trackHeight) / 2);
         layers.setLayerInset(0, 0, inset, 0, inset);
         layers.setLayerInset(1, 0, inset, 0, inset);
         seekBar.setProgressDrawable(layers);
         GradientDrawable thumb = new GradientDrawable();
         thumb.setShape(GradientDrawable.OVAL);
         thumb.setColor(0xFF83AFC2);
-        int thumbSize = Math.round(Ui.dp(context, 11) * scale);
+        int thumbSize = Math.max(trackHeight + Math.round(Ui.dp(context, 4) * scale),
+                Math.round(Ui.dp(context, 11) * scale));
         thumb.setSize(thumbSize, thumbSize);
         seekBar.setThumb(thumb);
     }
