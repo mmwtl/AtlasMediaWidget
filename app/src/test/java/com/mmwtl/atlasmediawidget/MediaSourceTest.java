@@ -32,4 +32,11 @@ public class MediaSourceTest {
         assertEquals(false, MediaSourceLauncher.canOpen(MediaSource.Id.UNKNOWN));
         assertEquals(false, MediaSourceLauncher.canOpen(MediaSource.Id.CPAA));
     }
+
+    @Test public void oemMediaJumpTargetsMatchTheStockWidget() {
+        assertEquals("localradio", MediaSourceLauncher.oemJumpView(MediaSource.Id.RADIO));
+        assertEquals("bluetooth", MediaSourceLauncher.oemJumpView(MediaSource.Id.BT));
+        assertEquals("usb", MediaSourceLauncher.oemJumpView(MediaSource.Id.USB));
+        assertEquals("", MediaSourceLauncher.oemJumpView(MediaSource.Id.ONLINE));
+    }
 }

@@ -13,7 +13,7 @@
 
     <queries>
         <package android:name="com.salat.gbinder" />
-        <package android:name="com.geely.mediawidget" />
+        <package android:name="com.tencent.wecarflow" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
