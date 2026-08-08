@@ -14,7 +14,8 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 final class Ui {
-    static final int BACKGROUND = Color.rgb(23, 23, 23);
+    // Matches the default matte graphite surface used by fx11widget 1.0.0.87.
+    static final int BACKGROUND = Color.rgb(29, 34, 40);
     static final int CARD = Color.rgb(38, 38, 38);
     static final int NESTED = Color.rgb(51, 51, 51);
     static final int PRIMARY = Color.rgb(245, 245, 245);

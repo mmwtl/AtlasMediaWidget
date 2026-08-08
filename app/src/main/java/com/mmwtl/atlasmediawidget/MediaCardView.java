@@ -115,8 +115,8 @@ final class MediaCardView extends FrameLayout {
         scrim.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 style == CardStyle.COMPACT
-                        ? new int[]{0x5E11151E, 0x2211151E, 0xAD10141B, 0xF510141B}
-                        : new int[]{0x6011151E, 0x1011151E, 0xB010141B, 0xFA10141B}));
+                        ? new int[]{0x5E1D2228, 0x221D2228, 0xAD1D2228, 0xF51D2228}
+                        : new int[]{0x601D2228, 0x101D2228, 0xB01D2228, 0xFA1D2228}));
         addView(scrim, match());
 
         View border = new View(context);
@@ -378,10 +378,10 @@ final class MediaCardView extends FrameLayout {
         textParams.leftMargin = showThumbnail ? d(15) : 0;
         metadata.getChildAt(1).setLayoutParams(textParams);
 
-        LayoutParams placeholderParams = new LayoutParams(d(compact ? 100 : 165), d(compact ? 100 : 165));
-        placeholderParams.gravity = Gravity.TOP | Gravity.END;
-        placeholderParams.topMargin = by(compact ? 62 : 108);
-        placeholderParams.rightMargin = bx(compact ? 30 : 38);
+        int placeholderSize = d(compact ? 150 : 220);
+        LayoutParams placeholderParams = new LayoutParams(placeholderSize, placeholderSize);
+        placeholderParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        placeholderParams.topMargin = by(compact ? 58 : 72);
         placeholder.setLayoutParams(placeholderParams);
         placeholder.setVisibility(!hasArtwork && !chooserVisible ? VISIBLE : GONE);
 
