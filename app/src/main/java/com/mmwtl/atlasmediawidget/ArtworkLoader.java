@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,6 +59,7 @@ final class ArtworkLoader {
         return switch (artwork.kind) {
             case CONTENT_URI -> context.getContentResolver().openInputStream(Uri.parse(artwork.value));
             case ASSET -> context.getAssets().open(artwork.value);
+            case FILE -> new FileInputStream(artwork.value);
             case NONE -> null;
         };
     }

@@ -11,6 +11,7 @@ final class Prefs {
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     static final String KEY_SHOW_RADIO_COVERS = "show_radio_covers";
+    static final String KEY_CUSTOM_RADIO_CATALOG = "custom_radio_catalog";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     private static final String KEY_TEXT_GAP_PREFIX = "text_gap_";
@@ -70,12 +71,20 @@ final class Prefs {
         return preferences.getInt(key, fallback);
     }
 
+    String getString(String key, String fallback) {
+        return preferences.getString(key, fallback);
+    }
+
     void putBoolean(String key, boolean value) {
         preferences.edit().putBoolean(key, value).apply();
     }
 
     void putInt(String key, int value) {
         preferences.edit().putInt(key, value).apply();
+    }
+
+    void putString(String key, String value) {
+        preferences.edit().putString(key, value).apply();
     }
 
     int cardWidthDp(CardStyle style) {

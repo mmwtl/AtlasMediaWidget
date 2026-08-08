@@ -1,7 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
 final class ArtworkRef {
-    enum Kind { NONE, CONTENT_URI, ASSET }
+    enum Kind { NONE, CONTENT_URI, ASSET, FILE }
 
     static final ArtworkRef NONE = new ArtworkRef(Kind.NONE, "");
 
@@ -20,6 +20,10 @@ final class ArtworkRef {
 
     static ArtworkRef asset(String value) {
         return value == null || value.isBlank() ? NONE : new ArtworkRef(Kind.ASSET, value);
+    }
+
+    static ArtworkRef file(String value) {
+        return value == null || value.isBlank() ? NONE : new ArtworkRef(Kind.FILE, value);
     }
 
     boolean isEmpty() {

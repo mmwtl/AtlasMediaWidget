@@ -8,6 +8,8 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.Gravity;
@@ -25,19 +27,28 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class MainActivity extends ScaledActivity {
     private static final int MIN_WIDTH_DP = 360;
     private static final int MAX_WIDTH_DP = 900;
     private static final int MIN_HEIGHT_DP = 220;
     private static final int MAX_HEIGHT_DP = 900;
+    private static final int REQUEST_IMPORT_RADIO_CATALOG = 4100;
     private Prefs prefs;
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService catalogExecutor = Executors.newSingleThreadExecutor();
     private TextView permissionStatus;
     private TextView bridgeStatus;
     private Button serviceButton;
     private Switch autoStart;
     private Switch showRadioCovers;
+    private TextView radioCatalogStatus;
+    private Button importRadioCatalogButton;
+    private Button clearRadioCatalog;
     private RadioButton compactStyle;
     private RadioButton squareStyle;
     private TextView sizeValue;
@@ -84,6 +95,21 @@ public final class MainActivity extends ScaledActivity {
     @Override protected void onResume() {
         super.onResume();
         refresh();
+    }
+
+    @Override protected void onDestroy() {
+        main.removeCallbacksAndMessages(null);
+        catalogExecutor.shutdownNow();
+        super.onDestroy();
+    }
+
+    @Override @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_IMPORT_RADIO_CATALOG && resultCode == RESULT_OK
+                && data != null && data.getData() != null) {
+            importRadioCatalog(data.getData());
+        }
     }
 
     private View buildContent() {
@@ -429,6 +455,27 @@ public final class MainActivity extends ScaledActivity {
         noteParams.topMargin = Ui.dp(this, 8);
         behaviorCard.addView(note, noteParams);
 
+        LinearLayout radioCatalogCard = card();
+        radioCatalogCard.addView(text("Пользовательский каталог радио",
+                20, Ui.PRIMARY, Typeface.BOLD));
+        radioCatalogStatus = text("", 14, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams catalogStatusParams = fullWrap();
+        catalogStatusParams.topMargin = Ui.dp(this, 8);
+        radioCatalogCard.addView(radioCatalogStatus, catalogStatusParams);
+        TextView catalogHint = text(
+                "Импортируется один ZIP: stations.csv в корне и изображения в covers/. "
+                        + "Пользовательские частоты заменяют встроенные.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams catalogHintParams = fullWrap();
+        catalogHintParams.topMargin = Ui.dp(this, 8);
+        radioCatalogCard.addView(catalogHint, catalogHintParams);
+        importRadioCatalogButton = actionButton("Импортировать каталог ZIP");
+        importRadioCatalogButton.setOnClickListener(v -> chooseRadioCatalog());
+        radioCatalogCard.addView(importRadioCatalogButton, buttonParams());
+        clearRadioCatalog = actionButton("Вернуть встроенный каталог");
+        clearRadioCatalog.setOnClickListener(v -> clearCustomRadioCatalog());
+        radioCatalogCard.addView(clearRadioCatalog, buttonParams());
+
         LinearLayout scaleCard = card();
         scaleCard.addView(text(getString(R.string.scale_title),
                 20, Ui.PRIMARY, Typeface.BOLD));
@@ -446,6 +493,7 @@ public final class MainActivity extends ScaledActivity {
 
         addSectionHeading(root, getString(R.string.settings_section_content), false);
         root.addView(behaviorCard);
+        root.addView(radioCatalogCard);
 
         addSectionHeading(root, getString(R.string.settings_section_visual), false);
         root.addView(serviceCard);
@@ -525,6 +573,9 @@ public final class MainActivity extends ScaledActivity {
         serviceButton.setEnabled(enabled || overlay && usage);
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
         showRadioCovers.setChecked(prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true));
+        radioCatalogStatus.setText(RadioCatalogImporter.activeSummary(this));
+        clearRadioCatalog.setEnabled(!prefs.getString(
+                Prefs.KEY_CUSTOM_RADIO_CATALOG, "").isBlank());
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         refreshingStyle = true;
@@ -551,6 +602,64 @@ public final class MainActivity extends ScaledActivity {
             }
         }
         refresh();
+    }
+
+    @SuppressWarnings("deprecation")
+    private void chooseRadioCatalog() {
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/zip");
+        picker.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"application/zip", "application/octet-stream"});
+        try {
+            startActivityForResult(picker, REQUEST_IMPORT_RADIO_CATALOG);
+        } catch (ActivityNotFoundException error) {
+            Toast.makeText(this, "На ГУ нет системного выбора файлов",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void importRadioCatalog(Uri uri) {
+        radioCatalogStatus.setText("Проверка и импорт каталога…");
+        importRadioCatalogButton.setEnabled(false);
+        clearRadioCatalog.setEnabled(false);
+        android.content.Context appContext = getApplicationContext();
+        catalogExecutor.execute(() -> {
+            try {
+                RadioCatalogImporter.Result result = RadioCatalogImporter.importZip(appContext, uri);
+                main.post(() -> {
+                    if (isDestroyed()) return;
+                    radioCatalogStatus.setText("Импортировано: " + result.stations
+                            + " станций, " + result.covers + " обложек");
+                    clearRadioCatalog.setEnabled(true);
+                    importRadioCatalogButton.setEnabled(true);
+                    refreshOverlayIfRunning();
+                });
+            } catch (Exception error) {
+                AppLog.warn("Cannot import radio catalog", error);
+                String detail = error.getMessage() == null || error.getMessage().isBlank()
+                        ? "Не удалось импортировать каталог" : error.getMessage();
+                main.post(() -> {
+                    if (isDestroyed()) return;
+                    radioCatalogStatus.setText("Ошибка: " + detail);
+                    importRadioCatalogButton.setEnabled(true);
+                    clearRadioCatalog.setEnabled(!prefs.getString(
+                            Prefs.KEY_CUSTOM_RADIO_CATALOG, "").isBlank());
+                });
+            }
+        });
+    }
+
+    private void clearCustomRadioCatalog() {
+        File obsolete = RadioCatalogImporter.clear(this);
+        radioCatalogStatus.setText("Используется встроенный каталог Пензы");
+        clearRadioCatalog.setEnabled(false);
+        refreshOverlayIfRunning();
+        main.postDelayed(() -> {
+            if (!catalogExecutor.isShutdown()) {
+                catalogExecutor.execute(() -> RadioCatalogImporter.deleteCatalog(obsolete));
+            }
+        }, 2_000L);
     }
 
     private void openOverlaySettings() {

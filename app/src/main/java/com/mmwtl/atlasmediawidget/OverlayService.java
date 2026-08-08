@@ -121,7 +121,7 @@ public final class OverlayService extends Service
         prefs = new Prefs(this);
         windowManager = getSystemService(WindowManager.class);
         artworkLoader = new ArtworkLoader(this, this);
-        radioCatalog = RadioCatalog.loadBuiltIn(this);
+        radioCatalog = RadioCatalog.load(this);
         mediaSourceLauncher = new MediaSourceLauncher(this);
         bridge = new MediaBridgeClient(this, this);
         createNotificationChannel();
@@ -145,6 +145,7 @@ public final class OverlayService extends Service
             return START_NOT_STICKY;
         }
         if (intent != null && ACTION_REFRESH_STYLE.equals(intent.getAction())) {
+            radioCatalog = RadioCatalog.load(this);
             hideCardImmediately();
             main.removeCallbacks(foregroundPoll);
             main.post(foregroundPoll);

@@ -2,7 +2,8 @@ package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
 
-import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -21,27 +22,35 @@ final class RadioCatalog {
 
     static RadioCatalog loadBuiltIn(Context context) {
         Map<Integer, RadioStation> stations = new HashMap<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                context.getAssets().open(BUILT_IN_MANIFEST), StandardCharsets.UTF_8))) {
-            String line;
-            boolean first = true;
-            while ((line = reader.readLine()) != null) {
-                if (first) {
-                    first = false;
-                    continue;
-                }
-                if (line.isBlank()) continue;
-                String[] fields = line.split(",", 4);
-                if (fields.length != 4) continue;
-                int frequency = Integer.parseInt(fields[0].trim());
-                String name = fields[1].trim();
-                String band = fields[2].trim();
-                String cover = fields[3].trim();
-                stations.put(frequency, new RadioStation(frequency, name, band,
-                        ArtworkRef.asset(BUILT_IN_COVER_PREFIX + cover)));
+        try (InputStreamReader reader = new InputStreamReader(
+                context.getAssets().open(BUILT_IN_MANIFEST), StandardCharsets.UTF_8)) {
+            for (RadioCatalogCsv.Row row : RadioCatalogCsv.read(reader)) {
+                stations.put(row.frequencyKHz, new RadioStation(row.frequencyKHz,
+                        row.name, row.band, ArtworkRef.asset(BUILT_IN_COVER_PREFIX + row.cover)));
             }
         } catch (Exception error) {
             AppLog.warn("Cannot load built-in radio catalog", error);
+        }
+        return new RadioCatalog(stations);
+    }
+
+    static RadioCatalog load(Context context) {
+        Map<Integer, RadioStation> stations = new HashMap<>(loadBuiltIn(context).stations);
+        String directoryName = new Prefs(context).getString(Prefs.KEY_CUSTOM_RADIO_CATALOG, "");
+        File root = RadioCatalogImporter.catalogDirectory(context, directoryName);
+        if (root == null) return new RadioCatalog(stations);
+        File manifest = new File(root, RadioCatalogImporter.MANIFEST_NAME);
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(manifest), StandardCharsets.UTF_8)) {
+            for (RadioCatalogCsv.Row row : RadioCatalogCsv.read(reader)) {
+                File cover = row.cover.isBlank() ? null : new File(new File(root, "covers"), row.cover);
+                ArtworkRef artwork = cover != null && cover.isFile()
+                        ? ArtworkRef.file(cover.getAbsolutePath()) : ArtworkRef.NONE;
+                stations.put(row.frequencyKHz, new RadioStation(row.frequencyKHz,
+                        row.name, row.band, artwork));
+            }
+        } catch (Exception error) {
+            AppLog.warn("Cannot load custom radio catalog", error);
         }
         return new RadioCatalog(stations);
     }
