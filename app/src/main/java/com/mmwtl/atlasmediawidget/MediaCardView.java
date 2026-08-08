@@ -281,6 +281,10 @@ final class MediaCardView extends FrameLayout {
     int cardHeight() { return cardHeight; }
 
     void renderSnapshot(MediaSnapshot value, boolean bridgeConnected) {
+        renderSnapshot(value, bridgeConnected, null);
+    }
+
+    void renderSnapshot(MediaSnapshot value, boolean bridgeConnected, RadioDisplay radioDisplay) {
         snapshot = value;
         if (value == null) {
             renderDisconnected(getResources().getString(R.string.bridge_disconnected));
@@ -289,10 +293,13 @@ final class MediaCardView extends FrameLayout {
         activeSource = selectedSource(value);
         hasMedia = MediaPresentation.hasContent(activeSource, bridgeConnected,
                 value.backendConnected, value.title, value.artist, value.album, value.duration);
-        String displayTitle = MediaPresentation.title(activeSource, value.title);
+        String displayTitle = radioDisplay == null
+                ? MediaPresentation.title(activeSource, value.title) : radioDisplay.title;
         title.setText(hasMedia && !displayTitle.isBlank()
                 ? displayTitle : getResources().getString(R.string.unknown_track));
-        String detail = MediaPresentation.subtitle(activeSource, value.artist, value.album);
+        String detail = radioDisplay == null
+                ? MediaPresentation.subtitle(activeSource, value.artist, value.album)
+                : radioDisplay.subtitle;
         subtitle.setText(hasMedia && !detail.isBlank()
                 ? detail : getResources().getString(R.string.empty_hint));
         if (bridgeConnected && value.backendConnected) statusPill.setVisibility(GONE);

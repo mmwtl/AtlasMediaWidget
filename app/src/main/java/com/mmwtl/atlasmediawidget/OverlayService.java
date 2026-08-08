@@ -46,12 +46,13 @@ public final class OverlayService extends Service
     private ForegroundAppDetector foregroundDetector;
     private MediaBridgeClient bridge;
     private ArtworkLoader artworkLoader;
+    private RadioCatalog radioCatalog;
     private MediaSourceLauncher mediaSourceLauncher;
     private MediaCardView card;
     private WindowManager.LayoutParams cardParams;
     private MediaBridgeClient.State bridgeState = MediaBridgeClient.State.CONNECTING;
     private long loadedArtworkRevision = Long.MIN_VALUE;
-    private String loadedArtworkUri = "";
+    private String loadedArtworkKey = "";
     private long createdAt;
     private float dragStartRawX;
     private float dragStartRawY;
@@ -120,6 +121,7 @@ public final class OverlayService extends Service
         prefs = new Prefs(this);
         windowManager = getSystemService(WindowManager.class);
         artworkLoader = new ArtworkLoader(this, this);
+        radioCatalog = RadioCatalog.loadBuiltIn(this);
         mediaSourceLauncher = new MediaSourceLauncher(this);
         bridge = new MediaBridgeClient(this, this);
         createNotificationChannel();
@@ -270,7 +272,7 @@ public final class OverlayService extends Service
         cardParams = null;
         cardHiding = false;
         loadedArtworkRevision = Long.MIN_VALUE;
-        loadedArtworkUri = "";
+        loadedArtworkKey = "";
         Rect bounds = availableBounds();
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
@@ -373,7 +375,7 @@ public final class OverlayService extends Service
         if (card == null) return;
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (visible == null) card.renderDisconnected(stateDetail());
-        else card.renderSnapshot(visible, reducer.isConnected());
+        else card.renderSnapshot(visible, reducer.isConnected(), radioCatalog.display(visible));
     }
 
     private String stateDetail() {
@@ -385,12 +387,18 @@ public final class OverlayService extends Service
     }
 
     private void loadArtwork(MediaSnapshot snapshot) {
+        RadioDisplay radioDisplay = radioCatalog.display(snapshot);
+        ArtworkRef artwork = radioDisplay == null
+                ? ArtworkRef.contentUri(snapshot.artworkUri)
+                : prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true)
+                        ? radioDisplay.artwork : ArtworkRef.NONE;
+        String artworkKey = artwork.cacheKey();
         if (snapshot.artworkRevision == loadedArtworkRevision
-                && snapshot.artworkUri.equals(loadedArtworkUri)) return;
+                && artworkKey.equals(loadedArtworkKey)) return;
         loadedArtworkRevision = snapshot.artworkRevision;
-        loadedArtworkUri = snapshot.artworkUri;
+        loadedArtworkKey = artworkKey;
         if (card != null) card.setArtwork(null);
-        artworkLoader.load(snapshot.artworkUri, snapshot.generation, snapshot.artworkRevision);
+        artworkLoader.load(artwork, snapshot.generation, snapshot.artworkRevision);
     }
 
     private ForegroundAppDetector foregroundDetector() {

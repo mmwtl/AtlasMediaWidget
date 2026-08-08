@@ -37,6 +37,7 @@ public final class MainActivity extends ScaledActivity {
     private TextView bridgeStatus;
     private Button serviceButton;
     private Switch autoStart;
+    private Switch showRadioCovers;
     private RadioButton compactStyle;
     private RadioButton squareStyle;
     private TextView sizeValue;
@@ -407,6 +408,18 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout behaviorCard = card();
         behaviorCard.addView(text(getString(R.string.behavior_title),
                 20, Ui.PRIMARY, Typeface.BOLD));
+        showRadioCovers = new Switch(this);
+        showRadioCovers.setText("Показывать обложки радиостанций");
+        showRadioCovers.setTextColor(Ui.PRIMARY);
+        showRadioCovers.setTextSize(15);
+        showRadioCovers.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_SHOW_RADIO_COVERS, checked);
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams radioCoverParams = fullWrap();
+        radioCoverParams.topMargin = Ui.dp(this, 12);
+        behaviorCard.addView(showRadioCovers, radioCoverParams);
         TextView note = text(
                 "Карточка отображается только когда HOME находится на переднем плане. "
                         + "Перетаскивание выполняется за кнопку ⋮ в правом верхнем углу. "
@@ -511,6 +524,7 @@ public final class MainActivity extends ScaledActivity {
         serviceButton.setBackground(Ui.background(enabled ? Ui.NESTED : Ui.ACCENT, 8, this));
         serviceButton.setEnabled(enabled || overlay && usage);
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
+        showRadioCovers.setChecked(prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true));
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         refreshingStyle = true;
