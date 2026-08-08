@@ -12,4 +12,18 @@
     <string name="bridge_connecting">Подключение к GInputBridge…</string>
     <string name="unknown_track">Ничего не воспроизводится</string>
     <string name="empty_hint">Выберите источник • включите звук</string>
+    <string name="main_subtitle">Медиакарточка поверх главного экрана. Состояние и команды приходят из GInputBridge mediaapi v1.</string>
+    <string name="preview_title">Предпросмотр медиакарточки</string>
+    <string name="settings_section_system">СИСТЕМА</string>
+    <string name="settings_section_content">СОДЕРЖИМОЕ И ПОВЕДЕНИЕ</string>
+    <string name="settings_section_visual">ВНЕШНИЙ ВИД</string>
+    <string name="permissions_title">Системные разрешения</string>
+    <string name="bridge_title">GInputBridge</string>
+    <string name="service_title">Запуск и сервис</string>
+    <string name="behavior_title">Поведение overlay</string>
+    <string name="appearance_title">Медиакарточка</string>
+    <string name="scale_title">Интерфейс приложения</string>
+    <string name="scale_hint">Меняет размер экрана настроек без изменения размера медиакарточки overlay.</string>
+    <string name="scale">Масштаб</string>
+    <string name="scale_content_description">Масштаб интерфейса приложения</string>
 </resources>

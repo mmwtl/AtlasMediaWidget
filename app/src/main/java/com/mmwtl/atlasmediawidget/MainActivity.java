@@ -1,7 +1,6 @@
 package com.mmwtl.atlasmediawidget;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -14,6 +13,7 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -27,7 +27,7 @@ import android.widget.Toast;
 
 import java.util.Arrays;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends ScaledActivity {
     private static final int MIN_WIDTH_DP = 360;
     private static final int MAX_WIDTH_DP = 900;
     private static final int MIN_HEIGHT_DP = 220;
@@ -75,7 +75,9 @@ public final class MainActivity extends Activity {
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Prefs(this);
-        setContentView(buildContent());
+        View content = buildContent();
+        setContentView(content);
+        Ui.applySystemBarInsets(content);
     }
 
     @Override protected void onResume() {
@@ -84,30 +86,62 @@ public final class MainActivity extends Activity {
     }
 
     private View buildContent() {
+        LinearLayout screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(Ui.BACKGROUND);
+
+        LinearLayout stickyPreview = new LinearLayout(this);
+        stickyPreview.setOrientation(LinearLayout.VERTICAL);
+        stickyPreview.setClipChildren(false);
+        stickyPreview.setPadding(Ui.dp(this, 24), Ui.dp(this, 16),
+                Ui.dp(this, 24), Ui.dp(this, 12));
+        stickyPreview.setBackgroundColor(Ui.BACKGROUND);
+
+        LinearLayout previewTitleRow = new LinearLayout(this);
+        previewTitleRow.setOrientation(LinearLayout.HORIZONTAL);
+        previewTitleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(getString(R.string.app_name), 24, Ui.PRIMARY, Typeface.BOLD);
+        previewTitleRow.addView(title, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView previewTitle = text(getString(R.string.preview_title), 13,
+                Ui.SECONDARY, Typeface.NORMAL);
+        previewTitleRow.addView(previewTitle);
+        stickyPreview.addView(previewTitleRow);
+
+        previewHost = new FrameLayout(this);
+        previewHost.setClipChildren(false);
+        previewHost.setClipToPadding(false);
+        previewHost.setBackground(Ui.background(Ui.NESTED, 8, this));
+        previewHost.setPadding(Ui.dp(this, 8), Ui.dp(this, 10),
+                Ui.dp(this, 8), Ui.dp(this, 10));
+        previewHost.setContentDescription(getString(R.string.preview_title));
+        LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 110));
+        previewParams.topMargin = Ui.dp(this, 8);
+        stickyPreview.addView(previewHost, previewParams);
+        screen.addView(stickyPreview, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
         scroll.setBackgroundColor(Ui.BACKGROUND);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(Ui.dp(this, 28), Ui.dp(this, 38), Ui.dp(this, 28), Ui.dp(this, 38));
+        root.setPadding(Ui.dp(this, 24), Ui.dp(this, 12),
+                Ui.dp(this, 24), Ui.dp(this, 42));
         scroll.addView(root, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
 
-        TextView title = text("Atlas Media Widget", 30, Ui.PRIMARY, Typeface.BOLD);
-        root.addView(title);
-        TextView intro = text(
-                "Медиакарточка поверх главного экрана. Состояние и команды приходят из "
-                        + "GInputBridge mediaapi v1.",
-                17, Ui.SECONDARY, Typeface.NORMAL);
+        TextView intro = text(getString(R.string.main_subtitle),
+                15, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams introParams = fullWrap();
         introParams.topMargin = Ui.dp(this, 10);
         root.addView(intro, introParams);
 
         LinearLayout accessCard = card();
-        LinearLayout.LayoutParams cardParams = fullWrap();
-        cardParams.topMargin = Ui.dp(this, 28);
-        root.addView(accessCard, cardParams);
-        accessCard.addView(text("Разрешения", 20, Ui.PRIMARY, Typeface.BOLD));
-        permissionStatus = text("", 15, Ui.SECONDARY, Typeface.NORMAL);
+        accessCard.addView(text(getString(R.string.permissions_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        permissionStatus = text("", 14, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams statusParams = fullWrap();
         statusParams.topMargin = Ui.dp(this, 10);
         accessCard.addView(permissionStatus, statusParams);
@@ -119,11 +153,9 @@ public final class MainActivity extends Activity {
         accessCard.addView(usage, buttonParams());
 
         LinearLayout bridgeCard = card();
-        LinearLayout.LayoutParams bridgeParams = fullWrap();
-        bridgeParams.topMargin = Ui.dp(this, 18);
-        root.addView(bridgeCard, bridgeParams);
-        bridgeCard.addView(text("GInputBridge", 20, Ui.PRIMARY, Typeface.BOLD));
-        bridgeStatus = text("", 15, Ui.SECONDARY, Typeface.NORMAL);
+        bridgeCard.addView(text(getString(R.string.bridge_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        bridgeStatus = text("", 14, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams bridgeStatusParams = fullWrap();
         bridgeStatusParams.topMargin = Ui.dp(this, 10);
         bridgeCard.addView(bridgeStatus, bridgeStatusParams);
@@ -132,10 +164,8 @@ public final class MainActivity extends Activity {
         bridgeCard.addView(openBridge, buttonParams());
 
         LinearLayout serviceCard = card();
-        LinearLayout.LayoutParams serviceParams = fullWrap();
-        serviceParams.topMargin = Ui.dp(this, 18);
-        root.addView(serviceCard, serviceParams);
-        serviceCard.addView(text("Виджет", 20, Ui.PRIMARY, Typeface.BOLD));
+        serviceCard.addView(text(getString(R.string.appearance_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
 
         TextView styleTitle = text("Формат карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams styleTitleParams = fullWrap();
@@ -160,20 +190,6 @@ public final class MainActivity extends Activity {
             }
         });
         serviceCard.addView(styleGroup, fullWrap());
-
-        TextView previewTitle = text("Предпросмотр", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams previewTitleParams = fullWrap();
-        previewTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(previewTitle, previewTitleParams);
-        previewHost = new FrameLayout(this);
-        previewHost.setBackground(Ui.background(Ui.NESTED, 18, this));
-        previewHost.setPadding(Ui.dp(this, 8), Ui.dp(this, 8),
-                Ui.dp(this, 8), Ui.dp(this, 8));
-        previewHost.setContentDescription("Предпросмотр медиакарточки");
-        LinearLayout.LayoutParams previewParams = fullWrap();
-        previewParams.topMargin = Ui.dp(this, 8);
-        previewParams.height = Ui.dp(this, 1);
-        serviceCard.addView(previewHost, previewParams);
 
         TextView sizeTitle = text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams sizeTitleParams = fullWrap();
@@ -212,10 +228,12 @@ public final class MainActivity extends Activity {
         widthSize.setOnSeekBarChangeListener(sizeListener);
         heightSize.setOnSeekBarChangeListener(sizeListener);
 
-        serviceCard.addView(text("Сдвиг блока текста по вертикали",
+        LinearLayout typographyCard = card();
+        typographyCard.addView(text("Текст и отступы", 20, Ui.PRIMARY, Typeface.BOLD));
+        typographyCard.addView(text("Сдвиг блока текста по вертикали",
                 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
         textGapValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        serviceCard.addView(textGapValue, fullWrap());
+        typographyCard.addView(textGapValue, fullWrap());
         textGap = sizeSeekBar(Prefs.MIN_TEXT_GAP_DP, Prefs.MAX_TEXT_GAP_DP);
         textGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress,
@@ -231,31 +249,25 @@ public final class MainActivity extends Activity {
                 saveAppearance();
             }
         });
-        serviceCard.addView(textGap, fullWrap());
+        typographyCard.addView(textGap, fullWrap());
 
-        TextView typographyTitle = text("Текст и отступы", 15,
-                Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams typographyTitleParams = fullWrap();
-        typographyTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(typographyTitle, typographyTitleParams);
-
-        topInsetSetting = addLabeledSeek(serviceCard, "Отступ верхней строки",
+        topInsetSetting = addLabeledSeek(typographyCard, "Отступ верхней строки",
                 Prefs.MIN_TOP_INSET_DP, Prefs.MAX_TOP_INSET_DP);
-        contentInsetSetting = addLabeledSeek(serviceCard, "Боковой отступ контента",
+        contentInsetSetting = addLabeledSeek(typographyCard, "Боковой отступ контента",
                 Prefs.MIN_CONTENT_INSET_DP, Prefs.MAX_CONTENT_INSET_DP);
-        topRowTextSetting = addLabeledSeek(serviceCard, "Размер текста верхней строки",
+        topRowTextSetting = addLabeledSeek(typographyCard, "Размер текста верхней строки",
                 Prefs.MIN_TOP_ROW_TEXT_SIZE_SP, Prefs.MAX_TOP_ROW_TEXT_SIZE_SP);
-        titleTextSetting = addLabeledSeek(serviceCard, "Размер названия",
+        titleTextSetting = addLabeledSeek(typographyCard, "Размер названия",
                 Prefs.MIN_TITLE_TEXT_SIZE_SP, Prefs.MAX_TITLE_TEXT_SIZE_SP);
-        subtitleTextSetting = addLabeledSeek(serviceCard, "Размер исполнителя и альбома",
+        subtitleTextSetting = addLabeledSeek(typographyCard, "Размер исполнителя и альбома",
                 Prefs.MIN_SUBTITLE_TEXT_SIZE_SP, Prefs.MAX_SUBTITLE_TEXT_SIZE_SP);
-        subtitleGapSetting = addLabeledSeek(serviceCard, "Отступ подзаголовка",
+        subtitleGapSetting = addLabeledSeek(typographyCard, "Отступ подзаголовка",
                 0, Prefs.MAX_SUBTITLE_GAP_DP);
-        timeTextSetting = addLabeledSeek(serviceCard, "Размер времени",
+        timeTextSetting = addLabeledSeek(typographyCard, "Размер времени",
                 Prefs.MIN_TIME_TEXT_SIZE_SP, Prefs.MAX_TIME_TEXT_SIZE_SP);
-        progressGapSetting = addLabeledSeek(serviceCard, "Отступ прогресса от панели",
+        progressGapSetting = addLabeledSeek(typographyCard, "Отступ прогресса от панели",
                 0, Prefs.MAX_PROGRESS_GAP_DP);
-        progressThicknessSetting = addLabeledSeek(serviceCard, "Толщина линии прогресса",
+        progressThicknessSetting = addLabeledSeek(typographyCard, "Толщина линии прогресса",
                 Prefs.MIN_PROGRESS_THICKNESS_DP, Prefs.MAX_PROGRESS_THICKNESS_DP);
         SeekBar.OnSeekBarChangeListener appearanceListener =
                 new SeekBar.OnSeekBarChangeListener() {
@@ -298,33 +310,30 @@ public final class MainActivity extends Activity {
             refreshSizeControls(current);
             refreshOverlayIfRunning();
         });
-        serviceCard.addView(resetAppearance, buttonParams());
+        typographyCard.addView(resetAppearance, buttonParams());
 
-        TextView controlsTitle = text("Панель управления", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams controlsTitleParams = fullWrap();
-        controlsTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(controlsTitle, controlsTitleParams);
-
-        serviceCard.addView(text("Высота нижней панели", 14,
+        LinearLayout controlsCard = card();
+        controlsCard.addView(text("Панель управления", 20, Ui.PRIMARY, Typeface.BOLD));
+        controlsCard.addView(text("Высота нижней панели", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlPanelHeightValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        serviceCard.addView(controlPanelHeightValue, fullWrap());
+        controlsCard.addView(controlPanelHeightValue, fullWrap());
         controlPanelHeight = sizeSeekBar(Prefs.MIN_CONTROL_PANEL_HEIGHT_DP,
                 Prefs.MAX_CONTROL_PANEL_HEIGHT_DP);
-        serviceCard.addView(controlPanelHeight, fullWrap());
+        controlsCard.addView(controlPanelHeight, fullWrap());
 
-        serviceCard.addView(text("Размер иконок", 14,
+        controlsCard.addView(text("Размер иконок", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlIconScaleValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        serviceCard.addView(controlIconScaleValue, fullWrap());
+        controlsCard.addView(controlIconScaleValue, fullWrap());
         controlIconScale = sizeSeekBar(Prefs.MIN_CONTROL_ICON_SCALE_PERCENT,
                 Prefs.MAX_CONTROL_ICON_SCALE_PERCENT);
-        serviceCard.addView(controlIconScale, fullWrap());
+        controlsCard.addView(controlIconScale, fullWrap());
 
-        serviceCard.addView(text("Разбежка боковых иконок от центра", 14,
+        controlsCard.addView(text("Разбежка боковых иконок от центра", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlSpreadValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        serviceCard.addView(controlSpreadValue, fullWrap());
+        controlsCard.addView(controlSpreadValue, fullWrap());
         controlSpread = sizeSeekBar(Prefs.MIN_CONTROL_SPREAD_PERCENT,
                 Prefs.MAX_CONTROL_SPREAD_PERCENT);
         SeekBar.OnSeekBarChangeListener controlListener = new SeekBar.OnSeekBarChangeListener() {
@@ -344,15 +353,15 @@ public final class MainActivity extends Activity {
         controlPanelHeight.setOnSeekBarChangeListener(controlListener);
         controlIconScale.setOnSeekBarChangeListener(controlListener);
         controlSpread.setOnSeekBarChangeListener(controlListener);
-        serviceCard.addView(controlSpread, fullWrap());
+        controlsCard.addView(controlSpread, fullWrap());
 
-        serviceCard.addView(text("Дополнительный отступ иконок от нижней границы", 14,
+        controlsCard.addView(text("Дополнительный отступ иконок от нижней границы", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlBottomInsetValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        serviceCard.addView(controlBottomInsetValue, fullWrap());
+        controlsCard.addView(controlBottomInsetValue, fullWrap());
         controlBottomInset = sizeSeekBar(0, Prefs.MAX_CONTROL_BOTTOM_INSET_DP);
         controlBottomInset.setOnSeekBarChangeListener(controlListener);
-        serviceCard.addView(controlBottomInset, fullWrap());
+        controlsCard.addView(controlBottomInset, fullWrap());
 
         Button resetControls = actionButton("Вернуть панель по умолчанию");
         resetControls.setOnClickListener(v -> {
@@ -365,7 +374,7 @@ public final class MainActivity extends Activity {
                 OverlayService.refreshStyle(this);
             }
         });
-        serviceCard.addView(resetControls, buttonParams());
+        controlsCard.addView(resetControls, buttonParams());
 
         Button resetSize = actionButton("Вернуть размер по умолчанию");
         resetSize.setOnClickListener(v -> {
@@ -378,30 +387,112 @@ public final class MainActivity extends Activity {
         });
         serviceCard.addView(resetSize, buttonParams());
 
+        LinearLayout runtimeCard = card();
+        runtimeCard.addView(text(getString(R.string.service_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
         serviceButton = actionButton("Запустить");
         serviceButton.setOnClickListener(v -> toggleService());
-        serviceCard.addView(serviceButton, buttonParams());
+        runtimeCard.addView(serviceButton, buttonParams());
         autoStart = new Switch(this);
         autoStart.setText("Автозапуск после загрузки ГУ");
         autoStart.setTextColor(Ui.PRIMARY);
-        autoStart.setTextSize(16);
-        autoStart.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        autoStart.setTextSize(15);
         autoStart.setOnCheckedChangeListener((button, checked) -> {
             if (button.isPressed()) prefs.putBoolean(Prefs.KEY_AUTO_START, checked);
         });
         LinearLayout.LayoutParams switchParams = fullWrap();
         switchParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(autoStart, switchParams);
+        runtimeCard.addView(autoStart, switchParams);
 
+        LinearLayout behaviorCard = card();
+        behaviorCard.addView(text(getString(R.string.behavior_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
         TextView note = text(
                 "Карточка отображается только когда HOME находится на переднем плане. "
                         + "Перетаскивание выполняется за кнопку ⋮ в правом верхнем углу. "
                         + "Нажатие на свободную область открывает активный медиаисточник.",
                 14, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams noteParams = fullWrap();
-        noteParams.topMargin = Ui.dp(this, 24);
-        root.addView(note, noteParams);
-        return scroll;
+        noteParams.topMargin = Ui.dp(this, 8);
+        behaviorCard.addView(note, noteParams);
+
+        LinearLayout scaleCard = card();
+        scaleCard.addView(text(getString(R.string.scale_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        TextView scaleHint = text(getString(R.string.scale_hint),
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams scaleHintParams = fullWrap();
+        scaleHintParams.topMargin = Ui.dp(this, 6);
+        scaleCard.addView(scaleHint, scaleHintParams);
+        addScaleSlider(scaleCard);
+
+        addSectionHeading(root, getString(R.string.settings_section_system), true);
+        root.addView(accessCard);
+        root.addView(bridgeCard);
+        root.addView(runtimeCard);
+
+        addSectionHeading(root, getString(R.string.settings_section_content), false);
+        root.addView(behaviorCard);
+
+        addSectionHeading(root, getString(R.string.settings_section_visual), false);
+        root.addView(serviceCard);
+        root.addView(typographyCard);
+        root.addView(controlsCard);
+        root.addView(scaleCard);
+
+        screen.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        return screen;
+    }
+
+    private void addSectionHeading(LinearLayout parent, String label, boolean first) {
+        TextView heading = text(label, 16, Ui.ACCENT, Typeface.BOLD);
+        LinearLayout.LayoutParams params = fullWrap();
+        params.topMargin = Ui.dp(this, first ? 20 : 14);
+        params.bottomMargin = Ui.dp(this, 10);
+        parent.addView(heading, params);
+    }
+
+    private void addScaleSlider(LinearLayout parent) {
+        int current = configuredScaleTenths(this);
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams headerParams = fullWrap();
+        headerParams.topMargin = Ui.dp(this, 15);
+        parent.addView(header, headerParams);
+        header.addView(text(getString(R.string.scale), 14, Ui.PRIMARY, Typeface.NORMAL),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView value = text(formatScale(current), 14, Ui.SECONDARY, Typeface.NORMAL);
+        value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        header.addView(value);
+
+        SeekBar scale = sizeSeekBar(MIN_SCALE_TENTHS, MAX_SCALE_TENTHS);
+        scale.setProgress(current);
+        scale.setContentDescription(getString(R.string.scale_content_description));
+        scale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress,
+                    boolean fromUser) {
+                value.setText(formatScale(progress));
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                int selected = seekBar.getProgress();
+                if (selected != configuredScaleTenths(MainActivity.this)) {
+                    prefs.putInt(Prefs.KEY_APP_UI_SCALE_TENTHS, selected);
+                    recreate();
+                }
+            }
+        });
+        parent.addView(scale, fullWrap());
+    }
+
+    private static String formatScale(int tenths) {
+        return tenths % 10 == 0
+                ? tenths / 10 + "×"
+                : tenths / 10 + "." + tenths % 10 + "×";
     }
 
     private void refresh() {
@@ -417,6 +508,7 @@ public final class MainActivity extends Activity {
         bridgeStatus.setTextColor(bridgeInstalled ? Ui.ACCENT : Ui.ERROR);
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
+        serviceButton.setBackground(Ui.background(enabled ? Ui.NESTED : Ui.ACCENT, 8, this));
         serviceButton.setEnabled(enabled || overlay && usage);
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
         CardStyle style = CardStyle.fromPreference(
@@ -487,28 +579,18 @@ public final class MainActivity extends Activity {
     }
 
     private LinearLayout card() {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(Ui.dp(this, 20), Ui.dp(this, 18), Ui.dp(this, 20), Ui.dp(this, 18));
-        card.setBackground(Ui.background(Ui.CARD, 20, this));
-        return card;
+        return Ui.card(this);
     }
 
     private Button actionButton(String label) {
-        Button button = new Button(this);
-        button.setAllCaps(false);
-        button.setText(label);
-        button.setTextSize(16);
-        button.setTextColor(Ui.PRIMARY);
-        button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Ui.NESTED));
-        return button;
+        return Ui.button(this, label);
     }
 
     private RadioButton styleButton(String label) {
         RadioButton button = new RadioButton(this);
         button.setId(View.generateViewId());
         button.setText(label);
-        button.setTextSize(16);
+        button.setTextSize(15);
         button.setTextColor(Ui.PRIMARY);
         button.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
         button.setPadding(0, Ui.dp(this, 6), Ui.dp(this, 12), Ui.dp(this, 6));
@@ -637,19 +719,27 @@ public final class MainActivity extends Activity {
 
     private void renderPreview() {
         if (previewHost == null || widthSize == null || topInsetSetting == null) return;
+        if (previewHost.getWidth() <= 0) {
+            previewHost.post(this::renderPreview);
+            return;
+        }
         int configuredWidthDp = widthSize.getProgress();
         int configuredHeightDp = heightSize.getProgress();
-        int maxWidthPx = Math.max(Ui.dp(this, 280),
-                getResources().getDisplayMetrics().widthPixels - Ui.dp(this, 112));
-        int maxHeightPx = Math.max(Ui.dp(this, 180), Math.min(Ui.dp(this, 520),
-                getResources().getDisplayMetrics().heightPixels / 2));
-        int configuredWidthPx = Ui.dp(this, configuredWidthDp);
-        int configuredHeightPx = Ui.dp(this, configuredHeightDp);
+        android.content.Context widgetContext = getApplicationContext();
+        int configuredWidthPx = Ui.dp(widgetContext, configuredWidthDp);
+        int configuredHeightPx = Ui.dp(widgetContext, configuredHeightDp);
+        int maxWidthPx = Math.max(1, previewHost.getWidth()
+                - previewHost.getPaddingLeft() - previewHost.getPaddingRight());
+        int maxContainerHeightPx = Math.max(1, Math.round(
+                getWindowManager().getCurrentWindowMetrics().getBounds().height() * 0.30f));
+        int verticalPadding = previewHost.getPaddingTop() + previewHost.getPaddingBottom();
+        int maxHeightPx = Math.max(1, maxContainerHeightPx - verticalPadding);
         float scale = Math.min(1f, Math.min(
                 maxWidthPx / (float) configuredWidthPx,
                 maxHeightPx / (float) configuredHeightPx));
 
-        MediaCardView preview = new MediaCardView(this, configuredWidthDp, configuredHeightDp,
+        MediaCardView preview = new MediaCardView(widgetContext,
+                configuredWidthDp, configuredHeightDp,
                 configuredWidthPx, configuredHeightPx, currentStyle(), currentAppearance(),
                 previewListener);
         preview.renderSnapshot(previewSnapshot(), true);
@@ -660,12 +750,11 @@ public final class MainActivity extends Activity {
         stage.addView(preview, new FrameLayout.LayoutParams(
                 preview.cardWidth(), preview.cardHeight()));
         stage.setPivotX(preview.cardWidth() / 2f);
-        stage.setPivotY(0f);
+        stage.setPivotY(preview.cardHeight() / 2f);
         stage.setScaleX(scale);
         stage.setScaleY(scale);
         FrameLayout.LayoutParams stageParams = new FrameLayout.LayoutParams(
-                preview.cardWidth(), preview.cardHeight(), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
-        stageParams.topMargin = Ui.dp(this, 8);
+                preview.cardWidth(), preview.cardHeight(), Gravity.CENTER);
         previewHost.addView(stage, stageParams);
         View touchBlocker = new View(this);
         touchBlocker.setClickable(true);
@@ -673,7 +762,8 @@ public final class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         LinearLayout.LayoutParams hostParams = (LinearLayout.LayoutParams)
                 previewHost.getLayoutParams();
-        hostParams.height = Math.round(preview.cardHeight() * scale) + Ui.dp(this, 16);
+        hostParams.height = Math.min(maxContainerHeightPx,
+                Math.round(preview.cardHeight() * scale) + verticalPadding);
         previewHost.setLayoutParams(hostParams);
     }
 
@@ -707,10 +797,7 @@ public final class MainActivity extends Activity {
     }
 
     private TextView text(String value, float size, int color, int style) {
-        TextView view = new TextView(this);
-        view.setText(value);
-        view.setTextSize(size);
-        view.setTextColor(color);
+        TextView view = Ui.text(this, value, size, color);
         view.setTypeface(Typeface.DEFAULT, style);
         view.setLineSpacing(0, 1.12f);
         return view;

@@ -9,6 +9,7 @@ final class Prefs {
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_CARD_STYLE = "card_style";
+    static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     private static final String KEY_TEXT_GAP_PREFIX = "text_gap_";
