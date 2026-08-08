@@ -22,6 +22,8 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
+import android.view.animation.AccelerateInterpolator;
+import android.view.animation.DecelerateInterpolator;
 
 public final class OverlayService extends Service
         implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener {
@@ -33,6 +35,10 @@ public final class OverlayService extends Service
     private static final int POLL_VISIBLE_MS = 1_000;
     private static final int POLL_HIDDEN_MS = 1_500;
     private static final int PROGRESS_TICK_MS = 250;
+    private static final long APPEAR_ANIMATION_MS = 260L;
+    private static final long DISAPPEAR_ANIMATION_MS = 180L;
+    private static final float HIDDEN_SCALE = 0.97f;
+    private static final int HIDDEN_OFFSET_DP = 12;
     private static volatile boolean running;
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -53,6 +59,7 @@ public final class OverlayService extends Service
     private int dragStartX;
     private int dragStartY;
     private int notificationState = -1;
+    private boolean cardHiding;
 
     private final Runnable foregroundPoll = new Runnable() {
         @Override public void run() {
@@ -136,7 +143,7 @@ public final class OverlayService extends Service
             return START_NOT_STICKY;
         }
         if (intent != null && ACTION_REFRESH_STYLE.equals(intent.getAction())) {
-            hideCard();
+            hideCardImmediately();
             main.removeCallbacks(foregroundPoll);
             main.post(foregroundPoll);
             return START_STICKY;
@@ -149,7 +156,7 @@ public final class OverlayService extends Service
 
     @Override public void onDestroy() {
         main.removeCallbacksAndMessages(null);
-        hideCard();
+        hideCardImmediately();
         if (bridge != null) bridge.stop();
         if (artworkLoader != null) artworkLoader.shutdown();
         stopForeground(STOP_FOREGROUND_REMOVE);
@@ -250,9 +257,18 @@ public final class OverlayService extends Service
     }
 
     private void showCard() {
-        if (card != null && card.isAttachedToWindow()) return;
+        if (card != null && card.isAttachedToWindow()) {
+            if (cardHiding) {
+                cardHiding = false;
+                animateCardVisible(card);
+                main.removeCallbacks(progressTick);
+                main.post(progressTick);
+            }
+            return;
+        }
         card = null;
         cardParams = null;
+        cardHiding = false;
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkUri = "";
         Rect bounds = availableBounds();
@@ -278,10 +294,15 @@ public final class OverlayService extends Service
         params.y = storedY == Prefs.POSITION_UNSET
                 ? bounds.top + Math.max(0, Math.round(bounds.height() * 0.62f)) : storedY;
         clampPosition(params, candidate, bounds);
+        candidate.setAlpha(0f);
+        candidate.setScaleX(HIDDEN_SCALE);
+        candidate.setScaleY(HIDDEN_SCALE);
+        candidate.setTranslationY(Ui.dp(this, HIDDEN_OFFSET_DP));
         try {
             windowManager.addView(candidate, params);
             card = candidate;
             cardParams = params;
+            animateCardVisible(candidate);
             renderCurrent();
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
             if (visible != null) loadArtwork(visible);
@@ -297,15 +318,62 @@ public final class OverlayService extends Service
 
     private void hideCard() {
         main.removeCallbacks(progressTick);
-        if (card != null && windowManager != null) {
-            try {
-                windowManager.removeViewImmediate(card);
-            } catch (IllegalArgumentException ignored) {
-                // OEM launcher may already have detached the overlay.
-            }
+        if (card == null || windowManager == null || cardHiding) return;
+        if (!card.isAttachedToWindow()) {
+            card = null;
+            cardParams = null;
+            return;
+        }
+        MediaCardView target = card;
+        target.animate().cancel();
+        cardHiding = true;
+        target.animate()
+                .alpha(0f)
+                .scaleX(HIDDEN_SCALE)
+                .scaleY(HIDDEN_SCALE)
+                .translationY(Ui.dp(this, HIDDEN_OFFSET_DP))
+                .setDuration(DISAPPEAR_ANIMATION_MS)
+                .setInterpolator(new AccelerateInterpolator())
+                .withEndAction(() -> {
+                    if (card != target || !cardHiding) return;
+                    removeCardView(target);
+                    card = null;
+                    cardParams = null;
+                    cardHiding = false;
+                })
+                .start();
+    }
+
+    private void animateCardVisible(MediaCardView target) {
+        target.animate().cancel();
+        target.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .translationY(0f)
+                .setDuration(APPEAR_ANIMATION_MS)
+                .setInterpolator(new DecelerateInterpolator())
+                .start();
+    }
+
+    private void hideCardImmediately() {
+        main.removeCallbacks(progressTick);
+        if (card != null) {
+            cardHiding = false;
+            card.animate().cancel();
+            removeCardView(card);
         }
         card = null;
         cardParams = null;
+    }
+
+    private void removeCardView(MediaCardView target) {
+        if (windowManager == null) return;
+        try {
+            windowManager.removeViewImmediate(target);
+        } catch (IllegalArgumentException ignored) {
+            // OEM launcher may already have detached the overlay.
+        }
     }
 
     private void renderCurrent() {
