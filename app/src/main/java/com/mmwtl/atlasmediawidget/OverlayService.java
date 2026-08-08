@@ -23,7 +23,6 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.view.animation.AccelerateInterpolator;
-import android.view.animation.DecelerateInterpolator;
 
 public final class OverlayService extends Service
         implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener {
@@ -35,7 +34,6 @@ public final class OverlayService extends Service
     private static final int POLL_VISIBLE_MS = 1_000;
     private static final int POLL_HIDDEN_MS = 1_500;
     private static final int PROGRESS_TICK_MS = 250;
-    private static final long APPEAR_ANIMATION_MS = 260L;
     private static final long DISAPPEAR_ANIMATION_MS = 180L;
     private static final float HIDDEN_SCALE = 0.97f;
     private static final int HIDDEN_OFFSET_DP = 12;
@@ -54,6 +52,7 @@ public final class OverlayService extends Service
     private MediaBridgeClient.State bridgeState = MediaBridgeClient.State.CONNECTING;
     private long loadedArtworkRevision = Long.MIN_VALUE;
     private String loadedArtworkUri = "";
+    private long createdAt;
     private float dragStartRawX;
     private float dragStartRawY;
     private int dragStartX;
@@ -117,6 +116,7 @@ public final class OverlayService extends Service
 
     @Override public void onCreate() {
         super.onCreate();
+        createdAt = SystemClock.elapsedRealtime();
         prefs = new Prefs(this);
         windowManager = getSystemService(WindowManager.class);
         artworkLoader = new ArtworkLoader(this, this);
@@ -260,7 +260,7 @@ public final class OverlayService extends Service
         if (card != null && card.isAttachedToWindow()) {
             if (cardHiding) {
                 cardHiding = false;
-                animateCardVisible(card);
+                showCardImmediately(card);
                 main.removeCallbacks(progressTick);
                 main.post(progressTick);
             }
@@ -294,15 +294,12 @@ public final class OverlayService extends Service
         params.y = storedY == Prefs.POSITION_UNSET
                 ? bounds.top + Math.max(0, Math.round(bounds.height() * 0.62f)) : storedY;
         clampPosition(params, candidate, bounds);
-        candidate.setAlpha(0f);
-        candidate.setScaleX(HIDDEN_SCALE);
-        candidate.setScaleY(HIDDEN_SCALE);
-        candidate.setTranslationY(Ui.dp(this, HIDDEN_OFFSET_DP));
         try {
             windowManager.addView(candidate, params);
             card = candidate;
             cardParams = params;
-            animateCardVisible(candidate);
+            AppLog.info("Overlay card attached t+"
+                    + (SystemClock.elapsedRealtime() - createdAt) + " ms after service creation");
             renderCurrent();
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
             if (visible != null) loadArtwork(visible);
@@ -344,16 +341,12 @@ public final class OverlayService extends Service
                 .start();
     }
 
-    private void animateCardVisible(MediaCardView target) {
+    private void showCardImmediately(MediaCardView target) {
         target.animate().cancel();
-        target.animate()
-                .alpha(1f)
-                .scaleX(1f)
-                .scaleY(1f)
-                .translationY(0f)
-                .setDuration(APPEAR_ANIMATION_MS)
-                .setInterpolator(new DecelerateInterpolator())
-                .start();
+        target.setAlpha(1f);
+        target.setScaleX(1f);
+        target.setScaleY(1f);
+        target.setTranslationY(0f);
     }
 
     private void hideCardImmediately() {

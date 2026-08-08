@@ -11,6 +11,7 @@ import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
+import android.os.SystemClock;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -28,25 +29,27 @@ final class MediaBridgeClient {
     private final Handler main = new Handler(android.os.Looper.getMainLooper());
     private final HandlerThread ipcThread = new HandlerThread("atlas-media-bridge");
     private final AtomicLong nextRequest = new AtomicLong();
+    private final BridgeConnectionState connectionState = new BridgeConnectionState();
     private Handler ipc;
     private Messenger incoming;
     private Messenger remote;
-    private boolean registered;
-    private boolean started;
-    private boolean bound;
-    private boolean binding;
-    private int reconnectAttempt;
+    private volatile boolean started;
+    private long startedAt;
+    private long bindStartedAt;
+    private long registerStartedAt;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            binding = false;
-            bound = true;
-            reconnectAttempt = 0;
+            if (!started || !connectionState.onServiceConnected()) return;
+            main.removeCallbacks(bindTimeout);
+            registerStartedAt = SystemClock.elapsedRealtime();
+            AppLog.info("Media Bridge service connected after "
+                    + elapsedSince(bindStartedAt) + " ms (t+" + elapsedSince(startedAt) + " ms)");
             notifyState(State.REGISTERING, "");
+            main.postDelayed(registerTimeout, ReconnectPolicy.REGISTER_TIMEOUT_MS);
             ipc.post(() -> {
                 remote = new Messenger(service);
-                registered = false;
                 sendRegister();
             });
         }
@@ -67,6 +70,24 @@ final class MediaBridgeClient {
         }
     };
 
+    private final Runnable bindTimeout = () -> {
+        if (connectionState.is(BridgeConnectionState.Phase.BINDING)) {
+            handleConnectionLoss("Таймаут подключения к GInputBridge");
+        }
+    };
+
+    private final Runnable registerTimeout = () -> {
+        if (connectionState.is(BridgeConnectionState.Phase.REGISTERING)) {
+            handleConnectionLoss("Таймаут регистрации GInputBridge mediaapi");
+        }
+    };
+
+    private final Runnable snapshotTimeout = () -> {
+        if (connectionState.is(BridgeConnectionState.Phase.WAITING_SNAPSHOT)) {
+            handleConnectionLoss("Таймаут первого snapshot GInputBridge");
+        }
+    };
+
     MediaBridgeClient(Context context, Listener listener) {
         this.context = context.getApplicationContext();
         this.listener = listener;
@@ -76,6 +97,7 @@ final class MediaBridgeClient {
         main.post(() -> {
             if (started) return;
             started = true;
+            startedAt = SystemClock.elapsedRealtime();
             ipcThread.start();
             ipc = new Handler(ipcThread.getLooper());
             incoming = new Messenger(new Handler(ipcThread.getLooper(), this::handleIncoming));
@@ -87,19 +109,20 @@ final class MediaBridgeClient {
         main.post(() -> {
             if (!started) return;
             started = false;
-            main.removeCallbacks(rebind);
-            if (ipc != null) ipc.post(this::sendUnregister);
-            if (bound || binding) {
+            removeConnectionCallbacks();
+            boolean hadBinding = connectionState.hasBinding();
+            connectionState.onStopped();
+            if (ipc != null) ipc.post(() -> {
+                sendUnregister();
+                remote = null;
+            });
+            if (hadBinding) {
                 try {
                     context.unbindService(connection);
                 } catch (IllegalArgumentException ignored) {
                     // A concurrent Binder death may already have removed the connection.
                 }
             }
-            bound = false;
-            binding = false;
-            remote = null;
-            registered = false;
             ipcThread.quitSafely();
             notifyState(State.STOPPED, "");
         });
@@ -139,8 +162,9 @@ final class MediaBridgeClient {
     }
 
     private void bindNow() {
-        if (!started || bound || binding) return;
-        binding = true;
+        if (!started || !connectionState.startBinding()) return;
+        bindStartedAt = SystemClock.elapsedRealtime();
+        AppLog.info("Media Bridge bind requested at t+" + elapsedSince(startedAt) + " ms");
         notifyState(State.CONNECTING, "");
         Intent intent = new Intent(MediaBridgeContract.SERVICE_ACTION).setComponent(
                 new ComponentName(MediaBridgeContract.SERVICE_PACKAGE,
@@ -153,38 +177,40 @@ final class MediaBridgeClient {
             accepted = false;
         }
         if (!accepted) {
-            binding = false;
             notifyState(State.DISCONNECTED, "GInputBridge mediaapi не установлен или недоступен");
-            scheduleRebind();
+            scheduleRebind(connectionState.onDisconnected());
+        } else {
+            main.postDelayed(bindTimeout, ReconnectPolicy.BIND_TIMEOUT_MS);
         }
     }
 
     private final Runnable rebind = this::bindNow;
 
-    private void scheduleRebind() {
-        if (!started) return;
+    private void scheduleRebind(long delayMs) {
+        if (!started || delayMs < 0L) return;
         main.removeCallbacks(rebind);
-        main.postDelayed(rebind, ReconnectPolicy.delayMs(reconnectAttempt++));
+        AppLog.info("Media Bridge reconnect scheduled in " + delayMs + " ms");
+        main.postDelayed(rebind, delayMs);
     }
 
     private void handleConnectionLoss(String detail) {
         main.post(() -> {
             if (!started) return;
-            if (bound || binding) {
+            boolean hadBinding = connectionState.hasBinding();
+            long delayMs = connectionState.onDisconnected();
+            if (delayMs < 0L) return;
+            removeConnectionCallbacks();
+            if (hadBinding) {
                 try {
                     context.unbindService(connection);
                 } catch (IllegalArgumentException ignored) {
                     // Already unbound by the framework.
                 }
             }
-            bound = false;
-            binding = false;
-            if (ipc != null) ipc.post(() -> {
-                remote = null;
-                registered = false;
-            });
+            if (ipc != null) ipc.post(() -> remote = null);
+            AppLog.info(detail + " at t+" + elapsedSince(startedAt) + " ms");
             notifyState(State.DISCONNECTED, detail);
-            scheduleRebind();
+            scheduleRebind(delayMs);
         });
     }
 
@@ -202,7 +228,7 @@ final class MediaBridgeClient {
         Handler target = ipc;
         if (!started || target == null) return;
         target.post(() -> {
-            if (!registered || remote == null) {
+            if (!connectionState.canSend() || remote == null) {
                 if (what == MediaBridgeContract.COMMAND) {
                     postCommandResult(requestId, 5, "GInputBridge не подключён", 0L);
                 }
@@ -241,7 +267,7 @@ final class MediaBridgeClient {
         Bundle data = message.getData();
         int version = data.getInt(MediaBridgeContract.K_VERSION, -1);
         if (version != MediaBridgeContract.VERSION) {
-            notifyState(State.INCOMPATIBLE, "Несовместимая версия mediaapi: " + version);
+            markIncompatible("Несовместимая версия mediaapi: " + version);
             return true;
         }
         try {
@@ -249,15 +275,31 @@ final class MediaBridgeClient {
                 case MediaBridgeContract.REGISTERED -> {
                     int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
                     if (status == MediaBridgeContract.STATUS_OK) {
-                        registered = true;
-                        notifyState(State.CONNECTED, "");
+                        if (!connectionState.onRegistered()) return true;
+                        main.post(() -> {
+                            main.removeCallbacks(registerTimeout);
+                            AppLog.info("Media Bridge registered after "
+                                    + elapsedSince(registerStartedAt) + " ms (t+"
+                                    + elapsedSince(startedAt) + " ms)");
+                            listener.onBridgeState(State.CONNECTED, "");
+                            main.postDelayed(snapshotTimeout, ReconnectPolicy.SNAPSHOT_TIMEOUT_MS);
+                        });
                     } else {
-                        notifyState(State.INCOMPATIBLE, "Регистрация отклонена: " + status);
+                        markIncompatible("Регистрация отклонена: " + status);
                     }
                 }
                 case MediaBridgeContract.SNAPSHOT -> {
                     MediaSnapshot snapshot = MediaSnapshot.fromBundle(data);
-                    main.post(() -> listener.onSnapshot(snapshot));
+                    BridgeConnectionState.SnapshotResult result = connectionState.onSnapshot();
+                    if (result == BridgeConnectionState.SnapshotResult.IGNORED) return true;
+                    main.post(() -> {
+                        if (result == BridgeConnectionState.SnapshotResult.FIRST) {
+                            main.removeCallbacks(snapshotTimeout);
+                            AppLog.info("Media Bridge first snapshot received at t+"
+                                    + elapsedSince(startedAt) + " ms");
+                        }
+                        listener.onSnapshot(snapshot);
+                    });
                 }
                 case MediaBridgeContract.COMMAND_RESULT, MediaBridgeContract.ERROR ->
                         postCommandResult(
@@ -279,6 +321,31 @@ final class MediaBridgeClient {
 
     private void notifyState(State state, String detail) {
         main.post(() -> listener.onBridgeState(state, detail));
+    }
+
+    private void markIncompatible(String detail) {
+        if (!started) return;
+        connectionState.onIncompatible();
+        main.post(() -> {
+            removeConnectionTimeouts();
+            AppLog.info(detail + " at t+" + elapsedSince(startedAt) + " ms");
+            listener.onBridgeState(State.INCOMPATIBLE, detail);
+        });
+    }
+
+    private void removeConnectionCallbacks() {
+        main.removeCallbacks(rebind);
+        removeConnectionTimeouts();
+    }
+
+    private void removeConnectionTimeouts() {
+        main.removeCallbacks(bindTimeout);
+        main.removeCallbacks(registerTimeout);
+        main.removeCallbacks(snapshotTimeout);
+    }
+
+    private static long elapsedSince(long started) {
+        return Math.max(0L, SystemClock.elapsedRealtime() - started);
     }
 
     private String requestId(String prefix) {

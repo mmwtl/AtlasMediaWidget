@@ -27,7 +27,6 @@ final class Prefs {
     private static final String KEY_PROGRESS_GAP_PREFIX = "progress_gap_";
     private static final String KEY_PROGRESS_THICKNESS_PREFIX = "progress_thickness_";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
-    static final int BOOT_DELAY_SECONDS = 15;
     static final int MIN_TEXT_GAP_DP = -24;
     static final int MAX_TEXT_GAP_DP = 48;
     static final int MIN_CONTROL_PANEL_HEIGHT_DP = 64;

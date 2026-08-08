@@ -106,7 +106,7 @@ AtlasMediaWidget становится зависим от живого проц�
 - radio fallback в клиенте: выбранный источник не выглядит пустым, даже если старая версия
   GInputBridge ещё не передала частоту и RDS-название;
 - reconnect с bounded exponential backoff и очистка stale-состояния;
-- показ только поверх HOME, сохранение позиции, foreground service и отложенный boot start.
+- показ только поверх HOME, сохранение позиции, foreground service и немедленный boot start.
 
 ## Требования на ГУ
 
@@ -125,4 +125,4 @@ ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelea
 ```
 
 Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.13[14]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+`1.0.15[16]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.

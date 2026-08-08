@@ -6,7 +6,6 @@
     <string name="notification_visible">Карточка показана на главном экране</string>
     <string name="notification_hidden">Карточка ожидает главный экран</string>
     <string name="notification_permission_error">Нужны разрешения overlay и истории использования</string>
-    <string name="notification_boot_delay">Ожидание загрузки медиасистемы</string>
     <string name="stop">Остановить</string>
     <string name="bridge_disconnected">GInputBridge недоступен</string>
     <string name="bridge_connecting">Подключение к GInputBridge…</string>

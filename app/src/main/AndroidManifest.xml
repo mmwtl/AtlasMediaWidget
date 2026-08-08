@@ -65,10 +65,6 @@
             </intent-filter>
         </receiver>
 
-        <receiver
-            android:name=".DelayedBootReceiver"
-            android:enabled="true"
-            android:exported="false" />
     </application>
 
 </manifest>

@@ -11,6 +11,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.PowerManager;
 import android.os.Process;
+import android.os.SystemClock;
 
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +56,9 @@ final class ForegroundAppDetector {
     private String currentForegroundPackage() {
         if (usageStatsManager == null || !hasUsageAccess(context)) return null;
         long now = System.currentTimeMillis();
-        long begin = lastQuery == 0 ? now - 12L * 60L * 60L * 1000L
+        boolean initialQuery = lastQuery == 0;
+        long queryStarted = SystemClock.elapsedRealtime();
+        long begin = initialQuery ? now - 12L * 60L * 60L * 1000L
                 : Math.max(now - 60_000L, lastQuery - 2_000L);
         try {
             UsageEvents events = usageStatsManager.queryEvents(begin, now);
@@ -82,6 +85,10 @@ final class ForegroundAppDetector {
         } catch (RuntimeException error) {
             AppLog.warn("Cannot query foreground application", error);
             return null;
+        }
+        long queryElapsed = SystemClock.elapsedRealtime() - queryStarted;
+        if (initialQuery || queryElapsed >= 100L) {
+            AppLog.info("Foreground usage query completed in " + queryElapsed + " ms");
         }
         return tracker.foregroundPackage();
     }
