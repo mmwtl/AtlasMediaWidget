@@ -51,6 +51,7 @@ public final class OverlayService extends Service
         return thread;
     });
     private final SnapshotReducer reducer = new SnapshotReducer();
+    private final TransportSnapshotGuard transportSnapshotGuard = new TransportSnapshotGuard();
     private Prefs prefs;
     private WindowManager windowManager;
     private ForegroundAppDetector foregroundDetector;
@@ -76,6 +77,13 @@ public final class OverlayService extends Service
     private boolean visibilityReceiverRegistered;
     private boolean destroyed;
     private long fastProbeUntil;
+
+    private final Runnable transportReconcile = () -> {
+        if (bridgeState == MediaBridgeClient.State.CONNECTED) {
+            AppLog.info("Requesting post-command reconciliation snapshot");
+            bridge.requestSnapshot();
+        }
+    };
 
     private final BroadcastReceiver visibilityWakeReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -304,6 +312,8 @@ public final class OverlayService extends Service
             bridge.requestSnapshot();
         } else if (state == MediaBridgeClient.State.DISCONNECTED
                 || state == MediaBridgeClient.State.INCOMPATIBLE) {
+            transportSnapshotGuard.clear();
+            main.removeCallbacks(transportReconcile);
             reducer.onDisconnected(SystemClock.elapsedRealtime());
         }
         renderCurrent();
@@ -313,6 +323,12 @@ public final class OverlayService extends Service
     }
 
     @Override public void onSnapshot(MediaSnapshot snapshot) {
+        long now = SystemClock.elapsedRealtime();
+        if (transportSnapshotGuard.shouldDefer(snapshot, now)) {
+            AppLog.info("Holding transient empty ONLINE snapshot generation="
+                    + snapshot.generation + " during transport reconciliation");
+            return;
+        }
         if (!reducer.accept(snapshot)) return;
         renderCurrent();
         loadArtwork(snapshot);
@@ -320,6 +336,13 @@ public final class OverlayService extends Service
 
     @Override public void onCommandResult(String requestId, int status, String message,
             long generation) {
+        AppLog.info("Media command result request=" + requestId + " status=" + status
+                + " generation=" + generation + " message=" + message);
+        if (status != MediaBridgeContract.STATUS_OK) {
+            transportSnapshotGuard.clear();
+            main.removeCallbacks(transportReconcile);
+            bridge.requestSnapshot();
+        }
         if (card == null) return;
         if (status == MediaBridgeContract.STATUS_OK) {
             card.showTransientStatus("Команда отправлена", false);
@@ -362,15 +385,38 @@ public final class OverlayService extends Service
     }
 
     @Override public void onCommand(String command) {
-        bridge.sendCommand(command);
+        beginTransportReconciliation();
+        String requestId = bridge.sendCommand(command);
+        AppLog.info("Sending media command request=" + requestId + " command=" + command
+                + " source=" + visibleSource());
     }
 
     @Override public void onSeek(long positionMs) {
-        bridge.seekTo(positionMs);
+        beginTransportReconciliation();
+        String requestId = bridge.seekTo(positionMs);
+        AppLog.info("Sending media command request=" + requestId + " command=SEEK_TO"
+                + " position=" + positionMs + " source=" + visibleSource());
     }
 
     @Override public void onSource(MediaSource.Id source) {
-        bridge.setSource(source);
+        transportSnapshotGuard.clear();
+        main.removeCallbacks(transportReconcile);
+        String requestId = bridge.setSource(source);
+        AppLog.info("Sending media command request=" + requestId + " command=SET_SOURCE"
+                + " source=" + source);
+    }
+
+    private void beginTransportReconciliation() {
+        long now = SystemClock.elapsedRealtime();
+        transportSnapshotGuard.begin(reducer.visibleSnapshot(now), now);
+        main.removeCallbacks(transportReconcile);
+        main.postDelayed(transportReconcile, TransportSnapshotGuard.RECONCILIATION_MS);
+    }
+
+    private MediaSource.Id visibleSource() {
+        MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        return visible == null ? MediaSource.Id.UNKNOWN
+                : MediaSource.selectedId(visible.audioSource, visible.sources).displayId();
     }
 
     @Override public void onOpenSource() {

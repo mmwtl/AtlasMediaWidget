@@ -492,8 +492,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     private static MediaSource.Id selectedSource(MediaSnapshot value) {
-        for (MediaSource source : value.sources) if (source.selected) return source.id;
-        return value.audioSource;
+        return MediaSource.selectedId(value.audioSource, value.sources);
     }
 
     private void renderFallbackSource() {

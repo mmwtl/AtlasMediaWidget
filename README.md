@@ -116,15 +116,20 @@ AtlasMediaWidget становится зависим от живого проц�
 - показ только поверх HOME, сохранение позиции и foreground service;
 - ранний автозапуск по cold boot, Direct Boot и автомобильному `QUICKBOOT_POWERON`, с быстрым
   асинхронным определением HOME после включения экрана;
-- кнопка радио показывает доступное действие: паузу во время воспроизведения и play во время
-  паузы.
+- кнопка радио использует playback state mediaapi без клиентской инверсии, показывает паузу во
+  время воспроизведения и play во время паузы;
+- краткий пустой переход в Online после transport-команды удерживается не более 900 мс и
+  сверяется повторным snapshot, поэтому metadata и обложка не моргают, а устойчивый переход
+  источника остаётся видимым.
 
 ## Требования на ГУ
 
 1. Установить GInputBridge из совместимой ветки `mediaapi` и включить его Media runtime.
-2. Оставить включённым notification access GInputBridge для публичных MediaSession-плееров.
-3. Разрешить AtlasMediaWidget отображение поверх окон и доступ к истории использования.
-4. Запустить виджет из настроек приложения; автозапуск включается отдельно.
+2. Включить в GInputBridge `Управлять радио и Bluetooth`: без этой настройки Media Bridge не
+   маршрутизирует transport-команды в нативные Radio/BT API.
+3. Оставить включённым notification access GInputBridge для публичных MediaSession-плееров.
+4. Разрешить AtlasMediaWidget отображение поверх окон и доступ к истории использования.
+5. Запустить виджет из настроек приложения; автозапуск включается отдельно.
 
 API `mediaapi` v1 намеренно открыт всем установленным APK. Это приемлемо только при контролируемой
 установке ПО на изолированной ГУ.
@@ -136,4 +141,4 @@ ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelea
 ```
 
 Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.17[18]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+`1.0.18[19]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.

@@ -2,6 +2,8 @@ package com.mmwtl.atlasmediawidget;
 
 import org.junit.Test;
 
+import java.util.List;
+
 import static org.junit.Assert.assertEquals;
 
 public class MediaSourceTest {
@@ -38,5 +40,16 @@ public class MediaSourceTest {
         assertEquals("bluetooth", MediaSourceLauncher.oemJumpView(MediaSource.Id.BT));
         assertEquals("usb", MediaSourceLauncher.oemJumpView(MediaSource.Id.USB));
         assertEquals("", MediaSourceLauncher.oemJumpView(MediaSource.Id.ONLINE));
+    }
+
+    @Test public void explicitAudioSourceWinsOverAStaleSelectedListEntry() {
+        List<MediaSource> sources = List.of(
+                new MediaSource(MediaSource.Id.ONLINE, true, true, true, 0L),
+                new MediaSource(MediaSource.Id.RADIO, true, true, false, 0L));
+
+        assertEquals(MediaSource.Id.RADIO,
+                MediaSource.selectedId(MediaSource.Id.RADIO, sources));
+        assertEquals(MediaSource.Id.ONLINE,
+                MediaSource.selectedId(MediaSource.Id.UNKNOWN, sources));
     }
 }

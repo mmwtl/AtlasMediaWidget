@@ -7,14 +7,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class PlayPauseActionPolicyTest {
-    @Test public void radioNormalizesFirmwareActionFlagToCurrentState() {
-        assertTrue(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.RADIO, false));
-        assertFalse(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.RADIO, true));
-        assertEquals("PAUSE", PlayPauseActionPolicy.explicitCommand(MediaSource.Id.RADIO, false));
-        assertEquals("PLAY", PlayPauseActionPolicy.explicitCommand(MediaSource.Id.RADIO, true));
-        assertEquals("PAUSE", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, false,
+    @Test public void radioUsesTheVersionedBridgePlaybackStateWithoutInversion() {
+        assertTrue(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.RADIO, true));
+        assertFalse(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.RADIO, false));
+        assertEquals("PAUSE", PlayPauseActionPolicy.explicitCommand(MediaSource.Id.RADIO, true));
+        assertEquals("PLAY", PlayPauseActionPolicy.explicitCommand(MediaSource.Id.RADIO, false));
+        assertEquals("TOGGLE", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, true,
                 MediaBridgeContract.CAP_TOGGLE | MediaBridgeContract.CAP_PAUSE));
-        assertEquals("PLAY", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, true,
+        assertEquals("TOGGLE", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, false,
                 MediaBridgeContract.CAP_TOGGLE | MediaBridgeContract.CAP_PLAY));
     }
 
@@ -32,8 +32,10 @@ public class PlayPauseActionPolicyTest {
         assertFalse(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.YUNTING, false));
     }
 
-    @Test public void radioFallsBackToToggleWhenExplicitActionIsUnavailable() {
-        assertEquals("TOGGLE", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, false,
-                MediaBridgeContract.CAP_TOGGLE));
+    @Test public void explicitRadioCommandMatchesTheActionWhenToggleIsUnavailable() {
+        assertEquals("PAUSE", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, true,
+                MediaBridgeContract.CAP_PAUSE));
+        assertEquals("PLAY", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, false,
+                MediaBridgeContract.CAP_PLAY));
     }
 }
