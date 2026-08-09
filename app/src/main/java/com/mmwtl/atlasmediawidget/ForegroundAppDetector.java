@@ -32,7 +32,6 @@ final class ForegroundAppDetector {
         usageStatsManager = context.getSystemService(UsageStatsManager.class);
         powerManager = context.getSystemService(PowerManager.class);
         keyguardManager = context.getSystemService(KeyguardManager.class);
-        refreshHomePackages();
     }
 
     static boolean hasUsageAccess(Context context) {
@@ -45,12 +44,16 @@ final class ForegroundAppDetector {
     }
 
     boolean isHomeForeground() {
-        if (powerManager == null || !powerManager.isInteractive()
-                || keyguardManager != null && keyguardManager.isKeyguardLocked()) return false;
+        if (!isDeviceReady()) return false;
         long now = System.currentTimeMillis();
         if (homePackages.isEmpty() || now - lastHomeRefresh > 30_000L) refreshHomePackages();
         String foreground = currentForegroundPackage();
         return foreground != null && homePackages.contains(foreground);
+    }
+
+    boolean isDeviceReady() {
+        return powerManager != null && powerManager.isInteractive()
+                && (keyguardManager == null || !keyguardManager.isKeyguardLocked());
     }
 
     private String currentForegroundPackage() {
@@ -58,8 +61,7 @@ final class ForegroundAppDetector {
         long now = System.currentTimeMillis();
         boolean initialQuery = lastQuery == 0;
         long queryStarted = SystemClock.elapsedRealtime();
-        long begin = initialQuery ? now - 12L * 60L * 60L * 1000L
-                : Math.max(now - 60_000L, lastQuery - 2_000L);
+        long begin = ForegroundPollPolicy.queryBegin(now, lastQuery);
         try {
             UsageEvents events = usageStatsManager.queryEvents(begin, now);
             UsageEvents.Event event = new UsageEvents.Event();

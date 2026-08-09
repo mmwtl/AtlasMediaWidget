@@ -113,7 +113,11 @@ AtlasMediaWidget становится зависим от живого проц�
 - открытие штатного экрана `com.tencent.wecarflow` с source-specific `jumpView` для Radio,
   Bluetooth и USB по нажатию на свободную область;
 - reconnect с bounded exponential backoff и очистка stale-состояния;
-- показ только поверх HOME, сохранение позиции, foreground service и немедленный boot start.
+- показ только поверх HOME, сохранение позиции и foreground service;
+- ранний автозапуск по cold boot, Direct Boot и автомобильному `QUICKBOOT_POWERON`, с быстрым
+  асинхронным определением HOME после включения экрана;
+- кнопка радио показывает доступное действие: паузу во время воспроизведения и play во время
+  паузы.
 
 ## Требования на ГУ
 
@@ -132,4 +136,4 @@ ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelea
 ```
 
 Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.16[17]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+`1.0.17[18]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.

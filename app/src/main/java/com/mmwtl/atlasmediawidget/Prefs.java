@@ -2,8 +2,12 @@ package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.UserManager;
 
 final class Prefs {
+    private static final String NAME = "atlas_media_widget";
+    private static final Object MIGRATION_LOCK = new Object();
+    private static volatile boolean credentialMigrationAttempted;
     static final String KEY_SERVICE_ENABLED = "service_enabled";
     static final String KEY_AUTO_START = "auto_start";
     static final String KEY_POSITION_X = "position_x";
@@ -60,7 +64,26 @@ final class Prefs {
     private final SharedPreferences preferences;
 
     Prefs(Context context) {
-        preferences = context.getSharedPreferences("atlas_media_widget", Context.MODE_PRIVATE);
+        Context app = context.getApplicationContext();
+        Context storage = app.createDeviceProtectedStorageContext();
+        migrateCredentialPreferencesWhenAvailable(app, storage);
+        preferences = storage.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+    }
+
+    private static void migrateCredentialPreferencesWhenAvailable(Context credentialContext,
+            Context deviceContext) {
+        if (credentialMigrationAttempted) return;
+        UserManager users = credentialContext.getSystemService(UserManager.class);
+        if (users != null && !users.isUserUnlocked()) return;
+        synchronized (MIGRATION_LOCK) {
+            if (credentialMigrationAttempted) return;
+            try {
+                deviceContext.moveSharedPreferencesFrom(credentialContext, NAME);
+            } catch (RuntimeException error) {
+                AppLog.warn("Cannot migrate preferences to Direct Boot storage", error);
+            }
+            credentialMigrationAttempted = true;
+        }
     }
 
     boolean getBoolean(String key, boolean fallback) {

@@ -1,6 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
+import android.os.UserManager;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -36,6 +37,10 @@ final class RadioCatalog {
 
     static RadioCatalog load(Context context) {
         Map<Integer, RadioStation> stations = new HashMap<>(loadBuiltIn(context).stations);
+        UserManager users = context.getSystemService(UserManager.class);
+        if (users != null && !users.isUserUnlocked()) {
+            return new RadioCatalog(stations);
+        }
         String directoryName = new Prefs(context).getString(Prefs.KEY_CUSTOM_RADIO_CATALOG, "");
         File root = RadioCatalogImporter.catalogDirectory(context, directoryName);
         if (root == null) return new RadioCatalog(stations);

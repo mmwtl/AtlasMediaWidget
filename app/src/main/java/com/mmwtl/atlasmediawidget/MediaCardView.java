@@ -252,8 +252,8 @@ final class MediaCardView extends FrameLayout {
         next.setOnClickListener(v -> listener.onCommand("NEXT"));
         playPause.setOnClickListener(v -> {
             if (snapshot == null) return;
-            if (snapshot.supports(MediaBridgeContract.CAP_TOGGLE)) listener.onCommand("TOGGLE");
-            else listener.onCommand(snapshot.isPlaying() ? "PAUSE" : "PLAY");
+            listener.onCommand(PlayPauseActionPolicy.command(
+                    activeSource, snapshot.isPlaying(), snapshot.capabilities));
         });
         progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int value, boolean fromUser) {
@@ -306,11 +306,13 @@ final class MediaCardView extends FrameLayout {
         else setStatusPill("Медиасервис недоступен", true);
         previous.setEnabled(value.supports(MediaBridgeContract.CAP_PREVIOUS));
         next.setEnabled(value.supports(MediaBridgeContract.CAP_NEXT));
+        boolean currentlyPlaying = PlayPauseActionPolicy.isCurrentlyPlaying(
+                activeSource, value.isPlaying());
         boolean toggle = value.supports(MediaBridgeContract.CAP_TOGGLE)
-                || value.isPlaying() && value.supports(MediaBridgeContract.CAP_PAUSE)
-                || !value.isPlaying() && value.supports(MediaBridgeContract.CAP_PLAY);
+                || currentlyPlaying && value.supports(MediaBridgeContract.CAP_PAUSE)
+                || !currentlyPlaying && value.supports(MediaBridgeContract.CAP_PLAY);
         playPause.setEnabled(toggle);
-        playPause.setPlaying(value.isPlaying());
+        playPause.setPlaying(currentlyPlaying);
         progress.setEnabled(value.duration > 0L && value.supports(MediaBridgeContract.CAP_SEEK));
         progress.setAlpha(progress.isEnabled() ? 1f : 0.55f);
         duration.setText(formatTime(value.duration));

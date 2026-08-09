@@ -5,7 +5,10 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ServiceInfo;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
@@ -24,6 +27,10 @@ import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.view.animation.AccelerateInterpolator;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+
 public final class OverlayService extends Service
         implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener {
     static final String ACTION_START = "com.mmwtl.atlasmediawidget.action.START";
@@ -31,8 +38,6 @@ public final class OverlayService extends Service
     static final String ACTION_REFRESH_STYLE = "com.mmwtl.atlasmediawidget.action.REFRESH_STYLE";
     private static final String CHANNEL_ID = "atlas_media_widget_service";
     private static final int NOTIFICATION_ID = 2407;
-    private static final int POLL_VISIBLE_MS = 1_000;
-    private static final int POLL_HIDDEN_MS = 1_500;
     private static final int PROGRESS_TICK_MS = 250;
     private static final long DISAPPEAR_ANIMATION_MS = 180L;
     private static final float HIDDEN_SCALE = 0.97f;
@@ -40,6 +45,11 @@ public final class OverlayService extends Service
     private static volatile boolean running;
 
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService foregroundExecutor = Executors.newSingleThreadExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "atlas-home-detector");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final SnapshotReducer reducer = new SnapshotReducer();
     private Prefs prefs;
     private WindowManager windowManager;
@@ -60,9 +70,33 @@ public final class OverlayService extends Service
     private int dragStartY;
     private int notificationState = -1;
     private boolean cardHiding;
+    private boolean foregroundQueryInFlight;
+    private boolean visibilityCheckPending;
+    private boolean deviceWasReady;
+    private boolean visibilityReceiverRegistered;
+    private boolean destroyed;
+    private long fastProbeUntil;
+
+    private final BroadcastReceiver visibilityWakeReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            String action = intent == null ? null : intent.getAction();
+            if (Intent.ACTION_SCREEN_OFF.equals(action)) {
+                deviceWasReady = false;
+                hideCard();
+                scheduleForegroundPoll(ForegroundPollPolicy.HIDDEN_DELAY_MS);
+                return;
+            }
+            if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
+                radioCatalog = RadioCatalog.load(OverlayService.this);
+            }
+            AppLog.info("Immediate HOME check requested by " + action);
+            requestImmediateVisibilityCheck();
+        }
+    };
 
     private final Runnable foregroundPoll = new Runnable() {
         @Override public void run() {
+            if (destroyed) return;
             if (!prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
                 stopSelf();
                 return;
@@ -71,15 +105,35 @@ public final class OverlayService extends Service
                     || !ForegroundAppDetector.hasUsageAccess(OverlayService.this)) {
                 hideCard();
                 updateNotification(2);
-                main.postDelayed(this, POLL_HIDDEN_MS);
-            } else if (foregroundDetector().isHomeForeground()) {
-                showCard();
-                updateNotification(1);
-                main.postDelayed(this, POLL_VISIBLE_MS);
-            } else {
+                scheduleForegroundPoll(ForegroundPollPolicy.HIDDEN_DELAY_MS);
+                return;
+            }
+            ForegroundAppDetector detector = foregroundDetector();
+            boolean deviceReady = detector.isDeviceReady();
+            long now = SystemClock.elapsedRealtime();
+            if (deviceReady && !deviceWasReady) {
+                fastProbeUntil = now + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
+            }
+            deviceWasReady = deviceReady;
+            if (!deviceReady) {
                 hideCard();
                 updateNotification(0);
-                main.postDelayed(this, POLL_HIDDEN_MS);
+                scheduleForegroundPoll(ForegroundPollPolicy.nextDelay(
+                        false, false, now, fastProbeUntil));
+                return;
+            }
+            if (foregroundQueryInFlight) {
+                visibilityCheckPending = true;
+                return;
+            }
+            foregroundQueryInFlight = true;
+            try {
+                foregroundExecutor.execute(() -> {
+                    boolean homeForeground = detector.isHomeForeground();
+                    main.post(() -> applyForegroundResult(homeForeground));
+                });
+            } catch (RejectedExecutionException ignored) {
+                foregroundQueryInFlight = false;
             }
         }
     };
@@ -134,6 +188,8 @@ public final class OverlayService extends Service
         }
         notificationState = 0;
         running = true;
+        fastProbeUntil = createdAt + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
+        registerVisibilityWakeReceiver();
         bridge.start();
         AppLog.info("Overlay service created");
     }
@@ -147,18 +203,20 @@ public final class OverlayService extends Service
         if (intent != null && ACTION_REFRESH_STYLE.equals(intent.getAction())) {
             radioCatalog = RadioCatalog.load(this);
             hideCardImmediately();
-            main.removeCallbacks(foregroundPoll);
-            main.post(foregroundPoll);
+            requestImmediateVisibilityCheck();
             return START_STICKY;
         }
         prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
-        main.removeCallbacks(foregroundPoll);
-        main.post(foregroundPoll);
+        radioCatalog = RadioCatalog.load(this);
+        requestImmediateVisibilityCheck();
         return START_STICKY;
     }
 
     @Override public void onDestroy() {
+        destroyed = true;
         main.removeCallbacksAndMessages(null);
+        unregisterVisibilityWakeReceiver();
+        foregroundExecutor.shutdownNow();
         hideCardImmediately();
         if (bridge != null) bridge.stop();
         if (artworkLoader != null) artworkLoader.shutdown();
@@ -166,6 +224,73 @@ public final class OverlayService extends Service
         running = false;
         AppLog.info("Overlay service destroyed");
         super.onDestroy();
+    }
+
+    private void applyForegroundResult(boolean homeForeground) {
+        if (destroyed) return;
+        foregroundQueryInFlight = false;
+        if (visibilityCheckPending) {
+            visibilityCheckPending = false;
+            main.post(foregroundPoll);
+            return;
+        }
+        if (!prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+            stopSelf();
+            return;
+        }
+        boolean deviceReady = foregroundDetector().isDeviceReady();
+        if (homeForeground && deviceReady) {
+            showCard();
+            updateNotification(1);
+        } else {
+            hideCard();
+            updateNotification(0);
+        }
+        long now = SystemClock.elapsedRealtime();
+        scheduleForegroundPoll(ForegroundPollPolicy.nextDelay(
+                homeForeground, deviceReady, now, fastProbeUntil));
+    }
+
+    private void requestImmediateVisibilityCheck() {
+        fastProbeUntil = SystemClock.elapsedRealtime()
+                + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
+        main.removeCallbacks(foregroundPoll);
+        if (foregroundQueryInFlight) {
+            visibilityCheckPending = true;
+        } else {
+            main.post(foregroundPoll);
+        }
+    }
+
+    private void scheduleForegroundPoll(long delayMs) {
+        if (destroyed) return;
+        main.removeCallbacks(foregroundPoll);
+        main.postDelayed(foregroundPoll, delayMs);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void registerVisibilityWakeReceiver() {
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_USER_PRESENT);
+        filter.addAction(Intent.ACTION_USER_UNLOCKED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(visibilityWakeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(visibilityWakeReceiver, filter);
+        }
+        visibilityReceiverRegistered = true;
+    }
+
+    private void unregisterVisibilityWakeReceiver() {
+        if (!visibilityReceiverRegistered) return;
+        try {
+            unregisterReceiver(visibilityWakeReceiver);
+        } catch (IllegalArgumentException ignored) {
+            // The process may have already discarded receiver registration.
+        }
+        visibilityReceiverRegistered = false;
     }
 
     @Override public IBinder onBind(Intent intent) {
