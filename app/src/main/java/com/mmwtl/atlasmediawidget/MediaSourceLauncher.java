@@ -5,7 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 
 final class MediaSourceLauncher {
-    private static final String OEM_MEDIA_PACKAGE = "com.geely.mediawidget";
+    private static final String OEM_MEDIA_PACKAGE = "com.tencent.wecarflow";
+    private static final String OEM_JUMP_VIEW = "jumpView";
 
     private final Context context;
 
@@ -23,7 +24,7 @@ final class MediaSourceLauncher {
         }
         if (source == MediaSource.Id.BT || source == MediaSource.Id.RADIO
                 || source == MediaSource.Id.USB) {
-            if (launchPackage(OEM_MEDIA_PACKAGE)) return true;
+            if (launchOemMedia(source)) return true;
             return launchMusicSelector();
         }
         return false;
@@ -33,6 +34,15 @@ final class MediaSourceLauncher {
         MediaSource.Id display = source.displayId();
         return display == MediaSource.Id.BT || display == MediaSource.Id.RADIO
                 || display == MediaSource.Id.USB || display == MediaSource.Id.ONLINE;
+    }
+
+    static String oemJumpView(MediaSource.Id source) {
+        return switch (source.displayId()) {
+            case RADIO -> "localradio";
+            case BT -> "bluetooth";
+            case USB -> "usb";
+            default -> "";
+        };
     }
 
     private boolean launchMusicSelector() {
@@ -46,6 +56,17 @@ final class MediaSourceLauncher {
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(packageName);
         if (intent == null) return false;
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        return launch(intent);
+    }
+
+    private boolean launchOemMedia(MediaSource.Id source) {
+        String jumpView = oemJumpView(source);
+        if (jumpView.isBlank()) return false;
+        Intent intent = context.getPackageManager().getLaunchIntentForPackage(OEM_MEDIA_PACKAGE);
+        if (intent == null) return false;
+        intent.putExtra(OEM_JUMP_VIEW, jumpView);
+        // Matches SourceBigWidgetProvider -> MediaViewModel.jumpToApp() on the tested firmware.
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         return launch(intent);
     }
 

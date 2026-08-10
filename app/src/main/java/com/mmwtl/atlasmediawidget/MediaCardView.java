@@ -115,8 +115,8 @@ final class MediaCardView extends FrameLayout {
         scrim.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 style == CardStyle.COMPACT
-                        ? new int[]{0x5E11151E, 0x2211151E, 0xAD10141B, 0xF510141B}
-                        : new int[]{0x6011151E, 0x1011151E, 0xB010141B, 0xFA10141B}));
+                        ? new int[]{0x5E1D2228, 0x221D2228, 0xAD1D2228, 0xF51D2228}
+                        : new int[]{0x601D2228, 0x101D2228, 0xB01D2228, 0xFA1D2228}));
         addView(scrim, match());
 
         View border = new View(context);
@@ -252,8 +252,8 @@ final class MediaCardView extends FrameLayout {
         next.setOnClickListener(v -> listener.onCommand("NEXT"));
         playPause.setOnClickListener(v -> {
             if (snapshot == null) return;
-            if (snapshot.supports(MediaBridgeContract.CAP_TOGGLE)) listener.onCommand("TOGGLE");
-            else listener.onCommand(snapshot.isPlaying() ? "PAUSE" : "PLAY");
+            listener.onCommand(PlayPauseActionPolicy.command(
+                    activeSource, snapshot.isPlaying(), snapshot.capabilities));
         });
         progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int value, boolean fromUser) {
@@ -281,6 +281,10 @@ final class MediaCardView extends FrameLayout {
     int cardHeight() { return cardHeight; }
 
     void renderSnapshot(MediaSnapshot value, boolean bridgeConnected) {
+        renderSnapshot(value, bridgeConnected, null);
+    }
+
+    void renderSnapshot(MediaSnapshot value, boolean bridgeConnected, RadioDisplay radioDisplay) {
         snapshot = value;
         if (value == null) {
             renderDisconnected(getResources().getString(R.string.bridge_disconnected));
@@ -289,21 +293,26 @@ final class MediaCardView extends FrameLayout {
         activeSource = selectedSource(value);
         hasMedia = MediaPresentation.hasContent(activeSource, bridgeConnected,
                 value.backendConnected, value.title, value.artist, value.album, value.duration);
-        String displayTitle = MediaPresentation.title(activeSource, value.title);
+        String displayTitle = radioDisplay == null
+                ? MediaPresentation.title(activeSource, value.title) : radioDisplay.title;
         title.setText(hasMedia && !displayTitle.isBlank()
                 ? displayTitle : getResources().getString(R.string.unknown_track));
-        String detail = MediaPresentation.subtitle(activeSource, value.artist, value.album);
+        String detail = radioDisplay == null
+                ? MediaPresentation.subtitle(activeSource, value.artist, value.album)
+                : radioDisplay.subtitle;
         subtitle.setText(hasMedia && !detail.isBlank()
                 ? detail : getResources().getString(R.string.empty_hint));
         if (bridgeConnected && value.backendConnected) statusPill.setVisibility(GONE);
         else setStatusPill("Медиасервис недоступен", true);
         previous.setEnabled(value.supports(MediaBridgeContract.CAP_PREVIOUS));
         next.setEnabled(value.supports(MediaBridgeContract.CAP_NEXT));
+        boolean currentlyPlaying = PlayPauseActionPolicy.isCurrentlyPlaying(
+                activeSource, value.isPlaying());
         boolean toggle = value.supports(MediaBridgeContract.CAP_TOGGLE)
-                || value.isPlaying() && value.supports(MediaBridgeContract.CAP_PAUSE)
-                || !value.isPlaying() && value.supports(MediaBridgeContract.CAP_PLAY);
+                || currentlyPlaying && value.supports(MediaBridgeContract.CAP_PAUSE)
+                || !currentlyPlaying && value.supports(MediaBridgeContract.CAP_PLAY);
         playPause.setEnabled(toggle);
-        playPause.setPlaying(value.isPlaying());
+        playPause.setPlaying(currentlyPlaying);
         progress.setEnabled(value.duration > 0L && value.supports(MediaBridgeContract.CAP_SEEK));
         progress.setAlpha(progress.isEnabled() ? 1f : 0.55f);
         duration.setText(formatTime(value.duration));
@@ -378,10 +387,10 @@ final class MediaCardView extends FrameLayout {
         textParams.leftMargin = showThumbnail ? d(15) : 0;
         metadata.getChildAt(1).setLayoutParams(textParams);
 
-        LayoutParams placeholderParams = new LayoutParams(d(compact ? 100 : 165), d(compact ? 100 : 165));
-        placeholderParams.gravity = Gravity.TOP | Gravity.END;
-        placeholderParams.topMargin = by(compact ? 62 : 108);
-        placeholderParams.rightMargin = bx(compact ? 30 : 38);
+        int placeholderSize = d(compact ? 150 : 220);
+        LayoutParams placeholderParams = new LayoutParams(placeholderSize, placeholderSize);
+        placeholderParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        placeholderParams.topMargin = by(compact ? 58 : 72);
         placeholder.setLayoutParams(placeholderParams);
         placeholder.setVisibility(!hasArtwork && !chooserVisible ? VISIBLE : GONE);
 
@@ -483,8 +492,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     private static MediaSource.Id selectedSource(MediaSnapshot value) {
-        for (MediaSource source : value.sources) if (source.selected) return source.id;
-        return value.audioSource;
+        return MediaSource.selectedId(value.audioSource, value.sources);
     }
 
     private void renderFallbackSource() {

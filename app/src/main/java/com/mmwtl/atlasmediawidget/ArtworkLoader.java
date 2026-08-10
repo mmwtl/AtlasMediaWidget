@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -29,15 +30,19 @@ final class ArtworkLoader {
     }
 
     long load(String uri, long generation, long revision) {
+        return load(ArtworkRef.contentUri(uri), generation, revision);
+    }
+
+    long load(ArtworkRef artwork, long generation, long revision) {
         long token = (generation * 31L) ^ revision ^ activeToken.incrementAndGet();
         activeToken.set(token);
-        if (uri == null || uri.isBlank()) {
+        if (artwork == null || artwork.isEmpty()) {
             main.post(() -> listener.onArtwork(token, null));
             return token;
         }
         executor.execute(() -> {
             Bitmap bitmap = null;
-            try (InputStream input = context.getContentResolver().openInputStream(Uri.parse(uri))) {
+            try (InputStream input = open(artwork)) {
                 if (input != null) bitmap = BitmapFactory.decodeStream(input);
             } catch (Exception error) {
                 AppLog.warn("Cannot decode media artwork", error);
@@ -48,6 +53,15 @@ final class ArtworkLoader {
             });
         });
         return token;
+    }
+
+    private InputStream open(ArtworkRef artwork) throws Exception {
+        return switch (artwork.kind) {
+            case CONTENT_URI -> context.getContentResolver().openInputStream(Uri.parse(artwork.value));
+            case ASSET -> context.getAssets().open(artwork.value);
+            case FILE -> new FileInputStream(artwork.value);
+            case NONE -> null;
+        };
     }
 
     void clear() {

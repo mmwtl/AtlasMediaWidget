@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediawidget;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.os.UserManager;
 import android.provider.Settings;
 
 public final class BootReceiver extends BroadcastReceiver {
@@ -10,13 +11,15 @@ public final class BootReceiver extends BroadcastReceiver {
         if (intent == null) return;
         Prefs prefs = new Prefs(context);
         String action = intent.getAction();
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
+        if (BootStartPolicy.isStartupAction(action)) {
             if (!prefs.getBoolean(Prefs.KEY_AUTO_START, false)) {
-                prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, false);
+                if (isUserUnlocked(context)) {
+                    prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, false);
+                }
                 return;
             }
             prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
-            AppLog.info("Boot completed; starting overlay service without delay");
+            AppLog.info("Startup signal " + action + "; starting overlay service");
             startIfAllowed(context, prefs);
         } else if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
                 && prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
@@ -39,5 +42,10 @@ public final class BootReceiver extends BroadcastReceiver {
             prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, false);
             AppLog.warn("Boot start failed", error);
         }
+    }
+
+    private static boolean isUserUnlocked(Context context) {
+        UserManager users = context.getSystemService(UserManager.class);
+        return users == null || users.isUserUnlocked();
     }
 }

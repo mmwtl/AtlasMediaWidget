@@ -2,6 +2,8 @@ package com.mmwtl.atlasmediawidget;
 
 import android.os.Bundle;
 
+import java.util.List;
+
 final class MediaSource {
     enum Id {
         UNKNOWN, USB, BT, RADIO, ONLINE, OTHER, YUNTING, CPAA;
@@ -59,5 +61,11 @@ final class MediaSource {
                 bundle.getBoolean(MediaBridgeContract.K_SOURCE_SELECTED),
                 bundle.getLong(MediaBridgeContract.K_SOURCE_CAPABILITIES)
         );
+    }
+
+    static Id selectedId(Id audioSource, List<MediaSource> sources) {
+        if (audioSource != null && audioSource != Id.UNKNOWN) return audioSource;
+        for (MediaSource source : sources) if (source.selected) return source.id;
+        return Id.UNKNOWN;
     }
 }

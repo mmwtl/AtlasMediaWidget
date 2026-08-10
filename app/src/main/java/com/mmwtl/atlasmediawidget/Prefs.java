@@ -2,14 +2,20 @@ package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.UserManager;
 
 final class Prefs {
+    private static final String NAME = "atlas_media_widget";
+    private static final Object MIGRATION_LOCK = new Object();
+    private static volatile boolean credentialMigrationAttempted;
     static final String KEY_SERVICE_ENABLED = "service_enabled";
     static final String KEY_AUTO_START = "auto_start";
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
+    static final String KEY_SHOW_RADIO_COVERS = "show_radio_covers";
+    static final String KEY_CUSTOM_RADIO_CATALOG = "custom_radio_catalog";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     private static final String KEY_TEXT_GAP_PREFIX = "text_gap_";
@@ -58,7 +64,26 @@ final class Prefs {
     private final SharedPreferences preferences;
 
     Prefs(Context context) {
-        preferences = context.getSharedPreferences("atlas_media_widget", Context.MODE_PRIVATE);
+        Context app = context.getApplicationContext();
+        Context storage = app.createDeviceProtectedStorageContext();
+        migrateCredentialPreferencesWhenAvailable(app, storage);
+        preferences = storage.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+    }
+
+    private static void migrateCredentialPreferencesWhenAvailable(Context credentialContext,
+            Context deviceContext) {
+        if (credentialMigrationAttempted) return;
+        UserManager users = credentialContext.getSystemService(UserManager.class);
+        if (users != null && !users.isUserUnlocked()) return;
+        synchronized (MIGRATION_LOCK) {
+            if (credentialMigrationAttempted) return;
+            try {
+                deviceContext.moveSharedPreferencesFrom(credentialContext, NAME);
+            } catch (RuntimeException error) {
+                AppLog.warn("Cannot migrate preferences to Direct Boot storage", error);
+            }
+            credentialMigrationAttempted = true;
+        }
     }
 
     boolean getBoolean(String key, boolean fallback) {
@@ -69,12 +94,20 @@ final class Prefs {
         return preferences.getInt(key, fallback);
     }
 
+    String getString(String key, String fallback) {
+        return preferences.getString(key, fallback);
+    }
+
     void putBoolean(String key, boolean value) {
         preferences.edit().putBoolean(key, value).apply();
     }
 
     void putInt(String key, int value) {
         preferences.edit().putInt(key, value).apply();
+    }
+
+    void putString(String key, String value) {
+        preferences.edit().putString(key, value).apply();
     }
 
     int cardWidthDp(CardStyle style) {
