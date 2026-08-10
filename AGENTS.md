@@ -115,6 +115,16 @@ transitions.
 - Do not expose raw third-party notification contents. Retain only the media fields needed for the
   visible card and diagnostics.
 
+## Public documentation
+
+- Keep the root README product-facing: describe the app, screenshots, features, requirements,
+  setup, usage, build instructions and links to deeper documentation.
+- Do not leave design deliberation, implementation planning, completed-task checklists or internal
+  comparisons in the README. Put architectural research in `docs/` and maintainer constraints in
+  this file.
+- Label screenshot-only demonstration media states as demo data without exposing temporary test
+  hooks or capture procedures in the public README.
+
 ## Repository hygiene
 
 - After completing and verifying each improvement, create a Git commit unless the user explicitly

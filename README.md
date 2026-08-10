@@ -4,16 +4,21 @@
 
 <h1 align="center">Atlas Media Widget</h1>
 
-Кастомная медиакарточка для Android 11 ГУ. Приложение рисует `TYPE_APPLICATION_OVERLAY` по
-проверенной lifecycle-схеме AtlasAppWidget и использует GInputBridge `mediaapi` protocol v1 как
-единственный медиабэкенд.
+<p align="center">
+  Медиакарточка-оверлей для портретных автомобильных ГУ на Android 11
+</p>
+
+Atlas Media Widget показывает на домашнем экране обложку, метаданные, прогресс воспроизведения,
+кнопки управления и переключатель источников. Состояние и команды передаются через Media Bridge
+`mediaapi v1` установленного приложения GInputBridge.
+
+> Atlas Media Widget использует `TYPE_APPLICATION_OVERLAY`, а не системный `AppWidget`. Карточка
+> отображается только поверх HOME и не блокирует управление остальной частью экрана.
 
 ## Интерфейс
 
-Скриншоты сняты с версии `1.0.20 (21)` на Android 11 AVD в целевом разрешении 1440×1920.
-Для визуальной демонстрации в штатный `MediaCardView` поданы тестовые snapshots активных
-источников: музыкальный трек через Bluetooth и Европа Плюс на FM 103.8. Обложки, градиенты,
-метаданные, progress и transport controls отрисованы самим приложением.
+На карточках показаны демонстрационные медиаданные. Интерфейс, обложки и состояния элементов
+отрисованы штатным `MediaCardView` приложения.
 
 <table>
   <tr>
@@ -36,8 +41,8 @@
 
 <table>
   <tr>
-    <th>Основные настройки · Bluetooth</th>
-    <th>Внешний вид · Радио</th>
+    <th>Основные настройки</th>
+    <th>Настройка внешнего вида</th>
   </tr>
   <tr>
     <td>
@@ -53,143 +58,80 @@
   </tr>
 </table>
 
-## Короткий вывод
+## Возможности
 
-Сделать кастомную карточку с источниками, обложкой, прогрессом и transport controls можно.
-Практичный вариант — не настоящий `AppWidget`, а overlay по модели AtlasAppWidget, получающий
-атомарное состояние и выполняющий команды через установленный GInputBridge. Системный лаунчер ГУ
-жёстко закрепляет OEM-провайдер
-`com.geely.mediawidget.customwidget.SourceBigWidgetProvider`, поэтому нет подтверждения, что он
-позволит штатно разместить сторонний `AppWidgetProvider` в той же области.
+- источники Bluetooth, Radio, USB и Online;
+- полноразмерная обложка с градиентом для читаемости текста;
+- play/pause, previous, next и seek с учётом доступных источнику действий;
+- локальное плавное обновление прогресса без ежесекундных Binder-запросов;
+- прямоугольный формат 500×300 и квадратный формат 500×500;
+- отдельная настройка размера, текста, отступов, прогресса и панели управления для каждого формата;
+- живой предпросмотр, использующий тот же `MediaCardView`, что и overlay;
+- встроенный каталог 25 FM-станций Пензы с обложками;
+- импорт собственного ZIP-каталога радио с CSV и изображениями;
+- открытие активного медиаприложения или штатного экрана Radio, Bluetooth и USB;
+- отображение только поверх HOME, перетаскивание карточки и сохранение позиции;
+- foreground service, автозапуск после загрузки ГУ и восстановление соединения с GInputBridge;
+- явное состояние недоступного медиасервиса вместо бессрочного показа устаревших данных.
 
-Метаданные публичных медиасессий доступны обычному приложению через включённый пользователем
-`NotificationListenerService`:
+## Требования
 
-- пакет и имя проигрывателя;
-- title, artist, album и media ID;
-- duration, position, speed и playback state;
-- поддерживаемые transport actions;
-- URI/bitmap обложки, если источник их действительно публикует и разрешает чтение.
+- Android 11;
+- портретный экран; целевая конфигурация — 1440×1920;
+- GInputBridge с поддержкой Media Bridge `mediaapi v1`;
+- разрешения «Поверх других приложений» и «Доступ к истории использования» для Atlas Media Widget;
+- для надёжного автозапуска — разрешение автозапуска и снятие ограничений фоновой работы прошивки ГУ.
 
-Эту работу уже выполняет GInputBridge: `MediaSessionManager` даёт ему активные `MediaController`,
-`MediaController.Callback` сообщает metadata/playback state, а `OneOS MediaCenterManager` — текущий
-аппаратный источник. В GInputBridge уже есть source-aware маршрутизация play/pause/next/previous и
-переключения источников. Поэтому backend расширяется там, а AtlasMediaWidget остаётся UI-клиентом.
+В GInputBridge должны быть включены:
 
-## Рекомендуемая схема
+- Media runtime;
+- External API / Media Bridge runtime;
+- доступ к уведомлениям для MediaSession-плееров;
+- `Управлять радио и Bluetooth` для команд штатным Radio и Bluetooth.
 
-```text
-MediaSession + OneOS
-        │
-        ▼
-   GInputBridge
- MediaStateHub + CommandRouter
-        │ open versioned bound service
-        ▼
-GInputBridgeMediaSource
-        │ snapshot reducer / stale timeout
-        ▼
-foreground overlay service
-        │
-        ▼
- custom media view
-```
+## Установка и запуск
 
-GInputBridge backend уже реализован в ветке `mediaapi`. Следующий порядок относится к клиенту:
+1. Установите и настройте совместимую версию GInputBridge.
+2. Установите APK Atlas Media Widget.
+3. Откройте приложение и выдайте разрешения поверх окон и на историю использования.
+4. Проверьте статус GInputBridge на экране настроек.
+5. Выберите формат и размер карточки.
+6. Нажмите `Запустить`.
+7. При необходимости включите автозапуск после загрузки ГУ.
 
-1. Реализовать `GInputBridgeMediaSource`: Messenger protocol v1, reconnect и stale-state reducer.
-2. Добавить локальную экстраполяцию progress и generation-aware загрузку artwork.
-3. Поднять overlay, source selector и capability-driven controls.
-4. Проверить Radio, Bluetooth, USB, online и сторонние плееры на реальной ГУ.
+Карточка появляется на домашнем экране. Для перемещения используйте кнопку `⋮` в правом верхнем
+углу. Нажатие на свободную область карточки открывает текущий медиаисточник.
 
-Все четыре клиентских пункта реализованы в версии `1.0.13 (14)`. Проверки firmware-specific частей
-на реальной ГУ всё ещё обязательны.
+## Каталог радио
 
-Подробное сравнение вариантов и рисков: [docs/architecture-options.md](docs/architecture-options.md).
-Целевой полный контракт: [docs/full-media-bridge.md](docs/full-media-bridge.md).
-Текущий legacy-контракт GInputBridge: [docs/ginputbridge-api.md](docs/ginputbridge-api.md).
+Приложение содержит каталог FM-станций Пензы. Пользовательский каталог импортируется одним ZIP-файлом
+и может заменять названия и обложки для выбранных частот.
 
-## Почему это может быть стабильнее OEM-карточки
-
-В исследованной OEM-реализации состояние терялось после смерти Binder/callback-цепочки, а
-периодического восстановления почти не было. Своя реализация может делать немедленный snapshot,
-повторную идемпотентную подписку и редкую сверку состояния без убийства системных процессов.
-
-Но обычный APK не имеет статуса `persistent` и OEM-привилегий штатного виджета. Кроме того,
-AtlasMediaWidget становится зависим от живого процесса GInputBridge. Поэтому по интеграции с
-лаунчером и выживаемости процесса он изначально слабее; foreground service, разрешённый автозапуск
-и корректный reconnect только уменьшают этот разрыв. По управлению и восстановлению состояния он
-может быть лучше OEM-карточки, если GInputBridge отдаёт цельный снимок и остаётся единственным
-владельцем OneOS/MediaSession callback-цепочки.
-
-## Официальные Android API
-
-- [MediaSessionManager](https://developer.android.com/reference/android/media/session/MediaSessionManager)
-- [MediaController](https://developer.android.com/reference/android/media/session/MediaController)
-- [NotificationListenerService](https://developer.android.com/reference/android/service/notification/NotificationListenerService)
-- [App widgets](https://developer.android.com/develop/ui/views/appwidgets/overview)
-
-## Возможности приложения
-
-- atomic metadata/playback/source snapshots через Messenger;
-- обложка через временно разрешённый FileProvider URI GInputBridge;
-- полноразмерная обложка как фон карточки с градиентом для читаемости текста;
-- пресеты 500×300 и 500×500, отдельная настройка ширины/высоты и адаптивное заполнение карточки;
-- карточка без системной внешней тени на рабочем столе;
-- переданная звуковая волна в lossless WebP как крупная центрированная заглушка, когда обложка отсутствует;
-- source/status pills, отдельные пустое и playing-состояния в обоих форматах;
-- локальный плавный progress без секундного Binder polling;
-- seek только при capability `SEEK_TO`;
-- предоставленные lossless WebP-иконки previous/play-pause/next без подложки с source-aware
-  маршрутизацией в GInputBridge; next зеркально использует симметричную previous-иконку;
-- кнопки управления равномерно распределены по всей ширине карточки;
-- высота нижней панели, размер transport-иконок, их разбежка от центра и отступ от нижней границы регулируются отдельно
-  для каждого формата карточки;
-- дополнительный отступ блока текста от верхней строки регулируется отдельно для каждого формата;
-- живой предпросмотр использует тот же `MediaCardView`, что и overlay, и обновляется при движении
-  ползунков без выхода из настроек;
-- регулируются верхний и боковой отступы, размеры текста верхней строки, названия,
-  подзаголовка и времени, промежуток подзаголовка, положение и толщина линии прогресса;
-- крупная сетка выбора только USB, Bluetooth, Radio и Online с отдельными пиктограммами;
-- открытие активного online-приложения или штатного OEM media UI по нажатию на свободную область;
-- radio fallback в клиенте: выбранный источник не выглядит пустым, даже если старая версия
-  GInputBridge ещё не передала частоту и RDS-название;
-- встроенный каталог 25 актуальных FM-станций Пензы с квадратными обложками и явным флагом их
-  отображения; для радио название станции выводится как трек, а диапазон и частота — как
-  исполнитель (`FM 100.1`);
-- импорт пользовательского ZIP-каталога с CSV-списком и WebP/PNG/JPEG-обложками без разрешения на
-  внешнее хранилище; [описание формата](docs/radio-catalog.md);
-- открытие штатного экрана `com.tencent.wecarflow` с source-specific `jumpView` для Radio,
-  Bluetooth и USB по нажатию на свободную область;
-- reconnect с bounded exponential backoff и очистка stale-состояния;
-- показ только поверх HOME, сохранение позиции и foreground service;
-- ранний автозапуск по cold boot, Direct Boot и автомобильному `QUICKBOOT_POWERON`, с быстрым
-  асинхронным определением HOME после включения экрана;
-- кнопка радио использует playback state mediaapi без клиентской инверсии, показывает паузу во
-  время воспроизведения и play во время паузы;
-- краткий пустой переход в Online после transport-команды удерживается не более 900 мс и
-  сверяется повторным snapshot, поэтому metadata и обложка не моргают, а устойчивый переход
-  источника остаётся видимым;
-- launcher icon использует согласованные с AtlasAppWidget визуальный масштаб foreground и
-  яркость серо-голубого знака.
-
-## Требования на ГУ
-
-1. Установить GInputBridge из совместимой ветки `mediaapi` и включить его Media runtime.
-2. Включить в GInputBridge `Управлять радио и Bluetooth`: без этой настройки Media Bridge не
-   маршрутизирует transport-команды в нативные Radio/BT API.
-3. Оставить включённым notification access GInputBridge для публичных MediaSession-плееров.
-4. Разрешить AtlasMediaWidget отображение поверх окон и доступ к истории использования.
-5. Запустить виджет из настроек приложения; автозапуск включается отдельно.
-
-API `mediaapi` v1 намеренно открыт всем установленным APK. Это приемлемо только при контролируемой
-установке ПО на изолированной ГУ.
+Формат архива и пример CSV описаны в [документации каталога](docs/radio-catalog.md).
 
 ## Сборка
+
+Требуются JDK 17 и Android SDK 36. Сборка выполняется репозиторным Gradle Wrapper:
 
 ```sh
 ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelease
 ```
 
-Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.20[21]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+Release APK создаётся в `app/build/outputs/apk/release/` с именем вида
+`<versionName>[<versionCode>]AtlasMediaWidget-release.apk`.
+
+Локальная release-подпись подключается через игнорируемый `secure.signing.gradle`. Без него Gradle
+создаёт unsigned release APK.
+
+## Документация
+
+- [Контракт Media Bridge](docs/full-media-bridge.md)
+- [Совместимость с legacy API GInputBridge](docs/ginputbridge-api.md)
+- [Архитектурные варианты и ограничения](docs/architecture-options.md)
+- [Формат пользовательского каталога радио](docs/radio-catalog.md)
+
+## Совместимость
+
+Основная целевая платформа — протестированная портретная ГУ на Android 11. Поведение OEM-компонентов,
+автозапуска и энергосбережения может отличаться между версиями прошивки и требует проверки на
+реальном устройстве.
