@@ -1,6 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -33,14 +34,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends ScaledActivity {
-    private static final int MIN_WIDTH_DP = 360;
-    private static final int MAX_WIDTH_DP = 900;
-    private static final int MIN_HEIGHT_DP = 220;
-    private static final int MAX_HEIGHT_DP = 900;
     private static final int REQUEST_IMPORT_RADIO_CATALOG = 4100;
+    private static final int REQUEST_EXPORT_SETTINGS = 4101;
+    private static final int REQUEST_IMPORT_SETTINGS = 4102;
     private Prefs prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService catalogExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private TextView permissionStatus;
     private TextView bridgeStatus;
     private Button serviceButton;
@@ -49,6 +48,8 @@ public final class MainActivity extends ScaledActivity {
     private TextView radioCatalogStatus;
     private Button importRadioCatalogButton;
     private Button clearRadioCatalog;
+    private Button exportSettingsButton;
+    private Button importSettingsButton;
     private RadioButton compactStyle;
     private RadioButton squareStyle;
     private TextView sizeValue;
@@ -99,7 +100,7 @@ public final class MainActivity extends ScaledActivity {
 
     @Override protected void onDestroy() {
         main.removeCallbacksAndMessages(null);
-        catalogExecutor.shutdownNow();
+        ioExecutor.shutdownNow();
         super.onDestroy();
     }
 
@@ -109,6 +110,12 @@ public final class MainActivity extends ScaledActivity {
         if (requestCode == REQUEST_IMPORT_RADIO_CATALOG && resultCode == RESULT_OK
                 && data != null && data.getData() != null) {
             importRadioCatalog(data.getData());
+        } else if (requestCode == REQUEST_EXPORT_SETTINGS && resultCode == RESULT_OK
+                && data != null && data.getData() != null) {
+            exportSettings(data.getData());
+        } else if (requestCode == REQUEST_IMPORT_SETTINGS && resultCode == RESULT_OK
+                && data != null && data.getData() != null) {
+            readSettingsForImport(data.getData());
         }
     }
 
@@ -227,10 +234,10 @@ public final class MainActivity extends ScaledActivity {
         sizeValueParams.topMargin = Ui.dp(this, 6);
         serviceCard.addView(sizeValue, sizeValueParams);
         serviceCard.addView(text("Ширина", 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
-        widthSize = sizeSeekBar(MIN_WIDTH_DP, MAX_WIDTH_DP);
+        widthSize = sizeSeekBar(Prefs.MIN_CARD_WIDTH_DP, Prefs.MAX_CARD_WIDTH_DP);
         serviceCard.addView(widthSize, fullWrap());
         serviceCard.addView(text("Высота", 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
-        heightSize = sizeSeekBar(MIN_HEIGHT_DP, MAX_HEIGHT_DP);
+        heightSize = sizeSeekBar(Prefs.MIN_CARD_HEIGHT_DP, Prefs.MAX_CARD_HEIGHT_DP);
         serviceCard.addView(heightSize, fullWrap());
         SeekBar.OnSeekBarChangeListener sizeListener = new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
@@ -486,10 +493,29 @@ public final class MainActivity extends ScaledActivity {
         scaleCard.addView(scaleHint, scaleHintParams);
         addScaleSlider(scaleCard);
 
+        LinearLayout settingsBackupCard = card();
+        settingsBackupCard.addView(text("Импорт и экспорт настроек",
+                20, Ui.PRIMARY, Typeface.BOLD));
+        TextView settingsBackupHint = text(
+                "JSON содержит внешний вид обоих форматов карточки, положение overlay, "
+                        + "масштаб, автозапуск и показ радиообложек. Разрешения, состояние "
+                        + "запущенного сервиса и пользовательский каталог радио не переносятся.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams settingsBackupHintParams = fullWrap();
+        settingsBackupHintParams.topMargin = Ui.dp(this, 8);
+        settingsBackupCard.addView(settingsBackupHint, settingsBackupHintParams);
+        exportSettingsButton = actionButton("Экспортировать настройки в JSON");
+        exportSettingsButton.setOnClickListener(v -> chooseSettingsExport());
+        settingsBackupCard.addView(exportSettingsButton, buttonParams());
+        importSettingsButton = actionButton("Импортировать настройки из JSON");
+        importSettingsButton.setOnClickListener(v -> chooseSettingsImport());
+        settingsBackupCard.addView(importSettingsButton, buttonParams());
+
         addSectionHeading(root, getString(R.string.settings_section_system), true);
         root.addView(accessCard);
         root.addView(bridgeCard);
         root.addView(runtimeCard);
+        root.addView(settingsBackupCard);
 
         addSectionHeading(root, getString(R.string.settings_section_content), false);
         root.addView(behaviorCard);
@@ -624,7 +650,7 @@ public final class MainActivity extends ScaledActivity {
         importRadioCatalogButton.setEnabled(false);
         clearRadioCatalog.setEnabled(false);
         android.content.Context appContext = getApplicationContext();
-        catalogExecutor.execute(() -> {
+        ioExecutor.execute(() -> {
             try {
                 RadioCatalogImporter.Result result = RadioCatalogImporter.importZip(appContext, uri);
                 main.post(() -> {
@@ -656,10 +682,122 @@ public final class MainActivity extends ScaledActivity {
         clearRadioCatalog.setEnabled(false);
         refreshOverlayIfRunning();
         main.postDelayed(() -> {
-            if (!catalogExecutor.isShutdown()) {
-                catalogExecutor.execute(() -> RadioCatalogImporter.deleteCatalog(obsolete));
+            if (!ioExecutor.isShutdown()) {
+                ioExecutor.execute(() -> RadioCatalogImporter.deleteCatalog(obsolete));
             }
         }, 2_000L);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void chooseSettingsExport() {
+        Intent picker = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_TITLE, SettingsBackup.FILE_NAME);
+        launchFilePicker(picker, REQUEST_EXPORT_SETTINGS);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void chooseSettingsImport() {
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("application/json");
+        picker.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"application/json", "text/json", "text/plain",
+                        "application/octet-stream"});
+        launchFilePicker(picker, REQUEST_IMPORT_SETTINGS);
+    }
+
+    @SuppressWarnings("deprecation")
+    private void launchFilePicker(Intent picker, int requestCode) {
+        try {
+            startActivityForResult(picker, requestCode);
+        } catch (ActivityNotFoundException error) {
+            Toast.makeText(this, "На ГУ нет системного выбора файлов",
+                    Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void exportSettings(Uri uri) {
+        setSettingsTransferEnabled(false);
+        android.content.Context appContext = getApplicationContext();
+        ioExecutor.execute(() -> {
+            try {
+                SettingsBackup.write(appContext, prefs, uri);
+                main.post(() -> {
+                    if (isDestroyed()) return;
+                    setSettingsTransferEnabled(true);
+                    Toast.makeText(this, "Настройки экспортированы",
+                            Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception error) {
+                AppLog.warn("Cannot export settings", error);
+                showSettingsTransferError("Не удалось экспортировать настройки", error);
+            }
+        });
+    }
+
+    private void readSettingsForImport(Uri uri) {
+        setSettingsTransferEnabled(false);
+        android.content.Context appContext = getApplicationContext();
+        ioExecutor.execute(() -> {
+            try {
+                SettingsBackup.Data imported = SettingsBackup.read(appContext, uri);
+                main.post(() -> {
+                    if (isDestroyed()) return;
+                    setSettingsTransferEnabled(true);
+                    confirmSettingsImport(imported);
+                });
+            } catch (Exception error) {
+                AppLog.warn("Cannot read settings backup", error);
+                showSettingsTransferError("Не удалось прочитать настройки", error);
+            }
+        });
+    }
+
+    private void confirmSettingsImport(SettingsBackup.Data imported) {
+        new AlertDialog.Builder(this)
+                .setTitle("Импортировать настройки?")
+                .setMessage("Текущие переносимые настройки будут заменены значениями из JSON. "
+                        + "Разрешения, работа сервиса и каталог радио не изменятся.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Импортировать", (dialog, which) -> applySettings(imported))
+                .show();
+    }
+
+    private void applySettings(SettingsBackup.Data imported) {
+        setSettingsTransferEnabled(false);
+        ioExecutor.execute(() -> {
+            boolean saved = prefs.replacePortableSettings(imported);
+            main.post(() -> {
+                if (isDestroyed()) return;
+                setSettingsTransferEnabled(true);
+                if (!saved) {
+                    Toast.makeText(this, "Не удалось сохранить импортированные настройки",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+                refreshOverlayIfRunning();
+                Toast.makeText(this, "Настройки импортированы",
+                        Toast.LENGTH_LONG).show();
+                recreate();
+            });
+        });
+    }
+
+    private void showSettingsTransferError(String fallback, Exception error) {
+        String detail = error.getMessage() == null || error.getMessage().isBlank()
+                ? fallback : error.getMessage();
+        main.post(() -> {
+            if (isDestroyed()) return;
+            setSettingsTransferEnabled(true);
+            Toast.makeText(this, detail, Toast.LENGTH_LONG).show();
+        });
+    }
+
+    private void setSettingsTransferEnabled(boolean enabled) {
+        if (exportSettingsButton != null) exportSettingsButton.setEnabled(enabled);
+        if (importSettingsButton != null) importSettingsButton.setEnabled(enabled);
     }
 
     private void openOverlaySettings() {
@@ -742,8 +880,10 @@ public final class MainActivity extends ScaledActivity {
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
-        widthSize.setProgress(clamp(prefs.cardWidthDp(style), MIN_WIDTH_DP, MAX_WIDTH_DP));
-        heightSize.setProgress(clamp(prefs.cardHeightDp(style), MIN_HEIGHT_DP, MAX_HEIGHT_DP));
+        widthSize.setProgress(clamp(prefs.cardWidthDp(style),
+                Prefs.MIN_CARD_WIDTH_DP, Prefs.MAX_CARD_WIDTH_DP));
+        heightSize.setProgress(clamp(prefs.cardHeightDp(style),
+                Prefs.MIN_CARD_HEIGHT_DP, Prefs.MAX_CARD_HEIGHT_DP));
         textGap.setProgress(appearance.textGapDp);
         controlPanelHeight.setProgress(appearance.controlPanelHeightDp);
         controlIconScale.setProgress(appearance.controlIconScalePercent);

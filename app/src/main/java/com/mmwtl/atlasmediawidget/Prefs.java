@@ -33,6 +33,10 @@ final class Prefs {
     private static final String KEY_PROGRESS_GAP_PREFIX = "progress_gap_";
     private static final String KEY_PROGRESS_THICKNESS_PREFIX = "progress_thickness_";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
+    static final int MIN_CARD_WIDTH_DP = 360;
+    static final int MAX_CARD_WIDTH_DP = 900;
+    static final int MIN_CARD_HEIGHT_DP = 220;
+    static final int MAX_CARD_HEIGHT_DP = 900;
     static final int MIN_TEXT_GAP_DP = -24;
     static final int MAX_TEXT_GAP_DP = 48;
     static final int MIN_CONTROL_PANEL_HEIGHT_DP = 64;
@@ -243,6 +247,45 @@ final class Prefs {
                         clamp(value.progressThicknessDp, MIN_PROGRESS_THICKNESS_DP,
                                 MAX_PROGRESS_THICKNESS_DP))
                 .apply();
+    }
+
+    boolean replacePortableSettings(SettingsBackup.Data data) {
+        SharedPreferences.Editor editor = preferences.edit()
+                .putBoolean(KEY_AUTO_START, data.autoStart)
+                .putBoolean(KEY_SHOW_RADIO_COVERS, data.showRadioCovers)
+                .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
+                .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);
+        if (data.positionX == null) {
+            editor.remove(KEY_POSITION_X).remove(KEY_POSITION_Y);
+        } else {
+            editor.putInt(KEY_POSITION_X, data.positionX)
+                    .putInt(KEY_POSITION_Y, data.positionY);
+        }
+        putStyle(editor, CardStyle.COMPACT, data.compact);
+        putStyle(editor, CardStyle.SQUARE, data.square);
+        return editor.commit();
+    }
+
+    private static void putStyle(SharedPreferences.Editor editor, CardStyle style,
+            SettingsBackup.StyleData data) {
+        WidgetAppearance value = data.appearance;
+        String suffix = Integer.toString(style.preferenceValue);
+        editor.putInt(KEY_CARD_WIDTH_PREFIX + suffix, data.widthDp)
+                .putInt(KEY_CARD_HEIGHT_PREFIX + suffix, data.heightDp)
+                .putInt(KEY_TEXT_GAP_PREFIX + suffix, value.textGapDp)
+                .putInt(KEY_CONTROL_HEIGHT_PREFIX + suffix, value.controlPanelHeightDp)
+                .putInt(KEY_CONTROL_ICON_SCALE_PREFIX + suffix, value.controlIconScalePercent)
+                .putInt(KEY_CONTROL_SPREAD_PREFIX + suffix, value.controlSpreadPercent)
+                .putInt(KEY_CONTROL_BOTTOM_INSET_PREFIX + suffix, value.controlBottomInsetDp)
+                .putInt(KEY_TOP_INSET_PREFIX + suffix, value.topInsetDp)
+                .putInt(KEY_CONTENT_INSET_PREFIX + suffix, value.contentInsetDp)
+                .putInt(KEY_TOP_ROW_TEXT_SIZE_PREFIX + suffix, value.topRowTextSizeSp)
+                .putInt(KEY_TITLE_TEXT_SIZE_PREFIX + suffix, value.titleTextSizeSp)
+                .putInt(KEY_SUBTITLE_TEXT_SIZE_PREFIX + suffix, value.subtitleTextSizeSp)
+                .putInt(KEY_SUBTITLE_GAP_PREFIX + suffix, value.subtitleGapDp)
+                .putInt(KEY_TIME_TEXT_SIZE_PREFIX + suffix, value.timeTextSizeSp)
+                .putInt(KEY_PROGRESS_GAP_PREFIX + suffix, value.progressGapDp)
+                .putInt(KEY_PROGRESS_THICKNESS_PREFIX + suffix, value.progressThicknessDp);
     }
 
     private int ranged(String prefix, CardStyle style, int fallback, int min, int max) {
