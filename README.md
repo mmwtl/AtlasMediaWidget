@@ -11,22 +11,33 @@
 ## Интерфейс
 
 Скриншоты сняты с версии `1.0.20 (21)` на Android 11 AVD в целевом разрешении 1440×1920.
-Предпросмотр в настройках использует встроенные демонстрационные метаданные. На кадре реального
-overlay показано явное состояние недоступности, потому что в AVD не запущен совместимый сервис
-GInputBridge `mediaapi`.
-
-<p align="center">
-  <a href="docs/images/overlay-home.webp">
-    <img src="docs/images/overlay-home.webp" width="720" alt="Atlas Media Widget поверх домашнего экрана">
-  </a>
-</p>
-
-<p align="center"><em>Реальный overlay поверх HOME в состоянии недоступного медиасервиса.</em></p>
+Для визуальной демонстрации в штатный `MediaCardView` поданы тестовые snapshots активных
+источников: музыкальный трек через Bluetooth и Европа Плюс на FM 103.8. Обложки, градиенты,
+метаданные, progress и transport controls отрисованы самим приложением.
 
 <table>
   <tr>
-    <th>Основные настройки и живой предпросмотр</th>
-    <th>Настройка формата, размера, текста и отступов</th>
+    <th>Bluetooth · Ночной город</th>
+    <th>Радио · Европа Плюс · FM 103.8</th>
+  </tr>
+  <tr>
+    <td>
+      <a href="docs/images/media-bluetooth.webp">
+        <img src="docs/images/media-bluetooth.webp" alt="Активный Bluetooth с музыкальной обложкой">
+      </a>
+    </td>
+    <td>
+      <a href="docs/images/media-radio.webp">
+        <img src="docs/images/media-radio.webp" alt="Активное радио Европа Плюс с обложкой">
+      </a>
+    </td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <th>Основные настройки · Bluetooth</th>
+    <th>Внешний вид · Радио</th>
   </tr>
   <tr>
     <td>
