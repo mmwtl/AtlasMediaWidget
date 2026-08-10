@@ -1,8 +1,46 @@
-# Atlas Media Widget
+<p align="center">
+  <img src="app/src/main/res/drawable-nodpi/ic_launcher.png" width="160" alt="Иконка Atlas Media Widget">
+</p>
+
+<h1 align="center">Atlas Media Widget</h1>
 
 Кастомная медиакарточка для Android 11 ГУ. Приложение рисует `TYPE_APPLICATION_OVERLAY` по
 проверенной lifecycle-схеме AtlasAppWidget и использует GInputBridge `mediaapi` protocol v1 как
 единственный медиабэкенд.
+
+## Интерфейс
+
+Скриншоты сняты с версии `1.0.20 (21)` на Android 11 AVD в целевом разрешении 1440×1920.
+Предпросмотр в настройках использует встроенные демонстрационные метаданные. На кадре реального
+overlay показано явное состояние недоступности, потому что в AVD не запущен совместимый сервис
+GInputBridge `mediaapi`.
+
+<p align="center">
+  <a href="docs/images/overlay-home.webp">
+    <img src="docs/images/overlay-home.webp" width="720" alt="Atlas Media Widget поверх домашнего экрана">
+  </a>
+</p>
+
+<p align="center"><em>Реальный overlay поверх HOME в состоянии недоступного медиасервиса.</em></p>
+
+<table>
+  <tr>
+    <th>Основные настройки и живой предпросмотр</th>
+    <th>Настройка формата, размера, текста и отступов</th>
+  </tr>
+  <tr>
+    <td>
+      <a href="docs/images/settings-overview.webp">
+        <img src="docs/images/settings-overview.webp" alt="Основные настройки Atlas Media Widget">
+      </a>
+    </td>
+    <td>
+      <a href="docs/images/settings-appearance.webp">
+        <img src="docs/images/settings-appearance.webp" alt="Настройки внешнего вида Atlas Media Widget">
+      </a>
+    </td>
+  </tr>
+</table>
 
 ## Короткий вывод
 
