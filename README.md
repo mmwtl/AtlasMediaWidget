@@ -121,7 +121,8 @@ AtlasMediaWidget становится зависим от живого проц�
 - краткий пустой переход в Online после transport-команды удерживается не более 900 мс и
   сверяется повторным snapshot, поэтому metadata и обложка не моргают, а устойчивый переход
   источника остаётся видимым;
-- launcher icon использует тот же визуальный масштаб foreground, что и AtlasAppWidget.
+- launcher icon использует согласованные с AtlasAppWidget визуальный масштаб foreground и
+  яркость серо-голубого знака.
 
 ## Требования на ГУ
 
@@ -142,4 +143,4 @@ ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelea
 ```
 
 Артефакт создаётся в `app/build/outputs/apk/release/` с базовым именем
-`1.0.19[20]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
+`1.0.20[21]AtlasMediaWidget`. Без локального `secure.signing.gradle` release APK остаётся unsigned.
