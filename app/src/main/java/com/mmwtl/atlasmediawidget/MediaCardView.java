@@ -195,6 +195,7 @@ final class MediaCardView extends FrameLayout {
         subtitle = text("", appearance.subtitleTextSizeSp,
                 0xFFAFB1B7, Typeface.NORMAL);
         subtitle.setMaxLines(1);
+        metadata.setClipChildren(true);
         LinearLayout.LayoutParams subtitleParams = fullWrap();
         subtitleParams.topMargin = d(appearance.subtitleGapDp);
         textColumn.addView(subtitle, subtitleParams);
@@ -380,6 +381,8 @@ final class MediaCardView extends FrameLayout {
         boolean showThumbnail = compact && hasMedia && hasArtwork;
         int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
         int controlsTop = Math.max(0, cardHeight - panelHeight);
+        int progressTop = Math.max(0,
+                controlsTop - by((compact ? 32 : 33) + appearance.progressGapDp));
 
         artworkThumbnail.setVisibility(showThumbnail ? VISIBLE : GONE);
         LinearLayout.LayoutParams textParams = (LinearLayout.LayoutParams)
@@ -407,6 +410,8 @@ final class MediaCardView extends FrameLayout {
             metadataParams.rightMargin = bx(appearance.contentInsetDp);
             metadataParams.topMargin = by((compact ? 76 : 258) + appearance.textGapDp);
         }
+        int metadataBottom = showProgress ? progressTop - d(4) : controlsTop - d(4);
+        metadataParams.height = Math.max(d(48), metadataBottom - metadataParams.topMargin);
         metadataParams.gravity = Gravity.TOP | Gravity.START;
         metadata.setLayoutParams(metadataParams);
         metadata.setVisibility(chooserVisible ? GONE : VISIBLE);
@@ -415,8 +420,7 @@ final class MediaCardView extends FrameLayout {
         progressParams.gravity = Gravity.TOP;
         progressParams.leftMargin = bx(Math.max(8, appearance.contentInsetDp - 4));
         progressParams.rightMargin = bx(Math.max(8, appearance.contentInsetDp - 4));
-        progressParams.topMargin = Math.max(0,
-                controlsTop - by((compact ? 32 : 33) + appearance.progressGapDp));
+        progressParams.topMargin = progressTop;
         progressRow.setLayoutParams(progressParams);
         progressRow.setVisibility(!chooserVisible && showProgress ? VISIBLE : GONE);
 

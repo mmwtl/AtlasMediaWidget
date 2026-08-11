@@ -124,6 +124,29 @@ final class MediaSnapshot {
         return (capabilities & capability) != 0L;
     }
 
+    MediaSnapshot withMediaFieldsFrom(MediaSnapshot fallback) {
+        return new MediaSnapshot(
+                protocolVersion, generation, timestamp, backendConnected, backendErrorCode,
+                backendErrorMessage, audioSource, appSource, sources,
+                ownerPackage.isBlank() ? fallback.ownerPackage : ownerPackage,
+                ownerApp.isBlank() ? fallback.ownerApp : ownerApp,
+                mediaId.isBlank() ? fallback.mediaId : mediaId,
+                title.isBlank() ? fallback.title : title,
+                artist.isBlank() ? fallback.artist : artist,
+                album.isBlank() ? fallback.album : album,
+                duration > 0L ? duration : fallback.duration,
+                position >= 0L ? position : fallback.position,
+                updateElapsedRealtime > 0L ? updateElapsedRealtime : fallback.updateElapsedRealtime,
+                playbackState == 0 ? fallback.speed : speed,
+                playbackState == 0 ? fallback.playbackState : playbackState,
+                playbackErrorCode, playbackErrorMessage,
+                playbackActions != 0L ? playbackActions : fallback.playbackActions,
+                playbackState == 0 ? fallback.capabilities : capabilities,
+                artworkUri.isBlank() ? fallback.artworkUri : artworkUri,
+                artworkUri.isBlank() ? fallback.artworkRevision : artworkRevision
+        );
+    }
+
     private static String nonNull(String value) {
         return value == null ? "" : value;
     }
