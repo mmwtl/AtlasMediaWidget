@@ -35,7 +35,6 @@ import java.util.concurrent.Executors;
 
 public final class MainActivity extends ScaledActivity {
     private static final int REQUEST_IMPORT_RADIO_CATALOG = 4100;
-    private static final int REQUEST_EXPORT_SETTINGS = 4101;
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
     private Prefs prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -110,9 +109,6 @@ public final class MainActivity extends ScaledActivity {
         if (requestCode == REQUEST_IMPORT_RADIO_CATALOG && resultCode == RESULT_OK
                 && data != null && data.getData() != null) {
             importRadioCatalog(data.getData());
-        } else if (requestCode == REQUEST_EXPORT_SETTINGS && resultCode == RESULT_OK
-                && data != null && data.getData() != null) {
-            exportSettings(data.getData());
         } else if (requestCode == REQUEST_IMPORT_SETTINGS && resultCode == RESULT_OK
                 && data != null && data.getData() != null) {
             readSettingsForImport(data.getData());
@@ -688,13 +684,8 @@ public final class MainActivity extends ScaledActivity {
         }, 2_000L);
     }
 
-    @SuppressWarnings("deprecation")
     private void chooseSettingsExport() {
-        Intent picker = new Intent(Intent.ACTION_CREATE_DOCUMENT)
-                .addCategory(Intent.CATEGORY_OPENABLE)
-                .setType("application/json")
-                .putExtra(Intent.EXTRA_TITLE, SettingsBackup.FILE_NAME);
-        launchFilePicker(picker, REQUEST_EXPORT_SETTINGS);
+        exportSettings();
     }
 
     @SuppressWarnings("deprecation")
@@ -718,16 +709,17 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void exportSettings(Uri uri) {
+    private void exportSettings() {
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
         ioExecutor.execute(() -> {
             try {
-                SettingsBackup.write(appContext, prefs, uri);
+                SettingsExportStore.Result result = SettingsExportStore.export(
+                        appContext, prefs);
                 main.post(() -> {
                     if (isDestroyed()) return;
                     setSettingsTransferEnabled(true);
-                    Toast.makeText(this, "Настройки экспортированы",
+                    Toast.makeText(this, "Настройки сохранены: " + result.location,
                             Toast.LENGTH_LONG).show();
                 });
             } catch (Exception error) {
