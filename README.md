@@ -17,46 +17,48 @@ Atlas Media Widget показывает на домашнем экране об�
 
 ## Интерфейс
 
-На карточках показаны демонстрационные медиаданные. Интерфейс, обложки и состояния элементов
-отрисованы штатным `MediaCardView` приложения.
+Карточка работает поверх штатного домашнего экрана и занимает только выделенную ей область.
+Остальные элементы HOME остаются видимыми и интерактивными.
+
+<p align="center">
+  <a href="docs/images/home-overview.webp">
+    <img src="docs/images/home-overview.webp" width="520" alt="Atlas Media Widget на домашнем экране автомобильной ГУ">
+  </a>
+</p>
 
 <table>
   <tr>
-    <th>Bluetooth · Ночной город</th>
-    <th>Радио · Европа Плюс · FM 103.8</th>
+    <th>Bluetooth</th>
+    <th>Радио</th>
+    <th>Источники</th>
   </tr>
   <tr>
     <td>
-      <a href="docs/images/media-bluetooth.webp">
-        <img src="docs/images/media-bluetooth.webp" alt="Активный Bluetooth с музыкальной обложкой">
+      <a href="docs/images/media-bluetooth-device.webp">
+        <img src="docs/images/media-bluetooth-device.webp" alt="Музыкальная карточка Bluetooth с обложкой и прогрессом">
       </a>
     </td>
     <td>
-      <a href="docs/images/media-radio.webp">
-        <img src="docs/images/media-radio.webp" alt="Активное радио Европа Плюс с обложкой">
+      <a href="docs/images/media-radio-device.webp">
+        <img src="docs/images/media-radio-device.webp" alt="Карточка радио с логотипом станции">
+      </a>
+    </td>
+    <td>
+      <a href="docs/images/media-sources-device.webp">
+        <img src="docs/images/media-sources-device.webp" alt="Выбор источника Bluetooth, Радио, USB или Онлайн">
       </a>
     </td>
   </tr>
 </table>
 
-<table>
-  <tr>
-    <th>Основные настройки</th>
-    <th>Настройка внешнего вида</th>
-  </tr>
-  <tr>
-    <td>
-      <a href="docs/images/settings-overview.webp">
-        <img src="docs/images/settings-overview.webp" alt="Основные настройки Atlas Media Widget">
-      </a>
-    </td>
-    <td>
-      <a href="docs/images/settings-appearance.webp">
-        <img src="docs/images/settings-appearance.webp" alt="Настройки внешнего вида Atlas Media Widget">
-      </a>
-    </td>
-  </tr>
-</table>
+В приложении есть живой предпросмотр и отдельные настройки размера, формата и внешнего вида
+карточки.
+
+<p align="center">
+  <a href="docs/images/settings-device.webp">
+    <img src="docs/images/settings-device.webp" width="520" alt="Экран настройки Atlas Media Widget с живым предпросмотром">
+  </a>
+</p>
 
 ## Возможности
 
