@@ -7,7 +7,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class PlayPauseActionPolicyTest {
-    @Test public void radioUsesTheVersionedBridgePlaybackStateWithoutInversion() {
+    @Test public void radioUsesCorrectedBridgeStateAndToggle() {
         assertTrue(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.RADIO, true));
         assertFalse(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.RADIO, false));
         assertEquals("PAUSE", PlayPauseActionPolicy.explicitCommand(MediaSource.Id.RADIO, true));
@@ -32,7 +32,7 @@ public class PlayPauseActionPolicyTest {
         assertFalse(PlayPauseActionPolicy.isCurrentlyPlaying(MediaSource.Id.YUNTING, false));
     }
 
-    @Test public void explicitRadioCommandMatchesTheActionWhenToggleIsUnavailable() {
+    @Test public void radioUsesExplicitActionOnlyWhenToggleIsUnavailable() {
         assertEquals("PAUSE", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, true,
                 MediaBridgeContract.CAP_PAUSE));
         assertEquals("PLAY", PlayPauseActionPolicy.command(MediaSource.Id.RADIO, false,
