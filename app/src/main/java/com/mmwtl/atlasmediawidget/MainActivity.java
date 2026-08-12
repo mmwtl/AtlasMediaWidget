@@ -3,8 +3,11 @@ package com.mmwtl.atlasmediawidget;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
@@ -30,6 +33,8 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -40,6 +45,7 @@ public final class MainActivity extends ScaledActivity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private TextView permissionStatus;
+    private TextView settingsRouteStatus;
     private TextView bridgeStatus;
     private Button serviceButton;
     private Switch autoStart;
@@ -178,9 +184,47 @@ public final class MainActivity extends ScaledActivity {
         Button overlay = actionButton("Разрешить поверх окон");
         overlay.setOnClickListener(v -> openOverlaySettings());
         accessCard.addView(overlay, buttonParams());
-        Button usage = actionButton("Разрешить историю использования");
-        usage.setOnClickListener(v -> openUsageSettings());
-        accessCard.addView(usage, buttonParams());
+
+        TextView usageRoutesTitle = text("Маршруты к истории использования",
+                15, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams usageRoutesTitleParams = fullWrap();
+        usageRoutesTitleParams.topMargin = Ui.dp(this, 16);
+        accessCard.addView(usageRoutesTitle, usageRoutesTitleParams);
+        TextView usageRoutesHint = text(
+                "Если обычный маршрут попадает в урезанные настройки ГУ, проверяйте "
+                        + "варианты по порядку. После возврата статус разрешения обновится. "
+                        + "Кнопка 6 открывает только сведения о приложении и сама разрешение "
+                        + "не выдаёт.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams usageRoutesHintParams = fullWrap();
+        usageRoutesHintParams.topMargin = Ui.dp(this, 6);
+        accessCard.addView(usageRoutesHint, usageRoutesHintParams);
+
+        Button usageForApp = actionButton("1 · Usage Access для Atlas (package)");
+        usageForApp.setOnClickListener(v -> openUsageSettingsForApp());
+        accessCard.addView(usageForApp, buttonParams());
+        Button usageList = actionButton("2 · Общий список Usage Access");
+        usageList.setOnClickListener(v -> openUsageSettingsList());
+        accessCard.addView(usageList, buttonParams());
+        Button aospUsageForApp = actionButton("3 · AOSP: разрешение Atlas");
+        aospUsageForApp.setOnClickListener(v -> openAospUsageSettingsForApp());
+        accessCard.addView(aospUsageForApp, buttonParams());
+        Button aospUsageList = actionButton("4 · AOSP: список Usage Access");
+        aospUsageList.setOnClickListener(v -> openAospUsageSettingsList());
+        accessCard.addView(aospUsageList, buttonParams());
+        Button androidSettingsUsage = actionButton("5 · Usage Access только в Android Settings");
+        androidSettingsUsage.setOnClickListener(v -> openUsageSettingsInAndroidPackage());
+        accessCard.addView(androidSettingsUsage, buttonParams());
+        Button appDetails = actionButton("6 · Сведения о приложении Atlas");
+        appDetails.setOnClickListener(v -> openAppDetailsSettings());
+        accessCard.addView(appDetails, buttonParams());
+
+        settingsRouteStatus = text("Последний маршрут: ещё не проверялся",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams routeStatusParams = fullWrap();
+        routeStatusParams.topMargin = Ui.dp(this, 10);
+        accessCard.addView(settingsRouteStatus, routeStatusParams);
+        addAndroidSettingsLaunchers(accessCard);
 
         LinearLayout bridgeCard = card();
         bridgeCard.addView(text(getString(R.string.bridge_title),
@@ -801,8 +845,110 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void openUsageSettings() {
-        startActivity(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS));
+    private void openUsageSettingsForApp() {
+        Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                .setData(Uri.parse("package:" + getPackageName()));
+        openSettingsRoute(intent, "1 · Usage Access для Atlas (package)");
+    }
+
+    private void openUsageSettingsList() {
+        openSettingsRoute(new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
+                "2 · Общий список Usage Access");
+    }
+
+    private void openAospUsageSettingsForApp() {
+        Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                .setComponent(new ComponentName("com.android.settings",
+                        "com.android.settings.Settings$AppUsageAccessSettingsActivity"))
+                .setData(Uri.parse("package:" + getPackageName()));
+        openSettingsRoute(intent, "3 · AOSP: разрешение Atlas");
+    }
+
+    private void openAospUsageSettingsList() {
+        Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                .setComponent(new ComponentName("com.android.settings",
+                        "com.android.settings.Settings$UsageAccessSettingsActivity"));
+        openSettingsRoute(intent, "4 · AOSP: список Usage Access");
+    }
+
+    private void openUsageSettingsInAndroidPackage() {
+        Intent intent = new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+                .setData(Uri.parse("package:" + getPackageName()))
+                .setPackage("com.android.settings");
+        openSettingsRoute(intent, "5 · Usage Access только в Android Settings");
+    }
+
+    private void openAppDetailsSettings() {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:" + getPackageName()));
+        openSettingsRoute(intent, "6 · Сведения о приложении Atlas");
+    }
+
+    @SuppressWarnings("deprecation")
+    private void addAndroidSettingsLaunchers(LinearLayout parent) {
+        TextView title = text("Точки запуска пакета com.android.settings",
+                15, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams titleParams = fullWrap();
+        titleParams.topMargin = Ui.dp(this, 18);
+        parent.addView(title, titleParams);
+
+        Intent query = new Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .setPackage("com.android.settings");
+        PackageManager packageManager = getPackageManager();
+        List<ResolveInfo> launchers;
+        if (Build.VERSION.SDK_INT >= 33) {
+            launchers = packageManager.queryIntentActivities(query,
+                    PackageManager.ResolveInfoFlags.of(0));
+        } else {
+            launchers = packageManager.queryIntentActivities(query, 0);
+        }
+        launchers.sort(Comparator.comparing(route -> route.activityInfo == null
+                ? "" : route.activityInfo.name));
+
+        int index = 0;
+        for (ResolveInfo route : launchers) {
+            ActivityInfo activity = route.activityInfo;
+            if (activity == null) continue;
+            index++;
+            String activityName = activity.name;
+            String shortName = activityName.startsWith(activity.packageName + ".")
+                    ? activityName.substring(activity.packageName.length() + 1)
+                    : activityName;
+            String appLabel = String.valueOf(route.loadLabel(packageManager));
+            String routeLabel = "L" + index + " · " + appLabel + " · " + shortName;
+            ComponentName component = new ComponentName(activity.packageName, activityName);
+            Button launcher = actionButton(routeLabel);
+            launcher.setOnClickListener(v -> openSettingsRoute(
+                    new Intent(Intent.ACTION_MAIN)
+                            .addCategory(Intent.CATEGORY_LAUNCHER)
+                            .setComponent(component),
+                    routeLabel));
+            parent.addView(launcher, buttonParams());
+        }
+
+        if (index == 0) {
+            TextView empty = text("Launcher-Activity этого пакета не найдены.",
+                    13, Ui.ERROR, Typeface.NORMAL);
+            LinearLayout.LayoutParams emptyParams = fullWrap();
+            emptyParams.topMargin = Ui.dp(this, 8);
+            parent.addView(empty, emptyParams);
+        }
+    }
+
+    private void openSettingsRoute(Intent intent, String label) {
+        settingsRouteStatus.setText("Последний маршрут: " + label + " — отправлен");
+        settingsRouteStatus.setTextColor(Ui.ACCENT);
+        try {
+            startActivity(intent);
+        } catch (ActivityNotFoundException | SecurityException error) {
+            String result = "Последний маршрут: " + label + " — недоступен ("
+                    + error.getClass().getSimpleName() + ")";
+            settingsRouteStatus.setText(result);
+            settingsRouteStatus.setTextColor(Ui.ERROR);
+            AppLog.warn("Settings route unavailable: " + label, error);
+            Toast.makeText(this, result, Toast.LENGTH_LONG).show();
+        }
     }
 
     private void openGInputBridge() {
