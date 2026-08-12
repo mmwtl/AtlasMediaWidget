@@ -582,7 +582,8 @@ public final class OverlayService extends Service
                 && artworkKey.equals(loadedArtworkKey)) return;
         loadedArtworkRevision = snapshot.artworkRevision;
         loadedArtworkKey = artworkKey;
-        if (card != null) card.setArtwork(null);
+        // Keep the current bitmap visible until the replacement has decoded. ArtworkLoader
+        // still reports null for an empty or failed load, so genuinely unavailable art clears.
         artworkLoader.load(artwork, snapshot.generation, snapshot.artworkRevision);
     }
 

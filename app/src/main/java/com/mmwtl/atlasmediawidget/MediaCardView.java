@@ -348,6 +348,7 @@ final class MediaCardView extends FrameLayout {
 
     void setArtwork(Bitmap bitmap) {
         artwork.animate().cancel();
+        boolean replacingVisibleArtwork = hasArtwork && bitmap != null;
         hasArtwork = bitmap != null;
         if (bitmap == null) {
             artwork.setImageDrawable(null);
@@ -355,9 +356,13 @@ final class MediaCardView extends FrameLayout {
             artworkThumbnail.setImageDrawable(null);
         } else {
             artwork.setImageBitmap(bitmap);
-            artwork.setAlpha(0f);
             artworkThumbnail.setImageBitmap(bitmap);
-            artwork.animate().alpha(1f).setDuration(220L).start();
+            if (replacingVisibleArtwork) {
+                artwork.setAlpha(1f);
+            } else {
+                artwork.setAlpha(0f);
+                artwork.animate().alpha(1f).setDuration(220L).start();
+            }
         }
         updateContentLayout();
     }
