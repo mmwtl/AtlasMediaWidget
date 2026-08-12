@@ -43,12 +43,11 @@ final class ForegroundAppDetector {
         ) == AppOpsManager.MODE_ALLOWED;
     }
 
-    boolean isHomeForeground() {
+    boolean isHomeVisible() {
         if (!isDeviceReady()) return false;
         long now = System.currentTimeMillis();
         if (homePackages.isEmpty() || now - lastHomeRefresh > 30_000L) refreshHomePackages();
-        String foreground = currentForegroundPackage();
-        return foreground != null && homePackages.contains(foreground);
+        return refreshActivityVisibility() && tracker.isAnyPackageVisible(homePackages);
     }
 
     boolean isDeviceReady() {
@@ -56,8 +55,8 @@ final class ForegroundAppDetector {
                 && (keyguardManager == null || !keyguardManager.isKeyguardLocked());
     }
 
-    private String currentForegroundPackage() {
-        if (usageStatsManager == null || !hasUsageAccess(context)) return null;
+    private boolean refreshActivityVisibility() {
+        if (usageStatsManager == null || !hasUsageAccess(context)) return false;
         long now = System.currentTimeMillis();
         boolean initialQuery = lastQuery == 0;
         long queryStarted = SystemClock.elapsedRealtime();
@@ -68,10 +67,17 @@ final class ForegroundAppDetector {
             while (events != null && events.hasNextEvent()) {
                 events.getNextEvent(event);
                 if (event.getEventType() == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    tracker.onResumed(event.getTimeStamp(), event.getPackageName());
-                } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_PAUSED
-                        || event.getEventType() == UsageEvents.Event.ACTIVITY_STOPPED) {
-                    tracker.onStopped(event.getTimeStamp(), event.getPackageName());
+                    tracker.onResumed(
+                            event.getTimeStamp(), event.getPackageName(), event.getClassName());
+                } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_PAUSED) {
+                    tracker.onPaused(
+                            event.getTimeStamp(), event.getPackageName(), event.getClassName());
+                } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_STOPPED) {
+                    tracker.onStopped(
+                            event.getTimeStamp(), event.getPackageName(), event.getClassName());
+                } else if (event.getEventType() == UsageEvents.Event.DEVICE_SHUTDOWN
+                        || event.getEventType() == UsageEvents.Event.DEVICE_STARTUP) {
+                    tracker.onReset(event.getTimeStamp());
                 }
             }
             lastQuery = now;
@@ -86,13 +92,13 @@ final class ForegroundAppDetector {
             }
         } catch (RuntimeException error) {
             AppLog.warn("Cannot query foreground application", error);
-            return null;
+            return false;
         }
         long queryElapsed = SystemClock.elapsedRealtime() - queryStarted;
         if (initialQuery || queryElapsed >= 100L) {
             AppLog.info("Foreground usage query completed in " + queryElapsed + " ms");
         }
-        return tracker.foregroundPackage();
+        return true;
     }
 
     private void refreshHomePackages() {

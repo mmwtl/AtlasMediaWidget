@@ -140,8 +140,8 @@ public final class OverlayService extends Service
             foregroundQueryInFlight = true;
             try {
                 foregroundExecutor.execute(() -> {
-                    boolean homeForeground = detector.isHomeForeground();
-                    main.post(() -> applyForegroundResult(homeForeground));
+                    boolean homeVisible = detector.isHomeVisible();
+                    main.post(() -> applyForegroundResult(homeVisible));
                 });
             } catch (RejectedExecutionException ignored) {
                 foregroundQueryInFlight = false;
@@ -237,7 +237,7 @@ public final class OverlayService extends Service
         super.onDestroy();
     }
 
-    private void applyForegroundResult(boolean homeForeground) {
+    private void applyForegroundResult(boolean homeVisible) {
         if (destroyed) return;
         foregroundQueryInFlight = false;
         if (visibilityCheckPending) {
@@ -250,7 +250,7 @@ public final class OverlayService extends Service
             return;
         }
         boolean deviceReady = foregroundDetector().isDeviceReady();
-        if (homeForeground && deviceReady) {
+        if (homeVisible && deviceReady) {
             showCard();
             updateNotification(1);
         } else {
@@ -259,7 +259,7 @@ public final class OverlayService extends Service
         }
         long now = SystemClock.elapsedRealtime();
         scheduleForegroundPoll(ForegroundPollPolicy.nextDelay(
-                homeForeground, deviceReady, now, fastProbeUntil));
+                homeVisible, deviceReady, now, fastProbeUntil));
     }
 
     private void requestImmediateVisibilityCheck() {
