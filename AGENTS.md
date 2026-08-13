@@ -77,13 +77,17 @@ provider has been demonstrated on the real head unit.
 
 - Once the Android module exists, keep `appVersionCode` and `appVersionName` at the top of the app
   Gradle file as the single version source.
-- For every completed application, resource, or build-system improvement, increment
-  `appVersionCode`. Increment the semantic patch component of `appVersionName` unless the user
-  requests a different release number.
+- Treat `main` as the only release-version branch. Increment `appVersionCode` and the semantic
+  patch component of the base `appVersionName` only when the completed improvement is being built
+  from `main`, unless the user requests a different release number.
+- Builds from any other branch must keep the base `appVersionCode` and base `appVersionName`
+  unchanged. Append a sanitized branch name to the effective visible `versionName` (for example,
+  branch `seek` makes `1.0.26-seek`), and use that effective version in the APK/archive name too.
+  Do not encode the branch name in `versionCode`.
 - A single user-requested batch is one version increment even when it contains several related
   files or commits.
-- Preserve the archive base name `<versionName>[<versionCode>]AtlasMediaWidget`; do not allow
-  Gradle to fall back to module-derived `app-*.apk` names.
+- Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
+  allow Gradle to fall back to module-derived `app-*.apk` names.
 
 ## Build and verification
 
