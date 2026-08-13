@@ -39,6 +39,7 @@ public final class OverlayService extends Service
     private static final String CHANNEL_ID = "atlas_media_widget_service";
     private static final int NOTIFICATION_ID = 2407;
     private static final int PROGRESS_TICK_MS = 250;
+    private static final long SNAPSHOT_RECONCILIATION_MS = 5_000L;
     private static final long DISAPPEAR_ANIMATION_MS = 180L;
     private static final float HIDDEN_SCALE = 0.97f;
     private static final int HIDDEN_OFFSET_DP = 12;
@@ -85,6 +86,18 @@ public final class OverlayService extends Service
         if (bridgeState == MediaBridgeClient.State.CONNECTED) {
             AppLog.info("Requesting post-command reconciliation snapshot");
             bridge.requestSnapshot();
+        }
+    };
+
+    private final Runnable snapshotReconcile = new Runnable() {
+        @Override public void run() {
+            if (destroyed || bridgeState != MediaBridgeClient.State.CONNECTED
+                    || card == null || !card.isAttachedToWindow()) return;
+            MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+            if (visible == null || !visible.isPlaying()) return;
+            AppLog.info("Requesting low-frequency playback reconciliation snapshot");
+            bridge.requestSnapshot();
+            main.postDelayed(this, SNAPSHOT_RECONCILIATION_MS);
         }
     };
 
@@ -319,9 +332,11 @@ public final class OverlayService extends Service
             onlineSnapshotStabilizer.clear();
             lastBackendSnapshot = null;
             main.removeCallbacks(transportReconcile);
+            main.removeCallbacks(snapshotReconcile);
             reducer.onDisconnected(SystemClock.elapsedRealtime());
         }
         renderCurrent();
+        scheduleSnapshotReconcile();
         if (card != null && !detail.isBlank()) {
             card.showTransientStatus(detail, state != MediaBridgeClient.State.CONNECTED);
         }
@@ -345,6 +360,7 @@ public final class OverlayService extends Service
         if (!reducer.accept(snapshot)) return;
         renderCurrent();
         loadArtwork(snapshot);
+        scheduleSnapshotReconcile();
     }
 
     @Override public void onCommandResult(String requestId, int status, String message,
@@ -357,6 +373,7 @@ public final class OverlayService extends Service
             bridge.requestSnapshot();
         }
         if (card == null) return;
+        card.onTransportResult(status == MediaBridgeContract.STATUS_OK);
         if (status == MediaBridgeContract.STATUS_OK) {
             card.showTransientStatus("Команда отправлена", false);
             main.postDelayed(this::renderCurrent, 3_000L);
@@ -450,6 +467,7 @@ public final class OverlayService extends Service
                 showCardImmediately(card);
                 main.removeCallbacks(progressTick);
                 main.post(progressTick);
+                scheduleSnapshotReconcile();
             }
             return;
         }
@@ -493,6 +511,7 @@ public final class OverlayService extends Service
             bridge.requestSnapshot();
             main.removeCallbacks(progressTick);
             main.post(progressTick);
+            scheduleSnapshotReconcile();
         } catch (SecurityException | WindowManager.BadTokenException error) {
             card = null;
             cardParams = null;
@@ -502,6 +521,7 @@ public final class OverlayService extends Service
 
     private void hideCard() {
         main.removeCallbacks(progressTick);
+        main.removeCallbacks(snapshotReconcile);
         if (card == null || windowManager == null || cardHiding) return;
         if (!card.isAttachedToWindow()) {
             card = null;
@@ -538,6 +558,7 @@ public final class OverlayService extends Service
 
     private void hideCardImmediately() {
         main.removeCallbacks(progressTick);
+        main.removeCallbacks(snapshotReconcile);
         if (card != null) {
             cardHiding = false;
             card.animate().cancel();
@@ -561,6 +582,16 @@ public final class OverlayService extends Service
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (visible == null) card.renderDisconnected(stateDetail());
         else card.renderSnapshot(visible, reducer.isConnected(), radioCatalog.display(visible));
+    }
+
+    private void scheduleSnapshotReconcile() {
+        main.removeCallbacks(snapshotReconcile);
+        if (destroyed || bridgeState != MediaBridgeClient.State.CONNECTED
+                || card == null || !card.isAttachedToWindow()) return;
+        MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        if (visible != null && visible.isPlaying()) {
+            main.postDelayed(snapshotReconcile, SNAPSHOT_RECONCILIATION_MS);
+        }
     }
 
     private String stateDetail() {
