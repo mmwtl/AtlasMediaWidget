@@ -4,11 +4,22 @@ plugins {
 
 def appVersionCode = 26
 def appVersionName = '1.0.25'
+def branchName = providers.exec {
+    commandLine('git', 'branch', '--show-current')
+}.standardOutput.asText.get().trim()
+def safeBranchName = { String value ->
+    def sanitized = value.replaceAll(/[^A-Za-z0-9._-]+/, '-')
+            .replaceAll(/^[.-]+|[.-]+$/, '')
+    sanitized.isEmpty() ? 'detached' : sanitized
+}
+def effectiveVersionName = branchName == 'main'
+        ? appVersionName
+        : "${appVersionName}-${safeBranchName(branchName)}"
 def secureSigningScript = providers.gradleProperty('secure.signing').orNull
 def secureSigningFile = secureSigningScript == null ? null : rootProject.file(secureSigningScript)
 
 base {
-    archivesName.set("${appVersionName}[${appVersionCode}]AtlasMediaWidget")
+    archivesName.set("${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget")
 }
 
 android {
@@ -20,7 +31,7 @@ android {
         minSdk = 30
         targetSdk = 36
         versionCode = appVersionCode
-        versionName = appVersionName
+        versionName = effectiveVersionName
         testInstrumentationRunner = 'android.test.InstrumentationTestRunner'
     }
 

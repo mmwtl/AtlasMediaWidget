@@ -75,6 +75,9 @@ final class MediaCardView extends FrameLayout {
     private boolean seeking;
     private boolean hasArtwork;
     private boolean hasMedia;
+    private long pendingSeekPosition = -1L;
+    private long pendingSeekAtElapsedRealtime = -1L;
+    private MediaSnapshot pendingSeekSnapshot;
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
             int maxWidthPx, int maxHeightPx, CardStyle style,
@@ -271,7 +274,9 @@ final class MediaCardView extends FrameLayout {
                 seeking = false;
                 if (snapshot != null && snapshot.duration > 0L
                         && snapshot.supports(MediaBridgeContract.CAP_SEEK)) {
-                    listener.onSeek(snapshot.duration * seekBar.getProgress() / PROGRESS_MAX);
+                    long position = snapshot.duration * seekBar.getProgress() / PROGRESS_MAX;
+                    beginPendingSeek(position);
+                    listener.onSeek(position);
                 }
             }
         });
@@ -286,6 +291,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     void renderSnapshot(MediaSnapshot value, boolean bridgeConnected, RadioDisplay radioDisplay) {
+        updatePendingSeek(value);
         snapshot = value;
         if (value == null) {
             renderDisconnected(getResources().getString(R.string.bridge_disconnected));
@@ -323,6 +329,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     void renderDisconnected(String detail) {
+        clearPendingSeek();
         snapshot = null;
         activeSource = MediaSource.Id.UNKNOWN;
         hasMedia = false;
@@ -345,6 +352,11 @@ final class MediaCardView extends FrameLayout {
     }
 
     void showTransientStatus(String message, boolean error) { setStatusPill(message, error); }
+
+    void onTransportResult(boolean success) {
+        if (!success) clearPendingSeek();
+        tick(SystemClock.elapsedRealtime());
+    }
 
     void setArtwork(Bitmap bitmap) {
         artwork.animate().cancel();
@@ -369,14 +381,58 @@ final class MediaCardView extends FrameLayout {
 
     void tick(long nowElapsedRealtime) {
         if (snapshot == null || seeking) return;
-        long value = ProgressEstimator.estimate(snapshot.position, snapshot.duration,
-                snapshot.updateElapsedRealtime, snapshot.speed, snapshot.playbackState,
-                nowElapsedRealtime);
+        if (SeekProjection.isTimedOut(pendingSeekAtElapsedRealtime, nowElapsedRealtime)) {
+            clearPendingSeek();
+        }
+        long value = pendingSeekPosition >= 0L
+                ? SeekProjection.estimate(snapshot, pendingSeekPosition,
+                        pendingSeekAtElapsedRealtime, nowElapsedRealtime)
+                : ProgressEstimator.estimate(snapshot.position, snapshot.duration,
+                        snapshot.updateElapsedRealtime, snapshot.speed, snapshot.playbackState,
+                        nowElapsedRealtime);
         elapsed.setText(formatTime(value));
         if (value >= 0L && snapshot.duration > 0L) {
             progress.setProgress((int) Math.min(PROGRESS_MAX,
                     value * PROGRESS_MAX / snapshot.duration));
         } else progress.setProgress(0);
+    }
+
+    private void beginPendingSeek(long position) {
+        pendingSeekPosition = Math.max(0L, position);
+        pendingSeekAtElapsedRealtime = SystemClock.elapsedRealtime();
+        pendingSeekSnapshot = snapshot;
+        tick(pendingSeekAtElapsedRealtime);
+    }
+
+    private void updatePendingSeek(MediaSnapshot candidate) {
+        if (pendingSeekPosition < 0L) return;
+        if (candidate == null || pendingSeekSnapshot == null
+                || !sameMedia(pendingSeekSnapshot, candidate)
+                || SeekProjection.isConfirmed(candidate, pendingSeekPosition,
+                        pendingSeekAtElapsedRealtime)
+                || SeekProjection.isTimedOut(pendingSeekAtElapsedRealtime,
+                        SystemClock.elapsedRealtime())) {
+            clearPendingSeek();
+        }
+    }
+
+    private void clearPendingSeek() {
+        pendingSeekPosition = -1L;
+        pendingSeekAtElapsedRealtime = -1L;
+        pendingSeekSnapshot = null;
+    }
+
+    private static boolean sameMedia(MediaSnapshot first, MediaSnapshot second) {
+        MediaSource.Id firstSource = MediaSource.selectedId(first.audioSource, first.sources);
+        MediaSource.Id secondSource = MediaSource.selectedId(second.audioSource, second.sources);
+        if (firstSource.displayId() != secondSource.displayId()) return false;
+        if (!first.mediaId.isBlank() && !second.mediaId.isBlank()) {
+            return first.mediaId.equals(second.mediaId)
+                    && first.ownerPackage.equals(second.ownerPackage);
+        }
+        return first.ownerPackage.equals(second.ownerPackage)
+                && first.title.equals(second.title)
+                && first.artist.equals(second.artist);
     }
 
     private void updateContentLayout() {
