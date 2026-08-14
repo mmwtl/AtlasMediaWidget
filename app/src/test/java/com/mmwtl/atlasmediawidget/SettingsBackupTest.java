@@ -29,6 +29,7 @@ public final class SettingsBackupTest {
         assertEquals(27, restored.square.appearance.contentInsetDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
+        assertEquals(2, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -46,12 +47,29 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 2);
+        root.put("schemaVersion", 3);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
 
         assertTrue(error.getMessage().contains("Неподдерживаемая версия"));
+    }
+
+    @Test public void schemaOneIgnoresLegacyVerticalTextShift() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.SQUARE, null, null), "test"));
+        root.put("schemaVersion", 1);
+        JSONObject styles = root.getJSONObject("settings").getJSONObject("cardStyles");
+        for (String name : new String[]{"compact", "square"}) {
+            JSONObject style = styles.getJSONObject(name);
+            style.remove("metadataProgressGapDp");
+            style.put("textGapDp", 48);
+        }
+
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+
+        assertEquals(14, restored.compact.appearance.metadataProgressGapDp);
+        assertEquals(14, restored.square.appearance.metadataProgressGapDp);
     }
 
     @Test public void rejectsValuesOutsideUiLimits() throws Exception {
@@ -82,7 +100,7 @@ public final class SettingsBackupTest {
         WidgetAppearance compactAppearance = WidgetAppearance.defaults(CardStyle.COMPACT);
         WidgetAppearance squareDefaults = WidgetAppearance.defaults(CardStyle.SQUARE);
         WidgetAppearance squareAppearance = new WidgetAppearance(
-                squareDefaults.textGapDp,
+                squareDefaults.metadataProgressGapDp,
                 squareDefaults.controlPanelHeightDp,
                 squareDefaults.controlIconScalePercent,
                 squareDefaults.controlSpreadPercent,

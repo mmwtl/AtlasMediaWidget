@@ -18,7 +18,7 @@ final class Prefs {
     static final String KEY_CUSTOM_RADIO_CATALOG = "custom_radio_catalog";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
-    private static final String KEY_TEXT_GAP_PREFIX = "text_gap_";
+    private static final String KEY_METADATA_PROGRESS_GAP_PREFIX = "metadata_progress_gap_";
     private static final String KEY_CONTROL_HEIGHT_PREFIX = "control_height_";
     private static final String KEY_CONTROL_ICON_SCALE_PREFIX = "control_icon_scale_";
     private static final String KEY_CONTROL_SPREAD_PREFIX = "control_spread_";
@@ -37,8 +37,8 @@ final class Prefs {
     static final int MAX_CARD_WIDTH_DP = 900;
     static final int MIN_CARD_HEIGHT_DP = 220;
     static final int MAX_CARD_HEIGHT_DP = 900;
-    static final int MIN_TEXT_GAP_DP = -24;
-    static final int MAX_TEXT_GAP_DP = 48;
+    static final int MIN_METADATA_PROGRESS_GAP_DP = 4;
+    static final int MAX_METADATA_PROGRESS_GAP_DP = 40;
     static final int MIN_CONTROL_PANEL_HEIGHT_DP = 64;
     static final int MAX_CONTROL_PANEL_HEIGHT_DP = 150;
     static final int MIN_CONTROL_ICON_SCALE_PERCENT = 60;
@@ -129,16 +129,6 @@ final class Prefs {
                 .apply();
     }
 
-    int textGapDp(CardStyle style) {
-        return clamp(getInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue, 0),
-                MIN_TEXT_GAP_DP, MAX_TEXT_GAP_DP);
-    }
-
-    void putTextGap(CardStyle style, int gapDp) {
-        putInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue,
-                clamp(gapDp, MIN_TEXT_GAP_DP, MAX_TEXT_GAP_DP));
-    }
-
     int controlPanelHeightDp(CardStyle style) {
         return clamp(getInt(KEY_CONTROL_HEIGHT_PREFIX + style.preferenceValue,
                 style.defaultControlPanelHeightDp), MIN_CONTROL_PANEL_HEIGHT_DP,
@@ -182,7 +172,9 @@ final class Prefs {
     WidgetAppearance appearance(CardStyle style) {
         WidgetAppearance defaults = WidgetAppearance.defaults(style);
         return new WidgetAppearance(
-                textGapDp(style),
+                ranged(KEY_METADATA_PROGRESS_GAP_PREFIX, style,
+                        defaults.metadataProgressGapDp,
+                        MIN_METADATA_PROGRESS_GAP_DP, MAX_METADATA_PROGRESS_GAP_DP),
                 controlPanelHeightDp(style),
                 controlIconScalePercent(style),
                 controlSpreadPercent(style),
@@ -209,8 +201,10 @@ final class Prefs {
 
     void putAppearance(CardStyle style, WidgetAppearance value) {
         preferences.edit()
-                .putInt(KEY_TEXT_GAP_PREFIX + style.preferenceValue,
-                        clamp(value.textGapDp, MIN_TEXT_GAP_DP, MAX_TEXT_GAP_DP))
+                .putInt(KEY_METADATA_PROGRESS_GAP_PREFIX + style.preferenceValue,
+                        clamp(value.metadataProgressGapDp,
+                                MIN_METADATA_PROGRESS_GAP_DP,
+                                MAX_METADATA_PROGRESS_GAP_DP))
                 .putInt(KEY_CONTROL_HEIGHT_PREFIX + style.preferenceValue,
                         clamp(value.controlPanelHeightDp, MIN_CONTROL_PANEL_HEIGHT_DP,
                                 MAX_CONTROL_PANEL_HEIGHT_DP))
@@ -272,7 +266,8 @@ final class Prefs {
         String suffix = Integer.toString(style.preferenceValue);
         editor.putInt(KEY_CARD_WIDTH_PREFIX + suffix, data.widthDp)
                 .putInt(KEY_CARD_HEIGHT_PREFIX + suffix, data.heightDp)
-                .putInt(KEY_TEXT_GAP_PREFIX + suffix, value.textGapDp)
+                .putInt(KEY_METADATA_PROGRESS_GAP_PREFIX + suffix,
+                        value.metadataProgressGapDp)
                 .putInt(KEY_CONTROL_HEIGHT_PREFIX + suffix, value.controlPanelHeightDp)
                 .putInt(KEY_CONTROL_ICON_SCALE_PREFIX + suffix, value.controlIconScalePercent)
                 .putInt(KEY_CONTROL_SPREAD_PREFIX + suffix, value.controlSpreadPercent)

@@ -35,7 +35,6 @@ final class MediaCardView extends FrameLayout {
     }
 
     private static final int PROGRESS_MAX = 10_000;
-    private static final int METADATA_PROGRESS_GAP_DP = 14;
     private static final MediaSource.Id[] WIDGET_SOURCES = {
             MediaSource.Id.BT, MediaSource.Id.RADIO,
             MediaSource.Id.USB, MediaSource.Id.ONLINE
@@ -475,15 +474,16 @@ final class MediaCardView extends FrameLayout {
             int width = Math.max(bx(180), cardWidth - left - bx(121));
             metadataParams = new LayoutParams(width, LayoutParams.WRAP_CONTENT);
             metadataParams.leftMargin = left;
-            metadataParams.topMargin = by(78 + appearance.textGapDp);
         } else {
             metadataParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
             metadataParams.leftMargin = bx(appearance.contentInsetDp);
             metadataParams.rightMargin = bx(appearance.contentInsetDp);
-            metadataParams.topMargin = by((compact ? 76 : 258) + appearance.textGapDp);
         }
         metadataParams.height = LayoutParams.WRAP_CONTENT;
-        metadataParams.gravity = Gravity.TOP | Gravity.START;
+        int metadataBottom = showProgress
+                ? progressTop - d(appearance.metadataProgressGapDp) : controlsTop - d(4);
+        metadataParams.gravity = Gravity.BOTTOM | Gravity.START;
+        metadataParams.bottomMargin = Math.max(0, cardHeight - metadataBottom);
         metadata.setLayoutParams(metadataParams);
         metadata.setVisibility(chooserVisible ? GONE : VISIBLE);
 
@@ -520,21 +520,6 @@ final class MediaCardView extends FrameLayout {
         chooserParams.rightMargin = bx(18);
         chooserParams.topMargin = by(compact ? 63 : 68);
         sourceChooser.setLayoutParams(chooserParams);
-    }
-
-    @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        super.onLayout(changed, left, top, right, bottom);
-        if (metadata.getVisibility() != VISIBLE) return;
-
-        int requestedTop = metadata.getTop();
-        int contentHeight = metadata.getMeasuredHeight();
-        int corridorBottom = progressRow.getVisibility() == VISIBLE
-                ? progressRow.getTop() - d(4) : controls.getTop() - d(4);
-        int safeBottom = progressRow.getVisibility() == VISIBLE
-                ? progressRow.getTop() - d(METADATA_PROGRESS_GAP_DP) : corridorBottom;
-        int resolvedTop = MetadataLayout.resolveTop(
-                requestedTop, contentHeight, corridorBottom, safeBottom);
-        metadata.setTranslationY(resolvedTop - requestedTop);
     }
 
     private void updateControlLayout(boolean compact, int panelHeight) {

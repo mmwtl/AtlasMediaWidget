@@ -29,9 +29,11 @@ public final class CardStyleTest {
         assertEquals(14, compact.topInsetDp);
         assertEquals(24, compact.contentInsetDp);
         assertEquals(22, compact.titleTextSizeSp);
+        assertEquals(14, compact.metadataProgressGapDp);
         assertEquals(17, square.topInsetDp);
         assertEquals(30, square.contentInsetDp);
         assertEquals(32, square.titleTextSizeSp);
+        assertEquals(14, square.metadataProgressGapDp);
         assertEquals(6, square.progressThicknessDp);
         assertEquals(0, square.controlBottomInsetDp);
     }

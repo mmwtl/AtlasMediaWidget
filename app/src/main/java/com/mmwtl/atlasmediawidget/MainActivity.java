@@ -54,8 +54,8 @@ public final class MainActivity extends ScaledActivity {
     private TextView sizeValue;
     private SeekBar widthSize;
     private SeekBar heightSize;
-    private TextView textGapValue;
-    private SeekBar textGap;
+    private TextView metadataProgressGapValue;
+    private SeekBar metadataProgressGap;
     private TextView controlPanelHeightValue;
     private SeekBar controlPanelHeight;
     private TextView controlIconScaleValue;
@@ -263,15 +263,16 @@ public final class MainActivity extends ScaledActivity {
 
         LinearLayout typographyCard = card();
         typographyCard.addView(text("Текст и отступы", 20, Ui.PRIMARY, Typeface.BOLD));
-        typographyCard.addView(text("Сдвиг блока текста по вертикали",
+        typographyCard.addView(text("Отступ текста от прогресса",
                 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
-        textGapValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        typographyCard.addView(textGapValue, fullWrap());
-        textGap = sizeSeekBar(Prefs.MIN_TEXT_GAP_DP, Prefs.MAX_TEXT_GAP_DP);
-        textGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+        metadataProgressGapValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        typographyCard.addView(metadataProgressGapValue, fullWrap());
+        metadataProgressGap = sizeSeekBar(Prefs.MIN_METADATA_PROGRESS_GAP_DP,
+                Prefs.MAX_METADATA_PROGRESS_GAP_DP);
+        metadataProgressGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress,
                     boolean fromUser) {
-                updateTextGapLabel();
+                updateMetadataProgressGapLabel();
                 if (fromUser) renderPreview();
             }
 
@@ -282,7 +283,7 @@ public final class MainActivity extends ScaledActivity {
                 saveAppearance();
             }
         });
-        typographyCard.addView(textGap, fullWrap());
+        typographyCard.addView(metadataProgressGap, fullWrap());
 
         topInsetSetting = addLabeledSeek(typographyCard, "Отступ верхней строки",
                 Prefs.MIN_TOP_INSET_DP, Prefs.MAX_TOP_INSET_DP);
@@ -326,7 +327,7 @@ public final class MainActivity extends ScaledActivity {
             WidgetAppearance defaults = WidgetAppearance.defaults(current);
             WidgetAppearance existing = currentAppearance();
             prefs.putAppearance(current, new WidgetAppearance(
-                    defaults.textGapDp,
+                    defaults.metadataProgressGapDp,
                     existing.controlPanelHeightDp,
                     existing.controlIconScalePercent,
                     existing.controlSpreadPercent,
@@ -909,7 +910,7 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void refreshSizeControls(CardStyle style) {
-        if (widthSize == null || heightSize == null || textGap == null
+        if (widthSize == null || heightSize == null || metadataProgressGap == null
                 || controlPanelHeight == null || controlIconScale == null
                 || controlSpread == null || controlBottomInset == null
                 || topInsetSetting == null) return;
@@ -920,7 +921,7 @@ public final class MainActivity extends ScaledActivity {
                 Prefs.MIN_CARD_WIDTH_DP, Prefs.MAX_CARD_WIDTH_DP));
         heightSize.setProgress(clamp(prefs.cardHeightDp(style),
                 Prefs.MIN_CARD_HEIGHT_DP, Prefs.MAX_CARD_HEIGHT_DP));
-        textGap.setProgress(appearance.textGapDp);
+        metadataProgressGap.setProgress(appearance.metadataProgressGapDp);
         controlPanelHeight.setProgress(appearance.controlPanelHeightDp);
         controlIconScale.setProgress(appearance.controlIconScalePercent);
         controlSpread.setProgress(appearance.controlSpreadPercent);
@@ -935,7 +936,7 @@ public final class MainActivity extends ScaledActivity {
         progressGapSetting.seek.setProgress(appearance.progressGapDp);
         progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
         updateSizeLabel();
-        updateTextGapLabel();
+        updateMetadataProgressGapLabel();
         updateControlLabels();
         updateAppearanceLabels();
         refreshingStyle = previous;
@@ -946,9 +947,8 @@ public final class MainActivity extends ScaledActivity {
         sizeValue.setText(widthSize.getProgress() + " × " + heightSize.getProgress() + " dp");
     }
 
-    private void updateTextGapLabel() {
-        int value = textGap.getProgress();
-        textGapValue.setText((value > 0 ? "+" : "") + value + " dp");
+    private void updateMetadataProgressGapLabel() {
+        metadataProgressGapValue.setText(metadataProgressGap.getProgress() + " dp");
     }
 
     private void updateControlLabels() {
@@ -974,7 +974,7 @@ public final class MainActivity extends ScaledActivity {
     private WidgetAppearance currentAppearance() {
         if (topInsetSetting == null) return prefs.appearance(currentStyle());
         return new WidgetAppearance(
-                textGap.getProgress(),
+                metadataProgressGap.getProgress(),
                 controlPanelHeight.getProgress(),
                 controlIconScale.getProgress(),
                 controlSpread.getProgress(),

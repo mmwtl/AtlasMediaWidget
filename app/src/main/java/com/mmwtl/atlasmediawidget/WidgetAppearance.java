@@ -1,7 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
 final class WidgetAppearance {
-    final int textGapDp;
+    final int metadataProgressGapDp;
     final int controlPanelHeightDp;
     final int controlIconScalePercent;
     final int controlSpreadPercent;
@@ -16,12 +16,12 @@ final class WidgetAppearance {
     final int progressGapDp;
     final int progressThicknessDp;
 
-    WidgetAppearance(int textGapDp, int controlPanelHeightDp,
+    WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
             int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
             int topInsetDp, int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
             int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
             int progressGapDp, int progressThicknessDp) {
-        this.textGapDp = textGapDp;
+        this.metadataProgressGapDp = metadataProgressGapDp;
         this.controlPanelHeightDp = controlPanelHeightDp;
         this.controlIconScalePercent = controlIconScalePercent;
         this.controlSpreadPercent = controlSpreadPercent;
@@ -40,7 +40,7 @@ final class WidgetAppearance {
     static WidgetAppearance defaults(CardStyle style) {
         boolean compact = style == CardStyle.COMPACT;
         return new WidgetAppearance(
-                0,
+                14,
                 style.defaultControlPanelHeightDp,
                 Prefs.DEFAULT_CONTROL_ICON_SCALE_PERCENT,
                 Prefs.DEFAULT_CONTROL_SPREAD_PERCENT,

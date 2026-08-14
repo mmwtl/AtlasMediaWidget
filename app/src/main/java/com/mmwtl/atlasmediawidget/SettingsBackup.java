@@ -16,7 +16,8 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
+    private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
@@ -76,8 +77,10 @@ final class SettingsBackup {
             requireRange(path + ".heightDp", heightDp,
                     Prefs.MIN_CARD_HEIGHT_DP, Prefs.MAX_CARD_HEIGHT_DP);
             if (appearance == null) throw invalid("Нет параметров внешнего вида: " + path);
-            requireRange(path + ".textGapDp", appearance.textGapDp,
-                    Prefs.MIN_TEXT_GAP_DP, Prefs.MAX_TEXT_GAP_DP);
+            requireRange(path + ".metadataProgressGapDp",
+                    appearance.metadataProgressGapDp,
+                    Prefs.MIN_METADATA_PROGRESS_GAP_DP,
+                    Prefs.MAX_METADATA_PROGRESS_GAP_DP);
             requireRange(path + ".controlPanelHeightDp", appearance.controlPanelHeightDp,
                     Prefs.MIN_CONTROL_PANEL_HEIGHT_DP, Prefs.MAX_CONTROL_PANEL_HEIGHT_DP);
             requireRange(path + ".controlIconScalePercent", appearance.controlIconScalePercent,
@@ -196,7 +199,7 @@ final class SettingsBackup {
                 throw invalid("Это не файл настроек Atlas Media Widget");
             }
             int version = requireInt(root, "schemaVersion", "schemaVersion");
-            if (version != SCHEMA_VERSION) {
+            if (version < MIN_SCHEMA_VERSION || version > SCHEMA_VERSION) {
                 throw invalid("Неподдерживаемая версия JSON: " + version);
             }
             JSONObject settings = requireObject(root, "settings", "settings");
@@ -221,9 +224,11 @@ final class SettingsBackup {
                     x,
                     y,
                     decodeStyle(requireObject(styles, "compact",
-                            "settings.cardStyles.compact"), "compact"),
+                                    "settings.cardStyles.compact"),
+                            "compact", CardStyle.COMPACT, version),
                     decodeStyle(requireObject(styles, "square",
-                            "settings.cardStyles.square"), "square"));
+                                    "settings.cardStyles.square"),
+                            "square", CardStyle.SQUARE, version));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
@@ -253,7 +258,7 @@ final class SettingsBackup {
         return new JSONObject()
                 .put("widthDp", data.widthDp)
                 .put("heightDp", data.heightDp)
-                .put("textGapDp", value.textGapDp)
+                .put("metadataProgressGapDp", value.metadataProgressGapDp)
                 .put("controlPanelHeightDp", value.controlPanelHeightDp)
                 .put("controlIconScalePercent", value.controlIconScalePercent)
                 .put("controlSpreadPercent", value.controlSpreadPercent)
@@ -269,12 +274,17 @@ final class SettingsBackup {
                 .put("progressThicknessDp", value.progressThicknessDp);
     }
 
-    private static StyleData decodeStyle(JSONObject object, String path) throws IOException {
+    private static StyleData decodeStyle(JSONObject object, String path,
+            CardStyle style, int schemaVersion) throws IOException {
+        int metadataProgressGapDp = schemaVersion >= 2
+                ? requireInt(object, "metadataProgressGapDp",
+                        path + ".metadataProgressGapDp")
+                : WidgetAppearance.defaults(style).metadataProgressGapDp;
         return new StyleData(
                 requireInt(object, "widthDp", path + ".widthDp"),
                 requireInt(object, "heightDp", path + ".heightDp"),
                 new WidgetAppearance(
-                        requireInt(object, "textGapDp", path + ".textGapDp"),
+                        metadataProgressGapDp,
                         requireInt(object, "controlPanelHeightDp",
                                 path + ".controlPanelHeightDp"),
                         requireInt(object, "controlIconScalePercent",
