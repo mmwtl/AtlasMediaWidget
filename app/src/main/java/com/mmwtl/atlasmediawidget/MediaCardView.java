@@ -35,6 +35,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     private static final int PROGRESS_MAX = 10_000;
+    private static final int METADATA_PROGRESS_GAP_DP = 14;
     private static final MediaSource.Id[] WIDGET_SOURCES = {
             MediaSource.Id.BT, MediaSource.Id.RADIO,
             MediaSource.Id.USB, MediaSource.Id.ONLINE
@@ -481,8 +482,7 @@ final class MediaCardView extends FrameLayout {
             metadataParams.rightMargin = bx(appearance.contentInsetDp);
             metadataParams.topMargin = by((compact ? 76 : 258) + appearance.textGapDp);
         }
-        int metadataBottom = showProgress ? progressTop - d(4) : controlsTop - d(4);
-        metadataParams.height = Math.max(d(48), metadataBottom - metadataParams.topMargin);
+        metadataParams.height = LayoutParams.WRAP_CONTENT;
         metadataParams.gravity = Gravity.TOP | Gravity.START;
         metadata.setLayoutParams(metadataParams);
         metadata.setVisibility(chooserVisible ? GONE : VISIBLE);
@@ -520,6 +520,21 @@ final class MediaCardView extends FrameLayout {
         chooserParams.rightMargin = bx(18);
         chooserParams.topMargin = by(compact ? 63 : 68);
         sourceChooser.setLayoutParams(chooserParams);
+    }
+
+    @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        if (metadata.getVisibility() != VISIBLE) return;
+
+        int requestedTop = metadata.getTop();
+        int contentHeight = metadata.getMeasuredHeight();
+        int corridorBottom = progressRow.getVisibility() == VISIBLE
+                ? progressRow.getTop() - d(4) : controls.getTop() - d(4);
+        int safeBottom = progressRow.getVisibility() == VISIBLE
+                ? progressRow.getTop() - d(METADATA_PROGRESS_GAP_DP) : corridorBottom;
+        int resolvedTop = MetadataLayout.resolveTop(
+                requestedTop, contentHeight, corridorBottom, safeBottom);
+        metadata.setTranslationY(resolvedTop - requestedTop);
     }
 
     private void updateControlLayout(boolean compact, int panelHeight) {
