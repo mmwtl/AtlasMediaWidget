@@ -69,6 +69,7 @@ public final class OverlayService extends Service
     private MediaBridgeClient.State bridgeState = MediaBridgeClient.State.CONNECTING;
     private long loadedArtworkRevision = Long.MIN_VALUE;
     private String loadedArtworkKey = "";
+    private long expectedArtworkToken = Long.MIN_VALUE;
     private long createdAt;
     private float dragStartRawX;
     private float dragStartRawY;
@@ -252,7 +253,9 @@ public final class OverlayService extends Service
         foregroundExecutor.shutdownNow();
         hideCardImmediately();
         if (bridge != null) bridge.stop();
-        if (artworkLoader != null) artworkLoader.shutdown();
+        if (artworkLoader != null) {
+            expectedArtworkToken = artworkLoader.shutdown();
+        }
         stopForeground(STOP_FOREGROUND_REMOVE);
         running = false;
         if (instance == this) instance = null;
@@ -345,6 +348,7 @@ public final class OverlayService extends Service
             bridge.requestSnapshot();
         } else if (state == MediaBridgeClient.State.DISCONNECTED
                 || state == MediaBridgeClient.State.INCOMPATIBLE) {
+            if (artworkLoader != null) expectedArtworkToken = artworkLoader.clear();
             transportSnapshotGuard.clear();
             onlineSnapshotStabilizer.clear();
             lastBackendSnapshot = null;
@@ -474,6 +478,7 @@ public final class OverlayService extends Service
     }
 
     @Override public void onArtwork(long token, android.graphics.Bitmap bitmap) {
+        if (token != expectedArtworkToken) return;
         if (card != null && card.isAttachedToWindow()) card.setArtwork(bitmap);
     }
 
@@ -632,7 +637,8 @@ public final class OverlayService extends Service
         loadedArtworkKey = artworkKey;
         // Keep the current bitmap visible until the replacement has decoded. ArtworkLoader
         // still reports null for an empty or failed load, so genuinely unavailable art clears.
-        artworkLoader.load(artwork, snapshot.generation, snapshot.artworkRevision);
+        expectedArtworkToken = artworkLoader.load(
+                artwork, snapshot.generation, snapshot.artworkRevision);
     }
 
     private ForegroundAppDetector foregroundDetector() {

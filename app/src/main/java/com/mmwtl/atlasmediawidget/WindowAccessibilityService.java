@@ -100,6 +100,8 @@ public final class WindowAccessibilityService extends AccessibilityService {
         destroyed = true;
         windowExecutor.shutdownNow();
         metadataExecutor.shutdownNow();
+        pendingMetadataWindowIds.clear();
+        metadataCache.clear();
         AccessibilityWindowState.markUnavailable();
         notifyOverlayService();
         AppLog.info("Window accessibility service disconnected");
@@ -112,6 +114,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
         }
         List<WindowObservation> observations = new ArrayList<>();
         List<Integer> windowsWithoutMetadata = new ArrayList<>();
+        Set<Integer> liveWindowIds = new HashSet<>();
         boolean eventWindowPresent = false;
         boolean useEventContext = scheduleMetadata && eventContextFresh;
         String eventPackage = useEventContext ? lastEventPackage : "";
@@ -126,6 +129,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
                         continue;
                     }
                     int windowId = window.getId();
+                    liveWindowIds.add(windowId);
                     Rect bounds = new Rect();
                     window.getBoundsInScreen(bounds);
                     boolean active = window.isActive();
@@ -162,6 +166,15 @@ public final class WindowAccessibilityService extends AccessibilityService {
                             bounds.right,
                             bounds.bottom
                     ));
+                }
+                // Window IDs are not a lifecycle-managed cache key. Remove closed windows so a
+                // long-running accessibility service cannot retain metadata forever, and so a
+                // recycled ID cannot inherit a stale package/class pair.
+                for (Integer cachedId : metadataCache.keySet()) {
+                    if (!liveWindowIds.contains(cachedId)) metadataCache.remove(cachedId);
+                }
+                for (Integer pendingId : pendingMetadataWindowIds) {
+                    if (!liveWindowIds.contains(pendingId)) pendingMetadataWindowIds.remove(pendingId);
                 }
             }
             WindowManager manager = getSystemService(WindowManager.class);

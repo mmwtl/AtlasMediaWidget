@@ -45,6 +45,18 @@ public final class OnlineSnapshotStabilizerTest {
         assertEquals("cover", result.artworkUri);
     }
 
+    @Test public void idlessVisibleTrackChangeDoesNotInheritPreviousArtwork() {
+        OnlineSnapshotStabilizer stabilizer = new OnlineSnapshotStabilizer();
+        stabilizer.stabilize(snapshot(1, "", "Old", "Artist", "Album", "old-cover", 42_000L), 100L);
+
+        MediaSnapshot result = stabilizer.stabilize(
+                snapshot(2, "", "New", "Artist", "", "", 0L), 200L);
+
+        assertEquals("New", result.title);
+        assertEquals("", result.album);
+        assertEquals("", result.artworkUri);
+    }
+
     @Test public void emptyCallbackExpiresAndNewTrackIsNeverMerged() {
         OnlineSnapshotStabilizer stabilizer = new OnlineSnapshotStabilizer();
         stabilizer.stabilize(snapshot(1, "old", "Old", "Artist", "Album", "cover", 42_000L), 100L);

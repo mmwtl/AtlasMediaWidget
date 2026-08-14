@@ -78,6 +78,8 @@ final class MediaCardView extends FrameLayout {
     private long pendingSeekPosition = -1L;
     private long pendingSeekAtElapsedRealtime = -1L;
     private MediaSnapshot pendingSeekSnapshot;
+    private long lastElapsedSecond = Long.MIN_VALUE;
+    private int lastRenderedProgress = Integer.MIN_VALUE;
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
             int maxWidthPx, int maxHeightPx, CardStyle style,
@@ -98,7 +100,6 @@ final class MediaCardView extends FrameLayout {
         setBackground(Ui.background(Ui.BACKGROUND, 26 * uiScale, context));
         setClipToOutline(true);
         setClickable(true);
-        setOnClickListener(v -> listener.onOpenSource());
 
         artwork = new ImageView(context);
         artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
@@ -250,7 +251,15 @@ final class MediaCardView extends FrameLayout {
         sourceOptions.setRowCount(2);
         sourceOptions.setUseDefaultMargins(false);
         sourceChooser.addView(sourceOptions, match());
+        sourceChooser.setOnClickListener(v -> hideSourceChooser());
         addView(sourceChooser);
+        setOnClickListener(v -> {
+            if (sourceChooser.getVisibility() == VISIBLE) {
+                hideSourceChooser();
+            } else {
+                listener.onOpenSource();
+            }
+        });
 
         previous.setOnClickListener(v -> listener.onCommand("PREVIOUS"));
         next.setOnClickListener(v -> listener.onCommand("NEXT"));
@@ -262,7 +271,7 @@ final class MediaCardView extends FrameLayout {
         progress.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int value, boolean fromUser) {
                 if (fromUser && snapshot != null && snapshot.duration > 0L) {
-                    elapsed.setText(formatTime(snapshot.duration * value / PROGRESS_MAX));
+                    setElapsed(snapshot.duration * value / PROGRESS_MAX);
                 }
             }
 
@@ -344,7 +353,8 @@ final class MediaCardView extends FrameLayout {
         progress.setEnabled(false);
         progress.setAlpha(0.55f);
         progress.setProgress(0);
-        elapsed.setText("–:––");
+        lastRenderedProgress = 0;
+        setElapsed(-1L);
         duration.setText("–:––");
         setArtwork(null);
         renderFallbackSource();
@@ -390,11 +400,11 @@ final class MediaCardView extends FrameLayout {
                 : ProgressEstimator.estimate(snapshot.position, snapshot.duration,
                         snapshot.updateElapsedRealtime, snapshot.speed, snapshot.playbackState,
                         nowElapsedRealtime);
-        elapsed.setText(formatTime(value));
+        setElapsed(value);
         if (value >= 0L && snapshot.duration > 0L) {
-            progress.setProgress((int) Math.min(PROGRESS_MAX,
+            setRenderedProgress((int) Math.min(PROGRESS_MAX,
                     value * PROGRESS_MAX / snapshot.duration));
-        } else progress.setProgress(0);
+        } else setRenderedProgress(0);
     }
 
     private void beginPendingSeek(long position) {
@@ -625,6 +635,19 @@ final class MediaCardView extends FrameLayout {
     private void hideSourceChooser() {
         sourceChooser.setVisibility(GONE);
         updateContentLayout();
+    }
+
+    private void setElapsed(long milliseconds) {
+        long second = milliseconds < 0L ? -1L : milliseconds / 1000L;
+        if (second == lastElapsedSecond) return;
+        lastElapsedSecond = second;
+        elapsed.setText(formatTime(milliseconds));
+    }
+
+    private void setRenderedProgress(int value) {
+        if (value == lastRenderedProgress) return;
+        lastRenderedProgress = value;
+        progress.setProgress(value);
     }
 
     private void setStatusPill(String message, boolean error) {

@@ -17,7 +17,10 @@ final class OnlineSnapshotStabilizer {
             return candidate;
         }
 
-        boolean candidateIdentifiesTrack = !candidate.mediaId.isBlank();
+        // Some ONLINE implementations do not expose a media ID. A non-empty title or artist
+        // still gives us a useful visible identity and must not be treated as an "empty"
+        // callback, otherwise the next track inherits the previous track's artwork/album.
+        boolean candidateIdentifiesTrack = identifiesTrack(candidate);
         boolean sameTrack = candidateIdentifiesTrack && (
                 !stable.mediaId.isBlank() && candidate.mediaId.equals(stable.mediaId)
                 || sameVisibleIdentity(candidate, stable));
@@ -57,5 +60,11 @@ final class OnlineSnapshotStabilizer {
                 || !first.title.equals(second.title)) return false;
         return first.artist.isBlank() || second.artist.isBlank()
                 || first.artist.equals(second.artist);
+    }
+
+    private static boolean identifiesTrack(MediaSnapshot snapshot) {
+        return !snapshot.mediaId.isBlank()
+                || !snapshot.title.isBlank()
+                || !snapshot.artist.isBlank();
     }
 }

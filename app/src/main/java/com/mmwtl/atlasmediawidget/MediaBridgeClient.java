@@ -27,7 +27,7 @@ final class MediaBridgeClient {
     private final Context context;
     private final Listener listener;
     private final Handler main = new Handler(android.os.Looper.getMainLooper());
-    private final HandlerThread ipcThread = new HandlerThread("atlas-media-bridge");
+    private HandlerThread ipcThread;
     private final AtomicLong nextRequest = new AtomicLong();
     private final BridgeConnectionState connectionState = new BridgeConnectionState();
     private Handler ipc;
@@ -98,9 +98,12 @@ final class MediaBridgeClient {
             if (started) return;
             started = true;
             startedAt = SystemClock.elapsedRealtime();
-            ipcThread.start();
-            ipc = new Handler(ipcThread.getLooper());
-            incoming = new Messenger(new Handler(ipcThread.getLooper(), this::handleIncoming));
+            HandlerThread thread = new HandlerThread("atlas-media-bridge");
+            ipcThread = thread;
+            thread.start();
+            android.os.Looper looper = thread.getLooper();
+            ipc = new Handler(looper);
+            incoming = new Messenger(new Handler(looper, this::handleIncoming));
             bindNow();
         });
     }
@@ -112,10 +115,17 @@ final class MediaBridgeClient {
             removeConnectionCallbacks();
             boolean hadBinding = connectionState.hasBinding();
             connectionState.onStopped();
-            if (ipc != null) ipc.post(() -> {
-                sendUnregister();
-                remote = null;
-            });
+            Handler oldIpc = ipc;
+            HandlerThread oldThread = ipcThread;
+            Messenger oldRemote = remote;
+            Messenger oldIncoming = incoming;
+            ipc = null;
+            ipcThread = null;
+            remote = null;
+            incoming = null;
+            if (oldIpc != null) {
+                oldIpc.post(() -> sendUnregister(oldRemote, oldIncoming));
+            }
             if (hadBinding) {
                 try {
                     context.unbindService(connection);
@@ -123,7 +133,7 @@ final class MediaBridgeClient {
                     // A concurrent Binder death may already have removed the connection.
                 }
             }
-            ipcThread.quitSafely();
+            if (oldThread != null) oldThread.quitSafely();
             notifyState(State.STOPPED, "");
         });
     }
@@ -219,9 +229,16 @@ final class MediaBridgeClient {
         sendMessage(MediaBridgeContract.REGISTER, data);
     }
 
-    private void sendUnregister() {
-        if (remote == null || incoming == null) return;
-        sendMessage(MediaBridgeContract.UNREGISTER, baseData(""));
+    private void sendUnregister(Messenger target, Messenger replyTo) {
+        if (target == null || replyTo == null) return;
+        Message message = Message.obtain(null, MediaBridgeContract.UNREGISTER);
+        message.replyTo = replyTo;
+        message.setData(baseData(""));
+        try {
+            target.send(message);
+        } catch (RemoteException error) {
+            AppLog.warn("Media Bridge unregister failed", error);
+        }
     }
 
     private void sendSimple(int what, String requestId, Bundle extra) {
