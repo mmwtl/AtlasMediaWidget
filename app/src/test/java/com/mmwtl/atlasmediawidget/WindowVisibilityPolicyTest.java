@@ -103,6 +103,24 @@ public final class WindowVisibilityPolicyTest {
     }
 
     @Test
+    public void staleFullscreenWindowBelowActiveFreeformDoesNotHidePanel() {
+        assertDecision(
+                WindowVisibilityPolicy.Decision.HOME_VISIBLE,
+                List.of(
+                        window("launcher", "HomeActivity", false, false,
+                                0, 0, WIDTH, HEIGHT, 0),
+                        window("video", "PlayerActivity", false, false,
+                                0, 0, WIDTH, HEIGHT, 1),
+                        window("video", "PlayerActivity", true, true,
+                                150, 250, 1290, 1600, 4)
+                ),
+                activity("video", "PlayerActivity"),
+                "video",
+                "PlayerActivity"
+        );
+    }
+
+    @Test
     public void arbitraryFullscreenThirdPartyOverlayHidesPanel() {
         assertDecision(
                 WindowVisibilityPolicy.Decision.HOME_HIDDEN,

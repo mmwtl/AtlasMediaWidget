@@ -56,10 +56,12 @@ final class WindowVisibilityPolicy {
         boolean launcherPresent = false;
         int highestLauncherLayer = Integer.MIN_VALUE;
         boolean nonHomeApplicationPresent = false;
+        boolean activeOrFocusedWindowPresent = false;
         for (WindowObservation window : windows) {
             if (window == null) {
                 continue;
             }
+            activeOrFocusedWindowPresent |= window.active || window.focused;
             boolean homeWindow = isHomeWindow(
                     window,
                     homePackages,
@@ -104,7 +106,7 @@ final class WindowVisibilityPolicy {
             boolean aboveLauncher = highestLauncherLayer == Integer.MIN_VALUE
                     || window.layer >= highestLauncherLayer;
             boolean foregroundWindow = window.active || window.focused
-                    || (!foregroundPackage.isEmpty()
+                    || (!activeOrFocusedWindowPresent && !foregroundPackage.isEmpty()
                     && foregroundPackage.equals(window.packageName));
 
             // Do not require a package name here. Some system windows on the head unit expose
