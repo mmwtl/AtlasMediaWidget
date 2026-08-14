@@ -18,6 +18,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.os.Trace;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -25,7 +26,6 @@ import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
-import android.view.animation.AccelerateInterpolator;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,9 +40,6 @@ public final class OverlayService extends Service
     private static final int NOTIFICATION_ID = 2407;
     private static final int PROGRESS_TICK_MS = 250;
     private static final long SNAPSHOT_RECONCILIATION_MS = 5_000L;
-    private static final long DISAPPEAR_ANIMATION_MS = 180L;
-    private static final float HIDDEN_SCALE = 0.97f;
-    private static final int HIDDEN_OFFSET_DP = 12;
     private static volatile boolean running;
     private static volatile OverlayService instance;
 
@@ -76,9 +73,9 @@ public final class OverlayService extends Service
     private int dragStartX;
     private int dragStartY;
     private int notificationState = -1;
-    private boolean cardHiding;
     private boolean foregroundQueryInFlight;
     private boolean visibilityCheckPending;
+    private long visibilityRequestGeneration;
     private boolean deviceWasReady;
     private boolean visibilityReceiverRegistered;
     private boolean destroyed;
@@ -154,6 +151,7 @@ public final class OverlayService extends Service
                 return;
             }
             foregroundQueryInFlight = true;
+            long queryGeneration = visibilityRequestGeneration;
             try {
                 foregroundExecutor.execute(() -> {
                     boolean homeVisible = false;
@@ -163,7 +161,7 @@ public final class OverlayService extends Service
                         AppLog.warn("HOME visibility query failed", error);
                     }
                     boolean result = homeVisible;
-                    main.post(() -> applyForegroundResult(result));
+                    main.post(() -> applyForegroundResult(result, queryGeneration));
                 });
             } catch (RejectedExecutionException ignored) {
                 foregroundQueryInFlight = false;
@@ -263,10 +261,10 @@ public final class OverlayService extends Service
         super.onDestroy();
     }
 
-    private void applyForegroundResult(boolean homeVisible) {
+    private void applyForegroundResult(boolean homeVisible, long queryGeneration) {
         if (destroyed) return;
         foregroundQueryInFlight = false;
-        if (visibilityCheckPending) {
+        if (visibilityCheckPending || queryGeneration != visibilityRequestGeneration) {
             visibilityCheckPending = false;
             main.post(foregroundPoll);
             return;
@@ -289,6 +287,7 @@ public final class OverlayService extends Service
     }
 
     private void requestImmediateVisibilityCheck() {
+        visibilityRequestGeneration++;
         fastProbeUntil = SystemClock.elapsedRealtime()
                 + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
         main.removeCallbacks(foregroundPoll);
@@ -338,6 +337,18 @@ public final class OverlayService extends Service
         OverlayService service = instance;
         if (service != null && !service.destroyed) {
             service.main.post(service::requestImmediateVisibilityCheck);
+        }
+    }
+
+    static void onAccessibilityForceHide(String packageName, String className) {
+        OverlayService service = instance;
+        if (service != null && !service.destroyed) {
+            service.main.post(() -> {
+                if (service.destroyed) return;
+                AppLog.info("Fast hide requested for " + packageName + "/" + className);
+                service.hideCard();
+                service.updateNotification(0);
+            });
         }
     }
 
@@ -484,18 +495,10 @@ public final class OverlayService extends Service
 
     private void showCard() {
         if (card != null && card.isAttachedToWindow()) {
-            if (cardHiding) {
-                cardHiding = false;
-                showCardImmediately(card);
-                main.removeCallbacks(progressTick);
-                main.post(progressTick);
-                scheduleSnapshotReconcile();
-            }
             return;
         }
         card = null;
         cardParams = null;
-        cardHiding = false;
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkKey = "";
         Rect bounds = availableBounds();
@@ -522,7 +525,12 @@ public final class OverlayService extends Service
                 ? bounds.top + Math.max(0, Math.round(bounds.height() * 0.62f)) : storedY;
         clampPosition(params, candidate, bounds);
         try {
-            windowManager.addView(candidate, params);
+            Trace.beginSection("AtlasOverlay.addView");
+            try {
+                windowManager.addView(candidate, params);
+            } finally {
+                Trace.endSection();
+            }
             card = candidate;
             cardParams = params;
             AppLog.info("Overlay card attached t+"
@@ -544,7 +552,7 @@ public final class OverlayService extends Service
     private void hideCard() {
         main.removeCallbacks(progressTick);
         main.removeCallbacks(snapshotReconcile);
-        if (card == null || windowManager == null || cardHiding) return;
+        if (card == null || windowManager == null) return;
         if (!card.isAttachedToWindow()) {
             card = null;
             cardParams = null;
@@ -552,37 +560,19 @@ public final class OverlayService extends Service
         }
         MediaCardView target = card;
         target.animate().cancel();
-        cardHiding = true;
-        target.animate()
-                .alpha(0f)
-                .scaleX(HIDDEN_SCALE)
-                .scaleY(HIDDEN_SCALE)
-                .translationY(Ui.dp(this, HIDDEN_OFFSET_DP))
-                .setDuration(DISAPPEAR_ANIMATION_MS)
-                .setInterpolator(new AccelerateInterpolator())
-                .withEndAction(() -> {
-                    if (card != target || !cardHiding) return;
-                    removeCardView(target);
-                    card = null;
-                    cardParams = null;
-                    cardHiding = false;
-                })
-                .start();
-    }
-
-    private void showCardImmediately(MediaCardView target) {
-        target.animate().cancel();
         target.setAlpha(1f);
         target.setScaleX(1f);
         target.setScaleY(1f);
         target.setTranslationY(0f);
+        removeCardView(target);
+        card = null;
+        cardParams = null;
     }
 
     private void hideCardImmediately() {
         main.removeCallbacks(progressTick);
         main.removeCallbacks(snapshotReconcile);
         if (card != null) {
-            cardHiding = false;
             card.animate().cancel();
             removeCardView(card);
         }
@@ -593,7 +583,12 @@ public final class OverlayService extends Service
     private void removeCardView(MediaCardView target) {
         if (windowManager == null) return;
         try {
-            windowManager.removeViewImmediate(target);
+            Trace.beginSection("AtlasOverlay.removeView");
+            try {
+                windowManager.removeViewImmediate(target);
+            } finally {
+                Trace.endSection();
+            }
         } catch (IllegalArgumentException ignored) {
             // OEM launcher may already have detached the overlay.
         }

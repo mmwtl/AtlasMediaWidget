@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediawidget;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.graphics.Rect;
+import android.os.Trace;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.view.accessibility.AccessibilityEvent;
@@ -69,6 +70,13 @@ public final class WindowAccessibilityService extends AccessibilityService {
                 || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             String eventPackage = text(event.getPackageName());
             String eventClass = text(event.getClassName());
+            if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    && HeadUnitWindowRules.forceHide(eventPackage, eventClass)) {
+                // These firmware-specific activities are known to represent a fullscreen shell
+                // transition. Hide immediately; the regular window snapshot still runs to
+                // reconcile the complete state and to decide when HOME can be shown again.
+                OverlayService.onAccessibilityForceHide(eventPackage, eventClass);
+            }
             boolean passiveOwnWindow = getPackageName().equals(eventPackage)
                     && (eventClass.isEmpty() || eventClass.startsWith("android."));
             if (!eventPackage.isEmpty() && !passiveOwnWindow) {
@@ -121,7 +129,13 @@ public final class WindowAccessibilityService extends AccessibilityService {
         String eventClass = useEventContext ? lastEventClass : "";
         int eventWindowId = useEventContext ? lastEventWindowId : -1;
         try {
-            List<AccessibilityWindowInfo> windows = getWindows();
+            Trace.beginSection("AtlasAccessibility.getWindows");
+            List<AccessibilityWindowInfo> windows;
+            try {
+                windows = getWindows();
+            } finally {
+                Trace.endSection();
+            }
             if (windows != null) {
                 boolean eventWindowAssigned = false;
                 for (AccessibilityWindowInfo window : windows) {

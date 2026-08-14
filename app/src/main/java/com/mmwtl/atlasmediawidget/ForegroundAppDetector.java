@@ -12,6 +12,7 @@ import android.content.pm.ResolveInfo;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemClock;
+import android.os.Trace;
 import android.os.UserManager;
 
 import java.util.HashSet;
@@ -51,27 +52,38 @@ final class ForegroundAppDetector {
         if (!isDeviceReady()) return false;
         long now = System.currentTimeMillis();
         if (homePackages.isEmpty() || now - lastHomeRefresh > 30_000L) refreshHomePackages();
-        boolean usageStateAvailable = refreshActivityVisibility();
-        AccessibilityWindowState.Snapshot windowState = AccessibilityWindowState.current();
-        if (windowState.available) {
-            WindowVisibilityPolicy.Decision decision = WindowVisibilityPolicy.evaluate(
-                    windowState.windows,
-                    windowState.displayWidth,
-                    windowState.displayHeight,
-                    homePackages,
-                    homeComponents,
-                    tracker.mostRecentVisibleActivity(),
-                    windowState.eventPackage,
-                    windowState.eventClass,
-                    context.getPackageName()
-            );
-            if (decision != WindowVisibilityPolicy.Decision.UNKNOWN) {
-                return decision == WindowVisibilityPolicy.Decision.HOME_VISIBLE;
-            }
+        // Accessibility snapshots are already collected from the window service and are the
+        // authoritative source when they contain a decisive result. Do not put the potentially
+        // slow UsageStats Binder query in front of this hot path.
+        WindowVisibilityPolicy.Decision decision = evaluateAccessibilitySnapshot();
+        if (decision != WindowVisibilityPolicy.Decision.UNKNOWN) {
+            return decision == WindowVisibilityPolicy.Decision.HOME_VISIBLE;
         }
-        // Accessibility is authoritative when it has a usable snapshot. UsageStats remains the
-        // bounded fallback for OEM frames where the window list is temporarily unavailable.
+
+        // UsageStats remains a bounded fallback for OEM frames where the accessibility snapshot
+        // is unavailable or cannot disambiguate the active window.
+        boolean usageStateAvailable = refreshActivityVisibility();
+        decision = evaluateAccessibilitySnapshot();
+        if (decision != WindowVisibilityPolicy.Decision.UNKNOWN) {
+            return decision == WindowVisibilityPolicy.Decision.HOME_VISIBLE;
+        }
         return usageStateAvailable && tracker.isAnyPackageVisible(homePackages);
+    }
+
+    private WindowVisibilityPolicy.Decision evaluateAccessibilitySnapshot() {
+        AccessibilityWindowState.Snapshot windowState = AccessibilityWindowState.current();
+        if (!windowState.available) return WindowVisibilityPolicy.Decision.UNKNOWN;
+        return WindowVisibilityPolicy.evaluate(
+                windowState.windows,
+                windowState.displayWidth,
+                windowState.displayHeight,
+                homePackages,
+                homeComponents,
+                tracker.mostRecentVisibleActivity(),
+                windowState.eventPackage,
+                windowState.eventClass,
+                context.getPackageName()
+        );
     }
 
     boolean isDeviceReady() {
@@ -89,11 +101,14 @@ final class ForegroundAppDetector {
         long queryStarted = SystemClock.elapsedRealtime();
         long begin = ForegroundPollPolicy.queryBegin(now, lastQuery);
         UsageEvents events;
+        Trace.beginSection("AtlasForeground.queryEvents");
         try {
             events = usageStatsManager.queryEvents(begin, now);
         } catch (RuntimeException error) {
             AppLog.warnRateLimited("usage-events", "Usage-events query failed", error);
             return false;
+        } finally {
+            Trace.endSection();
         }
         UsageEvents.Event event = new UsageEvents.Event();
         while (events != null && events.hasNextEvent()) {
