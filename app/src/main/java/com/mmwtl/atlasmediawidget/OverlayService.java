@@ -44,6 +44,7 @@ public final class OverlayService extends Service
     private static final float HIDDEN_SCALE = 0.97f;
     private static final int HIDDEN_OFFSET_DP = 12;
     private static volatile boolean running;
+    private static volatile OverlayService instance;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService foregroundExecutor = Executors.newSingleThreadExecutor(runnable -> {
@@ -126,7 +127,8 @@ public final class OverlayService extends Service
                 return;
             }
             if (!Settings.canDrawOverlays(OverlayService.this)
-                    || !ForegroundAppDetector.hasUsageAccess(OverlayService.this)) {
+                    || !ForegroundAppDetector.hasUsageAccess(OverlayService.this)
+                    || !AccessibilityWindowState.isEnabled(OverlayService.this)) {
                 hideCard();
                 updateNotification(2);
                 scheduleForegroundPoll(ForegroundPollPolicy.HIDDEN_DELAY_MS);
@@ -153,8 +155,14 @@ public final class OverlayService extends Service
             foregroundQueryInFlight = true;
             try {
                 foregroundExecutor.execute(() -> {
-                    boolean homeVisible = detector.isHomeVisible();
-                    main.post(() -> applyForegroundResult(homeVisible));
+                    boolean homeVisible = false;
+                    try {
+                        homeVisible = detector.isHomeVisible();
+                    } catch (RuntimeException error) {
+                        AppLog.warn("HOME visibility query failed", error);
+                    }
+                    boolean result = homeVisible;
+                    main.post(() -> applyForegroundResult(result));
                 });
             } catch (RejectedExecutionException ignored) {
                 foregroundQueryInFlight = false;
@@ -212,6 +220,7 @@ public final class OverlayService extends Service
         }
         notificationState = 0;
         running = true;
+        instance = this;
         fastProbeUntil = createdAt + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
         registerVisibilityWakeReceiver();
         bridge.start();
@@ -246,6 +255,7 @@ public final class OverlayService extends Service
         if (artworkLoader != null) artworkLoader.shutdown();
         stopForeground(STOP_FOREGROUND_REMOVE);
         running = false;
+        if (instance == this) instance = null;
         AppLog.info("Overlay service destroyed");
         super.onDestroy();
     }
@@ -319,6 +329,13 @@ public final class OverlayService extends Service
 
     @Override public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    static void onAccessibilityWindowsChanged() {
+        OverlayService service = instance;
+        if (service != null && !service.destroyed) {
+            service.main.post(service::requestImmediateVisibilityCheck);
+        }
     }
 
     @Override public void onBridgeState(MediaBridgeClient.State state, String detail) {

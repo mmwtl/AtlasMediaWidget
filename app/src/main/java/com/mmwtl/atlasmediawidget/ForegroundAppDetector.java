@@ -12,6 +12,7 @@ import android.content.pm.ResolveInfo;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.SystemClock;
+import android.os.UserManager;
 
 import java.util.HashSet;
 import java.util.List;
@@ -22,7 +23,9 @@ final class ForegroundAppDetector {
     private final UsageStatsManager usageStatsManager;
     private final PowerManager powerManager;
     private final KeyguardManager keyguardManager;
+    private final UserManager userManager;
     private final Set<String> homePackages = new HashSet<>();
+    private final Set<String> homeComponents = new HashSet<>();
     private final ForegroundEventTracker tracker = new ForegroundEventTracker();
     private long lastHomeRefresh;
     private long lastQuery;
@@ -32,6 +35,7 @@ final class ForegroundAppDetector {
         usageStatsManager = context.getSystemService(UsageStatsManager.class);
         powerManager = context.getSystemService(PowerManager.class);
         keyguardManager = context.getSystemService(KeyguardManager.class);
+        userManager = context.getSystemService(UserManager.class);
     }
 
     static boolean hasUsageAccess(Context context) {
@@ -47,52 +51,87 @@ final class ForegroundAppDetector {
         if (!isDeviceReady()) return false;
         long now = System.currentTimeMillis();
         if (homePackages.isEmpty() || now - lastHomeRefresh > 30_000L) refreshHomePackages();
-        return refreshActivityVisibility() && tracker.isAnyPackageVisible(homePackages);
+        boolean usageStateAvailable = refreshActivityVisibility();
+        AccessibilityWindowState.Snapshot windowState = AccessibilityWindowState.current();
+        if (windowState.available) {
+            WindowVisibilityPolicy.Decision decision = WindowVisibilityPolicy.evaluate(
+                    windowState.windows,
+                    windowState.displayWidth,
+                    windowState.displayHeight,
+                    homePackages,
+                    homeComponents,
+                    tracker.mostRecentVisibleActivity(),
+                    windowState.eventPackage,
+                    windowState.eventClass,
+                    context.getPackageName()
+            );
+            if (decision != WindowVisibilityPolicy.Decision.UNKNOWN) {
+                return decision == WindowVisibilityPolicy.Decision.HOME_VISIBLE;
+            }
+        }
+        // Accessibility is authoritative when it has a usable snapshot. UsageStats remains the
+        // bounded fallback for OEM frames where the window list is temporarily unavailable.
+        return usageStateAvailable && tracker.isAnyPackageVisible(homePackages);
     }
 
     boolean isDeviceReady() {
         return powerManager != null && powerManager.isInteractive()
-                && (keyguardManager == null || !keyguardManager.isKeyguardLocked());
+                && (keyguardManager == null || !keyguardManager.isKeyguardLocked())
+                && (userManager == null || userManager.isUserUnlocked());
     }
 
     private boolean refreshActivityVisibility() {
-        if (usageStatsManager == null || !hasUsageAccess(context)) return false;
+        if (usageStatsManager == null || !hasUsageAccess(context)) {
+            return false;
+        }
         long now = System.currentTimeMillis();
         boolean initialQuery = lastQuery == 0;
         long queryStarted = SystemClock.elapsedRealtime();
         long begin = ForegroundPollPolicy.queryBegin(now, lastQuery);
+        UsageEvents events;
         try {
-            UsageEvents events = usageStatsManager.queryEvents(begin, now);
-            UsageEvents.Event event = new UsageEvents.Event();
-            while (events != null && events.hasNextEvent()) {
-                events.getNextEvent(event);
-                if (event.getEventType() == UsageEvents.Event.ACTIVITY_RESUMED) {
-                    tracker.onResumed(
-                            event.getTimeStamp(), event.getPackageName(), event.getClassName());
-                } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_PAUSED) {
-                    tracker.onPaused(
-                            event.getTimeStamp(), event.getPackageName(), event.getClassName());
-                } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_STOPPED) {
-                    tracker.onStopped(
-                            event.getTimeStamp(), event.getPackageName(), event.getClassName());
-                } else if (event.getEventType() == UsageEvents.Event.DEVICE_SHUTDOWN
-                        || event.getEventType() == UsageEvents.Event.DEVICE_STARTUP) {
-                    tracker.onReset(event.getTimeStamp());
-                }
-            }
-            lastQuery = now;
-            if (!tracker.hasObservedEvent()) {
-                List<UsageStats> stats = usageStatsManager.queryUsageStats(
-                        UsageStatsManager.INTERVAL_DAILY, now - 86_400_000L, now);
-                if (stats != null) {
-                    for (UsageStats item : stats) {
-                        tracker.seed(item.getLastTimeUsed(), item.getPackageName());
-                    }
-                }
-            }
+            events = usageStatsManager.queryEvents(begin, now);
         } catch (RuntimeException error) {
-            AppLog.warn("Cannot query foreground application", error);
+            AppLog.warnRateLimited("usage-events", "Usage-events query failed", error);
             return false;
+        }
+        UsageEvents.Event event = new UsageEvents.Event();
+        while (events != null && events.hasNextEvent()) {
+            events.getNextEvent(event);
+            if (event.getEventType() == UsageEvents.Event.ACTIVITY_RESUMED) {
+                tracker.onResumed(
+                        event.getTimeStamp(), event.getPackageName(), event.getClassName());
+            } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_PAUSED) {
+                tracker.onPaused(
+                        event.getTimeStamp(), event.getPackageName(), event.getClassName());
+            } else if (event.getEventType() == UsageEvents.Event.ACTIVITY_STOPPED) {
+                tracker.onStopped(
+                        event.getTimeStamp(), event.getPackageName(), event.getClassName());
+            } else if (event.getEventType() == UsageEvents.Event.DEVICE_SHUTDOWN
+                    || event.getEventType() == UsageEvents.Event.DEVICE_STARTUP) {
+                tracker.onReset(event.getTimeStamp());
+            }
+        }
+        lastQuery = now;
+
+        if (!tracker.hasObservedEvent()) {
+            List<UsageStats> stats;
+            try {
+                stats = usageStatsManager.queryUsageStats(
+                        UsageStatsManager.INTERVAL_DAILY,
+                        now - 24L * 60L * 60L * 1000L,
+                        now
+                );
+            } catch (RuntimeException error) {
+                AppLog.warnRateLimited(
+                        "usage-stats", "Usage-stats fallback query failed", error);
+                return false;
+            }
+            if (stats != null) {
+                for (UsageStats item : stats) {
+                    tracker.seed(item.getLastTimeUsed(), item.getPackageName());
+                }
+            }
         }
         long queryElapsed = SystemClock.elapsedRealtime() - queryStarted;
         if (initialQuery || queryElapsed >= 100L) {
@@ -103,15 +142,25 @@ final class ForegroundAppDetector {
 
     private void refreshHomePackages() {
         homePackages.clear();
+        homeComponents.clear();
         Intent intent = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        List<ResolveInfo> homes;
         try {
-            List<ResolveInfo> homes = context.getPackageManager().queryIntentActivities(
+            homes = context.getPackageManager().queryIntentActivities(
                     intent, PackageManager.MATCH_ALL);
-            for (ResolveInfo home : homes) {
-                if (home.activityInfo != null) homePackages.add(home.activityInfo.packageName);
-            }
         } catch (RuntimeException error) {
-            AppLog.warn("Cannot query HOME packages", error);
+            AppLog.warnRateLimited("home-query", "HOME package query failed", error);
+            lastHomeRefresh = System.currentTimeMillis();
+            return;
+        }
+        for (ResolveInfo home : homes) {
+            if (home.activityInfo != null) {
+                homePackages.add(home.activityInfo.packageName);
+                homeComponents.add(WindowVisibilityPolicy.componentKey(
+                        home.activityInfo.packageName,
+                        home.activityInfo.name
+                ));
+            }
         }
         lastHomeRefresh = System.currentTimeMillis();
     }

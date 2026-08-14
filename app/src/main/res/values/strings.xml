@@ -5,7 +5,7 @@
     <string name="notification_title">Atlas Media Widget</string>
     <string name="notification_visible">Карточка показана на главном экране</string>
     <string name="notification_hidden">Карточка ожидает главный экран</string>
-    <string name="notification_permission_error">Нужны разрешения overlay и истории использования</string>
+    <string name="notification_permission_error">Нужны разрешения overlay, истории использования и контроля окон</string>
     <string name="stop">Остановить</string>
     <string name="bridge_disconnected">GInputBridge недоступен</string>
     <string name="bridge_connecting">Подключение к GInputBridge…</string>
@@ -17,6 +17,11 @@
     <string name="settings_section_content">СОДЕРЖИМОЕ И ПОВЕДЕНИЕ</string>
     <string name="settings_section_visual">ВНЕШНИЙ ВИД</string>
     <string name="permissions_title">Системные разрешения</string>
+    <string name="allow_accessibility">Разрешить контроль окон</string>
+    <string name="accessibility_service_label">Atlas Media Widget: контроль окон</string>
+    <string name="accessibility_service_description">Определяет, виден ли главный экран под полноэкранным или свободным окном. Не читает и не вводит текст.</string>
+    <string name="auto_start_permission_warning">Автозапуск сохранён, но без трёх специальных разрешений он не сработает корректно</string>
+    <string name="no_accessibility_settings">Системный экран специальных возможностей недоступен</string>
     <string name="bridge_title">GInputBridge</string>
     <string name="service_title">Запуск и сервис</string>
     <string name="behavior_title">Поведение overlay</string>

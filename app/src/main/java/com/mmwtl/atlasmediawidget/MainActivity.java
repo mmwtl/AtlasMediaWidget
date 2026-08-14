@@ -181,6 +181,9 @@ public final class MainActivity extends ScaledActivity {
         Button usageForApp = actionButton("Разрешить историю использования");
         usageForApp.setOnClickListener(v -> openUsageSettingsForApp());
         accessCard.addView(usageForApp, buttonParams());
+        Button accessibility = actionButton(getString(R.string.allow_accessibility));
+        accessibility.setOnClickListener(v -> openAccessibilitySettings());
+        accessCard.addView(accessibility, buttonParams());
 
         LinearLayout bridgeCard = card();
         bridgeCard.addView(text(getString(R.string.bridge_title),
@@ -428,7 +431,14 @@ public final class MainActivity extends ScaledActivity {
         autoStart.setTextColor(Ui.PRIMARY);
         autoStart.setTextSize(15);
         autoStart.setOnCheckedChangeListener((button, checked) -> {
-            if (button.isPressed()) prefs.putBoolean(Prefs.KEY_AUTO_START, checked);
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_AUTO_START, checked);
+            if (checked && (!Settings.canDrawOverlays(this)
+                    || !ForegroundAppDetector.hasUsageAccess(this)
+                    || !AccessibilityWindowState.isEnabled(this))) {
+                Toast.makeText(this, R.string.auto_start_permission_warning,
+                        Toast.LENGTH_LONG).show();
+            }
         });
         LinearLayout.LayoutParams switchParams = fullWrap();
         switchParams.topMargin = Ui.dp(this, 14);
@@ -581,9 +591,12 @@ public final class MainActivity extends ScaledActivity {
     private void refresh() {
         boolean overlay = Settings.canDrawOverlays(this);
         boolean usage = ForegroundAppDetector.hasUsageAccess(this);
+        boolean accessibility = AccessibilityWindowState.isEnabled(this);
         permissionStatus.setText("Поверх окон: " + yesNo(overlay)
-                + "\nИстория использования: " + yesNo(usage));
-        permissionStatus.setTextColor(overlay && usage ? Ui.ACCENT : Ui.ERROR);
+                + "\nИстория использования: " + yesNo(usage)
+                + "\nКонтроль окон: " + yesNo(accessibility));
+        permissionStatus.setTextColor(overlay && usage && accessibility
+                ? Ui.ACCENT : Ui.ERROR);
         boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
         bridgeStatus.setText(bridgeInstalled
                 ? "Пакет установлен. Требуется ветка mediaapi с protocol v1."
@@ -592,7 +605,7 @@ public final class MainActivity extends ScaledActivity {
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
         serviceButton.setBackground(Ui.background(enabled ? Ui.NESTED : Ui.ACCENT, 8, this));
-        serviceButton.setEnabled(enabled || overlay && usage);
+        serviceButton.setEnabled(enabled || overlay && usage && accessibility);
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
         showRadioCovers.setChecked(prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true));
         radioCatalogStatus.setText(RadioCatalogImporter.activeSummary(this));
@@ -613,7 +626,13 @@ public final class MainActivity extends ScaledActivity {
         if (enabled) {
             prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, false);
             OverlayService.stop(this);
-        } else if (Settings.canDrawOverlays(this) && ForegroundAppDetector.hasUsageAccess(this)) {
+        } else if (!Settings.canDrawOverlays(this)) {
+            openOverlaySettings();
+        } else if (!ForegroundAppDetector.hasUsageAccess(this)) {
+            openUsageSettingsForApp();
+        } else if (!AccessibilityWindowState.isEnabled(this)) {
+            openAccessibilitySettings();
+        } else {
             try {
                 prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
                 OverlayService.start(this);
@@ -806,6 +825,13 @@ public final class MainActivity extends ScaledActivity {
                         Uri.parse("package:" + getPackageName())),
                 new Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
                 "настройки истории использования");
+    }
+
+    private void openAccessibilitySettings() {
+        openPermissionSettings(
+                new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+                new Intent(Settings.ACTION_SETTINGS),
+                "настройки контроля окон");
     }
 
     private void openPermissionSettings(Intent direct, Intent fallback, String label) {

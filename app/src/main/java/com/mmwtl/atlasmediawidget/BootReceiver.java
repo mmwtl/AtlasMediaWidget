@@ -21,9 +21,12 @@ public final class BootReceiver extends BroadcastReceiver {
             prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
             AppLog.info("Startup signal " + action + "; starting overlay service");
             startIfAllowed(context, prefs);
-        } else if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)
-                && prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-            startIfAllowed(context, prefs);
+        } else if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
+            boolean shouldRestart = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)
+                    || prefs.getBoolean(Prefs.KEY_AUTO_START, false);
+            if (shouldRestart) {
+                startIfAllowed(context, prefs);
+            }
         }
     }
 
@@ -34,6 +37,10 @@ public final class BootReceiver extends BroadcastReceiver {
         }
         if (!ForegroundAppDetector.hasUsageAccess(context)) {
             AppLog.info("Boot start skipped: usage access is missing");
+            return;
+        }
+        if (!AccessibilityWindowState.isEnabled(context)) {
+            AppLog.info("Boot start skipped: window accessibility service is disabled");
             return;
         }
         try {
