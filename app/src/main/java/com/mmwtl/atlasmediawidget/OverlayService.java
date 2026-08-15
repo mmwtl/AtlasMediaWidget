@@ -53,7 +53,6 @@ public final class OverlayService extends Service
     private final TransportSnapshotGuard transportSnapshotGuard = new TransportSnapshotGuard();
     private final OnlineSnapshotStabilizer onlineSnapshotStabilizer =
             new OnlineSnapshotStabilizer();
-    private MediaSnapshot lastBackendSnapshot;
     private Prefs prefs;
     private WindowManager windowManager;
     private ForegroundAppDetector foregroundDetector;
@@ -362,7 +361,6 @@ public final class OverlayService extends Service
             if (artworkLoader != null) expectedArtworkToken = artworkLoader.clear();
             transportSnapshotGuard.clear();
             onlineSnapshotStabilizer.clear();
-            lastBackendSnapshot = null;
             main.removeCallbacks(transportReconcile);
             main.removeCallbacks(snapshotReconcile);
             reducer.onDisconnected(SystemClock.elapsedRealtime());
@@ -376,13 +374,6 @@ public final class OverlayService extends Service
 
     @Override public void onSnapshot(MediaSnapshot snapshot) {
         long now = SystemClock.elapsedRealtime();
-        MediaSource.Id fallback = SourceFallbackPolicy.fallback(lastBackendSnapshot, snapshot);
-        lastBackendSnapshot = snapshot;
-        if (fallback != MediaSource.Id.UNKNOWN) {
-            String requestId = bridge.setSource(fallback);
-            AppLog.info("Online source disconnected; sending automatic fallback request="
-                    + requestId + " source=" + fallback);
-        }
         snapshot = onlineSnapshotStabilizer.stabilize(snapshot, now);
         if (transportSnapshotGuard.shouldDefer(snapshot, now)) {
             AppLog.info("Holding transient empty ONLINE snapshot generation="
