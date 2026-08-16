@@ -6,6 +6,7 @@ import android.content.Intent;
 
 final class MediaSourceLauncher {
     private static final String OEM_MEDIA_PACKAGE = "com.tencent.wecarflow";
+    private static final String CARPLAY_PACKAGE = "com.autolink.carplay.app";
     private static final String OEM_JUMP_VIEW = "jumpView";
 
     private final Context context;
@@ -22,6 +23,10 @@ final class MediaSourceLauncher {
             if (!snapshot.ownerPackage.isBlank() && launchPackage(snapshot.ownerPackage)) return true;
             return launchMusicSelector();
         }
+        if (source == MediaSource.Id.CPAA) {
+            if (!snapshot.ownerPackage.isBlank() && launchPackage(snapshot.ownerPackage)) return true;
+            return launchPackage(CARPLAY_PACKAGE);
+        }
         if (source == MediaSource.Id.BT || source == MediaSource.Id.RADIO
                 || source == MediaSource.Id.USB) {
             if (launchOemMedia(source)) return true;
@@ -33,7 +38,8 @@ final class MediaSourceLauncher {
     static boolean canOpen(MediaSource.Id source) {
         MediaSource.Id display = source.displayId();
         return display == MediaSource.Id.BT || display == MediaSource.Id.RADIO
-                || display == MediaSource.Id.USB || display == MediaSource.Id.ONLINE;
+                || display == MediaSource.Id.USB || display == MediaSource.Id.ONLINE
+                || display == MediaSource.Id.CPAA;
     }
 
     static String oemJumpView(MediaSource.Id source) {

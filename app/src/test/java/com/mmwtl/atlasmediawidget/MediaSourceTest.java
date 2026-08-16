@@ -14,12 +14,12 @@ public class MediaSourceTest {
         assertEquals(MediaSource.Id.UNKNOWN, MediaSource.Id.fromWire(null));
     }
 
-    @Test public void widgetChoicesAreLimitedToFourUserFacingSources() {
+    @Test public void widgetChoicesIncludePhoneProjectionAsTheFifthSource() {
         assertEquals(true, MediaSource.Id.BT.isWidgetChoice());
         assertEquals(true, MediaSource.Id.RADIO.isWidgetChoice());
         assertEquals(true, MediaSource.Id.USB.isWidgetChoice());
         assertEquals(true, MediaSource.Id.ONLINE.isWidgetChoice());
-        assertEquals(false, MediaSource.Id.CPAA.isWidgetChoice());
+        assertEquals(true, MediaSource.Id.CPAA.isWidgetChoice());
         assertEquals(false, MediaSource.Id.YUNTING.isWidgetChoice());
     }
 
@@ -32,7 +32,7 @@ public class MediaSourceTest {
         assertEquals(true, MediaSourceLauncher.canOpen(MediaSource.Id.RADIO));
         assertEquals(true, MediaSourceLauncher.canOpen(MediaSource.Id.YUNTING));
         assertEquals(false, MediaSourceLauncher.canOpen(MediaSource.Id.UNKNOWN));
-        assertEquals(false, MediaSourceLauncher.canOpen(MediaSource.Id.CPAA));
+        assertEquals(true, MediaSourceLauncher.canOpen(MediaSource.Id.CPAA));
     }
 
     @Test public void oemMediaJumpTargetsMatchTheStockWidget() {

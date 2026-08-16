@@ -36,8 +36,8 @@ final class MediaCardView extends FrameLayout {
 
     private static final int PROGRESS_MAX = 10_000;
     private static final MediaSource.Id[] WIDGET_SOURCES = {
-            MediaSource.Id.BT, MediaSource.Id.RADIO,
-            MediaSource.Id.USB, MediaSource.Id.ONLINE
+            MediaSource.Id.RADIO, MediaSource.Id.BT,
+            MediaSource.Id.USB, MediaSource.Id.ONLINE, MediaSource.Id.CPAA
     };
 
     private final Listener listener;
@@ -247,7 +247,9 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.setPadding(d(12), d(10), d(12), d(10));
         sourceChooser.setBackground(pillBackground(context, 0xF0191D23, 0x77596872, d(22)));
         sourceOptions = new GridLayout(context);
-        sourceOptions.setColumnCount(2);
+        // Six logical columns allow a 2 + 3 layout: two wide choices on top and three
+        // equal choices below without nesting another layout hierarchy.
+        sourceOptions.setColumnCount(6);
         sourceOptions.setRowCount(2);
         sourceOptions.setUseDefaultMargins(false);
         sourceChooser.addView(sourceOptions, match());
@@ -611,8 +613,12 @@ final class MediaCardView extends FrameLayout {
                 hideSourceChooser();
                 listener.onSource(id);
             });
+            boolean topRow = index < 2;
+            int column = topRow ? index * 3 : (index - 2) * 2;
+            int columnSpan = topRow ? 3 : 2;
             GridLayout.LayoutParams params = new GridLayout.LayoutParams(
-                    GridLayout.spec(index / 2, 1f), GridLayout.spec(index % 2, 1f));
+                    GridLayout.spec(topRow ? 0 : 1, 1, 1f),
+                    GridLayout.spec(column, columnSpan, 1f));
             params.width = 0;
             params.height = 0;
             params.setGravity(Gravity.FILL);

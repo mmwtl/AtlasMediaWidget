@@ -30,6 +30,7 @@ final class SourceGlyphView extends View {
             case RADIO -> drawRadio(canvas);
             case USB -> drawUsb(canvas);
             case ONLINE -> drawOnline(canvas);
+            case CPAA -> drawPhoneProjection(canvas);
             default -> drawNote(canvas);
         }
     }
@@ -118,5 +119,20 @@ final class SourceGlyphView extends View {
         canvas.drawLine(w * 0.18f, cy, w * 0.82f, cy, paint);
         canvas.drawArc(w * 0.2f, h * 0.32f, w * 0.8f, h * 0.76f, 200f, 140f, false, paint);
         canvas.drawArc(w * 0.2f, h * 0.32f, w * 0.8f, h * 0.76f, 20f, 140f, false, paint);
+    }
+
+    private void drawPhoneProjection(Canvas canvas) {
+        float w = getWidth();
+        float h = getHeight();
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(Math.max(2f, w * 0.075f));
+        canvas.drawRoundRect(w * 0.18f, h * 0.09f, w * 0.64f, h * 0.91f,
+                w * 0.09f, w * 0.09f, paint);
+        canvas.drawLine(w * 0.35f, h * 0.18f, w * 0.47f, h * 0.18f, paint);
+        canvas.drawCircle(w * 0.41f, h * 0.8f, w * 0.025f, paint);
+        canvas.drawArc(w * 0.48f, h * 0.27f, w * 0.83f, h * 0.67f,
+                -70f, 140f, false, paint);
+        canvas.drawArc(w * 0.55f, h * 0.35f, w * 0.75f, h * 0.59f,
+                -70f, 140f, false, paint);
     }
 }

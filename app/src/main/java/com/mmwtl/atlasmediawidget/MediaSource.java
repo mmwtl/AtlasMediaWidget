@@ -25,13 +25,13 @@ final class MediaSource {
                 case ONLINE -> "Онлайн";
                 case OTHER -> "Другое";
                 case YUNTING -> "Yunting";
-                case CPAA -> "CarPlay";
+                case CPAA -> "CarPlay / Android Auto";
                 default -> "Неизвестно";
             };
         }
 
         boolean isWidgetChoice() {
-            return this == BT || this == RADIO || this == USB || this == ONLINE;
+            return this == BT || this == RADIO || this == USB || this == ONLINE || this == CPAA;
         }
 
         Id displayId() {
