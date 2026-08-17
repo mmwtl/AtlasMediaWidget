@@ -5,9 +5,10 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
 public class MediaBridgeContractTest {
-    @Test public void protocolV1ConstantsMatchGInputBridgeMediaapi() {
-        assertEquals("com.salat.gbinder.media.BIND", MediaBridgeContract.SERVICE_ACTION);
-        assertEquals("com.salat.gbinder.media.bridge.MediaBridgeService",
+    @Test public void protocolV1ConstantsMatchAtlasMediaApi() {
+        assertEquals("com.mmwtl.atlasmediaapi.media.BIND", MediaBridgeContract.SERVICE_ACTION);
+        assertEquals("com.mmwtl.atlasmediaapi", MediaBridgeContract.SERVICE_PACKAGE);
+        assertEquals("com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService",
                 MediaBridgeContract.SERVICE_CLASS);
         assertEquals(1, MediaBridgeContract.VERSION);
         assertEquals(1, MediaBridgeContract.REGISTER);

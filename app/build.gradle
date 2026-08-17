@@ -2,8 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
-def appVersionCode = 36
-def appVersionName = '1.1.6'
+def appVersionCode = 37
+def appVersionName = '1.1.7'
 def branchName = providers.exec {
     commandLine('git', 'branch', '--show-current')
 }.standardOutput.asText.get().trim()
@@ -12,9 +12,13 @@ def safeBranchName = { String value ->
             .replaceAll(/^[.-]+|[.-]+$/, '')
     sanitized.isEmpty() ? 'detached' : sanitized
 }
+def effectiveBranchSuffix = { String branch ->
+    if (branch == 'self-api' || branch == 'self') return 'self'
+    return safeBranchName(branch)
+}
 def effectiveVersionName = branchName == 'main'
         ? appVersionName
-        : "${appVersionName}-${safeBranchName(branchName)}"
+        : "${appVersionName}-${effectiveBranchSuffix(branchName)}"
 def secureSigningScript = providers.gradleProperty('secure.signing').orNull
 def secureSigningFile = secureSigningScript == null ? null : rootProject.file(secureSigningScript)
 

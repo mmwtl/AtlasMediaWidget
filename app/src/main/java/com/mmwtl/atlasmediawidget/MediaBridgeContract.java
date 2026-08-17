@@ -1,9 +1,9 @@
 package com.mmwtl.atlasmediawidget;
 
 final class MediaBridgeContract {
-    static final String SERVICE_ACTION = "com.salat.gbinder.media.BIND";
-    static final String SERVICE_PACKAGE = "com.salat.gbinder";
-    static final String SERVICE_CLASS = "com.salat.gbinder.media.bridge.MediaBridgeService";
+    static final String SERVICE_ACTION = "com.mmwtl.atlasmediaapi.media.BIND";
+    static final String SERVICE_PACKAGE = "com.mmwtl.atlasmediaapi";
+    static final String SERVICE_CLASS = "com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService";
     static final int VERSION = 1;
 
     static final int REGISTER = 1;

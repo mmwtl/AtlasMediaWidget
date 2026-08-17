@@ -8,9 +8,8 @@ These instructions apply to the entire repository.
 
 AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait automotive head
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
-proven shell and lifecycle approach from AtlasAppWidget. GInputBridge is installed on the target
-head unit and its versioned bound-service API is the primary media backend. Its legacy broadcast
-API is a compatibility and diagnostics path, not the target transport for the full media UI.
+proven shell and lifecycle approach from AtlasAppWidget. AtlasMediaApi (`com.mmwtl.atlasmediaapi`)
+is installed on the target head unit and its versioned bound-service API is the primary media backend.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -22,11 +21,10 @@ provider has been demonstrated on the real head unit.
 
 - Keep confirmed device behavior, Android API facts, and implementation assumptions visibly
   separate in documentation and reviews.
-- Treat the `mediaapi` branch of `../GInputBridge` as the source of truth for its Messenger and
-  legacy broadcast contracts. Do not infer keys or behavior from UI text alone; verify them against
-  `MediaBridgeContract.kt`, the service implementation and the sender/receiver code.
-- Do not copy GInputBridge's `MediaSessionManager` collectors or its entire `com_geely` module into
-  this repository while its installed API satisfies the requirement.
+- Treat `/Users/wital/dev/AtlasMediaApi` as the source of truth for the Media Bridge protocol v1
+  Messenger contracts. Verify them against `MediaBridgeContract.kt`.
+- Do not copy backend collectors or vendor modules into this repository while the installed API
+  satisfies the requirement.
 - Treat the decompiled OEM APKs as firmware-specific evidence, not as a stable public API.
 - Target the tested Android 11 head unit first. Do not generalize OEM Binder behavior to other
   firmware versions without a device test.
@@ -46,14 +44,10 @@ provider has been demonstrated on the real head unit.
 
 ## Media-state behavior
 
-- Consume the versioned GInputBridge Media Bridge service through one adapter. Bind using an
+- Consume the versioned AtlasMediaApi Media Bridge service through one adapter. Bind using an
   explicit component, register a reply Messenger, accept only a compatible protocol version, and
   reconnect after Binder death with bounded backoff.
-- Keep the legacy `PLAYBACK_METADATA`, `PLAYBACK_STATE`, `AUDIO_SOURCE_CHANGED`, and
-  `REQUEST_PLAYBACK_INFO` broadcasts only as a temporary compatibility/diagnostics adapter.
-- Validate the required GInputBridge settings during setup: Media runtime, External API/Media
-  Bridge runtime, and notification access. Legacy `Send media session data`/`Broadcast intents`
-  settings are required only while the broadcast fallback is active. Report a specific missing
+- Validate the required AtlasMediaApi status during setup. Report a specific missing
   prerequisite instead of silently showing cached data.
 - The Media Bridge snapshot must include current and available sources, playback position,
   duration, speed, actions and a read-granted artwork URI. Keep fields optional where the active

@@ -192,8 +192,8 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams bridgeStatusParams = fullWrap();
         bridgeStatusParams.topMargin = Ui.dp(this, 10);
         bridgeCard.addView(bridgeStatus, bridgeStatusParams);
-        Button openBridge = actionButton("Открыть GInputBridge");
-        openBridge.setOnClickListener(v -> openGInputBridge());
+        Button openBridge = actionButton("Открыть Atlas Media API");
+        openBridge.setOnClickListener(v -> openAtlasMediaApi());
         bridgeCard.addView(openBridge, buttonParams());
 
         LinearLayout serviceCard = card();
@@ -600,8 +600,8 @@ public final class MainActivity extends ScaledActivity {
                 ? Ui.ACCENT : Ui.ERROR);
         boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
         bridgeStatus.setText(bridgeInstalled
-                ? "Пакет установлен. Требуется ветка mediaapi с protocol v1."
-                : "Пакет com.salat.gbinder не найден.");
+                ? "Пакет com.mmwtl.atlasmediaapi установлен."
+                : "Пакет com.mmwtl.atlasmediaapi не найден.");
         bridgeStatus.setTextColor(bridgeInstalled ? Ui.ACCENT : Ui.ERROR);
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
@@ -850,10 +850,10 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void openGInputBridge() {
+    private void openAtlasMediaApi() {
         Intent launch = getPackageManager().getLaunchIntentForPackage(MediaBridgeContract.SERVICE_PACKAGE);
         if (launch == null) {
-            Toast.makeText(this, "GInputBridge не установлен", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Atlas Media API не установлен", Toast.LENGTH_SHORT).show();
             return;
         }
         startActivity(launch);

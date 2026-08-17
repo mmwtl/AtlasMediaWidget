@@ -1,12 +1,12 @@
-# Полный Media Bridge между GInputBridge и AtlasMediaWidget
+# Полный Media Bridge между AtlasMediaApi и AtlasMediaWidget
 
-Документ синхронизирован с реализацией GInputBridge в ветке `mediaapi`, protocol v1. Источник
-истины для wire-формата — `GInputBridge/docs/atlas-media-bridge.md` и
-`MediaBridgeContract.kt` той же ветки.
+Документ синхронизирован с реализацией AtlasMediaApi, protocol v1. Источник
+истины для wire-формата — `AtlasMediaApi/docs/atlas-media-bridge-v1.md` и
+`MediaBridgeContract.kt`.
 
 ## Разделение ответственности
 
-GInputBridge — единственный медиабэкенд: выбирает активную сессию, объединяет `MediaController` с
+AtlasMediaApi — автономный медиабэкенд: выбирает активную сессию, объединяет `MediaController` с
 OneOS MediaCenter, определяет источники, выполняет команды и нормализует обложки.
 AtlasMediaWidget — UI-клиент: показывает atomic snapshot, экстраполирует progress, управляет
 overlay, переподключается после Binder death и отправляет команды.
@@ -19,16 +19,16 @@ OneOS Binder, `NotificationListenerService` и вторая логика выб�
 Используется explicit bind:
 
 ```text
-action    = com.salat.gbinder.media.BIND
-package   = com.salat.gbinder
-component = com.salat.gbinder/com.salat.gbinder.media.bridge.MediaBridgeService
+action    = com.mmwtl.atlasmediaapi.media.BIND
+package   = com.mmwtl.atlasmediaapi
+component = com.mmwtl.atlasmediaapi/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService
 ```
 
 Service exported и намеренно открыт: permission, package allowlist и проверка signing certificate
 отсутствуют. Любой установленный APK может читать snapshots/artwork и отправлять команды. Это
 приемлемо только при принятом условии, что ГУ изолирована и владелец контролирует все установки.
 
-`Message.sendingUid` используется GInputBridge только для получения package names, которым
+`Message.sendingUid` используется AtlasMediaApi только для получения package names, которым
 выдаётся временный read grant на artwork URI. Он не является проверкой доступа.
 
 Оставлять explicit component всё равно нужно: он исключает implicit resolution не того сервиса.
@@ -37,9 +37,9 @@ Service exported и намеренно открыт: permission, package allowli
 ## Messenger protocol v1
 
 Каждое client message содержит `protocolVersion: Int = 1`. `replyTo` обязателен для register,
-snapshot request и command. Поддерживаемый диапазон GInputBridge сейчас `[1,1]`.
+snapshot request и command. Поддерживаемый диапазон AtlasMediaApi сейчас `[1,1]`.
 
-Client → GInputBridge:
+Client → AtlasMediaApi:
 
 | `what` | Имя | Поля |
 |---:|---|---|
@@ -48,7 +48,7 @@ Client → GInputBridge:
 | 3 | `GET_SNAPSHOT` | `protocolVersion`, optional `requestId`, `replyTo` |
 | 4 | `COMMAND` | `protocolVersion`, непустой `requestId`, `command`, аргументы, `replyTo` |
 
-GInputBridge → client:
+AtlasMediaApi → client:
 
 | `what` | Имя | Назначение |
 |---:|---|---|
@@ -70,7 +70,7 @@ GInputBridge → client:
 - `duration`, `position`, `updateElapsedRealtime`, `speed`;
 - `playbackState`, `playbackErrorCode`, `playbackErrorMessage`, `playbackActions`;
 - нормализованный `capabilities`;
-- GInputBridge-owned `artworkUri` и `artworkRevision`.
+- AtlasMediaApi-owned `artworkUri` и `artworkRevision`.
 
 Неизвестные `duration` и `position` равны `-1`, а не `0`. `timestamp` использует wall clock;
 позиция привязана к монотонному `SystemClock.elapsedRealtime()`.
@@ -101,7 +101,7 @@ CarPlay владеет media keys; переключение source разреш�
 
 Для Radio next/previous означают поиск станции, для media — смену трека. AtlasMediaWidget не должен
 делать собственный fallback через `MediaController`: hardware keys и IPC уже используют единый
-`MediaCommandRouter` GInputBridge.
+`MediaCommandRouter` AtlasMediaApi.
 
 `COMMAND_RESULT` содержит `requestId`, `status`, `message`, `generation`. Статусы v1:
 
@@ -122,7 +122,7 @@ CarPlay владеет media keys; переключение source разреш�
 
 ## Progress
 
-GInputBridge не отправляет position каждую секунду. Только при `PLAYING` клиент вычисляет:
+AtlasMediaApi не отправляет position каждую секунду. Только при `PLAYING` клиент вычисляет:
 
 ```text
 estimated = position
@@ -135,7 +135,7 @@ estimated = position
 
 ## Artwork
 
-GInputBridge читает доступный bitmap/URI, уменьшает максимальную сторону до 512 px, сохраняет JPEG
+AtlasMediaApi читает доступный bitmap/URI, уменьшает максимальную сторону до 512 px, сохраняет JPEG
 в private cache и публикует собственный `content://` FileProvider URI. Bitmap через Messenger не
 передаётся. При unregister/Binder death URI grant отзывается.
 

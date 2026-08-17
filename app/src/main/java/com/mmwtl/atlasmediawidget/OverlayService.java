@@ -665,7 +665,7 @@ public final class OverlayService extends Service
     private String stateDetail() {
         return switch (bridgeState) {
             case CONNECTING, REGISTERING -> getString(R.string.bridge_connecting);
-            case INCOMPATIBLE -> "Несовместимая версия GInputBridge mediaapi";
+            case INCOMPATIBLE -> "Несовместимая версия Atlas Media API";
             default -> getString(R.string.bridge_disconnected);
         };
     }

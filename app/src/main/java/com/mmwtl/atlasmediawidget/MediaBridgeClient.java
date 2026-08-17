@@ -56,35 +56,35 @@ final class MediaBridgeClient {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            handleConnectionLoss("GInputBridge service disconnected");
+            handleConnectionLoss("Atlas Media API service disconnected");
         }
 
         @Override
         public void onBindingDied(ComponentName name) {
-            handleConnectionLoss("GInputBridge binding died");
+            handleConnectionLoss("Atlas Media API binding died");
         }
 
         @Override
         public void onNullBinding(ComponentName name) {
-            handleConnectionLoss("GInputBridge returned a null binding");
+            handleConnectionLoss("Atlas Media API returned a null binding");
         }
     };
 
     private final Runnable bindTimeout = () -> {
         if (connectionState.is(BridgeConnectionState.Phase.BINDING)) {
-            handleConnectionLoss("Таймаут подключения к GInputBridge");
+            handleConnectionLoss("Таймаут подключения к Atlas Media API");
         }
     };
 
     private final Runnable registerTimeout = () -> {
         if (connectionState.is(BridgeConnectionState.Phase.REGISTERING)) {
-            handleConnectionLoss("Таймаут регистрации GInputBridge mediaapi");
+            handleConnectionLoss("Таймаут регистрации Atlas Media API");
         }
     };
 
     private final Runnable snapshotTimeout = () -> {
         if (connectionState.is(BridgeConnectionState.Phase.WAITING_SNAPSHOT)) {
-            handleConnectionLoss("Таймаут первого snapshot GInputBridge");
+            handleConnectionLoss("Таймаут первого snapshot Atlas Media API");
         }
     };
 
@@ -183,11 +183,11 @@ final class MediaBridgeClient {
         try {
             accepted = context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
         } catch (RuntimeException error) {
-            AppLog.warn("Cannot bind GInputBridge media service", error);
+            AppLog.warn("Cannot bind Atlas Media API service", error);
             accepted = false;
         }
         if (!accepted) {
-            notifyState(State.DISCONNECTED, "GInputBridge mediaapi не установлен или недоступен");
+            notifyState(State.DISCONNECTED, "Atlas Media API не установлен или недоступен");
             scheduleRebind(connectionState.onDisconnected());
         } else {
             main.postDelayed(bindTimeout, ReconnectPolicy.BIND_TIMEOUT_MS);
@@ -247,7 +247,7 @@ final class MediaBridgeClient {
         target.post(() -> {
             if (!connectionState.canSend() || remote == null) {
                 if (what == MediaBridgeContract.COMMAND) {
-                    postCommandResult(requestId, 5, "GInputBridge не подключён", 0L);
+                    postCommandResult(requestId, 5, "Atlas Media API не подключён", 0L);
                 }
                 return;
             }
@@ -276,7 +276,7 @@ final class MediaBridgeClient {
             target.send(message);
         } catch (RemoteException error) {
             AppLog.warn("Media Bridge send failed", error);
-            handleConnectionLoss("Ошибка Binder GInputBridge");
+            handleConnectionLoss("Ошибка Binder Atlas Media API");
         }
     }
 
