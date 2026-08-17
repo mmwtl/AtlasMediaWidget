@@ -19,6 +19,8 @@ final class ArtworkLoader {
     // megabytes in the app heap for a single cover.
     private static final int MAX_DECODE_DIMENSION_PX = 1440;
     private static final long MAX_DECODE_PIXELS = 2_000_000L;
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 250L;
 
     interface Listener {
         void onArtwork(long token, Bitmap bitmap);
@@ -47,34 +49,54 @@ final class ArtworkLoader {
             });
             return token;
         }
-        executor.execute(() -> {
-            Bitmap bitmap = null;
-            try {
-                BitmapFactory.Options bounds = new BitmapFactory.Options();
-                bounds.inJustDecodeBounds = true;
-                try (InputStream input = open(artwork)) {
-                    if (input != null) BitmapFactory.decodeStream(input, null, bounds);
-                }
-                if (bounds.outWidth > 0 && bounds.outHeight > 0) {
-                    BitmapFactory.Options options = new BitmapFactory.Options();
-                    options.inSampleSize = calculateInSampleSize(
-                            bounds.outWidth, bounds.outHeight);
-                    options.inScaled = false;
-                    bitmap = decode(artwork, options);
-                }
-            } catch (OutOfMemoryError error) {
-                // The bounds/sample guard should make this exceptional. Keep the service alive if
-                // a provider changes its stream between the bounds and decode passes.
-                AppLog.warn("Cannot allocate media artwork bitmap", error);
-            } catch (Exception error) {
-                AppLog.warn("Cannot decode media artwork", error);
-            }
-            Bitmap result = bitmap;
-            main.post(() -> {
-                if (activeToken.get() == token) listener.onArtwork(token, result);
-            });
-        });
+        decodeAsync(artwork, token, 1);
         return token;
+    }
+
+    private void decodeAsync(ArtworkRef artwork, long token, int attempt) {
+        if (activeToken.get() != token) return;
+        try {
+            executor.execute(() -> {
+                Bitmap result = decodeOnce(artwork);
+                if (result == null && attempt < MAX_ATTEMPTS
+                        && activeToken.get() == token) {
+                    main.postDelayed(() -> decodeAsync(artwork, token, attempt + 1),
+                            RETRY_DELAY_MS * attempt);
+                    return;
+                }
+                main.post(() -> {
+                    if (activeToken.get() == token) {
+                        listener.onArtwork(token, result);
+                    } else if (result != null) {
+                        result.recycle();
+                    }
+                });
+            });
+        } catch (RuntimeException error) {
+            AppLog.warn("Cannot schedule media artwork decode", error);
+        }
+    }
+
+    private Bitmap decodeOnce(ArtworkRef artwork) {
+        try {
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            try (InputStream input = open(artwork)) {
+                if (input != null) BitmapFactory.decodeStream(input, null, bounds);
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight);
+            options.inScaled = false;
+            return decode(artwork, options);
+        } catch (OutOfMemoryError error) {
+            // The bounds/sample guard should make this exceptional. Keep the service alive if
+            // a provider changes its stream between the bounds and decode passes.
+            AppLog.warn("Cannot allocate media artwork bitmap", error);
+        } catch (Exception error) {
+            AppLog.warn("Cannot decode media artwork", error);
+        }
+        return null;
     }
 
     private Bitmap decode(ArtworkRef artwork, BitmapFactory.Options options) throws Exception {

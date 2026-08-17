@@ -1,5 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
+import android.net.Uri;
+
 final class ArtworkRef {
     enum Kind { NONE, CONTENT_URI, ASSET, FILE }
 
@@ -16,6 +18,16 @@ final class ArtworkRef {
     static ArtworkRef contentUri(String value) {
         return value == null || value.isBlank()
                 ? NONE : new ArtworkRef(Kind.CONTENT_URI, value);
+    }
+
+    static ArtworkRef mediaUri(String value) {
+        if (value == null || value.isBlank()) return NONE;
+        Uri uri = Uri.parse(value);
+        if (uri.getScheme() == null) return file(value);
+        if ("file".equalsIgnoreCase(uri.getScheme())) {
+            return file(uri.getPath());
+        }
+        return contentUri(value);
     }
 
     static ArtworkRef asset(String value) {

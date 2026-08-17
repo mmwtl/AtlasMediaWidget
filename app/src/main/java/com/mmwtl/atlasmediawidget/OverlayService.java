@@ -513,7 +513,7 @@ public final class OverlayService extends Service
 
     @Override public void onArtwork(long token, android.graphics.Bitmap bitmap) {
         if (token != expectedArtworkToken) return;
-        if (card != null && card.isAttachedToWindow()) card.setArtwork(bitmap);
+        if (card != null) card.setArtwork(bitmap);
     }
 
     private void showCard() {
@@ -534,6 +534,8 @@ public final class OverlayService extends Service
                     AppLog.info("Overlay card reattached in "
                             + (SystemClock.elapsedRealtime() - createdAt) + " ms");
                     renderCurrent();
+                    MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+                    if (visible != null) loadArtwork(visible);
                     main.removeCallbacks(progressTick);
                     main.post(progressTick);
                     scheduleSnapshotReconcile();
@@ -671,7 +673,7 @@ public final class OverlayService extends Service
     private void loadArtwork(MediaSnapshot snapshot) {
         RadioDisplay radioDisplay = radioCatalog.display(snapshot);
         ArtworkRef artwork = radioDisplay == null
-                ? ArtworkRef.contentUri(snapshot.artworkUri)
+                ? ArtworkRef.mediaUri(snapshot.artworkUri)
                 : prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true)
                         ? radioDisplay.artwork : ArtworkRef.NONE;
         String artworkKey = artwork.cacheKey();
