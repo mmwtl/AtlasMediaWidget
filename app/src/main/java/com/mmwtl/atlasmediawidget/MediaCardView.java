@@ -15,7 +15,6 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
-import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -55,7 +54,7 @@ final class MediaCardView extends FrameLayout {
     private final SourceGlyphView sourceGlyph;
     private final TextView sourceLabel;
     private final FrameLayout sourceChooser;
-    private final GridLayout sourceOptions;
+    private final LinearLayout sourceOptions;
     private final TextView statusPill;
     private final LinearLayout metadata;
     private final TextView title;
@@ -246,12 +245,8 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.setClickable(true);
         sourceChooser.setPadding(d(12), d(10), d(12), d(10));
         sourceChooser.setBackground(pillBackground(context, 0xF0191D23, 0x77596872, d(22)));
-        sourceOptions = new GridLayout(context);
-        // Six logical columns allow a 2 + 3 layout: two wide choices on top and three
-        // equal choices below without nesting another layout hierarchy.
-        sourceOptions.setColumnCount(6);
-        sourceOptions.setRowCount(2);
-        sourceOptions.setUseDefaultMargins(false);
+        sourceOptions = new LinearLayout(context);
+        sourceOptions.setOrientation(LinearLayout.VERTICAL);
         sourceChooser.addView(sourceOptions, match());
         sourceChooser.setOnClickListener(v -> hideSourceChooser());
         addView(sourceChooser);
@@ -586,6 +581,12 @@ final class MediaCardView extends FrameLayout {
 
     private void rebuildSourceOptions() {
         sourceOptions.removeAllViews();
+        LinearLayout topRow = sourceRow();
+        LinearLayout bottomRow = sourceRow();
+        sourceOptions.addView(topRow, new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, 1f));
+        sourceOptions.addView(bottomRow, new LinearLayout.LayoutParams(
+                LayoutParams.MATCH_PARENT, 0, 1f));
         for (int index = 0; index < availableSources.size(); index++) {
             MediaSource source = availableSources.get(index);
             MediaSource.Id id = source.id.displayId();
@@ -613,18 +614,18 @@ final class MediaCardView extends FrameLayout {
                 hideSourceChooser();
                 listener.onSource(id);
             });
-            boolean topRow = index < 2;
-            int column = topRow ? index * 3 : (index - 2) * 2;
-            int columnSpan = topRow ? 3 : 2;
-            GridLayout.LayoutParams params = new GridLayout.LayoutParams(
-                    GridLayout.spec(topRow ? 0 : 1, 1, 1f),
-                    GridLayout.spec(column, columnSpan, 1f));
-            params.width = 0;
-            params.height = 0;
-            params.setGravity(Gravity.FILL);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, LayoutParams.MATCH_PARENT, 1f);
             params.setMargins(d(5), d(5), d(5), d(5));
-            sourceOptions.addView(option, params);
+            (index < 2 ? topRow : bottomRow).addView(option, params);
         }
+    }
+
+    private LinearLayout sourceRow() {
+        LinearLayout row = new LinearLayout(getContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        return row;
     }
 
     private void toggleSourceChooser() {
