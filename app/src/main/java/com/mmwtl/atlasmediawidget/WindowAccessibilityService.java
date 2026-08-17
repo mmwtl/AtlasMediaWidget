@@ -83,13 +83,6 @@ public final class WindowAccessibilityService extends AccessibilityService {
         if (relevant) {
             String eventPackage = text(event.getPackageName());
             String eventClass = text(event.getClassName());
-            if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-                    && HeadUnitWindowRules.forceHide(eventPackage, eventClass)) {
-                // These firmware-specific activities are known to represent a fullscreen shell
-                // transition. Hide immediately; the regular window snapshot still runs to
-                // reconcile the complete state and to decide when HOME can be shown again.
-                OverlayService.onAccessibilityForceHide(eventPackage, eventClass);
-            }
             boolean passiveOwnWindow = getPackageName().equals(eventPackage)
                     && (eventClass.isEmpty() || eventClass.startsWith("android."));
             if (!eventPackage.isEmpty() && !passiveOwnWindow) {

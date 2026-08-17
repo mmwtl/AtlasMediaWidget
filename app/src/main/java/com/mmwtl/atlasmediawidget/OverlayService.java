@@ -382,18 +382,6 @@ public final class OverlayService extends Service
         }
     }
 
-    static void onAccessibilityForceHide(String packageName, String className) {
-        OverlayService service = instance;
-        if (service != null && !service.destroyed) {
-            service.main.post(() -> {
-                if (service.destroyed) return;
-                AppLog.info("Fast hide requested for " + packageName + "/" + className);
-                service.hideCard();
-                service.updateNotification(0);
-            });
-        }
-    }
-
     @Override public void onBridgeState(MediaBridgeClient.State state, String detail) {
         bridgeState = state;
         if (state == MediaBridgeClient.State.CONNECTED) {
@@ -529,11 +517,36 @@ public final class OverlayService extends Service
     }
 
     private void showCard() {
-        if (card != null && card.isAttachedToWindow()) {
-            return;
+        if (windowManager == null) {
+            windowManager = getSystemService(WindowManager.class);
         }
-        card = null;
-        cardParams = null;
+        if (card != null) {
+            if (card.isAttachedToWindow()) {
+                card.setVisibility(View.VISIBLE);
+                return;
+            }
+            if (cardParams != null) {
+                Rect bounds = availableBounds();
+                clampPosition(cardParams, card, bounds);
+                try {
+                    card.setVisibility(View.VISIBLE);
+                    windowManager.addView(card, cardParams);
+                    AppLog.info("Overlay card reattached in "
+                            + (SystemClock.elapsedRealtime() - createdAt) + " ms");
+                    renderCurrent();
+                    main.removeCallbacks(progressTick);
+                    main.post(progressTick);
+                    scheduleSnapshotReconcile();
+                    return;
+                } catch (SecurityException | WindowManager.BadTokenException
+                         | IllegalArgumentException | IllegalStateException error) {
+                    AppLog.warn("Cannot reattach cached overlay window", error);
+                    discardCard();
+                }
+            } else {
+                discardCard();
+            }
+        }
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkKey = "";
         Rect bounds = availableBounds();
@@ -578,8 +591,7 @@ public final class OverlayService extends Service
             main.post(progressTick);
             scheduleSnapshotReconcile();
         } catch (SecurityException | WindowManager.BadTokenException error) {
-            card = null;
-            cardParams = null;
+            discardCard();
             AppLog.warn("Cannot attach media overlay", error);
         }
     }
@@ -588,25 +600,27 @@ public final class OverlayService extends Service
         main.removeCallbacks(progressTick);
         main.removeCallbacks(snapshotReconcile);
         if (card == null || windowManager == null) return;
-        if (!card.isAttachedToWindow()) {
-            card = null;
-            cardParams = null;
-            return;
-        }
         MediaCardView target = card;
         target.animate().cancel();
         target.setAlpha(1f);
         target.setScaleX(1f);
         target.setScaleY(1f);
         target.setTranslationY(0f);
+        // Keep the view reference and its LayoutParams. During a WindowManager traversal
+        // isAttachedToWindow() can briefly be false while the window is still registered;
+        // discarding the reference here can leave an orphaned window and add a second card on
+        // the next HOME check. This mirrors the working AtlasAppWidget behavior.
+        target.setVisibility(View.GONE);
         removeCardView(target);
-        card = null;
-        cardParams = null;
     }
 
     private void hideCardImmediately() {
         main.removeCallbacks(progressTick);
         main.removeCallbacks(snapshotReconcile);
+        discardCard();
+    }
+
+    private void discardCard() {
         if (card != null) {
             card.animate().cancel();
             removeCardView(card);
