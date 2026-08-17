@@ -53,6 +53,7 @@ public final class OverlayService extends Service
     private final TransportSnapshotGuard transportSnapshotGuard = new TransportSnapshotGuard();
     private final OnlineSnapshotStabilizer onlineSnapshotStabilizer =
             new OnlineSnapshotStabilizer();
+    private final CardSuppressionPolicy cardSuppression = new CardSuppressionPolicy();
     private Prefs prefs;
     private WindowManager windowManager;
     private ForegroundAppDetector foregroundDetector;
@@ -74,6 +75,7 @@ public final class OverlayService extends Service
     private int notificationState = -1;
     private boolean foregroundQueryInFlight;
     private boolean visibilityCheckPending;
+    private boolean visibilityCheckPendingFast;
     private long visibilityRequestGeneration;
     private boolean deviceWasReady;
     private boolean visibilityReceiverRegistered;
@@ -116,57 +118,70 @@ public final class OverlayService extends Service
         }
     };
 
-    private final Runnable foregroundPoll = new Runnable() {
-        @Override public void run() {
-            if (destroyed) return;
-            if (!prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                stopSelf();
-                return;
-            }
-            if (!Settings.canDrawOverlays(OverlayService.this)
-                    || !ForegroundAppDetector.hasUsageAccess(OverlayService.this)
-                    || !AccessibilityWindowState.isEnabled(OverlayService.this)) {
-                hideCard();
-                updateNotification(2);
-                scheduleForegroundPoll(ForegroundPollPolicy.HIDDEN_DELAY_MS);
-                return;
-            }
-            ForegroundAppDetector detector = foregroundDetector();
-            boolean deviceReady = detector.isDeviceReady();
-            long now = SystemClock.elapsedRealtime();
-            if (deviceReady && !deviceWasReady) {
-                fastProbeUntil = now + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
-            }
-            deviceWasReady = deviceReady;
-            if (!deviceReady) {
-                hideCard();
-                updateNotification(0);
-                scheduleForegroundPoll(ForegroundPollPolicy.nextDelay(
-                        false, false, now, fastProbeUntil));
-                return;
-            }
-            if (foregroundQueryInFlight) {
-                visibilityCheckPending = true;
-                return;
-            }
-            foregroundQueryInFlight = true;
-            long queryGeneration = visibilityRequestGeneration;
-            try {
-                foregroundExecutor.execute(() -> {
-                    boolean homeVisible = false;
-                    try {
-                        homeVisible = detector.isHomeVisible();
-                    } catch (RuntimeException error) {
-                        AppLog.warn("HOME visibility query failed", error);
-                    }
-                    boolean result = homeVisible;
-                    main.post(() -> applyForegroundResult(result, queryGeneration));
-                });
-            } catch (RejectedExecutionException ignored) {
-                foregroundQueryInFlight = false;
-            }
+    private final Runnable foregroundPoll = () -> runVisibilityQuery(false);
+    private final Runnable accessibilityFastPoll = () -> runVisibilityQuery(true);
+
+    private void runVisibilityQuery(boolean accessibilityFast) {
+        if (destroyed) return;
+        if (!prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+            stopSelf();
+            return;
         }
-    };
+        if (!Settings.canDrawOverlays(OverlayService.this)
+                || !ForegroundAppDetector.hasUsageAccess(OverlayService.this)
+                || !AccessibilityWindowState.isEnabled(OverlayService.this)) {
+            hideCard();
+            updateNotification(2);
+            scheduleForegroundPoll(ForegroundPollPolicy.HIDDEN_DELAY_MS);
+            return;
+        }
+        ForegroundAppDetector detector = foregroundDetector();
+        boolean deviceReady = detector.isDeviceReady();
+        long now = SystemClock.elapsedRealtime();
+        if (deviceReady && !deviceWasReady) {
+            fastProbeUntil = now + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
+        }
+        deviceWasReady = deviceReady;
+        if (!deviceReady) {
+            hideCard();
+            updateNotification(0);
+            scheduleForegroundPoll(ForegroundPollPolicy.nextDelay(
+                    false, false, now, fastProbeUntil));
+            return;
+        }
+        if (foregroundQueryInFlight) {
+            if (!visibilityCheckPending) {
+                visibilityCheckPendingFast = accessibilityFast;
+            } else {
+                visibilityCheckPendingFast &= accessibilityFast;
+            }
+            visibilityCheckPending = true;
+            return;
+        }
+        foregroundQueryInFlight = true;
+        long queryGeneration = visibilityRequestGeneration;
+        try {
+            foregroundExecutor.execute(() -> {
+                boolean homeVisible = false;
+                try {
+                    if (accessibilityFast) {
+                        Boolean fastResult = detector.isHomeVisibleFromAccessibility();
+                        homeVisible = fastResult != null
+                                ? fastResult
+                                : detector.isHomeVisible();
+                    } else {
+                        homeVisible = detector.isHomeVisible();
+                    }
+                } catch (RuntimeException error) {
+                    AppLog.warn("HOME visibility query failed", error);
+                }
+                boolean result = homeVisible;
+                main.post(() -> applyForegroundResult(result, queryGeneration));
+            });
+        } catch (RejectedExecutionException ignored) {
+            foregroundQueryInFlight = false;
+        }
+    }
 
     private final Runnable progressTick = new Runnable() {
         @Override public void run() {
@@ -264,8 +279,10 @@ public final class OverlayService extends Service
         if (destroyed) return;
         foregroundQueryInFlight = false;
         if (visibilityCheckPending || queryGeneration != visibilityRequestGeneration) {
+            boolean fast = visibilityCheckPendingFast;
             visibilityCheckPending = false;
-            main.post(foregroundPoll);
+            visibilityCheckPendingFast = false;
+            main.post(fast ? accessibilityFastPoll : foregroundPoll);
             return;
         }
         if (!prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
@@ -273,33 +290,55 @@ public final class OverlayService extends Service
             return;
         }
         boolean deviceReady = foregroundDetector().isDeviceReady();
-        if (homeVisible && deviceReady) {
+        long now = SystemClock.elapsedRealtime();
+        cardSuppression.onVisibility(homeVisible, now);
+        boolean cardAllowed = cardSuppression.isCardAllowed(now);
+        if (homeVisible && deviceReady && cardAllowed) {
             showCard();
             updateNotification(1);
+        } else if (homeVisible && deviceReady) {
+            // Keep a visible card in place while the launched activity is still taking over.
+            // Remove it only after a non-HOME snapshot is confirmed.
+            updateNotification(card != null && card.isAttachedToWindow() ? 1 : 0);
         } else {
             hideCard();
             updateNotification(0);
         }
-        long now = SystemClock.elapsedRealtime();
         scheduleForegroundPoll(ForegroundPollPolicy.nextDelay(
-                homeVisible, deviceReady, now, fastProbeUntil));
+                homeVisible && cardAllowed, deviceReady, now, fastProbeUntil));
+        if (!cardAllowed && homeVisible) {
+            long remaining = Math.max(1L, cardSuppression.deadline() - now);
+            scheduleForegroundPoll(Math.min(
+                    remaining, ForegroundPollPolicy.VISIBLE_DELAY_MS));
+        }
     }
 
     private void requestImmediateVisibilityCheck() {
+        requestImmediateVisibilityCheck(false);
+    }
+
+    private void requestImmediateVisibilityCheck(boolean accessibilityEvent) {
         visibilityRequestGeneration++;
         fastProbeUntil = SystemClock.elapsedRealtime()
                 + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
         main.removeCallbacks(foregroundPoll);
+        main.removeCallbacks(accessibilityFastPoll);
         if (foregroundQueryInFlight) {
+            if (!visibilityCheckPending) {
+                visibilityCheckPendingFast = accessibilityEvent;
+            } else {
+                visibilityCheckPendingFast &= accessibilityEvent;
+            }
             visibilityCheckPending = true;
         } else {
-            main.post(foregroundPoll);
+            main.post(accessibilityEvent ? accessibilityFastPoll : foregroundPoll);
         }
     }
 
     private void scheduleForegroundPoll(long delayMs) {
         if (destroyed) return;
         main.removeCallbacks(foregroundPoll);
+        main.removeCallbacks(accessibilityFastPoll);
         main.postDelayed(foregroundPoll, delayMs);
     }
 
@@ -335,7 +374,11 @@ public final class OverlayService extends Service
     static void onAccessibilityWindowsChanged() {
         OverlayService service = instance;
         if (service != null && !service.destroyed) {
-            service.main.post(service::requestImmediateVisibilityCheck);
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                service.requestImmediateVisibilityCheck(true);
+            } else {
+                service.main.post(() -> service.requestImmediateVisibilityCheck(true));
+            }
         }
     }
 
@@ -474,6 +517,7 @@ public final class OverlayService extends Service
 
     @Override public void onOpenSource() {
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        cardSuppression.suppress(SystemClock.elapsedRealtime(), 1_500L);
         if (!mediaSourceLauncher.open(visible) && card != null) {
             card.showTransientStatus("Не удалось открыть источник", true);
         }

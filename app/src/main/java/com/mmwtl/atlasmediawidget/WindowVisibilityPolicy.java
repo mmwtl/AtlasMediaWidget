@@ -50,6 +50,16 @@ final class WindowVisibilityPolicy {
             return Decision.UNKNOWN;
         }
 
+        for (WindowObservation window : windows) {
+            if (window == null || !window.launcherAppListVisible
+                    || !homePackages.contains(window.packageName)) {
+                continue;
+            }
+            if (window.active || window.focused || window.packageName.equals(foregroundPackage)) {
+                return Decision.HOME_HIDDEN;
+            }
+        }
+
         boolean foregroundIsKnownHome = isHomeComponent(
                 foregroundPackage, foregroundClass, homeComponents);
 

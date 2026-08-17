@@ -3,6 +3,8 @@ package com.mmwtl.atlasmediawidget;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.Trace;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
@@ -24,6 +26,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /** Collects interactive windows and their screen bounds for the overlay visibility policy. */
 public final class WindowAccessibilityService extends AccessibilityService {
+    private static final long LAUNCHER_APP_LIST_REFRESH_MS = 250L;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService windowExecutor = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "atlas-accessibility-windows");
         thread.setDaemon(true);
@@ -43,7 +47,10 @@ public final class WindowAccessibilityService extends AccessibilityService {
     private volatile String lastEventClass = "";
     private volatile int lastEventWindowId = -1;
     private volatile boolean eventContextFresh;
+    private volatile boolean metadataRefreshRequested;
+    private volatile boolean launcherMetadataRefreshRequested;
     private volatile boolean destroyed;
+    private final Runnable launcherAppListRefresh = () -> requestRefresh(true, true);
 
     @Override
     protected void onServiceConnected() {
@@ -51,9 +58,12 @@ public final class WindowAccessibilityService extends AccessibilityService {
         AccessibilityServiceInfo info = getServiceInfo();
         if (info != null) {
             info.eventTypes = AccessibilityEvent.TYPE_WINDOWS_CHANGED
-                    | AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED;
+                    | AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    | AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    | AccessibilityEvent.TYPE_VIEW_SCROLLED;
             info.flags |= AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-                    | AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
+                    | AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+                    | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
             info.notificationTimeout = 50L;
             setServiceInfo(info);
         }
@@ -66,8 +76,11 @@ public final class WindowAccessibilityService extends AccessibilityService {
         if (event == null) {
             return;
         }
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOWS_CHANGED
-                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        boolean relevant = event.getEventType() == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                || event.getEventType() == AccessibilityEvent.TYPE_VIEW_SCROLLED;
+        if (relevant) {
             String eventPackage = text(event.getPackageName());
             String eventClass = text(event.getClassName());
             if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
@@ -94,8 +107,10 @@ public final class WindowAccessibilityService extends AccessibilityService {
             // The framework query is Binder-backed and can be slow on the head unit. Keep it
             // off the process main thread; the resulting immutable snapshot still triggers an
             // immediate overlay recheck.
-            eventGeneration.incrementAndGet();
-            requestRefresh();
+            requestRefresh(
+                    true,
+                    LauncherAllAppsViewDetector.isLauncherPackage(eventPackage)
+            );
         }
     }
 
@@ -106,6 +121,9 @@ public final class WindowAccessibilityService extends AccessibilityService {
     @Override
     public void onDestroy() {
         destroyed = true;
+        metadataRefreshRequested = false;
+        launcherMetadataRefreshRequested = false;
+        mainHandler.removeCallbacks(launcherAppListRefresh);
         windowExecutor.shutdownNow();
         metadataExecutor.shutdownNow();
         pendingMetadataWindowIds.clear();
@@ -116,7 +134,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
         super.onDestroy();
     }
 
-    private void refreshWindows(boolean scheduleMetadata) {
+    private void refreshWindows(boolean scheduleMetadata, boolean forceLauncherMetadata) {
         if (destroyed) {
             return;
         }
@@ -156,7 +174,13 @@ public final class WindowAccessibilityService extends AccessibilityService {
                         // waiting for a potentially slow root query. Prefer it for the active
                         // window, even when the root cache belongs to the previous Activity.
                         if (windowId == eventWindowId) {
-                            metadata = new WindowMetadata(eventPackage, eventClass);
+                            boolean appListVisible = metadata != null
+                                    && metadata.launcherAppListVisible;
+                            metadata = new WindowMetadata(
+                                    eventPackage,
+                                    eventClass,
+                                    appListVisible
+                            );
                             metadataCache.put(windowId, metadata);
                             eventWindowAssigned = true;
                             eventWindowPresent = true;
@@ -165,7 +189,13 @@ public final class WindowAccessibilityService extends AccessibilityService {
                     if (metadata == null) {
                         metadata = WindowMetadata.empty();
                     }
-                    if (scheduleMetadata && needsMetadata(metadata)) {
+                    boolean launcherWindow = LauncherAllAppsViewDetector.isLauncherPackage(
+                            metadata.packageName
+                    ) || (windowId == eventWindowId
+                            && LauncherAllAppsViewDetector.isLauncherPackage(eventPackage));
+                    if (scheduleMetadata && (needsMetadata(metadata)
+                            || (forceLauncherMetadata && launcherWindow
+                            && (active || focused || windowId == eventWindowId)))) {
                         windowsWithoutMetadata.add(windowId);
                     }
                     observations.add(new WindowObservation(
@@ -178,7 +208,8 @@ public final class WindowAccessibilityService extends AccessibilityService {
                             bounds.left,
                             bounds.top,
                             bounds.right,
-                            bounds.bottom
+                            bounds.bottom,
+                            metadata.launcherAppListVisible
                     ));
                 }
                 // Window IDs are not a lifecycle-managed cache key. Remove closed windows so a
@@ -205,6 +236,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
                         eventWindowPresent ? eventPackage : "",
                         eventWindowPresent ? eventClass : ""
                 );
+                scheduleLauncherAppListRefresh(hasVisibleLauncherAppList(observations));
             }
         } catch (RuntimeException error) {
             AccessibilityWindowState.markUnavailable();
@@ -282,7 +314,9 @@ public final class WindowAccessibilityService extends AccessibilityService {
             if (packageName.isEmpty() && className.isEmpty()) {
                 return null;
             }
-            return new WindowMetadata(packageName, className);
+            boolean appListVisible = LauncherAllAppsViewDetector.isLauncherPackage(packageName)
+                    && containsAllAppsMarker(root);
+            return new WindowMetadata(packageName, className, appListVisible);
         } catch (RuntimeException error) {
             AppLog.warnRateLimited(
                     "accessibility-window-root",
@@ -290,6 +324,10 @@ public final class WindowAccessibilityService extends AccessibilityService {
                     error
             );
             return null;
+        } finally {
+            if (root != null) {
+                recycle(root);
+            }
         }
     }
 
@@ -318,10 +356,21 @@ public final class WindowAccessibilityService extends AccessibilityService {
     }
 
     private void requestRefresh() {
-        requestRefresh(true);
+        requestRefresh(true, false);
     }
 
     private void requestRefresh(boolean scheduleMetadata) {
+        requestRefresh(scheduleMetadata, false);
+    }
+
+    private void requestRefresh(boolean scheduleMetadata, boolean forceLauncherMetadata) {
+        if (scheduleMetadata) {
+            metadataRefreshRequested = true;
+        }
+        if (forceLauncherMetadata) {
+            launcherMetadataRefreshRequested = true;
+        }
+        eventGeneration.incrementAndGet();
         if (destroyed || !refreshQueued.compareAndSet(false, true)) {
             return;
         }
@@ -331,7 +380,11 @@ public final class WindowAccessibilityService extends AccessibilityService {
                 try {
                     while (!destroyed) {
                         long generation = eventGeneration.get();
-                        refreshWindows(scheduleMetadata);
+                        boolean scheduleMetadataForSnapshot = metadataRefreshRequested;
+                        metadataRefreshRequested = false;
+                        boolean forceLauncherScan = launcherMetadataRefreshRequested;
+                        launcherMetadataRefreshRequested = false;
+                        refreshWindows(scheduleMetadataForSnapshot, forceLauncherScan);
                         consumedGeneration = eventGeneration.get();
                         if (generation == eventGeneration.get()) {
                             break;
@@ -355,6 +408,72 @@ public final class WindowAccessibilityService extends AccessibilityService {
         OverlayService.onAccessibilityWindowsChanged();
     }
 
+    private void scheduleLauncherAppListRefresh(boolean appListVisible) {
+        mainHandler.removeCallbacks(launcherAppListRefresh);
+        if (appListVisible && !destroyed) {
+            mainHandler.postDelayed(launcherAppListRefresh, LAUNCHER_APP_LIST_REFRESH_MS);
+        }
+    }
+
+    private static boolean hasVisibleLauncherAppList(List<WindowObservation> observations) {
+        for (WindowObservation observation : observations) {
+            if (observation != null && observation.launcherAppListVisible) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("deprecation")
+    private static void recycle(AccessibilityNodeInfo node) {
+        node.recycle();
+    }
+
+    @SuppressWarnings("deprecation")
+    private static boolean containsAllAppsMarker(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return false;
+        }
+        try {
+            if (!node.isVisibleToUser()) {
+                return false;
+            }
+            if (LauncherAllAppsViewDetector.isAllAppsMarker(
+                    text(node.getViewIdResourceName()),
+                    text(node.getClassName()),
+                    text(node.getText()))) {
+                return true;
+            }
+            int childCount = node.getChildCount();
+            for (int index = 0; index < childCount; index++) {
+                AccessibilityNodeInfo child = null;
+                try {
+                    child = node.getChild(index);
+                    if (containsAllAppsMarker(child)) {
+                        return true;
+                    }
+                } catch (RuntimeException error) {
+                    AppLog.warnRateLimited(
+                            "accessibility-app-list",
+                            "Cannot inspect launcher app-list node",
+                            error
+                    );
+                } finally {
+                    if (child != null) {
+                        recycle(child);
+                    }
+                }
+            }
+        } catch (RuntimeException error) {
+            AppLog.warnRateLimited(
+                    "accessibility-app-list",
+                    "Cannot inspect launcher app-list root",
+                    error
+            );
+        }
+        return false;
+    }
+
     private static String text(CharSequence value) {
         return value == null ? "" : value.toString();
     }
@@ -368,14 +487,16 @@ public final class WindowAccessibilityService extends AccessibilityService {
     private static final class WindowMetadata {
         final String packageName;
         final String className;
+        final boolean launcherAppListVisible;
 
-        WindowMetadata(String packageName, String className) {
+        WindowMetadata(String packageName, String className, boolean launcherAppListVisible) {
             this.packageName = text(packageName);
             this.className = text(className);
+            this.launcherAppListVisible = launcherAppListVisible;
         }
 
         static WindowMetadata empty() {
-            return new WindowMetadata("", "");
+            return new WindowMetadata("", "", false);
         }
     }
 }

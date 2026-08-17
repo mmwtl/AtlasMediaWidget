@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 
 final class ForegroundAppDetector {
+    private static final long FAST_ACCESSIBILITY_SNAPSHOT_MAX_AGE_MS = 2_000L;
     private final Context context;
     private final UsageStatsManager usageStatsManager;
     private final PowerManager powerManager;
@@ -70,9 +71,37 @@ final class ForegroundAppDetector {
         return usageStateAvailable && tracker.isAnyPackageVisible(homePackages);
     }
 
+    /**
+     * Resolves HOME from a recent Accessibility snapshot without starting a UsageStats query.
+     * A null result means that the snapshot is unavailable, stale, or ambiguous.
+     */
+    Boolean isHomeVisibleFromAccessibility() {
+        if (!isDeviceReady()) return Boolean.FALSE;
+        AccessibilityWindowState.Snapshot windowState = AccessibilityWindowState.current();
+        long snapshotAge = SystemClock.elapsedRealtime() - windowState.updatedAtElapsedRealtime;
+        if (!windowState.available
+                || windowState.updatedAtElapsedRealtime <= 0L
+                || snapshotAge > FAST_ACCESSIBILITY_SNAPSHOT_MAX_AGE_MS) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        if (homePackages.isEmpty() || now - lastHomeRefresh > 30_000L) {
+            refreshHomePackages();
+        }
+        WindowVisibilityPolicy.Decision decision = evaluateAccessibilitySnapshot(windowState);
+        if (decision == WindowVisibilityPolicy.Decision.UNKNOWN) return null;
+        return decision == WindowVisibilityPolicy.Decision.HOME_VISIBLE;
+    }
+
     private WindowVisibilityPolicy.Decision evaluateAccessibilitySnapshot() {
         AccessibilityWindowState.Snapshot windowState = AccessibilityWindowState.current();
         if (!windowState.available) return WindowVisibilityPolicy.Decision.UNKNOWN;
+        return evaluateAccessibilitySnapshot(windowState);
+    }
+
+    private WindowVisibilityPolicy.Decision evaluateAccessibilitySnapshot(
+            AccessibilityWindowState.Snapshot windowState
+    ) {
         return WindowVisibilityPolicy.evaluate(
                 windowState.windows,
                 windowState.displayWidth,
