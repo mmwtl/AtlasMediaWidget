@@ -768,13 +768,12 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void confirmSettingsImport(SettingsBackup.Data imported) {
-        new AlertDialog.Builder(this)
+        CompactDialog.show(new AlertDialog.Builder(this)
                 .setTitle("Импортировать настройки?")
                 .setMessage("Текущие переносимые настройки будут заменены значениями из JSON. "
                         + "Разрешения, работа сервиса и каталог радио не изменятся.")
                 .setNegativeButton("Отмена", null)
-                .setPositiveButton("Импортировать", (dialog, which) -> applySettings(imported))
-                .show();
+                .setPositiveButton("Импортировать", (dialog, which) -> applySettings(imported)));
     }
 
     private void applySettings(SettingsBackup.Data imported) {
