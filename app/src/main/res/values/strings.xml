@@ -17,7 +17,7 @@
     <string name="settings_section_content">СОДЕРЖИМОЕ И ПОВЕДЕНИЕ</string>
     <string name="settings_section_visual">ВНЕШНИЙ ВИД</string>
     <string name="permissions_title">Системные разрешения</string>
-    <string name="allow_accessibility">Разрешить контроль окон</string>
+    <string name="allow_accessibility">Разрешить спецвозможности</string>
     <string name="accessibility_service_label">Atlas Media Widget: контроль окон</string>
     <string name="accessibility_service_description">Определяет, виден ли главный экран под полноэкранным или свободным окном. Не читает и не вводит текст.</string>
     <string name="auto_start_permission_warning">Автозапуск сохранён, но без трёх специальных разрешений он не сработает корректно</string>
