@@ -19,7 +19,6 @@ public final class SettingsBackupTest {
         SettingsBackup.Data restored = SettingsBackup.decode(json);
 
         assertTrue(restored.autoStart);
-        assertFalse(restored.showRadioCovers);
         assertEquals(17, restored.appUiScaleTenths);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(Integer.valueOf(321), restored.positionX);
@@ -34,6 +33,7 @@ public final class SettingsBackupTest {
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
         assertFalse(settings.has("customRadioCatalog"));
+        assertFalse(settings.has("showRadioCovers"));
     }
 
     @Test public void jsonRoundTripPreservesDefaultPosition() throws Exception {
@@ -95,6 +95,64 @@ public final class SettingsBackupTest {
         assertTrue(error.getMessage().contains("true или false"));
     }
 
+    @Test public void legacyBackupWithShowRadioCoversDecodesCleanly() throws Exception {
+        String json = "{\n"
+                + "  \"format\": \"atlas-media-widget-settings\",\n"
+                + "  \"schemaVersion\": 2,\n"
+                + "  \"appVersion\": \"1.1.6\",\n"
+                + "  \"settings\": {\n"
+                + "    \"autoStart\": true,\n"
+                + "    \"showRadioCovers\": true,\n"
+                + "    \"uiScaleTenths\": 10,\n"
+                + "    \"selectedCardStyle\": \"compact\",\n"
+                + "    \"overlayPosition\": null,\n"
+                + "    \"cardStyles\": {\n"
+                + "      \"compact\": {\n"
+                + "        \"widthDp\": 500,\n"
+                + "        \"heightDp\": 300,\n"
+                + "        \"metadataProgressGapDp\": 14,\n"
+                + "        \"controlPanelHeightDp\": 90,\n"
+                + "        \"controlIconScalePercent\": 100,\n"
+                + "        \"controlSpreadPercent\": 33,\n"
+                + "        \"controlBottomInsetDp\": 0,\n"
+                + "        \"topInsetDp\": 10,\n"
+                + "        \"contentInsetDp\": 24,\n"
+                + "        \"topRowTextSizeSp\": 13,\n"
+                + "        \"titleTextSizeSp\": 22,\n"
+                + "        \"subtitleTextSizeSp\": 15,\n"
+                + "        \"subtitleGapDp\": 4,\n"
+                + "        \"timeTextSizeSp\": 13,\n"
+                + "        \"progressGapDp\": 8,\n"
+                + "        \"progressThicknessDp\": 4\n"
+                + "      },\n"
+                + "      \"square\": {\n"
+                + "        \"widthDp\": 500,\n"
+                + "        \"heightDp\": 500,\n"
+                + "        \"metadataProgressGapDp\": 14,\n"
+                + "        \"controlPanelHeightDp\": 110,\n"
+                + "        \"controlIconScalePercent\": 100,\n"
+                + "        \"controlSpreadPercent\": 33,\n"
+                + "        \"controlBottomInsetDp\": 0,\n"
+                + "        \"topInsetDp\": 10,\n"
+                + "        \"contentInsetDp\": 24,\n"
+                + "        \"topRowTextSizeSp\": 13,\n"
+                + "        \"titleTextSizeSp\": 26,\n"
+                + "        \"subtitleTextSizeSp\": 17,\n"
+                + "        \"subtitleGapDp\": 4,\n"
+                + "        \"timeTextSizeSp\": 14,\n"
+                + "        \"progressGapDp\": 8,\n"
+                + "        \"progressThicknessDp\": 4\n"
+                + "      }\n"
+                + "    }\n"
+                + "  }\n"
+                + "}\n";
+
+        SettingsBackup.Data restored = SettingsBackup.decode(json);
+        assertTrue(restored.autoStart);
+        assertEquals(CardStyle.COMPACT, restored.selectedStyle);
+        assertEquals(500, restored.compact.widthDp);
+    }
+
     private static SettingsBackup.Data data(int scale, CardStyle selected,
             Integer x, Integer y) throws IOException {
         WidgetAppearance compactAppearance = WidgetAppearance.defaults(CardStyle.COMPACT);
@@ -116,7 +174,6 @@ public final class SettingsBackupTest {
                 squareDefaults.progressThicknessDp);
         return new SettingsBackup.Data(
                 true,
-                false,
                 scale,
                 selected,
                 x,

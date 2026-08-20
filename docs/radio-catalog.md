@@ -1,11 +1,37 @@
-# Пользовательский каталог радио
+# [RU] Каталог радиостанций и обложек
+# [EN] Radio Station Catalog & Artwork
 
-В настройках AtlasMediaWidget можно импортировать один ZIP-файл. Пользовательские записи
-заменяют встроенные станции с той же частотой; остальные встроенные станции Пензы сохраняются.
-Импорт полностью копируется во внутреннее хранилище приложения, поэтому исходный ZIP после
-импорта больше не нужен.
+---
 
-## Структура ZIP
+## 1. Архитектура / Architecture
+
+### [RU] Централизованное управление в AtlasMediaApi
+Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi` (`com.mmwtl.atlasmediaapi`).
+
+- `AtlasMediaApi` автоматически сопоставляет текущую частоту радиоприёмника с каталогом;
+- название станции передаётся в `snapshot.title`;
+- диапазон и частота (например, `FM 101.8`) передаются в `snapshot.artist`;
+- обложка станции предоставляется через `FileProvider` URI в `snapshot.artworkUri` с инкрементом `snapshot.artworkRevision`;
+- виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов.
+
+### [EN] Centralized Management in AtlasMediaApi
+Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally within the `AtlasMediaApi` service (`com.mmwtl.atlasmediaapi`).
+
+- `AtlasMediaApi` automatically matches the current radio frequency against the active catalog;
+- The resolved station name is supplied in `snapshot.title`;
+- The band and frequency (e.g., `FM 101.8`) are supplied in `snapshot.artist`;
+- Station artwork is provided via a `FileProvider` URI in `snapshot.artworkUri` with an incrementing `snapshot.artworkRevision`;
+- `AtlasMediaWidget` renders the incoming metadata and decodes the artwork URI without storing redundant local assets.
+
+---
+
+## 2. Структура ZIP-архива каталога / Catalog ZIP Structure
+
+### [RU]
+Импорт пользовательского каталога выполняется в `AtlasMediaApi DiagnosticActivity`. ZIP-архив должен иметь следующую структуру:
+
+### [EN]
+Custom catalog import is performed in the `AtlasMediaApi DiagnosticActivity`. The ZIP archive must follow this structure:
 
 ```text
 my-radio.zip
@@ -15,7 +41,15 @@ my-radio.zip
     └── local_station.png
 ```
 
-`stations.csv` кодируется в UTF-8 и использует четыре столбца:
+---
+
+## 3. Формат stations.csv / Format of stations.csv
+
+### [RU]
+Файл `stations.csv` кодируется в UTF-8 и содержит четыре обязательных столбца:
+
+### [EN]
+The `stations.csv` file must be UTF-8 encoded and contain four mandatory columns:
 
 ```csv
 frequency_khz,name,band,cover
@@ -24,15 +58,28 @@ frequency_khz,name,band,cover
 101800,"Моя станция, Пенза",FM,local_station.png
 ```
 
-- `frequency_khz`: для FM — от `87500` до `108000`, для AM — от `500` до `1800`;
-- `name`: отображаемое название, до 80 символов;
-- `band`: строго `FM` или `AM`;
-- `cover`: имя файла из папки `covers/` либо пустое значение.
+- `frequency_khz`:
+  - **[RU]** для FM — от `87500` до `108000` кГц, для AM — от `500` до `1800` кГц.
+  - **[EN]** for FM — `87500` to `108000` kHz, for AM — `500` to `1800` kHz.
+- `name`:
+  - **[RU]** отображаемое название (до 80 символов).
+  - **[EN]** display name (up to 80 characters).
+- `band`:
+  - **[RU]** строго `FM` или `AM`.
+  - **[EN]** strictly `FM` or `AM`.
+- `cover`:
+  - **[RU]** имя файла из папки `covers/` либо пустое поле (если обложка не требуется).
+  - **[EN]** filename from `covers/` or empty (if no cover is required).
 
-Поддерживаются WebP, PNG и JPEG размером от 32×32 до 4096×4096. Имена файлов должны состоять
-из латинских букв, цифр, точки, дефиса и подчёркивания. Один ZIP может содержать до 256 станций,
-300 файлов и 64 МБ данных после распаковки. Повторяющиеся частоты отклоняются целиком: частичный
-импорт не выполняется.
+---
 
-Кнопка «Вернуть встроенный каталог» отключает пользовательские записи и снова использует только
-встроенный набор Пензы.
+## 4. Ограничения и валидация / Constraints & Validation
+
+- **[RU] Форматы изображений:** WebP, PNG, JPEG размером от 32×32 до 4096×4096 пикселей.
+  **[EN] Image formats:** WebP, PNG, JPEG with dimensions from 32×32 to 4096×4096 px.
+- **[RU] Имена файлов:** только латинские буквы, цифры, точки, дефисы и подчёркивания (`[A-Za-z0-9._-]`).
+  **[EN] Filenames:** alphanumeric, dots, hyphens, and underscores only (`[A-Za-z0-9._-]`).
+- **[RU] Лимиты:** до 256 станций, до 300 файлов, суммарный размер распакованного архива — до 64 МБ.
+  **[EN] Limits:** up to 256 stations, up to 300 files, uncompressed size up to 64 MB.
+- **[RU] Целостность:** при наличии дублирующихся частот или отсутствующих обложек импорт отклоняется целиком.
+  **[EN] Integrity:** duplicate frequencies or missing cover files will cause the entire import to be rejected.

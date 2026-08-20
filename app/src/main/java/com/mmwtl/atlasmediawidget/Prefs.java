@@ -14,8 +14,6 @@ final class Prefs {
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
-    static final String KEY_SHOW_RADIO_COVERS = "show_radio_covers";
-    static final String KEY_CUSTOM_RADIO_CATALOG = "custom_radio_catalog";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     private static final String KEY_METADATA_PROGRESS_GAP_PREFIX = "metadata_progress_gap_";
@@ -246,7 +244,6 @@ final class Prefs {
     boolean replacePortableSettings(SettingsBackup.Data data) {
         SharedPreferences.Editor editor = preferences.edit()
                 .putBoolean(KEY_AUTO_START, data.autoStart)
-                .putBoolean(KEY_SHOW_RADIO_COVERS, data.showRadioCovers)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
                 .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);
         if (data.positionX == null) {

@@ -22,7 +22,6 @@ final class SettingsBackup {
 
     static final class Data {
         final boolean autoStart;
-        final boolean showRadioCovers;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
         final Integer positionX;
@@ -30,11 +29,10 @@ final class SettingsBackup {
         final StyleData compact;
         final StyleData square;
 
-        Data(boolean autoStart, boolean showRadioCovers, int appUiScaleTenths,
+        Data(boolean autoStart, int appUiScaleTenths,
                 CardStyle selectedStyle, Integer positionX, Integer positionY,
                 StyleData compact, StyleData square) throws IOException {
             this.autoStart = autoStart;
-            this.showRadioCovers = showRadioCovers;
             this.appUiScaleTenths = requireRange("settings.uiScaleTenths", appUiScaleTenths,
                     ScaledActivity.MIN_SCALE_TENTHS, ScaledActivity.MAX_SCALE_TENTHS);
             if (selectedStyle == null) throw invalid("Не указан формат карточки");
@@ -120,7 +118,6 @@ final class SettingsBackup {
         Integer positionY = positionX == null ? null : y;
         return new Data(
                 prefs.getBoolean(Prefs.KEY_AUTO_START, false),
-                prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true),
                 clamp(prefs.getInt(Prefs.KEY_APP_UI_SCALE_TENTHS,
                                 ScaledActivity.DEFAULT_SCALE_TENTHS),
                         ScaledActivity.MIN_SCALE_TENTHS, ScaledActivity.MAX_SCALE_TENTHS),
@@ -169,7 +166,6 @@ final class SettingsBackup {
             root.put("appVersion", appVersion == null ? "" : appVersion);
             JSONObject settings = new JSONObject();
             settings.put("autoStart", data.autoStart);
-            settings.put("showRadioCovers", data.showRadioCovers);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -217,7 +213,6 @@ final class SettingsBackup {
             }
             return new Data(
                     requireBoolean(settings, "autoStart", "settings.autoStart"),
-                    requireBoolean(settings, "showRadioCovers", "settings.showRadioCovers"),
                     requireInt(settings, "uiScaleTenths", "settings.uiScaleTenths"),
                     parseStyleName(requireString(settings, "selectedCardStyle",
                             "settings.selectedCardStyle")),

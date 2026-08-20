@@ -59,7 +59,6 @@ public final class OverlayService extends Service
     private ForegroundAppDetector foregroundDetector;
     private MediaBridgeClient bridge;
     private ArtworkLoader artworkLoader;
-    private RadioCatalog radioCatalog;
     private MediaSourceLauncher mediaSourceLauncher;
     private MediaCardView card;
     private WindowManager.LayoutParams cardParams;
@@ -109,9 +108,6 @@ public final class OverlayService extends Service
                 hideCard();
                 scheduleForegroundPoll(ForegroundPollPolicy.HIDDEN_DELAY_MS);
                 return;
-            }
-            if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
-                radioCatalog = RadioCatalog.load(OverlayService.this);
             }
             AppLog.info("Immediate HOME check requested by " + action);
             requestImmediateVisibilityCheck();
@@ -220,7 +216,6 @@ public final class OverlayService extends Service
         prefs = new Prefs(this);
         windowManager = getSystemService(WindowManager.class);
         artworkLoader = new ArtworkLoader(this, this);
-        radioCatalog = RadioCatalog.load(this);
         mediaSourceLauncher = new MediaSourceLauncher(this);
         bridge = new MediaBridgeClient(this, this);
         createNotificationChannel();
@@ -247,13 +242,11 @@ public final class OverlayService extends Service
             return START_NOT_STICKY;
         }
         if (intent != null && ACTION_REFRESH_STYLE.equals(intent.getAction())) {
-            radioCatalog = RadioCatalog.load(this);
             hideCardImmediately();
             requestImmediateVisibilityCheck();
             return START_STICKY;
         }
         prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
-        radioCatalog = RadioCatalog.load(this);
         requestImmediateVisibilityCheck();
         return START_STICKY;
     }
@@ -649,7 +642,7 @@ public final class OverlayService extends Service
         if (card == null) return;
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (visible == null) card.renderDisconnected(stateDetail());
-        else card.renderSnapshot(visible, reducer.isConnected(), radioCatalog.display(visible));
+        else card.renderSnapshot(visible, reducer.isConnected());
     }
 
     private void scheduleSnapshotReconcile() {
@@ -671,11 +664,9 @@ public final class OverlayService extends Service
     }
 
     private void loadArtwork(MediaSnapshot snapshot) {
-        RadioDisplay radioDisplay = radioCatalog.display(snapshot);
-        ArtworkRef artwork = radioDisplay == null
+        ArtworkRef artwork = !snapshot.artworkUri.isBlank()
                 ? ArtworkRef.mediaUri(snapshot.artworkUri)
-                : prefs.getBoolean(Prefs.KEY_SHOW_RADIO_COVERS, true)
-                        ? radioDisplay.artwork : ArtworkRef.NONE;
+                : ArtworkRef.NONE;
         String artworkKey = artwork.cacheKey();
         if (snapshot.artworkRevision == loadedArtworkRevision
                 && artworkKey.equals(loadedArtworkKey)) return;
