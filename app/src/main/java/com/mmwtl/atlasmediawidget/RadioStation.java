@@ -43,7 +43,7 @@ final class RadioStation {
     static RadioStation fromBundle(Bundle bundle) {
         if (bundle == null) return null;
         int frequency = bundle.getInt(MediaBridgeContract.K_RADIO_FREQUENCY_KHZ, -1);
-        if (!isSupportedFrequency(frequency)) return null;
+        if (!isValidFrequency(frequency)) return null;
         String id = bundle.getString(MediaBridgeContract.K_RADIO_STATION_ID, "");
         int band = bundle.getInt(MediaBridgeContract.K_RADIO_BAND);
         if (id.isBlank()) id = band + ":" + frequency + ":"
@@ -66,24 +66,43 @@ final class RadioStation {
     String displayName() {
         if (!name.isBlank()) return name;
         if (!serviceName.isBlank()) return serviceName;
-        if (!formattedFrequency.isBlank()) return formattedFrequency;
-        return Integer.toString(frequencyKHz);
+        return frequencyLabel();
     }
 
     String displayDetail() {
-        if (!formattedFrequency.isBlank()) return formattedFrequency;
-        return bandName;
+        String frequency = frequencyLabel();
+        return frequency.isBlank() ? bandName : frequency;
     }
 
     String artworkKey() {
         return id + '|' + artworkUri;
     }
 
-    private static boolean isSupportedFrequency(int value) {
-        return value >= 500 && value <= 1_800
-                || value >= 8_750 && value <= 10_800
-                || value >= 87_500 && value <= 108_000
-                || value >= 174_000 && value <= 240_000;
+    static boolean isValidFrequency(int value) {
+        return value > 0;
+    }
+
+    private String frequencyLabel() {
+        if (!formattedFrequency.isBlank()) return formattedFrequency;
+        if (!isValidFrequency(frequencyKHz)) return "";
+        if (frequencyKHz >= 8_750 && frequencyKHz <= 10_800) {
+            return formatScaled(frequencyKHz, 100) + " MHz";
+        }
+        if (frequencyKHz >= 50_000) {
+            return formatScaled(frequencyKHz, 1_000) + " MHz";
+        }
+        return frequencyKHz + " kHz";
+    }
+
+    private static String formatScaled(int value, int divisor) {
+        int whole = value / divisor;
+        int remainder = value % divisor;
+        if (remainder == 0) return Integer.toString(whole);
+        String fraction = Integer.toString(divisor + remainder).substring(1);
+        while (fraction.endsWith("0")) {
+            fraction = fraction.substring(0, fraction.length() - 1);
+        }
+        return whole + "." + fraction;
     }
 
     private static String nonNull(String value) {

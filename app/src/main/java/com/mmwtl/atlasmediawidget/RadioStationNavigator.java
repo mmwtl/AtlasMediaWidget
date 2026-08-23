@@ -11,6 +11,7 @@ final class RadioStationNavigator {
         if (stations == null || stations.isEmpty() || direction == 0) return null;
         int current = currentIndex(stations, snapshot);
         if (current < 0) return direction > 0 ? stations.get(0) : stations.get(stations.size() - 1);
+        if (stations.size() == 1) return null;
         int next = Math.floorMod(current + Integer.signum(direction), stations.size());
         return stations.get(next);
     }

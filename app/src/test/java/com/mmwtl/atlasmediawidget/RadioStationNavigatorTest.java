@@ -40,6 +40,21 @@ public final class RadioStationNavigatorTest {
                 snapshot("", "", ""), 1));
     }
 
+    @Test public void currentOnlySavedStationDoesNotTuneItAgain() {
+        assertNull(RadioStationNavigator.adjacent(List.of(second),
+                snapshot("radio:1:100100:Радио 7", "Радио 7", "100.1 MHz"), 1));
+    }
+
+    @Test public void unknownOnlySavedStationCanStillBeSelected() {
+        assertEquals(second, RadioStationNavigator.adjacent(List.of(second),
+                snapshot("radio:1:100050:Неизвестная", "Неизвестная", "100.05 MHz"), 1));
+    }
+
+    @Test public void frequencyMismatchFallsBackToNormalizedStationName() {
+        assertEquals(third, RadioStationNavigator.adjacent(stations,
+                snapshot("radio:1:100050:Радио 7", "  РАДИО 7  ", "100.05 MHz"), 1));
+    }
+
     private static RadioStation station(String id, int frequency, int band, String name) {
         return new RadioStation(id, frequency,
                 frequency == 94_200 ? "94.2 MHz"

@@ -55,6 +55,8 @@ public final class OverlayService extends Service
     private final OnlineSnapshotStabilizer onlineSnapshotStabilizer =
             new OnlineSnapshotStabilizer();
     private final CardSuppressionPolicy cardSuppression = new CardSuppressionPolicy();
+    private final PendingRadioNavigation pendingRadioNavigation =
+            new PendingRadioNavigation();
     private Prefs prefs;
     private WindowManager windowManager;
     private ForegroundAppDetector foregroundDetector;
@@ -84,7 +86,6 @@ public final class OverlayService extends Service
     private long fastProbeUntil;
     private RadioStationLists radioStations = RadioStationLists.EMPTY;
     private boolean radioStationsRequestInFlight;
-    private int pendingRadioDirection;
 
     private final Runnable transportReconcile = () -> {
         if (bridgeState == MediaBridgeClient.State.CONNECTED) {
@@ -398,7 +399,7 @@ public final class OverlayService extends Service
             reducer.onDisconnected(SystemClock.elapsedRealtime());
             radioStations = RadioStationLists.EMPTY;
             radioStationsRequestInFlight = false;
-            pendingRadioDirection = 0;
+            pendingRadioNavigation.clear();
             if (radioArtworkLoader != null) radioArtworkLoader.clear();
             if (card != null) card.setRadioStations(RadioStationLists.EMPTY);
         }
@@ -418,6 +419,7 @@ public final class OverlayService extends Service
             return;
         }
         if (!reducer.accept(snapshot)) return;
+        pendingRadioNavigation.cancelIfSourceChanged(visibleSource());
         renderCurrent();
         loadArtwork(snapshot);
         scheduleSnapshotReconcile();
@@ -451,14 +453,15 @@ public final class OverlayService extends Service
                 + " favorites=" + radioStations.favorites.size()
                 + " generation=" + radioStations.generation);
         if (card != null) card.setRadioStations(radioStations);
-        int direction = pendingRadioDirection;
-        pendingRadioDirection = 0;
+        int direction = pendingRadioNavigation.consume(visibleSource());
         if (direction != 0) {
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
             RadioStation target = RadioStationNavigator.adjacent(
                     radioStations.saved, visible, direction);
             if (target == null) {
-                if (card != null) card.showTransientStatus("Нет сохранённых станций", true);
+                if (card != null) card.showTransientStatus(radioStations.saved.isEmpty()
+                        ? "Нет сохранённых станций"
+                        : "Нет другой сохранённой станции", true);
             } else {
                 tuneRadio(target);
             }
@@ -467,7 +470,7 @@ public final class OverlayService extends Service
 
     @Override public void onRadioStationsError(int status, String message) {
         radioStationsRequestInFlight = false;
-        pendingRadioDirection = 0;
+        pendingRadioNavigation.clear();
         radioStations = RadioStationLists.EMPTY;
         String detail = switch (status) {
             case 5 -> "Радиосервис недоступен";
@@ -518,7 +521,12 @@ public final class OverlayService extends Service
             RadioStation target = RadioStationNavigator.adjacent(
                     radioStations.saved, visible, "NEXT".equals(command) ? 1 : -1);
             if (target == null) {
-                pendingRadioDirection = "NEXT".equals(command) ? 1 : -1;
+                if (!radioStations.saved.isEmpty()) {
+                    if (card != null) card.showTransientStatus(
+                            "Нет другой сохранённой станции", false);
+                    return;
+                }
+                pendingRadioNavigation.schedule("NEXT".equals(command) ? 1 : -1);
                 requestRadioStations();
                 if (card != null) card.showTransientStatus(
                         "Загрузка сохранённых станций…", false);
@@ -543,6 +551,7 @@ public final class OverlayService extends Service
     @Override public void onSource(MediaSource.Id source) {
         transportSnapshotGuard.clear();
         main.removeCallbacks(transportReconcile);
+        pendingRadioNavigation.cancelIfSourceChanged(source);
         String requestId = bridge.setSource(source);
         AppLog.info("Sending media command request=" + requestId + " command=SET_SOURCE"
                 + " source=" + source);
