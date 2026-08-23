@@ -22,6 +22,8 @@ final class MediaBridgeClient {
         void onBridgeState(State state, String detail);
         void onSnapshot(MediaSnapshot snapshot);
         void onCommandResult(String requestId, int status, String message, long generation);
+        void onRadioStations(RadioStationLists lists);
+        void onRadioStationsError(int status, String message);
     }
 
     private final Context context;
@@ -142,6 +144,11 @@ final class MediaBridgeClient {
         sendSimple(MediaBridgeContract.GET_SNAPSHOT, requestId("snapshot"), null);
     }
 
+    void requestRadioStations() {
+        sendSimple(MediaBridgeContract.GET_RADIO_STATIONS,
+                requestId("radio-stations"), null);
+    }
+
     String sendCommand(String command) {
         return sendCommand(command, -1L, null, null, true);
     }
@@ -152,6 +159,23 @@ final class MediaBridgeClient {
 
     String setSource(MediaSource.Id source) {
         return sendCommand("SET_SOURCE", -1L, source.name(), null, true);
+    }
+
+    String tuneRadio(RadioStation station) {
+        String requestId = requestId("command-radio");
+        Bundle extra = new Bundle();
+        extra.putString(MediaBridgeContract.K_COMMAND, "TUNE_RADIO");
+        extra.putInt(MediaBridgeContract.K_RADIO_FREQUENCY_KHZ, station.frequencyKHz);
+        extra.putInt(MediaBridgeContract.K_RADIO_BAND, station.band);
+        extra.putString(MediaBridgeContract.K_RADIO_ENSEMBLE_NAME, station.ensembleName);
+        extra.putString(MediaBridgeContract.K_RADIO_SERVICE_NAME, station.serviceName);
+        extra.putString(MediaBridgeContract.K_RADIO_GENRE, station.genre);
+        extra.putInt(MediaBridgeContract.K_RADIO_ICON_ID, station.iconId);
+        extra.putInt(MediaBridgeContract.K_RADIO_SIGNAL_QUALITY, station.signalQuality);
+        extra.putString(MediaBridgeContract.K_RADIO_SELECTOR, station.selector);
+        extra.putBoolean(MediaBridgeContract.K_COMMAND_AUTOPLAY, true);
+        sendSimple(MediaBridgeContract.COMMAND, requestId, extra);
+        return requestId;
     }
 
     private String sendCommand(String command, long position, String source,
@@ -318,7 +342,28 @@ final class MediaBridgeClient {
                         listener.onSnapshot(snapshot);
                     });
                 }
-                case MediaBridgeContract.COMMAND_RESULT, MediaBridgeContract.ERROR ->
+                case MediaBridgeContract.RADIO_STATIONS -> {
+                    int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
+                    if (status == MediaBridgeContract.STATUS_OK) {
+                        RadioStationLists lists = RadioStationLists.fromBundle(data);
+                        main.post(() -> listener.onRadioStations(lists));
+                    } else {
+                        postRadioStationsError(status,
+                                data.getString(MediaBridgeContract.K_MESSAGE, ""));
+                    }
+                }
+                case MediaBridgeContract.ERROR -> {
+                    String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
+                    int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
+                    String detail = data.getString(MediaBridgeContract.K_MESSAGE, "");
+                    if (requestId.startsWith("radio-stations-")) {
+                        postRadioStationsError(status, detail);
+                    } else {
+                        postCommandResult(requestId, status, detail,
+                                data.getLong(MediaBridgeContract.K_GENERATION));
+                    }
+                }
+                case MediaBridgeContract.COMMAND_RESULT ->
                         postCommandResult(
                                 data.getString(MediaBridgeContract.K_REQUEST_ID, ""),
                                 data.getInt(MediaBridgeContract.K_STATUS, -1),
@@ -328,12 +373,19 @@ final class MediaBridgeClient {
             }
         } catch (RuntimeException error) {
             AppLog.warn("Invalid Media Bridge payload", error);
+            if (message.what == MediaBridgeContract.RADIO_STATIONS) {
+                postRadioStationsError(1, "Некорректный список радиостанций");
+            }
         }
         return true;
     }
 
     private void postCommandResult(String requestId, int status, String message, long generation) {
         main.post(() -> listener.onCommandResult(requestId, status, message, generation));
+    }
+
+    private void postRadioStationsError(int status, String message) {
+        main.post(() -> listener.onRadioStationsError(status, message));
     }
 
     private void notifyState(State state, String detail) {

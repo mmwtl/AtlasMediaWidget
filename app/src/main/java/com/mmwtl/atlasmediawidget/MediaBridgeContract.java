@@ -10,10 +10,12 @@ final class MediaBridgeContract {
     static final int UNREGISTER = 2;
     static final int GET_SNAPSHOT = 3;
     static final int COMMAND = 4;
+    static final int GET_RADIO_STATIONS = 5;
     static final int REGISTERED = 100;
     static final int SNAPSHOT = 101;
     static final int COMMAND_RESULT = 102;
     static final int ERROR = 103;
+    static final int RADIO_STATIONS = 104;
 
     static final long CAP_PLAY = 0x01L;
     static final long CAP_PAUSE = 0x02L;
@@ -22,6 +24,7 @@ final class MediaBridgeContract {
     static final long CAP_PREVIOUS = 0x10L;
     static final long CAP_SEEK = 0x20L;
     static final long CAP_SET_SOURCE = 0x40L;
+    static final long CAP_TUNE_RADIO = 0x80L;
 
     static final int STATUS_OK = 0;
     static final int STATUS_UNSUPPORTED_VERSION = 2;
@@ -62,6 +65,22 @@ final class MediaBridgeContract {
     static final String K_CAPABILITIES = "capabilities";
     static final String K_ARTWORK_URI = "artworkUri";
     static final String K_ARTWORK_REVISION = "artworkRevision";
+    static final String K_RADIO_SAVED_STATIONS = "radioSavedStations";
+    static final String K_RADIO_FAVORITE_STATIONS = "radioFavoriteStations";
+    static final String K_RADIO_STATION_ID = "radioStationId";
+    static final String K_RADIO_FREQUENCY_KHZ = "radioFrequencyKHz";
+    static final String K_RADIO_FORMATTED_FREQUENCY = "radioFormattedFrequency";
+    static final String K_RADIO_BAND = "radioBand";
+    static final String K_RADIO_BAND_NAME = "radioBandName";
+    static final String K_RADIO_NAME = "radioName";
+    static final String K_RADIO_ENSEMBLE_NAME = "radioEnsembleName";
+    static final String K_RADIO_SERVICE_NAME = "radioServiceName";
+    static final String K_RADIO_GENRE = "radioGenre";
+    static final String K_RADIO_ICON_ID = "radioIconId";
+    static final String K_RADIO_SIGNAL_QUALITY = "radioSignalQuality";
+    static final String K_RADIO_SELECTOR = "radioSelector";
+    static final String K_RADIO_FAVORITE = "radioFavorite";
+    static final String K_RADIO_ARTWORK_URI = "radioArtworkUri";
     static final String K_COMMAND = "command";
     static final String K_COMMAND_POSITION = "position";
     static final String K_COMMAND_SOURCE = "source";

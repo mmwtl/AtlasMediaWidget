@@ -15,14 +15,21 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.view.ViewGroup;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 final class MediaCardView extends FrameLayout {
     interface Listener {
@@ -31,6 +38,9 @@ final class MediaCardView extends FrameLayout {
         void onSeek(long positionMs);
         void onSource(MediaSource.Id source);
         void onOpenSource();
+        void onRadioStationsRequested();
+        void onRadioStation(RadioStation station);
+        void onRadioArtworkRequested(RadioStation station);
     }
 
     private static final int PROGRESS_MAX = 10_000;
@@ -47,6 +57,7 @@ final class MediaCardView extends FrameLayout {
     private final float heightScale;
     private final float uiScale;
     private final WidgetAppearance appearance;
+    private final boolean radioSavedNavigation;
     private final ImageView artwork;
     private final ImageView artworkThumbnail;
     private final ImageView placeholder;
@@ -68,7 +79,16 @@ final class MediaCardView extends FrameLayout {
     private final TransportButton previous;
     private final TransportButton playPause;
     private final TransportButton next;
+    private final ImageView favoritesButton;
+    private final FrameLayout favoritesChooser;
+    private final TextView favoritesEmpty;
+    private final ListView favoritesList;
+    private final FavoriteStationAdapter favoritesAdapter;
     private final List<MediaSource> availableSources = new ArrayList<>();
+    private final Map<String, Bitmap> radioArtwork = new HashMap<>();
+    private final Set<String> failedRadioArtwork = new HashSet<>();
+    private List<RadioStation> favoriteStations = List.of();
+    private boolean favoritesLoading;
     private MediaSnapshot snapshot;
     private MediaSource.Id activeSource = MediaSource.Id.UNKNOWN;
     private boolean seeking;
@@ -82,11 +102,12 @@ final class MediaCardView extends FrameLayout {
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
             int maxWidthPx, int maxHeightPx, CardStyle style,
-            WidgetAppearance appearance, Listener listener) {
+            WidgetAppearance appearance, boolean radioSavedNavigation, Listener listener) {
         super(context);
         this.listener = listener;
         this.style = style;
         this.appearance = appearance;
+        this.radioSavedNavigation = radioSavedNavigation;
         cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
                 Ui.dp(context, requestedWidthDp)));
         cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
@@ -166,6 +187,24 @@ final class MediaCardView extends FrameLayout {
         statusParams.topMargin = by(appearance.topInsetDp + 3);
         statusParams.rightMargin = bx(49);
         addView(statusPill, statusParams);
+
+        favoritesButton = new ImageView(context);
+        favoritesButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        favoritesButton.setImageResource(R.drawable.ic_radio_favorites);
+        favoritesButton.setImageTintList(
+                android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
+        favoritesButton.setPadding(d(10), d(10), d(10), d(10));
+        favoritesButton.setClickable(true);
+        favoritesButton.setFocusable(true);
+        favoritesButton.setContentDescription("Лайкнутые радиостанции");
+        favoritesButton.setBackground(pillBackground(context, 0xB333333B, 0x66596872, d(19)));
+        favoritesButton.setVisibility(GONE);
+        favoritesButton.setOnClickListener(v -> toggleFavoritesChooser());
+        LayoutParams favoriteButtonParams = new LayoutParams(d(42), d(42));
+        favoriteButtonParams.gravity = Gravity.TOP | Gravity.END;
+        favoriteButtonParams.topMargin = by(4);
+        favoriteButtonParams.rightMargin = bx(47);
+        addView(favoritesButton, favoriteButtonParams);
 
         TextView dragHandle = text("⋮", style == CardStyle.COMPACT ? 27 : 29,
                 Ui.SECONDARY, Typeface.BOLD);
@@ -250,8 +289,39 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.addView(sourceOptions, match());
         sourceChooser.setOnClickListener(v -> hideSourceChooser());
         addView(sourceChooser);
+
+        favoritesChooser = new FrameLayout(context);
+        favoritesChooser.setVisibility(GONE);
+        favoritesChooser.setClickable(true);
+        favoritesChooser.setPadding(d(12), d(10), d(12), d(10));
+        favoritesChooser.setBackground(
+                pillBackground(context, 0xF0191D23, 0x77596872, d(22)));
+        LinearLayout favoritesContent = new LinearLayout(context);
+        favoritesContent.setOrientation(LinearLayout.VERTICAL);
+        TextView favoritesTitle = text("Лайкнутые станции",
+                style == CardStyle.COMPACT ? 16 : 19, Ui.PRIMARY, Typeface.BOLD);
+        favoritesTitle.setPadding(d(8), 0, d(8), d(6));
+        favoritesContent.addView(favoritesTitle, fullWrap());
+        favoritesEmpty = text("Загрузка…", style == CardStyle.COMPACT ? 14 : 16,
+                Ui.SECONDARY, Typeface.NORMAL);
+        favoritesEmpty.setGravity(Gravity.CENTER);
+        favoritesContent.addView(favoritesEmpty,
+                new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+        favoritesList = new ListView(context);
+        favoritesList.setDividerHeight(d(6));
+        favoritesList.setDivider(null);
+        favoritesList.setSelector(android.R.color.transparent);
+        favoritesList.setVerticalScrollBarEnabled(true);
+        favoritesAdapter = new FavoriteStationAdapter();
+        favoritesList.setAdapter(favoritesAdapter);
+        favoritesContent.addView(favoritesList,
+                new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+        favoritesChooser.addView(favoritesContent, match());
+        addView(favoritesChooser);
         setOnClickListener(v -> {
-            if (sourceChooser.getVisibility() == VISIBLE) {
+            if (favoritesChooser.getVisibility() == VISIBLE) {
+                hideFavoritesChooser();
+            } else if (sourceChooser.getVisibility() == VISIBLE) {
                 hideSourceChooser();
             } else {
                 listener.onOpenSource();
@@ -310,8 +380,18 @@ final class MediaCardView extends FrameLayout {
                 ? detail : getResources().getString(R.string.empty_hint));
         if (bridgeConnected && value.backendConnected) statusPill.setVisibility(GONE);
         else setStatusPill("Медиасервис недоступен", true);
-        previous.setEnabled(value.supports(MediaBridgeContract.CAP_PREVIOUS));
-        next.setEnabled(value.supports(MediaBridgeContract.CAP_NEXT));
+        boolean directSavedNavigation = radioSavedNavigation
+                && activeSource.displayId() == MediaSource.Id.RADIO;
+        previous.setEnabled(value.supports(directSavedNavigation
+                ? MediaBridgeContract.CAP_TUNE_RADIO : MediaBridgeContract.CAP_PREVIOUS));
+        next.setEnabled(value.supports(directSavedNavigation
+                ? MediaBridgeContract.CAP_TUNE_RADIO : MediaBridgeContract.CAP_NEXT));
+        favoritesButton.setVisibility(activeSource.displayId() == MediaSource.Id.RADIO
+                ? VISIBLE : GONE);
+        favoritesButton.setEnabled(value.supports(MediaBridgeContract.CAP_TUNE_RADIO));
+        favoritesButton.setAlpha(favoritesButton.isEnabled() ? 1f : 0.45f);
+        updateStatusPillPosition();
+        if (activeSource.displayId() != MediaSource.Id.RADIO) hideFavoritesChooser();
         boolean currentlyPlaying = PlayPauseActionPolicy.isCurrentlyPlaying(
                 activeSource, value.isPlaying());
         boolean toggle = value.supports(MediaBridgeContract.CAP_TOGGLE)
@@ -331,6 +411,8 @@ final class MediaCardView extends FrameLayout {
         clearPendingSeek();
         snapshot = null;
         activeSource = MediaSource.Id.UNKNOWN;
+        favoritesButton.setVisibility(GONE);
+        hideFavoritesChooser();
         hasMedia = false;
         title.setText(R.string.unknown_track);
         subtitle.setText(R.string.empty_hint);
@@ -356,6 +438,48 @@ final class MediaCardView extends FrameLayout {
     void onTransportResult(boolean success) {
         if (!success) clearPendingSeek();
         tick(SystemClock.elapsedRealtime());
+    }
+
+    void setRadioStations(RadioStationLists lists) {
+        favoriteStations = lists == null ? List.of() : lists.favorites;
+        Set<String> currentArtworkKeys = new HashSet<>();
+        for (RadioStation station : favoriteStations) {
+            currentArtworkKeys.add(station.artworkKey());
+        }
+        radioArtwork.keySet().retainAll(currentArtworkKeys);
+        failedRadioArtwork.retainAll(currentArtworkKeys);
+        favoritesLoading = false;
+        favoritesAdapter.notifyDataSetChanged();
+        updateFavoritesEmptyState();
+    }
+
+    void setRadioStationsError(String message) {
+        favoriteStations = List.of();
+        radioArtwork.clear();
+        failedRadioArtwork.clear();
+        favoritesLoading = false;
+        favoritesEmpty.setText(message == null || message.isBlank()
+                ? "Список станций недоступен" : message);
+        favoritesEmpty.setTextColor(Ui.ERROR);
+        favoritesEmpty.setVisibility(VISIBLE);
+        favoritesList.setVisibility(GONE);
+    }
+
+    void setRadioArtwork(String key, Bitmap bitmap) {
+        boolean belongsToCurrentList = false;
+        for (RadioStation station : favoriteStations) {
+            if (station.artworkKey().equals(key)) {
+                belongsToCurrentList = true;
+                break;
+            }
+        }
+        if (!belongsToCurrentList) return;
+        if (bitmap == null) failedRadioArtwork.add(key);
+        else {
+            failedRadioArtwork.remove(key);
+            radioArtwork.put(key, bitmap);
+        }
+        favoritesAdapter.notifyDataSetChanged();
     }
 
     void setArtwork(Bitmap bitmap) {
@@ -437,7 +561,8 @@ final class MediaCardView extends FrameLayout {
 
     private void updateContentLayout() {
         boolean compact = style == CardStyle.COMPACT;
-        boolean chooserVisible = sourceChooser.getVisibility() == VISIBLE;
+        boolean chooserVisible = sourceChooser.getVisibility() == VISIBLE
+                || favoritesChooser.getVisibility() == VISIBLE;
         boolean showProgress = hasMedia && snapshot != null && snapshot.duration > 0L;
         boolean showThumbnail = compact && hasMedia && hasArtwork;
         int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
@@ -510,6 +635,7 @@ final class MediaCardView extends FrameLayout {
         chooserParams.rightMargin = bx(18);
         chooserParams.topMargin = by(compact ? 63 : 68);
         sourceChooser.setLayoutParams(chooserParams);
+        favoritesChooser.setLayoutParams(new LayoutParams(chooserParams));
     }
 
     private void updateControlLayout(boolean compact, int panelHeight) {
@@ -625,6 +751,7 @@ final class MediaCardView extends FrameLayout {
         if (sourceOptions.getChildCount() == 0) return;
         if (sourceChooser.getVisibility() == VISIBLE) hideSourceChooser();
         else {
+            hideFavoritesChooser();
             sourceChooser.setVisibility(VISIBLE);
             sourceChooser.bringToFront();
             sourcePill.bringToFront();
@@ -636,6 +763,115 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.setVisibility(GONE);
         updateContentLayout();
     }
+
+    private void toggleFavoritesChooser() {
+        if (favoritesChooser.getVisibility() == VISIBLE) {
+            hideFavoritesChooser();
+            return;
+        }
+        hideSourceChooser();
+        favoritesLoading = true;
+        updateFavoritesEmptyState();
+        favoritesChooser.setVisibility(VISIBLE);
+        favoritesChooser.bringToFront();
+        favoritesButton.bringToFront();
+        listener.onRadioStationsRequested();
+        updateContentLayout();
+    }
+
+    private void hideFavoritesChooser() {
+        if (favoritesChooser.getVisibility() == GONE) return;
+        favoritesChooser.setVisibility(GONE);
+        updateContentLayout();
+    }
+
+    private void updateFavoritesEmptyState() {
+        if (favoritesLoading && favoriteStations.isEmpty()) {
+            favoritesEmpty.setText("Загрузка…");
+            favoritesEmpty.setTextColor(Ui.SECONDARY);
+            favoritesEmpty.setVisibility(VISIBLE);
+            favoritesList.setVisibility(GONE);
+        } else if (favoriteStations.isEmpty()) {
+            favoritesEmpty.setText("Нет лайкнутых станций");
+            favoritesEmpty.setTextColor(Ui.SECONDARY);
+            favoritesEmpty.setVisibility(VISIBLE);
+            favoritesList.setVisibility(GONE);
+        } else {
+            favoritesEmpty.setVisibility(GONE);
+            favoritesList.setVisibility(VISIBLE);
+        }
+    }
+
+    private final class FavoriteStationAdapter extends BaseAdapter {
+        @Override public int getCount() { return favoriteStations.size(); }
+        @Override public RadioStation getItem(int position) { return favoriteStations.get(position); }
+        @Override public long getItemId(int position) { return getItem(position).id.hashCode(); }
+
+        @Override public View getView(int position, View convertView, ViewGroup parent) {
+            StationRow row;
+            if (convertView == null) {
+                LinearLayout container = new LinearLayout(getContext());
+                container.setGravity(Gravity.CENTER_VERTICAL);
+                container.setPadding(d(8), d(7), d(10), d(7));
+                container.setBackground(pillBackground(getContext(), 0xD1262A30,
+                        0x554F5E68, d(14)));
+                ImageView cover = new ImageView(getContext());
+                cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                cover.setBackground(Ui.background(Ui.NESTED, 10 * uiScale, getContext()));
+                cover.setClipToOutline(true);
+                container.addView(cover, new LinearLayout.LayoutParams(d(54), d(54)));
+                LinearLayout labels = new LinearLayout(getContext());
+                labels.setOrientation(LinearLayout.VERTICAL);
+                labels.setGravity(Gravity.CENTER_VERTICAL);
+                TextView name = text("", style == CardStyle.COMPACT ? 15 : 18,
+                        Ui.PRIMARY, Typeface.BOLD);
+                name.setMaxLines(1);
+                name.setEllipsize(TextUtils.TruncateAt.END);
+                labels.addView(name, fullWrap());
+                TextView detail = text("", style == CardStyle.COMPACT ? 12 : 14,
+                        Ui.SECONDARY, Typeface.NORMAL);
+                labels.addView(detail, fullWrap());
+                LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
+                        0, LayoutParams.WRAP_CONTENT, 1f);
+                labelsParams.leftMargin = d(12);
+                container.addView(labels, labelsParams);
+                row = new StationRow(container, cover, name, detail);
+                container.setTag(row);
+                convertView = container;
+            } else {
+                row = (StationRow) convertView.getTag();
+            }
+            RadioStation station = getItem(position);
+            row.name.setText(station.displayName());
+            row.detail.setText(station.displayDetail());
+            Bitmap bitmap = radioArtwork.get(station.artworkKey());
+            if (bitmap != null) {
+                row.cover.setImageBitmap(bitmap);
+                row.cover.setImageTintList(null);
+                row.cover.setPadding(0, 0, 0, 0);
+                row.cover.setAlpha(1f);
+            } else {
+                row.cover.setImageResource(R.drawable.ic_sound_wave);
+                row.cover.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+                row.cover.setPadding(d(10), d(10), d(10), d(10));
+                row.cover.setAlpha(0.45f);
+                if (!station.artworkUri.isBlank()
+                        && !failedRadioArtwork.contains(station.artworkKey())) {
+                    listener.onRadioArtworkRequested(station);
+                }
+            }
+            convertView.setContentDescription(station.displayName() + ", "
+                    + station.displayDetail());
+            convertView.setOnClickListener(v -> {
+                hideFavoritesChooser();
+                listener.onRadioStation(station);
+            });
+            return convertView;
+        }
+    }
+
+    private record StationRow(LinearLayout container, ImageView cover,
+            TextView name, TextView detail) {}
 
     private void setElapsed(long milliseconds) {
         long second = milliseconds < 0L ? -1L : milliseconds / 1000L;
@@ -657,6 +893,15 @@ final class MediaCardView extends FrameLayout {
                 error ? 0x1FD98282 : 0x1F7893A0,
                 error ? 0x88D98282 : 0x887893A0, d(16)));
         statusPill.setVisibility(VISIBLE);
+        updateStatusPillPosition();
+    }
+
+    private void updateStatusPillPosition() {
+        LayoutParams params = (LayoutParams) statusPill.getLayoutParams();
+        int rightMargin = favoritesButton != null && favoritesButton.getVisibility() == VISIBLE
+                ? 94 : 49;
+        params.rightMargin = bx(rightMargin);
+        statusPill.setLayoutParams(params);
     }
 
     private static GradientDrawable pillBackground(Context context, int color,

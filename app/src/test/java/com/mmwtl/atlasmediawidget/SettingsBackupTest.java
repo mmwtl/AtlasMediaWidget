@@ -19,6 +19,7 @@ public final class SettingsBackupTest {
         SettingsBackup.Data restored = SettingsBackup.decode(json);
 
         assertTrue(restored.autoStart);
+        assertTrue(restored.radioSavedNavigation);
         assertEquals(17, restored.appUiScaleTenths);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(Integer.valueOf(321), restored.positionX);
@@ -28,7 +29,7 @@ public final class SettingsBackupTest {
         assertEquals(27, restored.square.appearance.contentInsetDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(2, root.getInt("schemaVersion"));
+        assertEquals(3, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -47,7 +48,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 3);
+        root.put("schemaVersion", 4);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
@@ -149,6 +150,7 @@ public final class SettingsBackupTest {
 
         SettingsBackup.Data restored = SettingsBackup.decode(json);
         assertTrue(restored.autoStart);
+        assertFalse(restored.radioSavedNavigation);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(500, restored.compact.widthDp);
     }
@@ -173,6 +175,7 @@ public final class SettingsBackupTest {
                 squareDefaults.progressGapDp,
                 squareDefaults.progressThicknessDp);
         return new SettingsBackup.Data(
+                true,
                 true,
                 scale,
                 selected,

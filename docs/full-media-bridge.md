@@ -47,6 +47,7 @@ Client → AtlasMediaApi:
 | 2 | `UNREGISTER` | `protocolVersion`, `replyTo` |
 | 3 | `GET_SNAPSHOT` | `protocolVersion`, optional `requestId`, `replyTo` |
 | 4 | `COMMAND` | `protocolVersion`, непустой `requestId`, `command`, аргументы, `replyTo` |
+| 5 | `GET_RADIO_STATIONS` | `protocolVersion`, optional `requestId`, `replyTo` |
 
 AtlasMediaApi → client:
 
@@ -56,6 +57,7 @@ AtlasMediaApi → client:
 | 101 | `SNAPSHOT` | initial, push или ответ на `GET_SNAPSHOT` |
 | 102 | `COMMAND_RESULT` | результат передачи команды backend |
 | 103 | `ERROR` | malformed request или несовместимая версия |
+| 104 | `RADIO_STATIONS` | сохранённые и лайкнутые станции с URI обложек |
 
 Регистрация идемпотентна для одного reply Binder. Binder death автоматически снимает подписку.
 
@@ -90,6 +92,7 @@ USB/BT/CPAA обновляются OneOS callbacks, а не polling.
 | 4 | `0x10` | `PREVIOUS` |
 | 5 | `0x20` | `SEEK_TO` |
 | 6 | `0x40` | `SET_SOURCE` |
+| 7 | `0x80` | `TUNE_RADIO` |
 
 Команды без аргументов: `PLAY`, `PAUSE`, `TOGGLE`, `NEXT`, `PREVIOUS`.
 
@@ -102,6 +105,19 @@ CarPlay владеет media keys; переключение source разреш�
 Для Radio next/previous означают поиск станции, для media — смену трека. AtlasMediaWidget не должен
 делать собственный fallback через `MediaController`: hardware keys и IPC уже используют единый
 `MediaCommandRouter` AtlasMediaApi.
+
+`TUNE_RADIO` передаёт обратно поля выбранного элемента `RADIO_STATIONS`: обязательные
+`radioFrequencyKHz` и `radioBand`, а также `radioEnsembleName`, `radioServiceName`, `radioGenre`,
+`radioIconId`, `radioSignalQuality`, `radioSelector` и `autoplay`. Команда напрямую настраивает
+приёмник и не запускает поиск. Виджет использует её для списка лайкнутых станций и, если включена
+соответствующая настройка, для циклической навигации по сохранённым станциям.
+
+## Списки радиостанций
+
+`RADIO_STATIONS` содержит `radioSavedStations` и `radioFavoriteStations`. Каждый элемент передаёт
+стабильный ID, частоту, диапазон, имя, RDS/DAB-поля, признак избранного и `radioArtworkUri`.
+Списки запрашиваются при подключении и повторно при открытии панели лайкнутых станций. Они не
+подменяют snapshot текущего радио и очищаются после разрыва Binder-соединения.
 
 `COMMAND_RESULT` содержит `requestId`, `status`, `message`, `generation`. Статусы v1:
 
@@ -138,6 +154,9 @@ estimated = position
 AtlasMediaApi читает доступный bitmap/URI, уменьшает максимальную сторону до 512 px, сохраняет JPEG
 в private cache и публикует собственный `content://` FileProvider URI. Bitmap через Messenger не
 передаётся. При unregister/Binder death URI grant отзывается.
+
+Обложки элементов `RADIO_STATIONS` используют тот же механизм временных URI grants. Виджет
+декодирует миниатюры вне main thread, ограничивает их размер и держит небольшой LRU-кэш.
 
 AtlasMediaWidget связывает decode с `artworkRevision` и `generation`: поздний результат старого
 трека не должен перезаписать новую или уже очищенную обложку.

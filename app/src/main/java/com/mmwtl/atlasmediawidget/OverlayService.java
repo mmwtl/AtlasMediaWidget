@@ -32,7 +32,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 
 public final class OverlayService extends Service
-        implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener {
+        implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener,
+        RadioArtworkLoader.Listener {
     static final String ACTION_START = "com.mmwtl.atlasmediawidget.action.START";
     static final String ACTION_STOP = "com.mmwtl.atlasmediawidget.action.STOP";
     static final String ACTION_REFRESH_STYLE = "com.mmwtl.atlasmediawidget.action.REFRESH_STYLE";
@@ -59,6 +60,7 @@ public final class OverlayService extends Service
     private ForegroundAppDetector foregroundDetector;
     private MediaBridgeClient bridge;
     private ArtworkLoader artworkLoader;
+    private RadioArtworkLoader radioArtworkLoader;
     private MediaSourceLauncher mediaSourceLauncher;
     private MediaCardView card;
     private WindowManager.LayoutParams cardParams;
@@ -80,6 +82,9 @@ public final class OverlayService extends Service
     private boolean visibilityReceiverRegistered;
     private boolean destroyed;
     private long fastProbeUntil;
+    private RadioStationLists radioStations = RadioStationLists.EMPTY;
+    private boolean radioStationsRequestInFlight;
+    private int pendingRadioDirection;
 
     private final Runnable transportReconcile = () -> {
         if (bridgeState == MediaBridgeClient.State.CONNECTED) {
@@ -216,6 +221,7 @@ public final class OverlayService extends Service
         prefs = new Prefs(this);
         windowManager = getSystemService(WindowManager.class);
         artworkLoader = new ArtworkLoader(this, this);
+        radioArtworkLoader = new RadioArtworkLoader(this, this);
         mediaSourceLauncher = new MediaSourceLauncher(this);
         bridge = new MediaBridgeClient(this, this);
         createNotificationChannel();
@@ -261,6 +267,7 @@ public final class OverlayService extends Service
         if (artworkLoader != null) {
             expectedArtworkToken = artworkLoader.shutdown();
         }
+        if (radioArtworkLoader != null) radioArtworkLoader.shutdown();
         stopForeground(STOP_FOREGROUND_REMOVE);
         running = false;
         if (instance == this) instance = null;
@@ -380,6 +387,7 @@ public final class OverlayService extends Service
         if (state == MediaBridgeClient.State.CONNECTED) {
             reducer.onConnected(SystemClock.elapsedRealtime());
             bridge.requestSnapshot();
+            requestRadioStations();
         } else if (state == MediaBridgeClient.State.DISCONNECTED
                 || state == MediaBridgeClient.State.INCOMPATIBLE) {
             if (artworkLoader != null) expectedArtworkToken = artworkLoader.clear();
@@ -388,6 +396,11 @@ public final class OverlayService extends Service
             main.removeCallbacks(transportReconcile);
             main.removeCallbacks(snapshotReconcile);
             reducer.onDisconnected(SystemClock.elapsedRealtime());
+            radioStations = RadioStationLists.EMPTY;
+            radioStationsRequestInFlight = false;
+            pendingRadioDirection = 0;
+            if (radioArtworkLoader != null) radioArtworkLoader.clear();
+            if (card != null) card.setRadioStations(RadioStationLists.EMPTY);
         }
         renderCurrent();
         scheduleSnapshotReconcile();
@@ -431,6 +444,42 @@ public final class OverlayService extends Service
         }
     }
 
+    @Override public void onRadioStations(RadioStationLists lists) {
+        radioStationsRequestInFlight = false;
+        radioStations = lists == null ? RadioStationLists.EMPTY : lists;
+        AppLog.info("Radio station lists received: saved=" + radioStations.saved.size()
+                + " favorites=" + radioStations.favorites.size()
+                + " generation=" + radioStations.generation);
+        if (card != null) card.setRadioStations(radioStations);
+        int direction = pendingRadioDirection;
+        pendingRadioDirection = 0;
+        if (direction != 0) {
+            MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+            RadioStation target = RadioStationNavigator.adjacent(
+                    radioStations.saved, visible, direction);
+            if (target == null) {
+                if (card != null) card.showTransientStatus("Нет сохранённых станций", true);
+            } else {
+                tuneRadio(target);
+            }
+        }
+    }
+
+    @Override public void onRadioStationsError(int status, String message) {
+        radioStationsRequestInFlight = false;
+        pendingRadioDirection = 0;
+        radioStations = RadioStationLists.EMPTY;
+        String detail = switch (status) {
+            case 5 -> "Радиосервис недоступен";
+            case 6 -> "Списки радиостанций не поддерживаются";
+            default -> message == null || message.isBlank()
+                    ? "Список радиостанций недоступен (" + status + ')' : message;
+        };
+        AppLog.info("Radio station list request failed: status=" + status
+                + " message=" + detail);
+        if (card != null) card.setRadioStationsError(detail);
+    }
+
     @Override public boolean onDragTouch(View view, MotionEvent event) {
         if (card == null || cardParams == null) return false;
         switch (event.getActionMasked()) {
@@ -462,6 +511,22 @@ public final class OverlayService extends Service
     }
 
     @Override public void onCommand(String command) {
+        if (prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false)
+                && visibleSource() == MediaSource.Id.RADIO
+                && ("PREVIOUS".equals(command) || "NEXT".equals(command))) {
+            MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+            RadioStation target = RadioStationNavigator.adjacent(
+                    radioStations.saved, visible, "NEXT".equals(command) ? 1 : -1);
+            if (target == null) {
+                pendingRadioDirection = "NEXT".equals(command) ? 1 : -1;
+                requestRadioStations();
+                if (card != null) card.showTransientStatus(
+                        "Загрузка сохранённых станций…", false);
+                return;
+            }
+            tuneRadio(target);
+            return;
+        }
         beginTransportReconciliation();
         String requestId = bridge.sendCommand(command);
         AppLog.info("Sending media command request=" + requestId + " command=" + command
@@ -481,6 +546,43 @@ public final class OverlayService extends Service
         String requestId = bridge.setSource(source);
         AppLog.info("Sending media command request=" + requestId + " command=SET_SOURCE"
                 + " source=" + source);
+    }
+
+    @Override public void onRadioStationsRequested() {
+        requestRadioStations();
+    }
+
+    @Override public void onRadioStation(RadioStation station) {
+        tuneRadio(station);
+    }
+
+    @Override public void onRadioArtworkRequested(RadioStation station) {
+        if (radioArtworkLoader != null) radioArtworkLoader.load(station);
+    }
+
+    @Override public void onRadioArtwork(String key, android.graphics.Bitmap bitmap) {
+        if (card != null) card.setRadioArtwork(key, bitmap);
+    }
+
+    private void requestRadioStations() {
+        if (radioStationsRequestInFlight
+                || bridgeState != MediaBridgeClient.State.CONNECTED) return;
+        radioStationsRequestInFlight = true;
+        bridge.requestRadioStations();
+    }
+
+    private void tuneRadio(RadioStation station) {
+        MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        if (station == null || visible == null
+                || !visible.supports(MediaBridgeContract.CAP_TUNE_RADIO)) {
+            if (card != null) card.showTransientStatus(
+                    "Прямое переключение радио недоступно", true);
+            return;
+        }
+        beginTransportReconciliation();
+        String requestId = bridge.tuneRadio(station);
+        AppLog.info("Sending radio tune request=" + requestId + " station=" + station.id
+                + " frequencyKHz=" + station.frequencyKHz + " band=" + station.band);
     }
 
     private void beginTransportReconciliation() {
@@ -527,6 +629,7 @@ public final class OverlayService extends Service
                     AppLog.info("Overlay card reattached in "
                             + (SystemClock.elapsedRealtime() - createdAt) + " ms");
                     renderCurrent();
+                    card.setRadioStations(radioStations);
                     MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
                     if (visible != null) loadArtwork(visible);
                     main.removeCallbacks(progressTick);
@@ -551,7 +654,8 @@ public final class OverlayService extends Service
         int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
         MediaCardView candidate = new MediaCardView(this,
                 prefs.cardWidthDp(style), prefs.cardHeightDp(style),
-                maxWidth, maxHeight, style, prefs.appearance(style), this);
+                maxWidth, maxHeight, style, prefs.appearance(style),
+                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false), this);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
                 candidate.cardHeight(),
@@ -579,6 +683,7 @@ public final class OverlayService extends Service
             AppLog.info("Overlay card attached t+"
                     + (SystemClock.elapsedRealtime() - createdAt) + " ms after service creation");
             renderCurrent();
+            card.setRadioStations(radioStations);
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
             if (visible != null) loadArtwork(visible);
             bridge.requestSnapshot();

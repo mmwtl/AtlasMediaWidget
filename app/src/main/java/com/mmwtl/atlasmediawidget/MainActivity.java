@@ -42,6 +42,7 @@ public final class MainActivity extends ScaledActivity {
     private TextView bridgeStatus;
     private Button serviceButton;
     private Switch autoStart;
+    private Switch radioSavedNavigation;
     private Button exportSettingsButton;
     private Button importSettingsButton;
     private RadioButton compactStyle;
@@ -77,6 +78,9 @@ public final class MainActivity extends ScaledActivity {
         @Override public void onSeek(long positionMs) {}
         @Override public void onSource(MediaSource.Id source) {}
         @Override public void onOpenSource() {}
+        @Override public void onRadioStationsRequested() {}
+        @Override public void onRadioStation(RadioStation station) {}
+        @Override public void onRadioArtworkRequested(RadioStation station) {}
     };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -448,6 +452,25 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams noteParams = fullWrap();
         noteParams.topMargin = Ui.dp(this, 8);
         behaviorCard.addView(note, noteParams);
+        radioSavedNavigation = new Switch(this);
+        radioSavedNavigation.setText("Переключать радио по сохранённым станциям");
+        radioSavedNavigation.setTextColor(Ui.PRIMARY);
+        radioSavedNavigation.setTextSize(15);
+        radioSavedNavigation.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, checked);
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams radioNavigationParams = fullWrap();
+        radioNavigationParams.topMargin = Ui.dp(this, 14);
+        behaviorCard.addView(radioSavedNavigation, radioNavigationParams);
+        TextView radioNavigationHint = text(
+                "Когда Радио активно, кнопки назад и вперёд напрямую выбирают соседнюю "
+                        + "станцию из сохранённого списка вместо поиска по эфиру.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams radioHintParams = fullWrap();
+        radioHintParams.topMargin = Ui.dp(this, 5);
+        behaviorCard.addView(radioNavigationHint, radioHintParams);
 
         LinearLayout scaleCard = card();
         scaleCard.addView(text(getString(R.string.scale_title),
@@ -464,7 +487,7 @@ public final class MainActivity extends ScaledActivity {
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView settingsBackupHint = text(
                 "JSON содержит внешний вид обоих форматов карточки, положение overlay, "
-                        + "масштаб и автозапуск. Разрешения и состояние "
+                        + "масштаб, поведение радио и автозапуск. Разрешения и состояние "
                         + "запущенного сервиса не переносятся.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams settingsBackupHintParams = fullWrap();
@@ -566,6 +589,8 @@ public final class MainActivity extends ScaledActivity {
         serviceButton.setBackground(Ui.background(enabled ? Ui.NESTED : Ui.ACCENT, 8, this));
         serviceButton.setEnabled(enabled || overlay && usage && accessibility);
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
+        radioSavedNavigation.setChecked(
+                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false));
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         refreshingStyle = true;
@@ -935,7 +960,7 @@ public final class MainActivity extends ScaledActivity {
         MediaCardView preview = new MediaCardView(widgetContext,
                 configuredWidthDp, configuredHeightDp,
                 configuredWidthPx, configuredHeightPx, currentStyle(), currentAppearance(),
-                previewListener);
+                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false), previewListener);
         preview.renderSnapshot(previewSnapshot(), true);
         preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 

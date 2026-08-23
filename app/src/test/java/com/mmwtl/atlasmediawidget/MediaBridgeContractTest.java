@@ -13,8 +13,13 @@ public class MediaBridgeContractTest {
         assertEquals(1, MediaBridgeContract.VERSION);
         assertEquals(1, MediaBridgeContract.REGISTER);
         assertEquals(4, MediaBridgeContract.COMMAND);
+        assertEquals(5, MediaBridgeContract.GET_RADIO_STATIONS);
         assertEquals(100, MediaBridgeContract.REGISTERED);
         assertEquals(103, MediaBridgeContract.ERROR);
+        assertEquals(104, MediaBridgeContract.RADIO_STATIONS);
         assertEquals(0x40L, MediaBridgeContract.CAP_SET_SOURCE);
+        assertEquals(0x80L, MediaBridgeContract.CAP_TUNE_RADIO);
+        assertEquals("radioFavoriteStations",
+                MediaBridgeContract.K_RADIO_FAVORITE_STATIONS);
     }
 }

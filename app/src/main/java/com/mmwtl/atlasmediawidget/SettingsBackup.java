@@ -16,12 +16,13 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 2;
+    private static final int SCHEMA_VERSION = 3;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
         final boolean autoStart;
+        final boolean radioSavedNavigation;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
         final Integer positionX;
@@ -29,10 +30,11 @@ final class SettingsBackup {
         final StyleData compact;
         final StyleData square;
 
-        Data(boolean autoStart, int appUiScaleTenths,
+        Data(boolean autoStart, boolean radioSavedNavigation, int appUiScaleTenths,
                 CardStyle selectedStyle, Integer positionX, Integer positionY,
                 StyleData compact, StyleData square) throws IOException {
             this.autoStart = autoStart;
+            this.radioSavedNavigation = radioSavedNavigation;
             this.appUiScaleTenths = requireRange("settings.uiScaleTenths", appUiScaleTenths,
                     ScaledActivity.MIN_SCALE_TENTHS, ScaledActivity.MAX_SCALE_TENTHS);
             if (selectedStyle == null) throw invalid("Не указан формат карточки");
@@ -118,6 +120,7 @@ final class SettingsBackup {
         Integer positionY = positionX == null ? null : y;
         return new Data(
                 prefs.getBoolean(Prefs.KEY_AUTO_START, false),
+                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 clamp(prefs.getInt(Prefs.KEY_APP_UI_SCALE_TENTHS,
                                 ScaledActivity.DEFAULT_SCALE_TENTHS),
                         ScaledActivity.MIN_SCALE_TENTHS, ScaledActivity.MAX_SCALE_TENTHS),
@@ -166,6 +169,7 @@ final class SettingsBackup {
             root.put("appVersion", appVersion == null ? "" : appVersion);
             JSONObject settings = new JSONObject();
             settings.put("autoStart", data.autoStart);
+            settings.put("radioSavedNavigation", data.radioSavedNavigation);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -213,6 +217,8 @@ final class SettingsBackup {
             }
             return new Data(
                     requireBoolean(settings, "autoStart", "settings.autoStart"),
+                    version >= 3 && requireBoolean(settings, "radioSavedNavigation",
+                            "settings.radioSavedNavigation"),
                     requireInt(settings, "uiScaleTenths", "settings.uiScaleTenths"),
                     parseStyleName(requireString(settings, "selectedCardStyle",
                             "settings.selectedCardStyle")),
