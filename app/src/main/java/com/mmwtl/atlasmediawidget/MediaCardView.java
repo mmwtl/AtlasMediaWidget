@@ -447,7 +447,9 @@ final class MediaCardView extends FrameLayout {
             currentArtworkKeys.add(station.artworkKey());
         }
         radioArtwork.keySet().retainAll(currentArtworkKeys);
-        failedRadioArtwork.retainAll(currentArtworkKeys);
+        // A failed content-provider read is temporary. A fresh station-list response also
+        // refreshes URI grants, so allow one new bounded loader cycle for its current entries.
+        failedRadioArtwork.clear();
         favoritesLoading = false;
         favoritesAdapter.notifyDataSetChanged();
         updateFavoritesEmptyState();

@@ -17,6 +17,8 @@ import java.util.concurrent.Executors;
 final class RadioArtworkLoader {
     private static final int MAX_THUMBNAIL_DIMENSION_PX = 256;
     private static final int CACHE_ENTRIES = 32;
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 250L;
 
     interface Listener {
         void onRadioArtwork(String key, Bitmap bitmap);
@@ -48,24 +50,7 @@ final class RadioArtworkLoader {
             if (!inFlight.add(key)) return;
             requestGeneration = generation;
         }
-        try {
-            executor.execute(() -> {
-                Bitmap bitmap = decode(station.artworkUri);
-                main.post(() -> {
-                    synchronized (inFlight) {
-                        inFlight.remove(key);
-                        if (requestGeneration != generation) return;
-                    }
-                    if (bitmap != null) cache.put(key, bitmap);
-                    listener.onRadioArtwork(key, bitmap);
-                });
-            });
-        } catch (RuntimeException error) {
-            synchronized (inFlight) {
-                inFlight.remove(key);
-            }
-            AppLog.warn("Cannot schedule radio artwork decode", error);
-        }
+        decodeAsync(station.artworkUri, key, requestGeneration, 1);
     }
 
     void clear() {
@@ -79,6 +64,43 @@ final class RadioArtworkLoader {
     void shutdown() {
         clear();
         executor.shutdownNow();
+    }
+
+    private void decodeAsync(String uriValue, String key, long requestGeneration, int attempt) {
+        if (!isCurrent(key, requestGeneration)) return;
+        try {
+            executor.execute(() -> {
+                Bitmap bitmap = decode(uriValue);
+                if (bitmap == null && shouldRetry(attempt)
+                        && isCurrent(key, requestGeneration)) {
+                    main.postDelayed(
+                            () -> decodeAsync(uriValue, key, requestGeneration, attempt + 1),
+                            retryDelayMillis(attempt));
+                    return;
+                }
+                main.post(() -> complete(key, requestGeneration, bitmap));
+            });
+        } catch (RuntimeException error) {
+            AppLog.warn("Cannot schedule radio artwork decode", error);
+            main.post(() -> complete(key, requestGeneration, null));
+        }
+    }
+
+    private boolean isCurrent(String key, long requestGeneration) {
+        synchronized (inFlight) {
+            return requestGeneration == generation && inFlight.contains(key);
+        }
+    }
+
+    private void complete(String key, long requestGeneration, Bitmap bitmap) {
+        synchronized (inFlight) {
+            if (requestGeneration != generation || !inFlight.remove(key)) {
+                if (bitmap != null) bitmap.recycle();
+                return;
+            }
+        }
+        if (bitmap != null) cache.put(key, bitmap);
+        listener.onRadioArtwork(key, bitmap);
     }
 
     private Bitmap decode(String uriValue) {
@@ -111,5 +133,13 @@ final class RadioArtworkLoader {
             sample <<= 1;
         }
         return sample;
+    }
+
+    static boolean shouldRetry(int attempt) {
+        return attempt > 0 && attempt < MAX_ATTEMPTS;
+    }
+
+    static long retryDelayMillis(int attempt) {
+        return RETRY_DELAY_MS * Math.max(1, attempt);
     }
 }
