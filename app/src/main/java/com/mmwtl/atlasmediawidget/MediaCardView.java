@@ -44,6 +44,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     private static final int PROGRESS_MAX = 10_000;
+    private static final long CHOOSER_AUTO_HIDE_MS = 10_000L;
     private static final MediaSource.Id[] WIDGET_SOURCES = {
             MediaSource.Id.RADIO, MediaSource.Id.BT,
             MediaSource.Id.USB, MediaSource.Id.ONLINE, MediaSource.Id.CPAA
@@ -58,6 +59,7 @@ final class MediaCardView extends FrameLayout {
     private final float uiScale;
     private final WidgetAppearance appearance;
     private final boolean radioSavedNavigation;
+    private final boolean dragHandleVisible;
     private final ImageView artwork;
     private final ImageView artworkThumbnail;
     private final ImageView placeholder;
@@ -79,7 +81,7 @@ final class MediaCardView extends FrameLayout {
     private final TransportButton previous;
     private final TransportButton playPause;
     private final TransportButton next;
-    private final ImageView favoritesButton;
+    private final LinearLayout favoritesButton;
     private final FrameLayout favoritesChooser;
     private final TextView favoritesEmpty;
     private final ListView favoritesList;
@@ -99,15 +101,18 @@ final class MediaCardView extends FrameLayout {
     private MediaSnapshot pendingSeekSnapshot;
     private long lastElapsedSecond = Long.MIN_VALUE;
     private int lastRenderedProgress = Integer.MIN_VALUE;
+    private final Runnable chooserAutoHide = this::hideOpenChooser;
 
     MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
             int maxWidthPx, int maxHeightPx, CardStyle style,
-            WidgetAppearance appearance, boolean radioSavedNavigation, Listener listener) {
+            WidgetAppearance appearance, boolean radioSavedNavigation,
+            boolean dragHandleVisible, Listener listener) {
         super(context);
         this.listener = listener;
         this.style = style;
         this.appearance = appearance;
         this.radioSavedNavigation = radioSavedNavigation;
+        this.dragHandleVisible = dragHandleVisible;
         cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
                 Ui.dp(context, requestedWidthDp)));
         cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
@@ -151,12 +156,18 @@ final class MediaCardView extends FrameLayout {
         border.setBackground(borderDrawable);
         addView(border, match());
 
+        int topPillHeightDp = Math.max(38, appearance.topRowTextSizeSp + 24);
+        int topPillIconDp = Math.max(21, appearance.topRowTextSizeSp + 12);
+        int topEndInsetDp = dragHandleVisible ? 47 : Math.max(8,
+                appearance.contentInsetDp - (style == CardStyle.COMPACT ? 4 : 8));
+
         sourcePill = new LinearLayout(context);
         sourcePill.setGravity(Gravity.CENTER_VERTICAL);
         sourcePill.setPadding(d(11), 0, d(15), 0);
         sourcePill.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
         sourceGlyph = new SourceGlyphView(context);
-        sourcePill.addView(sourceGlyph, new LinearLayout.LayoutParams(d(25), d(25)));
+        sourcePill.addView(sourceGlyph,
+                new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
         TextView sourceDot = text("●", 8, 0xFF58A6FF, Typeface.BOLD);
         LinearLayout.LayoutParams dotParams = wrap();
         dotParams.leftMargin = d(7);
@@ -169,7 +180,7 @@ final class MediaCardView extends FrameLayout {
         sourcePill.addView(sourceLabel, sourceTextParams);
         sourcePill.setOnClickListener(v -> toggleSourceChooser());
         LayoutParams sourcePillParams = new LayoutParams(LayoutParams.WRAP_CONTENT,
-                d(Math.max(38, appearance.topRowTextSizeSp + 24)));
+                d(topPillHeightDp));
         sourcePillParams.gravity = Gravity.TOP | Gravity.START;
         sourcePillParams.leftMargin = bx(Math.max(8,
                 appearance.contentInsetDp - (style == CardStyle.COMPACT ? 4 : 8)));
@@ -188,29 +199,47 @@ final class MediaCardView extends FrameLayout {
         statusParams.rightMargin = bx(49);
         addView(statusPill, statusParams);
 
-        favoritesButton = new ImageView(context);
-        favoritesButton.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        favoritesButton.setImageResource(R.drawable.ic_radio_favorites);
-        favoritesButton.setImageTintList(
+        favoritesButton = new LinearLayout(context);
+        favoritesButton.setGravity(Gravity.CENTER_VERTICAL);
+        favoritesButton.setPadding(d(11), 0, d(15), 0);
+        ImageView favoritesIcon = new ImageView(context);
+        favoritesIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        favoritesIcon.setImageResource(R.drawable.ic_radio_favorites);
+        favoritesIcon.setImageTintList(
                 android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
-        favoritesButton.setPadding(d(10), d(10), d(10), d(10));
+        favoritesButton.addView(favoritesIcon,
+                new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
+        TextView favoritesDot = text("●", 8, 0xFF58A6FF, Typeface.BOLD);
+        LinearLayout.LayoutParams favoritesDotParams = wrap();
+        favoritesDotParams.leftMargin = d(7);
+        favoritesButton.addView(favoritesDot, favoritesDotParams);
+        TextView favoritesLabel = text("ИЗБРАННОЕ", appearance.topRowTextSizeSp,
+                Ui.PRIMARY, Typeface.BOLD);
+        favoritesLabel.setLetterSpacing(0.05f);
+        LinearLayout.LayoutParams favoritesTextParams = wrap();
+        favoritesTextParams.leftMargin = d(5);
+        favoritesButton.addView(favoritesLabel, favoritesTextParams);
         favoritesButton.setClickable(true);
         favoritesButton.setFocusable(true);
         favoritesButton.setContentDescription("Лайкнутые радиостанции");
-        favoritesButton.setBackground(pillBackground(context, 0xB333333B, 0x66596872, d(19)));
+        favoritesButton.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
         favoritesButton.setVisibility(GONE);
         favoritesButton.setOnClickListener(v -> toggleFavoritesChooser());
-        LayoutParams favoriteButtonParams = new LayoutParams(d(42), d(42));
+        LayoutParams favoriteButtonParams = new LayoutParams(
+                LayoutParams.WRAP_CONTENT, d(topPillHeightDp));
         favoriteButtonParams.gravity = Gravity.TOP | Gravity.END;
-        favoriteButtonParams.topMargin = by(4);
-        favoriteButtonParams.rightMargin = bx(47);
+        favoriteButtonParams.topMargin = by(appearance.topInsetDp);
+        favoriteButtonParams.rightMargin = bx(topEndInsetDp);
         addView(favoritesButton, favoriteButtonParams);
+        favoritesButton.addOnLayoutChangeListener((view, left, top, right, bottom,
+                oldLeft, oldTop, oldRight, oldBottom) -> updateStatusPillPosition());
 
         TextView dragHandle = text("⋮", style == CardStyle.COMPACT ? 27 : 29,
                 Ui.SECONDARY, Typeface.BOLD);
         dragHandle.setGravity(Gravity.CENTER);
         dragHandle.setContentDescription("Перетащить виджет");
         dragHandle.setOnTouchListener(listener::onDragTouch);
+        dragHandle.setVisibility(dragHandleVisible ? VISIBLE : GONE);
         LayoutParams dragParams = new LayoutParams(d(43), d(50));
         dragParams.gravity = Gravity.TOP | Gravity.END;
         dragParams.topMargin = by(5);
@@ -757,12 +786,14 @@ final class MediaCardView extends FrameLayout {
             sourceChooser.setVisibility(VISIBLE);
             sourceChooser.bringToFront();
             sourcePill.bringToFront();
+            scheduleChooserAutoHide();
             updateContentLayout();
         }
     }
 
     private void hideSourceChooser() {
         sourceChooser.setVisibility(GONE);
+        cancelChooserAutoHideIfClosed();
         updateContentLayout();
     }
 
@@ -778,13 +809,40 @@ final class MediaCardView extends FrameLayout {
         favoritesChooser.bringToFront();
         favoritesButton.bringToFront();
         listener.onRadioStationsRequested();
+        scheduleChooserAutoHide();
         updateContentLayout();
     }
 
     private void hideFavoritesChooser() {
         if (favoritesChooser.getVisibility() == GONE) return;
         favoritesChooser.setVisibility(GONE);
+        cancelChooserAutoHideIfClosed();
         updateContentLayout();
+    }
+
+    private void scheduleChooserAutoHide() {
+        removeCallbacks(chooserAutoHide);
+        postDelayed(chooserAutoHide, CHOOSER_AUTO_HIDE_MS);
+    }
+
+    private void cancelChooserAutoHideIfClosed() {
+        if (sourceChooser.getVisibility() != VISIBLE
+                && favoritesChooser.getVisibility() != VISIBLE) {
+            removeCallbacks(chooserAutoHide);
+        }
+    }
+
+    private void hideOpenChooser() {
+        if (sourceChooser.getVisibility() == VISIBLE) {
+            hideSourceChooser();
+        } else if (favoritesChooser.getVisibility() == VISIBLE) {
+            hideFavoritesChooser();
+        }
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        removeCallbacks(chooserAutoHide);
+        super.onDetachedFromWindow();
     }
 
     private void updateFavoritesEmptyState() {
@@ -900,9 +958,15 @@ final class MediaCardView extends FrameLayout {
 
     private void updateStatusPillPosition() {
         LayoutParams params = (LayoutParams) statusPill.getLayoutParams();
-        int rightMargin = favoritesButton != null && favoritesButton.getVisibility() == VISIBLE
-                ? 94 : 49;
-        params.rightMargin = bx(rightMargin);
+        if (favoritesButton != null && favoritesButton.getVisibility() == VISIBLE) {
+            LayoutParams favoritesParams = (LayoutParams) favoritesButton.getLayoutParams();
+            int fallbackWidth = d(Math.max(128, appearance.topRowTextSizeSp * 8 + 55));
+            params.rightMargin = favoritesParams.rightMargin
+                    + Math.max(favoritesButton.getWidth(), fallbackWidth) + d(8);
+        } else {
+            params.rightMargin = bx(dragHandleVisible ? 49 : Math.max(8,
+                    appearance.contentInsetDp - (style == CardStyle.COMPACT ? 4 : 8)));
+        }
         statusPill.setLayoutParams(params);
     }
 

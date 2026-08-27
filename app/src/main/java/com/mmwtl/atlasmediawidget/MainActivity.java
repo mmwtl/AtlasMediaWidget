@@ -43,6 +43,7 @@ public final class MainActivity extends ScaledActivity {
     private Button serviceButton;
     private Switch autoStart;
     private Switch radioSavedNavigation;
+    private Switch dragHandleVisible;
     private Button exportSettingsButton;
     private Button importSettingsButton;
     private RadioButton compactStyle;
@@ -285,7 +286,8 @@ public final class MainActivity extends ScaledActivity {
                 Prefs.MIN_TOP_INSET_DP, Prefs.MAX_TOP_INSET_DP);
         contentInsetSetting = addLabeledSeek(typographyCard, "Боковой отступ контента",
                 Prefs.MIN_CONTENT_INSET_DP, Prefs.MAX_CONTENT_INSET_DP);
-        topRowTextSetting = addLabeledSeek(typographyCard, "Размер текста верхней строки",
+        topRowTextSetting = addLabeledSeek(typographyCard,
+                "Размер плашек источника и избранного",
                 Prefs.MIN_TOP_ROW_TEXT_SIZE_SP, Prefs.MAX_TOP_ROW_TEXT_SIZE_SP);
         titleTextSetting = addLabeledSeek(typographyCard, "Размер названия",
                 Prefs.MIN_TITLE_TEXT_SIZE_SP, Prefs.MAX_TITLE_TEXT_SIZE_SP);
@@ -446,7 +448,7 @@ public final class MainActivity extends ScaledActivity {
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView note = text(
                 "Карточка отображается только когда HOME находится на переднем плане. "
-                        + "Перетаскивание выполняется за кнопку ⋮ в правом верхнем углу. "
+                        + "Перетаскивание выполняется за точки ⋮ в правом верхнем углу. "
                         + "Нажатие на свободную область открывает активный медиаисточник.",
                 14, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams noteParams = fullWrap();
@@ -471,6 +473,25 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams radioHintParams = fullWrap();
         radioHintParams.topMargin = Ui.dp(this, 5);
         behaviorCard.addView(radioNavigationHint, radioHintParams);
+        dragHandleVisible = new Switch(this);
+        dragHandleVisible.setText("Показывать точки перемещения на виджете");
+        dragHandleVisible.setTextColor(Ui.PRIMARY);
+        dragHandleVisible.setTextSize(15);
+        dragHandleVisible.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, checked);
+            renderPreview();
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams dragHandleParams = fullWrap();
+        dragHandleParams.topMargin = Ui.dp(this, 14);
+        behaviorCard.addView(dragHandleVisible, dragHandleParams);
+        TextView dragHandleHint = text(
+                "Если точки скрыты, включите их здесь снова, чтобы переместить виджет.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams dragHandleHintParams = fullWrap();
+        dragHandleHintParams.topMargin = Ui.dp(this, 5);
+        behaviorCard.addView(dragHandleHint, dragHandleHintParams);
 
         LinearLayout scaleCard = card();
         scaleCard.addView(text(getString(R.string.scale_title),
@@ -591,6 +612,8 @@ public final class MainActivity extends ScaledActivity {
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
         radioSavedNavigation.setChecked(
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false));
+        dragHandleVisible.setChecked(
+                prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         refreshingStyle = true;
@@ -960,7 +983,8 @@ public final class MainActivity extends ScaledActivity {
         MediaCardView preview = new MediaCardView(widgetContext,
                 configuredWidthDp, configuredHeightDp,
                 configuredWidthPx, configuredHeightPx, currentStyle(), currentAppearance(),
-                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false), previewListener);
+                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
+                prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true), previewListener);
         preview.renderSnapshot(previewSnapshot(), true);
         preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 
@@ -990,17 +1014,17 @@ public final class MainActivity extends ScaledActivity {
         long capabilities = MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_PAUSE
                 | MediaBridgeContract.CAP_TOGGLE | MediaBridgeContract.CAP_NEXT
                 | MediaBridgeContract.CAP_PREVIOUS | MediaBridgeContract.CAP_SEEK
-                | MediaBridgeContract.CAP_SET_SOURCE;
+                | MediaBridgeContract.CAP_SET_SOURCE | MediaBridgeContract.CAP_TUNE_RADIO;
         return new MediaSnapshot(
                 MediaBridgeContract.VERSION, 1L, System.currentTimeMillis(), true, 0, "",
-                MediaSource.Id.BT, "",
+                MediaSource.Id.RADIO, "",
                 Arrays.asList(
-                        new MediaSource(MediaSource.Id.BT, true, true, true, capabilities),
-                        new MediaSource(MediaSource.Id.RADIO, true, true, false, capabilities),
+                        new MediaSource(MediaSource.Id.BT, true, true, false, capabilities),
+                        new MediaSource(MediaSource.Id.RADIO, true, true, true, capabilities),
                         new MediaSource(MediaSource.Id.USB, true, true, false, capabilities),
                         new MediaSource(MediaSource.Id.ONLINE, true, true, false, capabilities)),
-                "preview", "Bluetooth", "preview-track", "Ветер перемен",
-                "Кино", "Группа крови", 232_000L, 84_000L,
+                "preview", "Радио", "preview-station", "Радио Дача",
+                "98.8 FM", "", 0L, 0L,
                 SystemClock.elapsedRealtime(), 1f, MediaSnapshot.STATE_PLAYING,
                 0, "", 0L, capabilities, "", 0L);
     }

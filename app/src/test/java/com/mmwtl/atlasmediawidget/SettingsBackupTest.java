@@ -20,6 +20,7 @@ public final class SettingsBackupTest {
 
         assertTrue(restored.autoStart);
         assertTrue(restored.radioSavedNavigation);
+        assertTrue(restored.dragHandleVisible);
         assertEquals(17, restored.appUiScaleTenths);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(Integer.valueOf(321), restored.positionX);
@@ -29,7 +30,7 @@ public final class SettingsBackupTest {
         assertEquals(27, restored.square.appearance.contentInsetDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(3, root.getInt("schemaVersion"));
+        assertEquals(4, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -45,10 +46,17 @@ public final class SettingsBackupTest {
         assertNull(restored.positionY);
     }
 
+    @Test public void jsonRoundTripPreservesHiddenDragHandle() throws Exception {
+        SettingsBackup.Data restored = SettingsBackup.decode(SettingsBackup.encode(
+                data(15, CardStyle.SQUARE, null, null, false), "test"));
+
+        assertFalse(restored.dragHandleVisible);
+    }
+
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 4);
+        root.put("schemaVersion", 5);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
@@ -71,6 +79,17 @@ public final class SettingsBackupTest {
 
         assertEquals(14, restored.compact.appearance.metadataProgressGapDp);
         assertEquals(14, restored.square.appearance.metadataProgressGapDp);
+    }
+
+    @Test public void schemaThreeDefaultsDragHandleToVisible() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.SQUARE, null, null, false), "test"));
+        root.put("schemaVersion", 3);
+        root.getJSONObject("settings").remove("dragHandleVisible");
+
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+
+        assertTrue(restored.dragHandleVisible);
     }
 
     @Test public void rejectsValuesOutsideUiLimits() throws Exception {
@@ -151,12 +170,18 @@ public final class SettingsBackupTest {
         SettingsBackup.Data restored = SettingsBackup.decode(json);
         assertTrue(restored.autoStart);
         assertFalse(restored.radioSavedNavigation);
+        assertTrue(restored.dragHandleVisible);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(500, restored.compact.widthDp);
     }
 
     private static SettingsBackup.Data data(int scale, CardStyle selected,
             Integer x, Integer y) throws IOException {
+        return data(scale, selected, x, y, true);
+    }
+
+    private static SettingsBackup.Data data(int scale, CardStyle selected,
+            Integer x, Integer y, boolean dragHandleVisible) throws IOException {
         WidgetAppearance compactAppearance = WidgetAppearance.defaults(CardStyle.COMPACT);
         WidgetAppearance squareDefaults = WidgetAppearance.defaults(CardStyle.SQUARE);
         WidgetAppearance squareAppearance = new WidgetAppearance(
@@ -177,6 +202,7 @@ public final class SettingsBackupTest {
         return new SettingsBackup.Data(
                 true,
                 true,
+                dragHandleVisible,
                 scale,
                 selected,
                 x,

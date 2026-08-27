@@ -15,6 +15,7 @@ final class Prefs {
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     static final String KEY_RADIO_SAVED_NAVIGATION = "radio_saved_navigation";
+    static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     private static final String KEY_METADATA_PROGRESS_GAP_PREFIX = "metadata_progress_gap_";
@@ -52,7 +53,7 @@ final class Prefs {
     static final int MIN_CONTENT_INSET_DP = 12;
     static final int MAX_CONTENT_INSET_DP = 60;
     static final int MIN_TOP_ROW_TEXT_SIZE_SP = 9;
-    static final int MAX_TOP_ROW_TEXT_SIZE_SP = 20;
+    static final int MAX_TOP_ROW_TEXT_SIZE_SP = 28;
     static final int MIN_TITLE_TEXT_SIZE_SP = 16;
     static final int MAX_TITLE_TEXT_SIZE_SP = 44;
     static final int MIN_SUBTITLE_TEXT_SIZE_SP = 10;
@@ -246,6 +247,7 @@ final class Prefs {
         SharedPreferences.Editor editor = preferences.edit()
                 .putBoolean(KEY_AUTO_START, data.autoStart)
                 .putBoolean(KEY_RADIO_SAVED_NAVIGATION, data.radioSavedNavigation)
+                .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
                 .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);
         if (data.positionX == null) {
