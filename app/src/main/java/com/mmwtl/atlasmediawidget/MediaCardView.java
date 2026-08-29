@@ -885,7 +885,7 @@ final class MediaCardView extends FrameLayout {
                 cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 cover.setBackground(Ui.background(Ui.NESTED, 14 * uiScale, getContext()));
                 cover.setClipToOutline(true);
-                int logoSize = d(compact ? 64 : 104);
+                int logoSize = d(compact ? 72 : 128);
                 container.addView(cover, new LinearLayout.LayoutParams(
                         logoSize, logoSize));
                 LinearLayout labels = new LinearLayout(getContext());
@@ -894,29 +894,26 @@ final class MediaCardView extends FrameLayout {
                 TextView name = text("", style == CardStyle.COMPACT ? 15 : 18,
                         Ui.PRIMARY, Typeface.BOLD);
                 name.setGravity(compact ? Gravity.START : Gravity.CENTER);
-                name.setMaxLines(compact ? 1 : 2);
+                name.setMaxLines(1);
                 name.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams nameParams = fullWrap();
                 if (!compact) nameParams.topMargin = d(8);
                 labels.addView(name, nameParams);
-                TextView detail = text("", style == CardStyle.COMPACT ? 12 : 14,
-                        Ui.SECONDARY, Typeface.NORMAL);
-                detail.setGravity(compact ? Gravity.START : Gravity.CENTER);
-                labels.addView(detail, fullWrap());
                 LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
                         compact ? 0 : LayoutParams.MATCH_PARENT,
                         LayoutParams.WRAP_CONTENT, compact ? 1f : 0f);
                 if (compact) labelsParams.leftMargin = d(8);
                 container.addView(labels, labelsParams);
-                tile = new StationTile(container, cover, name, detail);
+                tile = new StationTile(container, cover, name);
                 container.setTag(tile);
                 convertView = container;
             } else {
                 tile = (StationTile) convertView.getTag();
             }
             RadioStation station = getItem(position);
-            tile.name.setText(station.displayName());
-            tile.detail.setText(station.displayDetail());
+            String detail = station.displayDetail();
+            String visibleName = station.name.isBlank() ? detail : station.name;
+            tile.name.setText(visibleName);
             Bitmap bitmap = radioArtwork.get(station.artworkKey());
             if (bitmap != null) {
                 tile.cover.setImageBitmap(bitmap);
@@ -933,8 +930,8 @@ final class MediaCardView extends FrameLayout {
                     listener.onRadioArtworkRequested(station);
                 }
             }
-            convertView.setContentDescription(station.displayName() + ", "
-                    + station.displayDetail());
+            convertView.setContentDescription(visibleName.equals(detail)
+                    ? visibleName : visibleName + ", " + detail);
             convertView.setOnClickListener(v -> {
                 hideFavoritesChooser();
                 listener.onRadioStation(station);
@@ -943,8 +940,7 @@ final class MediaCardView extends FrameLayout {
         }
     }
 
-    private record StationTile(LinearLayout container, ImageView cover,
-            TextView name, TextView detail) {}
+    private record StationTile(LinearLayout container, ImageView cover, TextView name) {}
 
     private void setElapsed(long milliseconds) {
         long second = milliseconds < 0L ? -1L : milliseconds / 1000L;
