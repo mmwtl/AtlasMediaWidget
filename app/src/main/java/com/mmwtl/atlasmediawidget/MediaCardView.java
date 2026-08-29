@@ -358,6 +358,11 @@ final class MediaCardView extends FrameLayout {
         favoritesGrid.setVerticalScrollBarEnabled(true);
         favoritesAdapter = new FavoriteStationAdapter();
         favoritesGrid.setAdapter(favoritesAdapter);
+        favoritesGrid.setOnItemClickListener((parent, view, position, id) -> {
+            RadioStation station = favoritesAdapter.getItem(position);
+            hideFavoritesChooser();
+            listener.onRadioStation(station);
+        });
         favoritesContent.addView(favoritesGrid,
                 new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
         favoritesChooser.addView(favoritesContent, match());
@@ -1003,10 +1008,6 @@ final class MediaCardView extends FrameLayout {
             }
             convertView.setContentDescription(visibleName.equals(detail)
                     ? visibleName : visibleName + ", " + detail);
-            convertView.setOnClickListener(v -> {
-                hideFavoritesChooser();
-                listener.onRadioStation(station);
-            });
             return convertView;
         }
     }
