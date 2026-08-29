@@ -327,10 +327,6 @@ final class MediaCardView extends FrameLayout {
                 pillBackground(context, 0xF0191D23, 0x77596872, d(22)));
         LinearLayout favoritesContent = new LinearLayout(context);
         favoritesContent.setOrientation(LinearLayout.VERTICAL);
-        TextView favoritesTitle = text("Лайкнутые станции",
-                style == CardStyle.COMPACT ? 16 : 19, Ui.PRIMARY, Typeface.BOLD);
-        favoritesTitle.setPadding(d(8), 0, d(8), d(6));
-        favoritesContent.addView(favoritesTitle, fullWrap());
         favoritesEmpty = text("Загрузка…", style == CardStyle.COMPACT ? 14 : 16,
                 Ui.SECONDARY, Typeface.NORMAL);
         favoritesEmpty.setGravity(Gravity.CENTER);
