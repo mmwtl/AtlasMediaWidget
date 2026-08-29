@@ -61,6 +61,8 @@ final class MediaCardView extends FrameLayout {
     private final WidgetAppearance appearance;
     private final boolean radioSavedNavigation;
     private final boolean dragHandleVisible;
+    private final int favoriteColumns;
+    private final int favoriteRows;
     private final ImageView artwork;
     private final ImageView artworkThumbnail;
     private final ImageView placeholder;
@@ -110,12 +112,27 @@ final class MediaCardView extends FrameLayout {
             int maxWidthPx, int maxHeightPx, CardStyle style,
             WidgetAppearance appearance, boolean radioSavedNavigation,
             boolean dragHandleVisible, Listener listener) {
+        this(context, requestedWidthDp, requestedHeightDp, maxWidthPx, maxHeightPx, style,
+                appearance, radioSavedNavigation, dragHandleVisible,
+                Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
+                Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS, listener);
+    }
+
+    MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
+            int maxWidthPx, int maxHeightPx, CardStyle style,
+            WidgetAppearance appearance, boolean radioSavedNavigation,
+            boolean dragHandleVisible, int favoriteColumns, int favoriteRows,
+            Listener listener) {
         super(context);
         this.listener = listener;
         this.style = style;
         this.appearance = appearance;
         this.radioSavedNavigation = radioSavedNavigation;
         this.dragHandleVisible = dragHandleVisible;
+        this.favoriteColumns = Math.max(Prefs.MIN_RADIO_FAVORITES_GRID_COLUMNS,
+                Math.min(Prefs.MAX_RADIO_FAVORITES_GRID_COLUMNS, favoriteColumns));
+        this.favoriteRows = Math.max(Prefs.MIN_RADIO_FAVORITES_GRID_ROWS,
+                Math.min(Prefs.MAX_RADIO_FAVORITES_GRID_ROWS, favoriteRows));
         cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
                 Ui.dp(context, requestedWidthDp)));
         cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
@@ -336,7 +353,7 @@ final class MediaCardView extends FrameLayout {
         favoritesContent.addView(favoritesEmpty,
                 new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
         favoritesGrid = new GridView(context);
-        favoritesGrid.setNumColumns(2);
+        favoritesGrid.setNumColumns(this.favoriteColumns);
         favoritesGrid.setHorizontalSpacing(d(6));
         favoritesGrid.setVerticalSpacing(d(6));
         favoritesGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
@@ -682,9 +699,11 @@ final class MediaCardView extends FrameLayout {
                 - favoritesChooser.getPaddingTop() - favoritesChooser.getPaddingBottom()
                 - favoritesGrid.getPaddingTop() - favoritesGrid.getPaddingBottom();
         int columnWidth = Math.max(1,
-                (gridWidth - favoritesGrid.getHorizontalSpacing()) / 2);
+                (gridWidth - favoritesGrid.getHorizontalSpacing() * (favoriteColumns - 1))
+                        / favoriteColumns);
         int tileHeight = Math.max(1,
-                (gridHeight - favoritesGrid.getVerticalSpacing()) / 2);
+                (gridHeight - favoritesGrid.getVerticalSpacing() * (favoriteRows - 1))
+                        / favoriteRows);
         if (columnWidth == favoriteColumnWidth && tileHeight == favoriteTileHeight) return;
         favoriteColumnWidth = columnWidth;
         favoriteTileHeight = tileHeight;
@@ -892,40 +911,38 @@ final class MediaCardView extends FrameLayout {
         @Override public View getView(int position, View convertView, ViewGroup parent) {
             StationTile tile;
             if (convertView == null) {
-                boolean compact = style == CardStyle.COMPACT;
+                boolean horizontal = style == CardStyle.COMPACT
+                        || favoriteTileHeight < d(72);
                 LinearLayout container = new LinearLayout(getContext());
-                container.setOrientation(compact
+                container.setOrientation(horizontal
                         ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
-                container.setGravity(compact
+                container.setGravity(horizontal
                         ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
-                container.setPadding(d(compact ? 6 : 8), d(compact ? 6 : 8),
-                        d(compact ? 6 : 8), d(compact ? 6 : 8));
                 container.setBackground(pillBackground(getContext(), 0xD1262A30,
                         0x554F5E68, d(14)));
                 ImageView cover = new ImageView(getContext());
                 cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
                 cover.setBackground(Ui.background(Ui.NESTED, 14 * uiScale, getContext()));
                 cover.setClipToOutline(true);
-                int logoSize = d(compact ? 72 : 128);
+                int logoSize = d(horizontal ? 72 : 128);
                 container.addView(cover, new LinearLayout.LayoutParams(
                         logoSize, logoSize));
                 LinearLayout labels = new LinearLayout(getContext());
                 labels.setOrientation(LinearLayout.VERTICAL);
-                labels.setGravity(compact ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
+                labels.setGravity(horizontal
+                        ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
                 TextView name = text("", style == CardStyle.COMPACT ? 15 : 18,
                         Ui.PRIMARY, Typeface.BOLD);
-                name.setGravity(compact ? Gravity.START : Gravity.CENTER);
+                name.setGravity(horizontal ? Gravity.START : Gravity.CENTER);
                 name.setMaxLines(1);
                 name.setEllipsize(TextUtils.TruncateAt.END);
                 LinearLayout.LayoutParams nameParams = fullWrap();
-                if (!compact) nameParams.topMargin = d(8);
                 labels.addView(name, nameParams);
                 LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
-                        compact ? 0 : LayoutParams.MATCH_PARENT,
-                        LayoutParams.WRAP_CONTENT, compact ? 1f : 0f);
-                if (compact) labelsParams.leftMargin = d(8);
+                        horizontal ? 0 : LayoutParams.MATCH_PARENT,
+                        LayoutParams.WRAP_CONTENT, horizontal ? 1f : 0f);
                 container.addView(labels, labelsParams);
-                tile = new StationTile(container, cover, name);
+                tile = new StationTile(container, cover, name, labels, horizontal);
                 container.setTag(tile);
                 convertView = container;
             } else {
@@ -935,19 +952,39 @@ final class MediaCardView extends FrameLayout {
             String detail = station.displayDetail();
             String visibleName = station.name.isBlank() ? detail : station.name;
             tile.name.setText(visibleName);
-            int tileHeight = Math.max(d(44), favoriteTileHeight);
-            int tilePadding = d(style == CardStyle.COMPACT ? 6 : 8);
+            int tileHeight = Math.max(1, favoriteTileHeight);
+            int requestedPadding = d(tile.horizontal ? 6 : 8);
+            int tilePadding = Math.min(requestedPadding, Math.max(1, tileHeight / 10));
+            tile.container.setPadding(tilePadding, tilePadding, tilePadding, tilePadding);
+            float baseTextPx = (style == CardStyle.COMPACT ? 15f : 18f) * uiScale
+                    * getResources().getDisplayMetrics().density
+                    * getResources().getConfiguration().fontScale;
+            float heightFraction = tile.horizontal ? 0.42f : 0.22f;
+            tile.name.setTextSize(TypedValue.COMPLEX_UNIT_PX,
+                    Math.max(1f, Math.min(baseTextPx, tileHeight * heightFraction)));
+            int labelGap = tile.horizontal
+                    ? Math.min(d(8), Math.max(1, favoriteColumnWidth / 30))
+                    : Math.min(d(8), Math.max(0,
+                            (tileHeight - tile.name.getLineHeight()) / 10));
+            LinearLayout.LayoutParams nameParams =
+                    (LinearLayout.LayoutParams) tile.name.getLayoutParams();
+            nameParams.topMargin = tile.horizontal ? 0 : labelGap;
+            tile.name.setLayoutParams(nameParams);
+            LinearLayout.LayoutParams labelsParams =
+                    (LinearLayout.LayoutParams) tile.labels.getLayoutParams();
+            labelsParams.leftMargin = tile.horizontal ? labelGap : 0;
+            tile.labels.setLayoutParams(labelsParams);
             int artworkSize;
-            if (style == CardStyle.COMPACT) {
+            if (tile.horizontal) {
                 int widthLimit = Math.round(favoriteColumnWidth * 0.42f);
                 artworkSize = Math.min(tileHeight - tilePadding * 2, widthLimit);
             } else {
                 int widthLimit = favoriteColumnWidth - tilePadding * 2;
                 int heightLimit = tileHeight - tilePadding * 2
-                        - tile.name.getLineHeight() - d(8);
+                        - tile.name.getLineHeight() - labelGap;
                 artworkSize = Math.min(widthLimit, heightLimit);
             }
-            artworkSize = Math.max(d(32), artworkSize);
+            artworkSize = Math.max(1, artworkSize);
             tile.cover.setLayoutParams(new LinearLayout.LayoutParams(
                     artworkSize, artworkSize));
             convertView.setLayoutParams(new AbsListView.LayoutParams(
@@ -961,7 +998,9 @@ final class MediaCardView extends FrameLayout {
             } else {
                 tile.cover.setImageResource(R.drawable.ic_sound_wave);
                 tile.cover.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
-                tile.cover.setPadding(d(12), d(12), d(12), d(12));
+                int placeholderPadding = Math.min(d(12), artworkSize / 4);
+                tile.cover.setPadding(placeholderPadding, placeholderPadding,
+                        placeholderPadding, placeholderPadding);
                 tile.cover.setAlpha(0.45f);
                 if (!station.artworkUri.isBlank()
                         && !failedRadioArtwork.contains(station.artworkKey())) {
@@ -978,7 +1017,8 @@ final class MediaCardView extends FrameLayout {
         }
     }
 
-    private record StationTile(LinearLayout container, ImageView cover, TextView name) {}
+    private record StationTile(LinearLayout container, ImageView cover, TextView name,
+            LinearLayout labels, boolean horizontal) {}
 
     private void setElapsed(long milliseconds) {
         long second = milliseconds < 0L ? -1L : milliseconds / 1000L;

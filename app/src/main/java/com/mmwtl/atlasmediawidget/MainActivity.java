@@ -71,6 +71,10 @@ public final class MainActivity extends ScaledActivity {
     private LabeledSeek timeTextSetting;
     private LabeledSeek progressGapSetting;
     private LabeledSeek progressThicknessSetting;
+    private TextView favoriteColumnsValue;
+    private SeekBar favoriteColumns;
+    private TextView favoriteRowsValue;
+    private SeekBar favoriteRows;
     private boolean refreshingStyle;
 
     private final MediaCardView.Listener previewListener = new MediaCardView.Listener() {
@@ -493,6 +497,48 @@ public final class MainActivity extends ScaledActivity {
         dragHandleHintParams.topMargin = Ui.dp(this, 5);
         behaviorCard.addView(dragHandleHint, dragHandleHintParams);
 
+        LinearLayout favoritesGridCard = card();
+        favoritesGridCard.addView(text("Сетка избранных радиостанций",
+                20, Ui.PRIMARY, Typeface.BOLD));
+        TextView favoritesGridHint = text(
+                "Настройте число столбцов и строк в первом экране списка избранного. "
+                        + "Остальные станции доступны прокруткой.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams favoritesGridHintParams = fullWrap();
+        favoritesGridHintParams.topMargin = Ui.dp(this, 8);
+        favoritesGridCard.addView(favoritesGridHint, favoritesGridHintParams);
+        favoritesGridCard.addView(text("Столбцы", 14, Ui.SECONDARY, Typeface.NORMAL),
+                labelParams());
+        favoriteColumnsValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        favoritesGridCard.addView(favoriteColumnsValue, fullWrap());
+        favoriteColumns = sizeSeekBar(Prefs.MIN_RADIO_FAVORITES_GRID_COLUMNS,
+                Prefs.MAX_RADIO_FAVORITES_GRID_COLUMNS);
+        favoritesGridCard.addView(favoriteColumns, fullWrap());
+        favoritesGridCard.addView(text("Строки", 14, Ui.SECONDARY, Typeface.NORMAL),
+                labelParams());
+        favoriteRowsValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        favoritesGridCard.addView(favoriteRowsValue, fullWrap());
+        favoriteRows = sizeSeekBar(Prefs.MIN_RADIO_FAVORITES_GRID_ROWS,
+                Prefs.MAX_RADIO_FAVORITES_GRID_ROWS);
+        favoritesGridCard.addView(favoriteRows, fullWrap());
+        SeekBar.OnSeekBarChangeListener favoritesGridListener =
+                new SeekBar.OnSeekBarChangeListener() {
+                    @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                            boolean fromUser) {
+                        updateFavoriteGridLabels();
+                    }
+
+                    @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+                    @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                        prefs.putRadioFavoritesGrid(favoriteColumns.getProgress(),
+                                favoriteRows.getProgress());
+                        refreshOverlayIfRunning();
+                    }
+                };
+        favoriteColumns.setOnSeekBarChangeListener(favoritesGridListener);
+        favoriteRows.setOnSeekBarChangeListener(favoritesGridListener);
+
         LinearLayout scaleCard = card();
         scaleCard.addView(text(getString(R.string.scale_title),
                 20, Ui.PRIMARY, Typeface.BOLD));
@@ -529,6 +575,7 @@ public final class MainActivity extends ScaledActivity {
 
         addSectionHeading(root, getString(R.string.settings_section_content), false);
         root.addView(behaviorCard);
+        root.addView(favoritesGridCard);
 
         addSectionHeading(root, getString(R.string.settings_section_visual), false);
         root.addView(serviceCard);
@@ -614,6 +661,7 @@ public final class MainActivity extends ScaledActivity {
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false));
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
+        refreshFavoriteGridControls();
         CardStyle style = CardStyle.fromPreference(
                 prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         refreshingStyle = true;
@@ -890,6 +938,19 @@ public final class MainActivity extends ScaledActivity {
         sizeValue.setText(widthSize.getProgress() + " × " + heightSize.getProgress() + " dp");
     }
 
+    private void refreshFavoriteGridControls() {
+        if (favoriteColumns == null || favoriteRows == null) return;
+        favoriteColumns.setProgress(prefs.radioFavoritesColumns());
+        favoriteRows.setProgress(prefs.radioFavoritesRows());
+        updateFavoriteGridLabels();
+    }
+
+    private void updateFavoriteGridLabels() {
+        if (favoriteColumnsValue == null || favoriteRowsValue == null) return;
+        favoriteColumnsValue.setText("Столбцы: " + favoriteColumns.getProgress());
+        favoriteRowsValue.setText("Строки: " + favoriteRows.getProgress());
+    }
+
     private void updateMetadataProgressGapLabel() {
         metadataProgressGapValue.setText(metadataProgressGap.getProgress() + " dp");
     }
@@ -984,7 +1045,11 @@ public final class MainActivity extends ScaledActivity {
                 configuredWidthDp, configuredHeightDp,
                 configuredWidthPx, configuredHeightPx, currentStyle(), currentAppearance(),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
-                prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true), previewListener);
+                prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
+                favoriteColumns == null ? prefs.radioFavoritesColumns()
+                        : favoriteColumns.getProgress(),
+                favoriteRows == null ? prefs.radioFavoritesRows() : favoriteRows.getProgress(),
+                previewListener);
         preview.renderSnapshot(previewSnapshot(), true);
         preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 

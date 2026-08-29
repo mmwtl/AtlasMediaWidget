@@ -665,7 +665,8 @@ public final class OverlayService extends Service
                 prefs.cardWidthDp(style), prefs.cardHeightDp(style),
                 maxWidth, maxHeight, style, prefs.appearance(style),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
-                prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true), this);
+                prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
+                prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), this);
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
                 candidate.cardHeight(),

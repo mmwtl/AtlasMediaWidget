@@ -20,6 +20,8 @@ public final class SettingsBackupTest {
 
         assertTrue(restored.autoStart);
         assertTrue(restored.radioSavedNavigation);
+        assertEquals(2, restored.favoriteColumns);
+        assertEquals(2, restored.favoriteRows);
         assertTrue(restored.dragHandleVisible);
         assertEquals(17, restored.appUiScaleTenths);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
@@ -30,12 +32,43 @@ public final class SettingsBackupTest {
         assertEquals(27, restored.square.appearance.contentInsetDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(4, root.getInt("schemaVersion"));
+        assertEquals(5, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
         assertFalse(settings.has("customRadioCatalog"));
         assertFalse(settings.has("showRadioCovers"));
+    }
+
+    @Test public void jsonRoundTripPreservesFavoriteGrid() throws Exception {
+        SettingsBackup.Data original = dataWithGrid(15, CardStyle.COMPACT, null, null, 4, 3);
+
+        SettingsBackup.Data restored = SettingsBackup.decode(
+                SettingsBackup.encode(original, "test"));
+
+        assertEquals(4, restored.favoriteColumns);
+        assertEquals(3, restored.favoriteRows);
+    }
+
+    @Test public void oldSchemaDefaultsFavoriteGridToTwoByTwo() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                dataWithGrid(15, CardStyle.SQUARE, null, null, 4, 4), "test"));
+        root.put("schemaVersion", 4);
+        JSONObject settings = root.getJSONObject("settings");
+        settings.remove("favoriteColumns");
+        settings.remove("favoriteRows");
+
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+
+        assertEquals(2, restored.favoriteColumns);
+        assertEquals(2, restored.favoriteRows);
+    }
+
+    @Test public void rejectsFavoriteGridOutsideSupportedRange() {
+        assertThrows(IOException.class,
+                () -> dataWithGrid(15, CardStyle.SQUARE, null, null, 1, 2));
+        assertThrows(IOException.class,
+                () -> dataWithGrid(15, CardStyle.SQUARE, null, null, 4, 5));
     }
 
     @Test public void jsonRoundTripPreservesDefaultPosition() throws Exception {
@@ -56,7 +89,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 5);
+        root.put("schemaVersion", 6);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
@@ -182,6 +215,17 @@ public final class SettingsBackupTest {
 
     private static SettingsBackup.Data data(int scale, CardStyle selected,
             Integer x, Integer y, boolean dragHandleVisible) throws IOException {
+        return dataWithGrid(scale, selected, x, y, dragHandleVisible, 2, 2);
+    }
+
+    private static SettingsBackup.Data dataWithGrid(int scale, CardStyle selected,
+            Integer x, Integer y, int columns, int rows) throws IOException {
+        return dataWithGrid(scale, selected, x, y, true, columns, rows);
+    }
+
+    private static SettingsBackup.Data dataWithGrid(int scale, CardStyle selected,
+            Integer x, Integer y, boolean dragHandleVisible, int columns, int rows)
+            throws IOException {
         WidgetAppearance compactAppearance = WidgetAppearance.defaults(CardStyle.COMPACT);
         WidgetAppearance squareDefaults = WidgetAppearance.defaults(CardStyle.SQUARE);
         WidgetAppearance squareAppearance = new WidgetAppearance(
@@ -208,6 +252,7 @@ public final class SettingsBackupTest {
                 x,
                 y,
                 new SettingsBackup.StyleData(481, 302, compactAppearance),
-                new SettingsBackup.StyleData(512, 506, squareAppearance));
+                new SettingsBackup.StyleData(512, 506, squareAppearance),
+                columns, rows);
     }
 }

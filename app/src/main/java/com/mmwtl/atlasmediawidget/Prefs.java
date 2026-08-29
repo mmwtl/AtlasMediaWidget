@@ -15,6 +15,8 @@ final class Prefs {
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     static final String KEY_RADIO_SAVED_NAVIGATION = "radio_saved_navigation";
+    static final String KEY_RADIO_FAVORITES_COLUMNS = "radio_favorites_columns";
+    static final String KEY_RADIO_FAVORITES_ROWS = "radio_favorites_rows";
     static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
@@ -64,6 +66,12 @@ final class Prefs {
     static final int MAX_PROGRESS_GAP_DP = 40;
     static final int MIN_PROGRESS_THICKNESS_DP = 2;
     static final int MAX_PROGRESS_THICKNESS_DP = 16;
+    static final int MIN_RADIO_FAVORITES_GRID_COLUMNS = 2;
+    static final int MAX_RADIO_FAVORITES_GRID_COLUMNS = 4;
+    static final int MIN_RADIO_FAVORITES_GRID_ROWS = 2;
+    static final int MAX_RADIO_FAVORITES_GRID_ROWS = 4;
+    static final int DEFAULT_RADIO_FAVORITES_GRID_COLUMNS = 2;
+    static final int DEFAULT_RADIO_FAVORITES_GRID_ROWS = 2;
 
     private final SharedPreferences preferences;
 
@@ -112,6 +120,27 @@ final class Prefs {
 
     void putString(String key, String value) {
         preferences.edit().putString(key, value).apply();
+    }
+
+    int radioFavoritesColumns() {
+        return clamp(getInt(KEY_RADIO_FAVORITES_COLUMNS,
+                        DEFAULT_RADIO_FAVORITES_GRID_COLUMNS),
+                MIN_RADIO_FAVORITES_GRID_COLUMNS, MAX_RADIO_FAVORITES_GRID_COLUMNS);
+    }
+
+    int radioFavoritesRows() {
+        return clamp(getInt(KEY_RADIO_FAVORITES_ROWS,
+                        DEFAULT_RADIO_FAVORITES_GRID_ROWS),
+                MIN_RADIO_FAVORITES_GRID_ROWS, MAX_RADIO_FAVORITES_GRID_ROWS);
+    }
+
+    void putRadioFavoritesGrid(int columns, int rows) {
+        preferences.edit()
+                .putInt(KEY_RADIO_FAVORITES_COLUMNS, clamp(columns,
+                        MIN_RADIO_FAVORITES_GRID_COLUMNS, MAX_RADIO_FAVORITES_GRID_COLUMNS))
+                .putInt(KEY_RADIO_FAVORITES_ROWS, clamp(rows,
+                        MIN_RADIO_FAVORITES_GRID_ROWS, MAX_RADIO_FAVORITES_GRID_ROWS))
+                .apply();
     }
 
     int cardWidthDp(CardStyle style) {
@@ -247,6 +276,8 @@ final class Prefs {
         SharedPreferences.Editor editor = preferences.edit()
                 .putBoolean(KEY_AUTO_START, data.autoStart)
                 .putBoolean(KEY_RADIO_SAVED_NAVIGATION, data.radioSavedNavigation)
+                .putInt(KEY_RADIO_FAVORITES_COLUMNS, data.favoriteColumns)
+                .putInt(KEY_RADIO_FAVORITES_ROWS, data.favoriteRows)
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
                 .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);

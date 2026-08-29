@@ -16,13 +16,15 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 4;
+    private static final int SCHEMA_VERSION = 5;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
         final boolean autoStart;
         final boolean radioSavedNavigation;
+        final int favoriteColumns;
+        final int favoriteRows;
         final boolean dragHandleVisible;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
@@ -35,8 +37,25 @@ final class SettingsBackup {
                 int appUiScaleTenths,
                 CardStyle selectedStyle, Integer positionX, Integer positionY,
                 StyleData compact, StyleData square) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, compact, square,
+                    Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
+                    Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths,
+                CardStyle selectedStyle, Integer positionX, Integer positionY,
+                StyleData compact, StyleData square, int favoriteColumns, int favoriteRows)
+                throws IOException {
             this.autoStart = autoStart;
             this.radioSavedNavigation = radioSavedNavigation;
+            this.favoriteColumns = requireRange("settings.favoriteColumns", favoriteColumns,
+                    Prefs.MIN_RADIO_FAVORITES_GRID_COLUMNS,
+                    Prefs.MAX_RADIO_FAVORITES_GRID_COLUMNS);
+            this.favoriteRows = requireRange("settings.favoriteRows", favoriteRows,
+                    Prefs.MIN_RADIO_FAVORITES_GRID_ROWS,
+                    Prefs.MAX_RADIO_FAVORITES_GRID_ROWS);
             this.dragHandleVisible = dragHandleVisible;
             this.appUiScaleTenths = requireRange("settings.uiScaleTenths", appUiScaleTenths,
                     ScaledActivity.MIN_SCALE_TENTHS, ScaledActivity.MAX_SCALE_TENTHS);
@@ -133,7 +152,8 @@ final class SettingsBackup {
                 positionX,
                 positionY,
                 captureStyle(prefs, CardStyle.COMPACT),
-                captureStyle(prefs, CardStyle.SQUARE));
+                captureStyle(prefs, CardStyle.SQUARE),
+                prefs.radioFavoritesColumns(), prefs.radioFavoritesRows());
     }
 
     static void write(Context context, Prefs prefs, Uri uri) throws IOException {
@@ -174,6 +194,8 @@ final class SettingsBackup {
             JSONObject settings = new JSONObject();
             settings.put("autoStart", data.autoStart);
             settings.put("radioSavedNavigation", data.radioSavedNavigation);
+            settings.put("favoriteColumns", data.favoriteColumns);
+            settings.put("favoriteRows", data.favoriteRows);
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
@@ -236,7 +258,13 @@ final class SettingsBackup {
                             "compact", CardStyle.COMPACT, version),
                     decodeStyle(requireObject(styles, "square",
                                     "settings.cardStyles.square"),
-                            "square", CardStyle.SQUARE, version));
+                            "square", CardStyle.SQUARE, version),
+                    version >= 5 ? requireInt(settings, "favoriteColumns",
+                            "settings.favoriteColumns")
+                            : Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
+                    version >= 5 ? requireInt(settings, "favoriteRows",
+                            "settings.favoriteRows")
+                            : Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS);
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
