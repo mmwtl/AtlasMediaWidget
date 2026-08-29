@@ -30,9 +30,10 @@ public final class SettingsBackupTest {
         assertEquals(481, restored.compact.widthDp);
         assertEquals(302, restored.compact.heightDp);
         assertEquals(27, restored.square.appearance.contentInsetDp);
+        assertEquals(CoverDimPreset.DEFAULT, restored.compact.appearance.coverDimPreset);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(5, root.getInt("schemaVersion"));
+        assertEquals(6, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -89,7 +90,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 6);
+        root.put("schemaVersion", 7);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
@@ -206,6 +207,7 @@ public final class SettingsBackupTest {
         assertTrue(restored.dragHandleVisible);
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(500, restored.compact.widthDp);
+        assertEquals(CoverDimPreset.MAXIMUM, restored.compact.appearance.coverDimPreset);
     }
 
     private static SettingsBackup.Data data(int scale, CardStyle selected,

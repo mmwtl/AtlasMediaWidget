@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 5;
+    private static final int SCHEMA_VERSION = 6;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
@@ -129,6 +129,9 @@ final class SettingsBackup {
                     0, Prefs.MAX_PROGRESS_GAP_DP);
             requireRange(path + ".progressThicknessDp", appearance.progressThicknessDp,
                     Prefs.MIN_PROGRESS_THICKNESS_DP, Prefs.MAX_PROGRESS_THICKNESS_DP);
+            if (appearance.coverDimPreset == null) {
+                throw invalid("Нет пресета затемнения обложки: " + path);
+            }
             return this;
         }
     }
@@ -307,7 +310,8 @@ final class SettingsBackup {
                 .put("subtitleGapDp", value.subtitleGapDp)
                 .put("timeTextSizeSp", value.timeTextSizeSp)
                 .put("progressGapDp", value.progressGapDp)
-                .put("progressThicknessDp", value.progressThicknessDp);
+                .put("progressThicknessDp", value.progressThicknessDp)
+                .put("coverDimPreset", value.coverDimPreset.backupName);
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,
@@ -316,6 +320,13 @@ final class SettingsBackup {
                 ? requireInt(object, "metadataProgressGapDp",
                         path + ".metadataProgressGapDp")
                 : WidgetAppearance.defaults(style).metadataProgressGapDp;
+        CoverDimPreset coverDimPreset = schemaVersion >= 6
+                ? CoverDimPreset.fromBackupName(requireString(object, "coverDimPreset",
+                        path + ".coverDimPreset"))
+                : CoverDimPreset.MAXIMUM;
+        if (coverDimPreset == null) {
+            throw invalid("Неизвестный пресет затемнения обложки: " + path + ".coverDimPreset");
+        }
         return new StyleData(
                 requireInt(object, "widthDp", path + ".widthDp"),
                 requireInt(object, "heightDp", path + ".heightDp"),
@@ -338,7 +349,8 @@ final class SettingsBackup {
                         requireInt(object, "timeTextSizeSp", path + ".timeTextSizeSp"),
                         requireInt(object, "progressGapDp", path + ".progressGapDp"),
                         requireInt(object, "progressThicknessDp",
-                                path + ".progressThicknessDp")));
+                                path + ".progressThicknessDp"),
+                        coverDimPreset));
     }
 
     private static CardStyle parseStyleName(String value) throws IOException {

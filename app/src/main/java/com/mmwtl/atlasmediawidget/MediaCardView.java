@@ -163,9 +163,7 @@ final class MediaCardView extends FrameLayout {
         View scrim = new View(context);
         scrim.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                style == CardStyle.COMPACT
-                        ? new int[]{0x5E1D2228, 0x221D2228, 0xAD1D2228, 0xF51D2228}
-                        : new int[]{0x601D2228, 0x101D2228, 0xB01D2228, 0xFA1D2228}));
+                appearance.coverDimPreset.colors(style)));
         addView(scrim, match());
 
         View border = new View(context);

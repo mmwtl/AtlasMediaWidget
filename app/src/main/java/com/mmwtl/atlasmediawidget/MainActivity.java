@@ -48,6 +48,8 @@ public final class MainActivity extends ScaledActivity {
     private Button importSettingsButton;
     private RadioButton compactStyle;
     private RadioButton squareStyle;
+    private RadioGroup coverDimPresetGroup;
+    private RadioButton[] coverDimPresetButtons;
     private TextView sizeValue;
     private SeekBar widthSize;
     private SeekBar heightSize;
@@ -225,6 +227,26 @@ public final class MainActivity extends ScaledActivity {
         });
         serviceCard.addView(styleGroup, fullWrap());
 
+        TextView coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams coverDimTitleParams = fullWrap();
+        coverDimTitleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(coverDimTitle, coverDimTitleParams);
+        coverDimPresetGroup = new RadioGroup(this);
+        coverDimPresetGroup.setOrientation(RadioGroup.HORIZONTAL);
+        coverDimPresetButtons = new RadioButton[CoverDimPreset.values().length];
+        for (CoverDimPreset preset : CoverDimPreset.values()) {
+            RadioButton button = styleButton(preset.label);
+            button.setTextSize(11);
+            button.setTag(preset);
+            coverDimPresetButtons[preset.preferenceValue] = button;
+            coverDimPresetGroup.addView(button, new RadioGroup.LayoutParams(0,
+                    RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        coverDimPresetGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (!refreshingStyle) saveAppearance();
+        });
+        serviceCard.addView(coverDimPresetGroup, fullWrap());
+
         TextView sizeTitle = text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams sizeTitleParams = fullWrap();
         sizeTitleParams.topMargin = Ui.dp(this, 14);
@@ -342,7 +364,8 @@ public final class MainActivity extends ScaledActivity {
                     defaults.subtitleGapDp,
                     defaults.timeTextSizeSp,
                     defaults.progressGapDp,
-                    defaults.progressThicknessDp));
+                    defaults.progressThicknessDp,
+                    existing.coverDimPreset));
             refreshSizeControls(current);
             refreshOverlayIfRunning();
         });
@@ -904,7 +927,7 @@ public final class MainActivity extends ScaledActivity {
         if (widthSize == null || heightSize == null || metadataProgressGap == null
                 || controlPanelHeight == null || controlIconScale == null
                 || controlSpread == null || controlBottomInset == null
-                || topInsetSetting == null) return;
+                || topInsetSetting == null || coverDimPresetButtons == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
@@ -926,6 +949,7 @@ public final class MainActivity extends ScaledActivity {
         timeTextSetting.seek.setProgress(appearance.timeTextSizeSp);
         progressGapSetting.seek.setProgress(appearance.progressGapDp);
         progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
+        coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
         updateSizeLabel();
         updateMetadataProgressGapLabel();
         updateControlLabels();
@@ -991,7 +1015,19 @@ public final class MainActivity extends ScaledActivity {
                 subtitleGapSetting.seek.getProgress(),
                 timeTextSetting.seek.getProgress(),
                 progressGapSetting.seek.getProgress(),
-                progressThicknessSetting.seek.getProgress());
+                progressThicknessSetting.seek.getProgress(),
+                selectedCoverDimPreset());
+    }
+
+    private CoverDimPreset selectedCoverDimPreset() {
+        if (coverDimPresetGroup != null) {
+            View selected = coverDimPresetGroup.findViewById(
+                    coverDimPresetGroup.getCheckedRadioButtonId());
+            if (selected != null && selected.getTag() instanceof CoverDimPreset preset) {
+                return preset;
+            }
+        }
+        return prefs.coverDimPreset(currentStyle());
     }
 
     private void saveAppearance() {
