@@ -16,9 +16,9 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.BaseAdapter;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.view.ViewGroup;
@@ -84,7 +84,7 @@ final class MediaCardView extends FrameLayout {
     private final LinearLayout favoritesButton;
     private final FrameLayout favoritesChooser;
     private final TextView favoritesEmpty;
-    private final ListView favoritesList;
+    private final GridView favoritesGrid;
     private final FavoriteStationAdapter favoritesAdapter;
     private final List<MediaSource> availableSources = new ArrayList<>();
     private final Map<String, Bitmap> radioArtwork = new HashMap<>();
@@ -336,14 +336,19 @@ final class MediaCardView extends FrameLayout {
         favoritesEmpty.setGravity(Gravity.CENTER);
         favoritesContent.addView(favoritesEmpty,
                 new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
-        favoritesList = new ListView(context);
-        favoritesList.setDividerHeight(d(6));
-        favoritesList.setDivider(null);
-        favoritesList.setSelector(android.R.color.transparent);
-        favoritesList.setVerticalScrollBarEnabled(true);
+        favoritesGrid = new GridView(context);
+        favoritesGrid.setNumColumns(2);
+        favoritesGrid.setHorizontalSpacing(d(6));
+        favoritesGrid.setVerticalSpacing(d(6));
+        favoritesGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        favoritesGrid.setGravity(Gravity.CENTER);
+        favoritesGrid.setPadding(d(4), d(2), d(4), d(4));
+        favoritesGrid.setClipToPadding(false);
+        favoritesGrid.setSelector(android.R.color.transparent);
+        favoritesGrid.setVerticalScrollBarEnabled(true);
         favoritesAdapter = new FavoriteStationAdapter();
-        favoritesList.setAdapter(favoritesAdapter);
-        favoritesContent.addView(favoritesList,
+        favoritesGrid.setAdapter(favoritesAdapter);
+        favoritesContent.addView(favoritesGrid,
                 new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
         favoritesChooser.addView(favoritesContent, match());
         addView(favoritesChooser);
@@ -493,7 +498,7 @@ final class MediaCardView extends FrameLayout {
                 ? "Список станций недоступен" : message);
         favoritesEmpty.setTextColor(Ui.ERROR);
         favoritesEmpty.setVisibility(VISIBLE);
-        favoritesList.setVisibility(GONE);
+        favoritesGrid.setVisibility(GONE);
     }
 
     void setRadioArtwork(String key, Bitmap bitmap) {
@@ -850,15 +855,15 @@ final class MediaCardView extends FrameLayout {
             favoritesEmpty.setText("Загрузка…");
             favoritesEmpty.setTextColor(Ui.SECONDARY);
             favoritesEmpty.setVisibility(VISIBLE);
-            favoritesList.setVisibility(GONE);
+            favoritesGrid.setVisibility(GONE);
         } else if (favoriteStations.isEmpty()) {
             favoritesEmpty.setText("Нет лайкнутых станций");
             favoritesEmpty.setTextColor(Ui.SECONDARY);
             favoritesEmpty.setVisibility(VISIBLE);
-            favoritesList.setVisibility(GONE);
+            favoritesGrid.setVisibility(GONE);
         } else {
             favoritesEmpty.setVisibility(GONE);
-            favoritesList.setVisibility(VISIBLE);
+            favoritesGrid.setVisibility(VISIBLE);
         }
     }
 
@@ -868,53 +873,65 @@ final class MediaCardView extends FrameLayout {
         @Override public long getItemId(int position) { return getItem(position).id.hashCode(); }
 
         @Override public View getView(int position, View convertView, ViewGroup parent) {
-            StationRow row;
+            StationTile tile;
             if (convertView == null) {
+                boolean compact = style == CardStyle.COMPACT;
                 LinearLayout container = new LinearLayout(getContext());
-                container.setGravity(Gravity.CENTER_VERTICAL);
-                container.setPadding(d(8), d(7), d(10), d(7));
+                container.setOrientation(compact
+                        ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
+                container.setGravity(compact
+                        ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
+                container.setPadding(d(compact ? 6 : 8), d(compact ? 6 : 8),
+                        d(compact ? 6 : 8), d(compact ? 6 : 8));
                 container.setBackground(pillBackground(getContext(), 0xD1262A30,
                         0x554F5E68, d(14)));
                 ImageView cover = new ImageView(getContext());
-                cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                cover.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 cover.setBackground(Ui.background(Ui.NESTED, 10 * uiScale, getContext()));
                 cover.setClipToOutline(true);
-                container.addView(cover, new LinearLayout.LayoutParams(d(54), d(54)));
+                int logoSize = d(compact ? 58 : 88);
+                container.addView(cover, new LinearLayout.LayoutParams(
+                        compact ? logoSize : LayoutParams.MATCH_PARENT, logoSize));
                 LinearLayout labels = new LinearLayout(getContext());
                 labels.setOrientation(LinearLayout.VERTICAL);
-                labels.setGravity(Gravity.CENTER_VERTICAL);
+                labels.setGravity(compact ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
                 TextView name = text("", style == CardStyle.COMPACT ? 15 : 18,
                         Ui.PRIMARY, Typeface.BOLD);
-                name.setMaxLines(1);
+                name.setGravity(compact ? Gravity.START : Gravity.CENTER);
+                name.setMaxLines(compact ? 1 : 2);
                 name.setEllipsize(TextUtils.TruncateAt.END);
-                labels.addView(name, fullWrap());
+                LinearLayout.LayoutParams nameParams = fullWrap();
+                if (!compact) nameParams.topMargin = d(8);
+                labels.addView(name, nameParams);
                 TextView detail = text("", style == CardStyle.COMPACT ? 12 : 14,
                         Ui.SECONDARY, Typeface.NORMAL);
+                detail.setGravity(compact ? Gravity.START : Gravity.CENTER);
                 labels.addView(detail, fullWrap());
                 LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
-                        0, LayoutParams.WRAP_CONTENT, 1f);
-                labelsParams.leftMargin = d(12);
+                        compact ? 0 : LayoutParams.MATCH_PARENT,
+                        LayoutParams.WRAP_CONTENT, compact ? 1f : 0f);
+                if (compact) labelsParams.leftMargin = d(8);
                 container.addView(labels, labelsParams);
-                row = new StationRow(container, cover, name, detail);
-                container.setTag(row);
+                tile = new StationTile(container, cover, name, detail);
+                container.setTag(tile);
                 convertView = container;
             } else {
-                row = (StationRow) convertView.getTag();
+                tile = (StationTile) convertView.getTag();
             }
             RadioStation station = getItem(position);
-            row.name.setText(station.displayName());
-            row.detail.setText(station.displayDetail());
+            tile.name.setText(station.displayName());
+            tile.detail.setText(station.displayDetail());
             Bitmap bitmap = radioArtwork.get(station.artworkKey());
             if (bitmap != null) {
-                row.cover.setImageBitmap(bitmap);
-                row.cover.setImageTintList(null);
-                row.cover.setPadding(0, 0, 0, 0);
-                row.cover.setAlpha(1f);
+                tile.cover.setImageBitmap(bitmap);
+                tile.cover.setImageTintList(null);
+                tile.cover.setPadding(0, 0, 0, 0);
+                tile.cover.setAlpha(1f);
             } else {
-                row.cover.setImageResource(R.drawable.ic_sound_wave);
-                row.cover.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
-                row.cover.setPadding(d(10), d(10), d(10), d(10));
-                row.cover.setAlpha(0.45f);
+                tile.cover.setImageResource(R.drawable.ic_sound_wave);
+                tile.cover.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+                tile.cover.setPadding(d(12), d(12), d(12), d(12));
+                tile.cover.setAlpha(0.45f);
                 if (!station.artworkUri.isBlank()
                         && !failedRadioArtwork.contains(station.artworkKey())) {
                     listener.onRadioArtworkRequested(station);
@@ -930,7 +947,7 @@ final class MediaCardView extends FrameLayout {
         }
     }
 
-    private record StationRow(LinearLayout container, ImageView cover,
+    private record StationTile(LinearLayout container, ImageView cover,
             TextView name, TextView detail) {}
 
     private void setElapsed(long milliseconds) {
