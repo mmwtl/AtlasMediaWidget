@@ -882,12 +882,12 @@ final class MediaCardView extends FrameLayout {
                 container.setBackground(pillBackground(getContext(), 0xD1262A30,
                         0x554F5E68, d(14)));
                 ImageView cover = new ImageView(getContext());
-                cover.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-                cover.setBackground(Ui.background(Ui.NESTED, 10 * uiScale, getContext()));
+                cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                cover.setBackground(Ui.background(Ui.NESTED, 14 * uiScale, getContext()));
                 cover.setClipToOutline(true);
-                int logoSize = d(compact ? 58 : 88);
+                int logoSize = d(compact ? 64 : 104);
                 container.addView(cover, new LinearLayout.LayoutParams(
-                        compact ? logoSize : LayoutParams.MATCH_PARENT, logoSize));
+                        logoSize, logoSize));
                 LinearLayout labels = new LinearLayout(getContext());
                 labels.setOrientation(LinearLayout.VERTICAL);
                 labels.setGravity(compact ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
