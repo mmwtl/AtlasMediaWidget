@@ -14,6 +14,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.AbsListView;
 import android.widget.FrameLayout;
 import android.widget.BaseAdapter;
 import android.widget.GridView;
@@ -86,6 +87,8 @@ final class MediaCardView extends FrameLayout {
     private final TextView favoritesEmpty;
     private final GridView favoritesGrid;
     private final FavoriteStationAdapter favoritesAdapter;
+    private int favoriteTileHeight;
+    private int favoriteColumnWidth;
     private final List<MediaSource> availableSources = new ArrayList<>();
     private final Map<String, Bitmap> radioArtwork = new HashMap<>();
     private final Set<String> failedRadioArtwork = new HashSet<>();
@@ -339,7 +342,7 @@ final class MediaCardView extends FrameLayout {
         favoritesGrid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
         favoritesGrid.setGravity(Gravity.CENTER);
         favoritesGrid.setPadding(d(4), d(2), d(4), d(4));
-        favoritesGrid.setClipToPadding(false);
+        favoritesGrid.setClipToPadding(true);
         favoritesGrid.setSelector(android.R.color.transparent);
         favoritesGrid.setVerticalScrollBarEnabled(true);
         favoritesAdapter = new FavoriteStationAdapter();
@@ -668,6 +671,24 @@ final class MediaCardView extends FrameLayout {
         chooserParams.topMargin = by(compact ? 63 : 68);
         sourceChooser.setLayoutParams(chooserParams);
         favoritesChooser.setLayoutParams(new LayoutParams(chooserParams));
+        updateFavoriteTileDimensions(chooserParams);
+    }
+
+    private void updateFavoriteTileDimensions(LayoutParams chooserParams) {
+        int gridWidth = cardWidth - chooserParams.leftMargin - chooserParams.rightMargin
+                - favoritesChooser.getPaddingLeft() - favoritesChooser.getPaddingRight()
+                - favoritesGrid.getPaddingLeft() - favoritesGrid.getPaddingRight();
+        int gridHeight = chooserParams.height
+                - favoritesChooser.getPaddingTop() - favoritesChooser.getPaddingBottom()
+                - favoritesGrid.getPaddingTop() - favoritesGrid.getPaddingBottom();
+        int columnWidth = Math.max(1,
+                (gridWidth - favoritesGrid.getHorizontalSpacing()) / 2);
+        int tileHeight = Math.max(1,
+                (gridHeight - favoritesGrid.getVerticalSpacing()) / 2);
+        if (columnWidth == favoriteColumnWidth && tileHeight == favoriteTileHeight) return;
+        favoriteColumnWidth = columnWidth;
+        favoriteTileHeight = tileHeight;
+        favoritesAdapter.notifyDataSetChanged();
     }
 
     private void updateControlLayout(boolean compact, int panelHeight) {
@@ -914,6 +935,23 @@ final class MediaCardView extends FrameLayout {
             String detail = station.displayDetail();
             String visibleName = station.name.isBlank() ? detail : station.name;
             tile.name.setText(visibleName);
+            int tileHeight = Math.max(d(44), favoriteTileHeight);
+            int tilePadding = d(style == CardStyle.COMPACT ? 6 : 8);
+            int artworkSize;
+            if (style == CardStyle.COMPACT) {
+                int widthLimit = Math.round(favoriteColumnWidth * 0.42f);
+                artworkSize = Math.min(tileHeight - tilePadding * 2, widthLimit);
+            } else {
+                int widthLimit = favoriteColumnWidth - tilePadding * 2;
+                int heightLimit = tileHeight - tilePadding * 2
+                        - tile.name.getLineHeight() - d(8);
+                artworkSize = Math.min(widthLimit, heightLimit);
+            }
+            artworkSize = Math.max(d(32), artworkSize);
+            tile.cover.setLayoutParams(new LinearLayout.LayoutParams(
+                    artworkSize, artworkSize));
+            convertView.setLayoutParams(new AbsListView.LayoutParams(
+                    LayoutParams.MATCH_PARENT, tileHeight));
             Bitmap bitmap = radioArtwork.get(station.artworkKey());
             if (bitmap != null) {
                 tile.cover.setImageBitmap(bitmap);
