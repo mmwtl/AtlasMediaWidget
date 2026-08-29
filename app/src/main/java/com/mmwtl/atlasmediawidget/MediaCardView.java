@@ -229,15 +229,11 @@ final class MediaCardView extends FrameLayout {
                 android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
         favoritesButton.addView(favoritesIcon,
                 new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
-        TextView favoritesDot = text("●", 8, 0xFF58A6FF, Typeface.BOLD);
-        LinearLayout.LayoutParams favoritesDotParams = wrap();
-        favoritesDotParams.leftMargin = d(7);
-        favoritesButton.addView(favoritesDot, favoritesDotParams);
         TextView favoritesLabel = text("ИЗБРАННОЕ", appearance.topRowTextSizeSp,
                 Ui.PRIMARY, Typeface.BOLD);
         favoritesLabel.setLetterSpacing(0.05f);
         LinearLayout.LayoutParams favoritesTextParams = wrap();
-        favoritesTextParams.leftMargin = d(5);
+        favoritesTextParams.leftMargin = d(7);
         favoritesButton.addView(favoritesLabel, favoritesTextParams);
         favoritesButton.setClickable(true);
         favoritesButton.setFocusable(true);
