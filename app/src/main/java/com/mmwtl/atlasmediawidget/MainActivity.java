@@ -43,6 +43,7 @@ public final class MainActivity extends ScaledActivity {
     private Button serviceButton;
     private Switch autoStart;
     private Switch radioSavedNavigation;
+    private Switch radioFavoritesNavigation;
     private Switch dragHandleVisible;
     private Button exportSettingsButton;
     private Button importSettingsButton;
@@ -482,12 +483,13 @@ public final class MainActivity extends ScaledActivity {
         noteParams.topMargin = Ui.dp(this, 8);
         behaviorCard.addView(note, noteParams);
         radioSavedNavigation = new Switch(this);
-        radioSavedNavigation.setText("Переключать радио по сохранённым станциям");
+        radioSavedNavigation.setText("Переключать радио без поиска по эфиру");
         radioSavedNavigation.setTextColor(Ui.PRIMARY);
         radioSavedNavigation.setTextSize(15);
         radioSavedNavigation.setOnCheckedChangeListener((button, checked) -> {
             if (!button.isPressed()) return;
             prefs.putBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, checked);
+            updateRadioNavigationControls();
             refreshOverlayIfRunning();
         });
         LinearLayout.LayoutParams radioNavigationParams = fullWrap();
@@ -495,11 +497,29 @@ public final class MainActivity extends ScaledActivity {
         behaviorCard.addView(radioSavedNavigation, radioNavigationParams);
         TextView radioNavigationHint = text(
                 "Когда Радио активно, кнопки назад и вперёд напрямую выбирают соседнюю "
-                        + "станцию из сохранённого списка вместо поиска по эфиру.",
+                        + "станцию из выбранного ниже списка.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams radioHintParams = fullWrap();
         radioHintParams.topMargin = Ui.dp(this, 5);
         behaviorCard.addView(radioNavigationHint, radioHintParams);
+        radioFavoritesNavigation = new Switch(this);
+        radioFavoritesNavigation.setText("Переключать только по избранным");
+        radioFavoritesNavigation.setTextColor(Ui.PRIMARY);
+        radioFavoritesNavigation.setTextSize(15);
+        radioFavoritesNavigation.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, checked);
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams radioFavoritesNavigationParams = fullWrap();
+        radioFavoritesNavigationParams.topMargin = Ui.dp(this, 10);
+        behaviorCard.addView(radioFavoritesNavigation, radioFavoritesNavigationParams);
+        TextView radioFavoritesNavigationHint = text(
+                "Если выключено, кнопки перелистывают все сохранённые станции.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams radioFavoritesHintParams = fullWrap();
+        radioFavoritesHintParams.topMargin = Ui.dp(this, 5);
+        behaviorCard.addView(radioFavoritesNavigationHint, radioFavoritesHintParams);
         dragHandleVisible = new Switch(this);
         dragHandleVisible.setText("Показывать точки перемещения на виджете");
         dragHandleVisible.setTextColor(Ui.PRIMARY);
@@ -682,6 +702,9 @@ public final class MainActivity extends ScaledActivity {
         autoStart.setChecked(prefs.getBoolean(Prefs.KEY_AUTO_START, false));
         radioSavedNavigation.setChecked(
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false));
+        radioFavoritesNavigation.setChecked(
+                prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false));
+        updateRadioNavigationControls();
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         refreshFavoriteGridControls();
@@ -967,6 +990,13 @@ public final class MainActivity extends ScaledActivity {
         favoriteColumns.setProgress(prefs.radioFavoritesColumns());
         favoriteRows.setProgress(prefs.radioFavoritesRows());
         updateFavoriteGridLabels();
+    }
+
+    private void updateRadioNavigationControls() {
+        if (radioSavedNavigation == null || radioFavoritesNavigation == null) return;
+        boolean enabled = radioSavedNavigation.isChecked();
+        radioFavoritesNavigation.setEnabled(enabled);
+        radioFavoritesNavigation.setAlpha(enabled ? 1f : 0.5f);
     }
 
     private void updateFavoriteGridLabels() {

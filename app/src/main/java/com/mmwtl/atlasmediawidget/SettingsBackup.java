@@ -16,13 +16,14 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 6;
+    private static final int SCHEMA_VERSION = 7;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
         final boolean autoStart;
         final boolean radioSavedNavigation;
+        final boolean radioFavoritesNavigation;
         final int favoriteColumns;
         final int favoriteRows;
         final boolean dragHandleVisible;
@@ -40,7 +41,7 @@ final class SettingsBackup {
             this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
                     selectedStyle, positionX, positionY, compact, square,
                     Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
-                    Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS);
+                    Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS, false);
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -48,8 +49,19 @@ final class SettingsBackup {
                 CardStyle selectedStyle, Integer positionX, Integer positionY,
                 StyleData compact, StyleData square, int favoriteColumns, int favoriteRows)
                 throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, compact, square,
+                    favoriteColumns, favoriteRows, false);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths,
+                CardStyle selectedStyle, Integer positionX, Integer positionY,
+                StyleData compact, StyleData square, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation) throws IOException {
             this.autoStart = autoStart;
             this.radioSavedNavigation = radioSavedNavigation;
+            this.radioFavoritesNavigation = radioFavoritesNavigation;
             this.favoriteColumns = requireRange("settings.favoriteColumns", favoriteColumns,
                     Prefs.MIN_RADIO_FAVORITES_GRID_COLUMNS,
                     Prefs.MAX_RADIO_FAVORITES_GRID_COLUMNS);
@@ -156,7 +168,8 @@ final class SettingsBackup {
                 positionY,
                 captureStyle(prefs, CardStyle.COMPACT),
                 captureStyle(prefs, CardStyle.SQUARE),
-                prefs.radioFavoritesColumns(), prefs.radioFavoritesRows());
+                prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
+                prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false));
     }
 
     static void write(Context context, Prefs prefs, Uri uri) throws IOException {
@@ -197,6 +210,7 @@ final class SettingsBackup {
             JSONObject settings = new JSONObject();
             settings.put("autoStart", data.autoStart);
             settings.put("radioSavedNavigation", data.radioSavedNavigation);
+            settings.put("radioFavoritesNavigation", data.radioFavoritesNavigation);
             settings.put("favoriteColumns", data.favoriteColumns);
             settings.put("favoriteRows", data.favoriteRows);
             settings.put("dragHandleVisible", data.dragHandleVisible);
@@ -267,7 +281,9 @@ final class SettingsBackup {
                             : Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
                     version >= 5 ? requireInt(settings, "favoriteRows",
                             "settings.favoriteRows")
-                            : Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS);
+                            : Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS,
+                    version >= 7 && requireBoolean(settings, "radioFavoritesNavigation",
+                            "settings.radioFavoritesNavigation"));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }

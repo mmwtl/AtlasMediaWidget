@@ -22,6 +22,10 @@ final class RadioStationLists {
         this.favorites = immutableDeduplicated(favorites);
     }
 
+    List<RadioStation> navigationStations(boolean favoritesOnly) {
+        return favoritesOnly ? favorites : saved;
+    }
+
     static RadioStationLists fromBundle(Bundle bundle) {
         int version = bundle.getInt(MediaBridgeContract.K_VERSION, -1);
         if (version != MediaBridgeContract.VERSION) {

@@ -27,6 +27,7 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -456,12 +457,13 @@ public final class OverlayService extends Service
         int direction = pendingRadioNavigation.consume(visibleSource());
         if (direction != 0) {
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+            List<RadioStation> navigationStations = radioNavigationStations();
             RadioStation target = RadioStationNavigator.adjacent(
-                    radioStations.saved, visible, direction);
+                    navigationStations, visible, direction);
             if (target == null) {
-                if (card != null) card.showTransientStatus(radioStations.saved.isEmpty()
-                        ? "Нет сохранённых станций"
-                        : "Нет другой сохранённой станции", true);
+                if (card != null) card.showTransientStatus(navigationStations.isEmpty()
+                        ? emptyRadioNavigationMessage()
+                        : noOtherRadioNavigationMessage(), true);
             } else {
                 tuneRadio(target);
             }
@@ -518,18 +520,19 @@ public final class OverlayService extends Service
                 && visibleSource() == MediaSource.Id.RADIO
                 && ("PREVIOUS".equals(command) || "NEXT".equals(command))) {
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+            List<RadioStation> navigationStations = radioNavigationStations();
             RadioStation target = RadioStationNavigator.adjacent(
-                    radioStations.saved, visible, "NEXT".equals(command) ? 1 : -1);
+                    navigationStations, visible, "NEXT".equals(command) ? 1 : -1);
             if (target == null) {
-                if (!radioStations.saved.isEmpty()) {
+                if (!navigationStations.isEmpty()) {
                     if (card != null) card.showTransientStatus(
-                            "Нет другой сохранённой станции", false);
+                            noOtherRadioNavigationMessage(), false);
                     return;
                 }
                 pendingRadioNavigation.schedule("NEXT".equals(command) ? 1 : -1);
                 requestRadioStations();
                 if (card != null) card.showTransientStatus(
-                        "Загрузка сохранённых станций…", false);
+                        loadingRadioNavigationMessage(), false);
                 return;
             }
             tuneRadio(target);
@@ -539,6 +542,30 @@ public final class OverlayService extends Service
         String requestId = bridge.sendCommand(command);
         AppLog.info("Sending media command request=" + requestId + " command=" + command
                 + " source=" + visibleSource());
+    }
+
+    private List<RadioStation> radioNavigationStations() {
+        return radioStations.navigationStations(
+                prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false));
+    }
+
+    private boolean navigatesRadioFavorites() {
+        return prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false);
+    }
+
+    private String emptyRadioNavigationMessage() {
+        return navigatesRadioFavorites()
+                ? "Нет избранных станций" : "Нет сохранённых станций";
+    }
+
+    private String noOtherRadioNavigationMessage() {
+        return navigatesRadioFavorites()
+                ? "Нет другой избранной станции" : "Нет другой сохранённой станции";
+    }
+
+    private String loadingRadioNavigationMessage() {
+        return navigatesRadioFavorites()
+                ? "Загрузка избранных станций…" : "Загрузка сохранённых станций…";
     }
 
     @Override public void onSeek(long positionMs) {

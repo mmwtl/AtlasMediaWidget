@@ -15,6 +15,7 @@ final class Prefs {
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     static final String KEY_RADIO_SAVED_NAVIGATION = "radio_saved_navigation";
+    static final String KEY_RADIO_FAVORITES_NAVIGATION = "radio_favorites_navigation";
     static final String KEY_RADIO_FAVORITES_COLUMNS = "radio_favorites_columns";
     static final String KEY_RADIO_FAVORITES_ROWS = "radio_favorites_rows";
     static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
@@ -306,6 +307,8 @@ final class Prefs {
         SharedPreferences.Editor editor = preferences.edit()
                 .putBoolean(KEY_AUTO_START, data.autoStart)
                 .putBoolean(KEY_RADIO_SAVED_NAVIGATION, data.radioSavedNavigation)
+                .putBoolean(KEY_RADIO_FAVORITES_NAVIGATION,
+                        data.radioFavoritesNavigation)
                 .putInt(KEY_RADIO_FAVORITES_COLUMNS, data.favoriteColumns)
                 .putInt(KEY_RADIO_FAVORITES_ROWS, data.favoriteRows)
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
