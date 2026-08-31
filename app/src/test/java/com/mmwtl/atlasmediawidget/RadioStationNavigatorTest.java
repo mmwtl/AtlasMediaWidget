@@ -35,6 +35,23 @@ public final class RadioStationNavigatorTest {
                 snapshot("", "Неизвестная", "99.0 MHz"), -1));
     }
 
+    @Test public void nonFavoriteStationSelectsNearestStationInRequestedDirection() {
+        MediaSnapshot current = snapshot("radio:1:97000:Неизвестная", "Неизвестная", "97 MHz");
+
+        assertEquals(second, RadioStationNavigator.adjacent(stations, current, 1));
+        assertEquals(first, RadioStationNavigator.adjacent(stations, current, -1));
+    }
+
+    @Test public void nonFavoriteStationWrapsOnlyWhenNoStationRemainsInDirection() {
+        MediaSnapshot beforeFirst = snapshot(
+                "radio:1:90000:Неизвестная", "Неизвестная", "90 MHz");
+        MediaSnapshot afterLast = snapshot(
+                "radio:3:200000:Неизвестная", "Неизвестная", "200 MHz");
+
+        assertEquals(third, RadioStationNavigator.adjacent(stations, beforeFirst, -1));
+        assertEquals(first, RadioStationNavigator.adjacent(stations, afterLast, 1));
+    }
+
     @Test public void emptyListDoesNotProduceTarget() {
         assertNull(RadioStationNavigator.adjacent(List.of(),
                 snapshot("", "", ""), 1));

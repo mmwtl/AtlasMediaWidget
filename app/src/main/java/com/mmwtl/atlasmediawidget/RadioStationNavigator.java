@@ -10,10 +10,39 @@ final class RadioStationNavigator {
             int direction) {
         if (stations == null || stations.isEmpty() || direction == 0) return null;
         int current = currentIndex(stations, snapshot);
-        if (current < 0) return direction > 0 ? stations.get(0) : stations.get(stations.size() - 1);
+        if (current < 0) {
+            int[] radioId = snapshot == null ? null : parseMediaId(snapshot.mediaId);
+            if (radioId != null) {
+                return nearestInDirection(stations, radioId[0], radioId[1], direction);
+            }
+            return direction > 0 ? stations.get(0) : stations.get(stations.size() - 1);
+        }
         if (stations.size() == 1) return null;
         int next = Math.floorMod(current + Integer.signum(direction), stations.size());
         return stations.get(next);
+    }
+
+    private static RadioStation nearestInDirection(List<RadioStation> stations, int band,
+            int frequencyKHz, int direction) {
+        if (direction > 0) {
+            for (RadioStation station : stations) {
+                if (compare(station, band, frequencyKHz) > 0) return station;
+            }
+            return stations.get(0);
+        }
+        for (int index = stations.size() - 1; index >= 0; index--) {
+            RadioStation station = stations.get(index);
+            if (compare(station, band, frequencyKHz) < 0) {
+                return station;
+            }
+        }
+        return stations.get(stations.size() - 1);
+    }
+
+    private static int compare(RadioStation station, int band, int frequencyKHz) {
+        int bandComparison = Integer.compare(station.band, band);
+        return bandComparison != 0
+                ? bandComparison : Integer.compare(station.frequencyKHz, frequencyKHz);
     }
 
     static int currentIndex(List<RadioStation> stations, MediaSnapshot snapshot) {
