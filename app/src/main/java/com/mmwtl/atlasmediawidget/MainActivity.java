@@ -296,6 +296,23 @@ public final class MainActivity extends ScaledActivity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
+        FrameLayout positionCornerField = new FrameLayout(this);
+        positionCornerField.setBackground(Ui.background(Ui.NESTED, 8, this));
+        positionCornerSpinner.setBackgroundColor(0x00000000);
+        positionCornerSpinner.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 34), 0);
+        positionCornerField.addView(positionCornerSpinner, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView positionCornerArrow = text("▾", 16, Ui.ACCENT, Typeface.BOLD);
+        positionCornerArrow.setGravity(Gravity.CENTER);
+        positionCornerArrow.setImportantForAccessibility(
+                View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        FrameLayout.LayoutParams positionCornerArrowParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        positionCornerArrowParams.rightMargin = Ui.dp(this, 10);
+        positionCornerField.addView(positionCornerArrow, positionCornerArrowParams);
+        positionCornerField.setOnClickListener(v -> positionCornerSpinner.performClick());
+
         LinearLayout positionGrid = new LinearLayout(this);
         positionGrid.setOrientation(LinearLayout.VERTICAL);
         LinearLayout positionHeader = new LinearLayout(this);
@@ -311,7 +328,7 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout positionRow = new LinearLayout(this);
         positionRow.setOrientation(LinearLayout.HORIZONTAL);
         positionRow.setGravity(Gravity.CENTER_VERTICAL);
-        positionRow.addView(positionCornerSpinner, positionColumnParams(1.25f, 0));
+        positionRow.addView(positionCornerField, positionColumnParams(1.25f, 0));
         positionX = numberInput();
         positionX.setHint("X");
         positionX.setContentDescription("Отступ по X в пикселях");
