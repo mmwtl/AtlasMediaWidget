@@ -264,16 +264,16 @@ public final class MainActivity extends ScaledActivity {
         widthSize = numberInput();
         widthSize.setHint("Ширина");
         widthSize.setContentDescription("Ширина карточки в пикселях");
-        sizeRow.addView(widthSize, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        sizeRow.addView(widthSize, sizeInputParams());
         sizeRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
                 compactUnitParams());
+        sizeRow.addView(new View(this), sizeSpacerParams());
         sizeRow.addView(text("×", 18, Ui.PRIMARY, Typeface.BOLD), compactUnitParams());
+        sizeRow.addView(new View(this), sizeSpacerParams());
         heightSize = numberInput();
         heightSize.setHint("Высота");
         heightSize.setContentDescription("Высота карточки в пикселях");
-        sizeRow.addView(heightSize, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        sizeRow.addView(heightSize, sizeInputParams());
         sizeRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
                 compactUnitParams());
         serviceCard.addView(sizeRow, fullWrap());
@@ -1044,6 +1044,14 @@ public final class MainActivity extends ScaledActivity {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         params.leftMargin = Ui.dp(this, 4);
         return params;
+    }
+
+    private LinearLayout.LayoutParams sizeInputParams() {
+        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.9f);
+    }
+
+    private LinearLayout.LayoutParams sizeSpacerParams() {
+        return new LinearLayout.LayoutParams(0, 1, 0.25f);
     }
 
     private LinearLayout.LayoutParams inlineLabelParams() {
