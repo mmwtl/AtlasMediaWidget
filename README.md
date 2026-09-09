@@ -135,19 +135,26 @@ Atlas Media Widget показывает на домашнем экране об�
 ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelease
 ```
 
-Release APK создаётся в `app/build/outputs/apk/release/` с именем вида
-`<versionName>[<versionCode>]AtlasMediaWidget-release.apk`.
+Release APK создаются в `app/build/outputs/apk/<variant>/release/` с именами вида
+`<versionName>[<versionCode>]AtlasMediaWidget-<variant>-release.apk`.
 
-Чтобы встроить подписанный APK Atlas Media API в Widget и предложить его установку с экрана
-настройки, передайте путь через Gradle property:
+Без параметров собирается вариант `plainRelease` без встроенного API:
+
+```sh
+ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelease
+```
+
+Чтобы одновременно получить `plainRelease` и `bundledRelease`, передайте путь к подписанному APK
+Atlas Media API:
 
 ```sh
 ANDROID_HOME=/path/to/android-sdk sh gradlew --offline clean check assembleRelease \
   -PembeddedApiApk=/path/to/AtlasMediaApi-release.apk
 ```
 
-Встроенный APK добавляется только в build output и не хранится в репозитории. Android всё равно
-потребует разрешить установку из Atlas Media Widget и отдельно подтвердить установку API.
+Файлы получают суффиксы `-plain-release.apk` и `-bundled-release.apk`. Встроенный APK добавляется
+только в bundled build output и не хранится в репозитории. Android всё равно потребует разрешить
+установку из Atlas Media Widget и отдельно подтвердить установку API.
 
 Локальная release-подпись подключается через игнорируемый `secure.signing.gradle`. Без него Gradle
 создаёт unsigned release APK.

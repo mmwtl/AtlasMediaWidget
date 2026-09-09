@@ -32,12 +32,13 @@ def prepareEmbeddedApiApk = tasks.register('prepareEmbeddedApiApk') {
     }
     doLast {
         delete(embeddedApiAssets)
-        if (embeddedApiApk.isPresent()) {
-            copy {
-                from(embeddedApiApk)
-                into(embeddedApiAssets)
-                rename { 'atlas-media-api.apk' }
-            }
+        if (!embeddedApiApk.isPresent()) {
+            throw new GradleException('Bundled build requires -PembeddedApiApk=/path/to/AtlasMediaApi.apk')
+        }
+        copy {
+            from(embeddedApiApk)
+            into(embeddedApiAssets)
+            rename { 'atlas-media-api.apk' }
         }
     }
 }
@@ -59,6 +60,16 @@ android {
         testInstrumentationRunner = 'android.test.InstrumentationTestRunner'
     }
 
+    flavorDimensions += 'distribution'
+    productFlavors {
+        plain {
+            dimension 'distribution'
+        }
+        bundled {
+            dimension 'distribution'
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -72,7 +83,13 @@ android {
     }
 
     sourceSets {
-        main.assets.srcDir(embeddedApiAssets)
+        bundled.assets.srcDir(embeddedApiAssets)
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().withFlavor('distribution', 'bundled')) { variantBuilder ->
+        if (!embeddedApiApk.isPresent()) variantBuilder.enable = false
     }
 }
 
@@ -85,8 +102,10 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
 }
 
-tasks.named('preBuild').configure {
-    dependsOn(prepareEmbeddedApiApk)
+tasks.configureEach { task ->
+    if (task.name == 'preBundledDebugBuild' || task.name == 'preBundledReleaseBuild') {
+        task.dependsOn(prepareEmbeddedApiApk)
+    }
 }
 
 if (secureSigningFile != null && secureSigningFile.isFile()) {
