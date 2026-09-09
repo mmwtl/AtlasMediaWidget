@@ -6,7 +6,7 @@
 ## 1. Архитектура / Architecture
 
 ### [RU] Централизованное управление в AtlasMediaApi
-Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi` (`com.mmwtl.atlasmediaapi`).
+Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi`. В `integrated` он входит в package Widget; в `plain` и `bundled` используется автономный `com.mmwtl.atlasmediaapi`.
 
 - `AtlasMediaApi` автоматически сопоставляет текущую частоту радиоприёмника с каталогом;
 - название станции передаётся в `snapshot.title`;
@@ -15,7 +15,7 @@
 - виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов.
 
 ### [EN] Centralized Management in AtlasMediaApi
-Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally within the `AtlasMediaApi` service (`com.mmwtl.atlasmediaapi`).
+Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service. The `integrated` variant includes it in the Widget package; `plain` and `bundled` use the standalone `com.mmwtl.atlasmediaapi` package.
 
 - `AtlasMediaApi` automatically matches the current radio frequency against the active catalog;
 - The resolved station name is supplied in `snapshot.title`;
@@ -28,7 +28,7 @@ Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are m
 ## 2. Структура ZIP-архива каталога / Catalog ZIP Structure
 
 ### [RU]
-Импорт пользовательского каталога выполняется в `AtlasMediaApi DiagnosticActivity`. ZIP-архив должен иметь следующую структуру:
+Импорт пользовательского каталога выполняется в настройках медиасервиса (`AtlasMediaApi DiagnosticActivity`). ZIP-архив должен иметь следующую структуру:
 
 ### [EN]
 Custom catalog import is performed in the `AtlasMediaApi DiagnosticActivity`. The ZIP archive must follow this structure:

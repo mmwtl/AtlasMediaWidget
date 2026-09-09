@@ -8,8 +8,9 @@ These instructions apply to the entire repository.
 
 AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait automotive head
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
-proven shell and lifecycle approach from AtlasAppWidget. AtlasMediaApi (`com.mmwtl.atlasmediaapi`)
-is installed on the target head unit and its versioned bound-service API is the primary media backend.
+proven shell and lifecycle approach from AtlasAppWidget. The versioned AtlasMediaApi bound service
+is the primary media backend: it may run inside the `integrated` Widget APK or in the autonomous
+`com.mmwtl.atlasmediaapi` package for `plain`/`bundled` compatibility.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -21,10 +22,9 @@ provider has been demonstrated on the real head unit.
 
 - Keep confirmed device behavior, Android API facts, and implementation assumptions visibly
   separate in documentation and reviews.
-- Treat `/Users/wital/dev/AtlasMediaApi` as the source of truth for the Media Bridge protocol v1
-  Messenger contracts. Verify them against `MediaBridgeContract.kt`.
-- Do not copy backend collectors or vendor modules into this repository while the installed API
-  satisfies the requirement.
+- Treat `/Users/wital/dev/AtlasMediaApi` as the upstream source of truth for Media Bridge protocol v1
+  and the integrated runtime. Keep `media-core`, `media-runtime`, `vendor-oneos`, and
+  `vendor-ecarx-stub` synchronized deliberately; do not make unrelated forks of backend behavior.
 - Treat the decompiled OEM APKs as firmware-specific evidence, not as a stable public API.
 - Target the tested Android 11 head unit first. Do not generalize OEM Binder behavior to other
   firmware versions without a device test.
@@ -45,10 +45,10 @@ provider has been demonstrated on the real head unit.
 ## Media-state behavior
 
 - Consume the versioned AtlasMediaApi Media Bridge service through one adapter. Bind using an
-  explicit component, register a reply Messenger, accept only a compatible protocol version, and
-  reconnect after Binder death with bounded backoff.
-- Validate the required AtlasMediaApi status during setup. Report a specific missing
-  prerequisite instead of silently showing cached data.
+  explicit flavor-selected component, register a reply Messenger, accept only a compatible protocol
+  version, and reconnect after Binder death with bounded backoff.
+- Validate the required media backend and notification-listener status during setup. Report a
+  specific missing prerequisite instead of silently showing cached data.
 - The Media Bridge snapshot must include current and available sources, playback position,
   duration, speed, actions and a read-granted artwork URI. Keep fields optional where the active
   source genuinely does not provide them; do not synthesize missing data from stale values.
@@ -62,8 +62,9 @@ provider has been demonstrated on the real head unit.
 - Extrapolate a playing position locally from position, speed and `SystemClock.elapsedRealtime()`.
   Do not request one IPC update per second. A low-frequency reconciliation timer may run only while
   the overlay is visible or playback is expected, and must supplement rather than replace callbacks.
-- Send transport/source commands only through the explicit versioned bound service. The v1 service
-  is intentionally open on the isolated head unit; do not add client-side identity assumptions.
+- Send transport/source commands only through the explicit versioned bound service. The autonomous
+  v1 service is intentionally open on the isolated head unit; the integrated service is private to
+  the Widget package. Do not add client-side identity assumptions.
   The UI must respect the capability mask and treat `OK` as command delivery, pending until a newer
   snapshot confirms the resulting state.
 
@@ -82,12 +83,15 @@ provider has been demonstrated on the real head unit.
   files or commits.
 - Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
   allow Gradle to fall back to module-derived `app-*.apk` names. Distribution variants append
-  `-plain-release.apk` or `-bundled-release.apk` to that base name.
-- Keep `plain` and `bundled` as distribution flavors of the same application. They must retain the
-  same application ID, version code, effective version name and Widget signing identity so either
-  variant can update the other without uninstalling the Widget.
+  `-plain-release.apk`, `-integrated-release.apk`, or `-bundled-release.apk` to that base name.
+- Keep `plain`, `integrated`, and `bundled` as distribution flavors of the same application. They must retain the
+  same application ID, version code, effective version name and Widget signing identity so any
+  variant can update another without uninstalling the Widget.
 - The `plain` variant must not contain `assets/atlas-media-api.apk`, request
   `REQUEST_INSTALL_PACKAGES`, or expose the embedded-API installation receiver/button.
+- The `integrated` variant must include `media-runtime`, bind its non-exported Media Bridge service
+  in the `:media` process, and contain neither `assets/atlas-media-api.apk` nor
+  `REQUEST_INSTALL_PACKAGES`.
 - Enable the `bundled` variant only when `-PembeddedApiApk=<path>` explicitly selects an API APK.
   Never choose the newest file from an output directory implicitly. The selected file is a build
   input, is copied byte-for-byte into the bundled APK, and must never be committed.
@@ -101,15 +105,16 @@ application improvement, run at minimum:
 sh gradlew --offline clean check assembleRelease
 ```
 
-Without `embeddedApiApk`, this command builds only `plainRelease`. To build and check both release
-variants, use an explicit signed AtlasMediaApi APK:
+Without `embeddedApiApk`, this command builds `plainRelease` and `integratedRelease`. To build and
+check `bundledRelease` too, use an explicit signed AtlasMediaApi APK:
 
 ```sh
 sh gradlew --offline clean check assembleRelease \
   -PembeddedApiApk=/absolute/path/to/AtlasMediaApi-release.apk
 ```
 
-Verify release outputs under `app/build/outputs/apk/plain/release/` and
+Verify release outputs under `app/build/outputs/apk/plain/release/`,
+`app/build/outputs/apk/integrated/release/`, and, when selected,
 `app/build/outputs/apk/bundled/release/`. Inspect package/version metadata and run
 `apksigner verify` when the artifacts are signed. Confirm the plain APK has neither the embedded
 API asset nor `REQUEST_INSTALL_PACKAGES`. For bundled builds, verify the selected input is a valid
@@ -117,6 +122,9 @@ API asset nor `REQUEST_INSTALL_PACKAGES`. For bundled builds, verify the selecte
 bundled asset exists, and compare its digest with the selected input APK. The API signing identity
 must remain compatible with already installed AtlasMediaApi versions; never auto-uninstall user
 data to bypass a signature mismatch.
+For integrated builds, verify the local Media Bridge, notification listener, diagnostics activity,
+and FileProvider are present only in that flavor; verify that the bridge and diagnostics activity
+run in `:media`, the bridge is not exported, and the provider authority uses the Widget package.
 
 Release signing may be supplied by the ignored local `secure.signing.gradle` and keystore files.
 If they are absent, report unsigned artifacts explicitly; never disguise a debug-signed artifact

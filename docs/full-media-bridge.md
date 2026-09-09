@@ -6,8 +6,9 @@
 
 ## Разделение ответственности
 
-AtlasMediaApi — автономный медиабэкенд: выбирает активную сессию, объединяет `MediaController` с
-OneOS MediaCenter, определяет источники, выполняет команды и нормализует обложки.
+AtlasMediaApi — медиабэкенд, встроенный в Widget либо установленный автономно: выбирает активную
+сессию, объединяет `MediaController` с OneOS MediaCenter, определяет источники, выполняет команды и
+нормализует обложки.
 AtlasMediaWidget — UI-клиент: показывает atomic snapshot, экстраполирует progress, управляет
 overlay, переподключается после Binder death и отправляет команды.
 
@@ -16,7 +17,7 @@ OneOS Binder, `NotificationListenerService` и вторая логика выб�
 
 ## Binding и модель доверия
 
-Используется explicit bind:
+Используется explicit bind. В `plain` и `bundled` сервис автономный:
 
 ```text
 action    = com.mmwtl.atlasmediaapi.media.BIND
@@ -24,9 +25,19 @@ package   = com.mmwtl.atlasmediaapi
 component = com.mmwtl.atlasmediaapi/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService
 ```
 
-Service exported и намеренно открыт: permission, package allowlist и проверка signing certificate
+В `integrated` тот же класс работает внутри package Widget:
+
+```text
+action    = com.mmwtl.atlasmediaapi.media.BIND
+package   = com.mmwtl.atlasmediawidget
+component = com.mmwtl.atlasmediawidget/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService
+process   = :media
+```
+
+Автономный service exported и намеренно открыт: permission, package allowlist и проверка signing certificate
 отсутствуют. Любой установленный APK может читать snapshots/artwork и отправлять команды. Это
 приемлемо только при принятом условии, что ГУ изолирована и владелец контролирует все установки.
+Встроенный service не exported и доступен только компонентам Atlas Media Widget.
 
 `Message.sendingUid` используется AtlasMediaApi только для получения package names, которым
 выдаётся временный read grant на artwork URI. Он не является проверкой доступа.

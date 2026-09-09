@@ -778,6 +778,14 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void refreshBridgeStatus() {
+        if (BuildConfig.INTEGRATED_MEDIA_API) {
+            bridgeStatus.setText("Медиасервис встроен в Atlas Media Widget.");
+            bridgeStatus.setTextColor(Ui.ACCENT);
+            openBridgeButton.setText("Настройки медиасервиса");
+            openBridgeButton.setVisibility(View.VISIBLE);
+            installBridgeButton.setVisibility(View.GONE);
+            return;
+        }
         boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
         boolean embeddedApiAvailable = EmbeddedApiInstaller.isAvailable(this);
         if (bridgeInstalled) {
@@ -788,6 +796,7 @@ public final class MainActivity extends ScaledActivity {
             bridgeStatus.setText("Пакет com.mmwtl.atlasmediaapi не найден, установщик не встроен.");
         }
         bridgeStatus.setTextColor(bridgeInstalled ? Ui.ACCENT : Ui.ERROR);
+        openBridgeButton.setText("Открыть Atlas Media API");
         openBridgeButton.setVisibility(bridgeInstalled ? View.VISIBLE : View.GONE);
         installBridgeButton.setVisibility(embeddedApiAvailable ? View.VISIBLE : View.GONE);
         installBridgeButton.setEnabled(true);
@@ -966,6 +975,19 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void openAtlasMediaApi() {
+        if (BuildConfig.INTEGRATED_MEDIA_API) {
+            Intent settings = new Intent().setClassName(
+                    getPackageName(),
+                    "com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity");
+            try {
+                startActivity(settings);
+            } catch (ActivityNotFoundException | SecurityException error) {
+                AppLog.warn("Integrated media service settings unavailable", error);
+                Toast.makeText(this, "Настройки медиасервиса недоступны",
+                        Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
         Intent launch = getPackageManager().getLaunchIntentForPackage(MediaBridgeContract.SERVICE_PACKAGE);
         if (launch == null) {
             Toast.makeText(this, "Atlas Media API не установлен", Toast.LENGTH_SHORT).show();

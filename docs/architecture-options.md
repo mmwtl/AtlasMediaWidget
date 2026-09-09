@@ -16,7 +16,8 @@
 
 | Вариант | Что получаем | Главные минусы | Оценка |
 |---|---|---|---|
-| Overlay + полный Media Bridge GInputBridge | Единый source-aware backend, metadata, progress, artwork, sources и controls без второй notification/OneOS подписки | Требует установки совместимой ветки `mediaapi`; GInputBridge становится точкой отказа; API открыт любому установленному APK | Рекомендуемый вариант |
+| Overlay + встроенный AtlasMediaApi runtime | Один APK; единый source-aware backend в отдельном процессе `:media`; сохраняется Messenger-контракт и восстановление после Binder death | Notification access и данные старого API не переносятся автоматически; backend увеличивает APK | Рекомендуемый вариант |
+| Overlay + автономный AtlasMediaApi | Независимое обновление и диагностика backend, прежний package `com.mmwtl.atlasmediaapi` | Два установленных приложения; отдельные разрешения и версии | Совместимость и откат |
 | Overlay + legacy broadcasts GInputBridge | Быстрый read-only прототип с metadata, coarse state и current-source events | Нет атомарности, controls, position/actions и гарантированно читаемой обложки | Только совместимость/диагностика |
 | Overlay + собственный notification listener | Независимая UI-карточка, metadata и controls всех корректно опубликованных медиасессий | Нужны отдельный notification access и дублирующие подписки; без OneOS возможен неверный выбор среди нескольких сессий | Резервный вариант |
 | Overlay + прямой OneOS adapter | Максимальная близость к OEM: source, radio frequency, BT/USB data и нативные controls | Непубличный firmware-specific API; совместимость после обновлений не гарантирована; большой `com_geely` модуль GInputBridge содержит около 491 файлов | Делать только минимальный адаптер после прототипа |
@@ -41,8 +42,8 @@ URI обложки может быть недоступен чужому UID; se
 использовать именно явно разрешённый notification listener, а не пытаться выдать permission через
 обычный runtime prompt.
 
-AtlasMediaWidget не должен получать этот доступ напрямую: установленный GInputBridge уже выполняет
-роль брокера и содержит нативную маршрутизацию команд. Целевой контракт описан в
+UI-процесс AtlasMediaWidget не должен получать этот доступ напрямую: встроенный или автономный
+AtlasMediaApi выполняет роль брокера и содержит нативную маршрутизацию команд. Целевой контракт описан в
 [full-media-bridge.md](full-media-bridge.md), текущий broadcast API — в
 [ginputbridge-api.md](ginputbridge-api.md).
 

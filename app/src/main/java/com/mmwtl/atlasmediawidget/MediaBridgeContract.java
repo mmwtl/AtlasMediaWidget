@@ -2,7 +2,7 @@ package com.mmwtl.atlasmediawidget;
 
 final class MediaBridgeContract {
     static final String SERVICE_ACTION = "com.mmwtl.atlasmediaapi.media.BIND";
-    static final String SERVICE_PACKAGE = "com.mmwtl.atlasmediaapi";
+    static final String SERVICE_PACKAGE = BuildConfig.MEDIA_BRIDGE_PACKAGE;
     static final String SERVICE_CLASS = "com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService";
     static final int VERSION = 1;
 
