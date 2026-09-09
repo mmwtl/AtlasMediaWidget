@@ -81,7 +81,16 @@ provider has been demonstrated on the real head unit.
 - A single user-requested batch is one version increment even when it contains several related
   files or commits.
 - Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
-  allow Gradle to fall back to module-derived `app-*.apk` names.
+  allow Gradle to fall back to module-derived `app-*.apk` names. Distribution variants append
+  `-plain-release.apk` or `-bundled-release.apk` to that base name.
+- Keep `plain` and `bundled` as distribution flavors of the same application. They must retain the
+  same application ID, version code, effective version name and Widget signing identity so either
+  variant can update the other without uninstalling the Widget.
+- The `plain` variant must not contain `assets/atlas-media-api.apk`, request
+  `REQUEST_INSTALL_PACKAGES`, or expose the embedded-API installation receiver/button.
+- Enable the `bundled` variant only when `-PembeddedApiApk=<path>` explicitly selects an API APK.
+  Never choose the newest file from an output directory implicitly. The selected file is a build
+  input, is copied byte-for-byte into the bundled APK, and must never be committed.
 
 ## Build and verification
 
@@ -92,11 +101,26 @@ application improvement, run at minimum:
 sh gradlew --offline clean check assembleRelease
 ```
 
-Verify the release output under `app/build/outputs/apk/release/`, inspect its package/version
-metadata, and run `apksigner verify` when the artifact is signed. Release signing may be supplied
-by the ignored local `secure.signing.gradle` and keystore files. If they are absent, report the
-unsigned artifact explicitly; never disguise a debug-signed artifact as a production release and
-never commit keystores or credentials.
+Without `embeddedApiApk`, this command builds only `plainRelease`. To build and check both release
+variants, use an explicit signed AtlasMediaApi APK:
+
+```sh
+sh gradlew --offline clean check assembleRelease \
+  -PembeddedApiApk=/absolute/path/to/AtlasMediaApi-release.apk
+```
+
+Verify release outputs under `app/build/outputs/apk/plain/release/` and
+`app/build/outputs/apk/bundled/release/`. Inspect package/version metadata and run
+`apksigner verify` when the artifacts are signed. Confirm the plain APK has neither the embedded
+API asset nor `REQUEST_INSTALL_PACKAGES`. For bundled builds, verify the selected input is a valid
+`com.mmwtl.atlasmediaapi` package with the intended version and signing identity, confirm the
+bundled asset exists, and compare its digest with the selected input APK. The API signing identity
+must remain compatible with already installed AtlasMediaApi versions; never auto-uninstall user
+data to bypass a signature mismatch.
+
+Release signing may be supplied by the ignored local `secure.signing.gradle` and keystore files.
+If they are absent, report unsigned artifacts explicitly; never disguise a debug-signed artifact
+as a production release and never commit keystores or credentials.
 
 For overlay or media changes, validate on Android 11 at 1440x1920 portrait when an emulator is
 available, then validate source arbitration and sleep/wake recovery on the real head unit. Unit
