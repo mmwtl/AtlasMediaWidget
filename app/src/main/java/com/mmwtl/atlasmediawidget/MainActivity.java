@@ -298,18 +298,26 @@ public final class MainActivity extends ScaledActivity {
 
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
+        positionRow.addView(text("Угол", 14, Ui.SECONDARY, Typeface.BOLD),
+                inlineLabelParams());
         positionRow.addView(positionCornerSpinner, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1.5f));
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1.25f));
         positionX = numberInput();
         positionX.setHint("X");
         positionX.setContentDescription("Отступ по X в пикселях");
-        positionRow.addView(positionX, compactInputParams());
-        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
+        positionRow.addView(text("X", 14, Ui.SECONDARY, Typeface.BOLD),
+                inlineLabelParams());
+        positionRow.addView(positionX, positionInputParams());
+        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
+                compactUnitParams());
         positionY = numberInput();
         positionY.setHint("Y");
         positionY.setContentDescription("Отступ по Y в пикселях");
-        positionRow.addView(positionY, compactInputParams());
-        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
+        positionRow.addView(text("Y", 14, Ui.SECONDARY, Typeface.BOLD),
+                inlineLabelParams());
+        positionRow.addView(positionY, positionInputParams());
+        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
+                compactUnitParams());
         serviceCard.addView(positionRow, fullWrap());
         Button applyGeometry = actionButton("Применить размер и положение");
         applyGeometry.setOnClickListener(v -> applyGeometry());
@@ -1031,10 +1039,17 @@ public final class MainActivity extends ScaledActivity {
         return labels;
     }
 
-    private LinearLayout.LayoutParams compactInputParams() {
+    private LinearLayout.LayoutParams positionInputParams() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                Ui.dp(this, 66), ViewGroup.LayoutParams.WRAP_CONTENT);
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
         params.leftMargin = Ui.dp(this, 4);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams inlineLabelParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = Ui.dp(this, 8);
         return params;
     }
 
