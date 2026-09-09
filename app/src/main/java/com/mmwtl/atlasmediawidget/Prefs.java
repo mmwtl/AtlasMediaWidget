@@ -12,6 +12,7 @@ final class Prefs {
     static final String KEY_AUTO_START = "auto_start";
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
+    static final String KEY_POSITION_CORNER = "position_corner";
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     static final String KEY_RADIO_SAVED_NAVIGATION = "radio_saved_navigation";
@@ -122,6 +123,14 @@ final class Prefs {
 
     void putInt(String key, int value) {
         preferences.edit().putInt(key, value).apply();
+    }
+
+    void putPosition(OverlayCorner corner, int offsetX, int offsetY) {
+        preferences.edit()
+                .putString(KEY_POSITION_CORNER, corner.preferenceValue)
+                .putInt(KEY_POSITION_X, Math.max(0, offsetX))
+                .putInt(KEY_POSITION_Y, Math.max(0, offsetY))
+                .apply();
     }
 
     void putString(String key, String value) {
@@ -315,10 +324,15 @@ final class Prefs {
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
                 .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);
         if (data.positionX == null) {
-            editor.remove(KEY_POSITION_X).remove(KEY_POSITION_Y);
+            editor.remove(KEY_POSITION_X).remove(KEY_POSITION_Y).remove(KEY_POSITION_CORNER);
         } else {
             editor.putInt(KEY_POSITION_X, data.positionX)
                     .putInt(KEY_POSITION_Y, data.positionY);
+            if (data.positionCorner == null) {
+                editor.remove(KEY_POSITION_CORNER);
+            } else {
+                editor.putString(KEY_POSITION_CORNER, data.positionCorner.preferenceValue);
+            }
         }
         putStyle(editor, CardStyle.COMPACT, data.compact);
         putStyle(editor, CardStyle.SQUARE, data.square);
