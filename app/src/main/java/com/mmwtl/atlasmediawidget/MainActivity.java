@@ -282,9 +282,6 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams positionTitleParams = fullWrap();
         positionTitleParams.topMargin = Ui.dp(this, 14);
         serviceCard.addView(positionTitle, positionTitleParams);
-        LinearLayout positionRow = new LinearLayout(this);
-        positionRow.setOrientation(LinearLayout.HORIZONTAL);
-        positionRow.setGravity(Gravity.CENTER_VERTICAL);
         positionCornerSpinner = new Spinner(this);
         positionCornerSpinner.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, cornerLabels()));
@@ -298,27 +295,43 @@ public final class MainActivity extends ScaledActivity {
 
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
-        positionRow.addView(text("Угол привязки", 14, Ui.SECONDARY, Typeface.BOLD),
-                inlineLabelParams());
-        positionRow.addView(positionCornerSpinner, new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1.25f));
+
+        LinearLayout positionGrid = new LinearLayout(this);
+        positionGrid.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout positionHeader = new LinearLayout(this);
+        positionHeader.setOrientation(LinearLayout.HORIZONTAL);
+        positionHeader.addView(text("Угол привязки", 14, Ui.SECONDARY, Typeface.BOLD),
+                positionColumnParams(1.25f, 0));
+        positionHeader.addView(text("Отступ X", 14, Ui.SECONDARY, Typeface.BOLD),
+                positionColumnParams(1f, 8));
+        positionHeader.addView(text("Отступ Y", 14, Ui.SECONDARY, Typeface.BOLD),
+                positionColumnParams(1f, 8));
+        positionGrid.addView(positionHeader, fullWrap());
+
+        LinearLayout positionRow = new LinearLayout(this);
+        positionRow.setOrientation(LinearLayout.HORIZONTAL);
+        positionRow.setGravity(Gravity.CENTER_VERTICAL);
+        positionRow.addView(positionCornerSpinner, positionColumnParams(1.25f, 0));
         positionX = numberInput();
         positionX.setHint("X");
         positionX.setContentDescription("Отступ по X в пикселях");
-        positionRow.addView(text("X", 14, Ui.SECONDARY, Typeface.BOLD),
-                inlineLabelParams());
-        positionRow.addView(positionX, positionInputParams());
-        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
-                compactUnitParams());
+        LinearLayout xCell = new LinearLayout(this);
+        xCell.setOrientation(LinearLayout.HORIZONTAL);
+        xCell.addView(positionX, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        xCell.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
+        positionRow.addView(xCell, positionColumnParams(1f, 8));
         positionY = numberInput();
         positionY.setHint("Y");
         positionY.setContentDescription("Отступ по Y в пикселях");
-        positionRow.addView(text("Y", 14, Ui.SECONDARY, Typeface.BOLD),
-                inlineLabelParams());
-        positionRow.addView(positionY, positionInputParams());
-        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
-                compactUnitParams());
-        serviceCard.addView(positionRow, fullWrap());
+        LinearLayout yCell = new LinearLayout(this);
+        yCell.setOrientation(LinearLayout.HORIZONTAL);
+        yCell.addView(positionY, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        yCell.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
+        positionRow.addView(yCell, positionColumnParams(1f, 8));
+        positionGrid.addView(positionRow, fullWrap());
+        serviceCard.addView(positionGrid, fullWrap());
         Button applyGeometry = actionButton("Применить размер и положение");
         applyGeometry.setOnClickListener(v -> applyGeometry());
         serviceCard.addView(applyGeometry, buttonParams());
@@ -1039,13 +1052,6 @@ public final class MainActivity extends ScaledActivity {
         return labels;
     }
 
-    private LinearLayout.LayoutParams positionInputParams() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        params.leftMargin = Ui.dp(this, 4);
-        return params;
-    }
-
     private LinearLayout.LayoutParams sizeInputParams() {
         return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 0.9f);
     }
@@ -1054,10 +1060,10 @@ public final class MainActivity extends ScaledActivity {
         return new LinearLayout.LayoutParams(0, 1, 0.25f);
     }
 
-    private LinearLayout.LayoutParams inlineLabelParams() {
+    private LinearLayout.LayoutParams positionColumnParams(float weight, int leftMarginDp) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.leftMargin = Ui.dp(this, 8);
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, weight);
+        params.leftMargin = Ui.dp(this, leftMarginDp);
         return params;
     }
 
