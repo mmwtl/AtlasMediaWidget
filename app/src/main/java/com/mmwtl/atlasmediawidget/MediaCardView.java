@@ -108,17 +108,17 @@ final class MediaCardView extends FrameLayout {
     private int lastRenderedProgress = Integer.MIN_VALUE;
     private final Runnable chooserAutoHide = this::hideOpenChooser;
 
-    MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
+    MediaCardView(Context context, int requestedWidthPx, int requestedHeightPx,
             int maxWidthPx, int maxHeightPx, CardStyle style,
             WidgetAppearance appearance, boolean radioSavedNavigation,
             boolean dragHandleVisible, Listener listener) {
-        this(context, requestedWidthDp, requestedHeightDp, maxWidthPx, maxHeightPx, style,
+        this(context, requestedWidthPx, requestedHeightPx, maxWidthPx, maxHeightPx, style,
                 appearance, radioSavedNavigation, dragHandleVisible,
                 Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
                 Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS, listener);
     }
 
-    MediaCardView(Context context, int requestedWidthDp, int requestedHeightDp,
+    MediaCardView(Context context, int requestedWidthPx, int requestedHeightPx,
             int maxWidthPx, int maxHeightPx, CardStyle style,
             WidgetAppearance appearance, boolean radioSavedNavigation,
             boolean dragHandleVisible, int favoriteColumns, int favoriteRows,
@@ -133,10 +133,8 @@ final class MediaCardView extends FrameLayout {
                 Math.min(Prefs.MAX_RADIO_FAVORITES_GRID_COLUMNS, favoriteColumns));
         this.favoriteRows = Math.max(Prefs.MIN_RADIO_FAVORITES_GRID_ROWS,
                 Math.min(Prefs.MAX_RADIO_FAVORITES_GRID_ROWS, favoriteRows));
-        cardWidth = Math.min(maxWidthPx, Math.max(Ui.dp(context, 320),
-                Ui.dp(context, requestedWidthDp)));
-        cardHeight = Math.min(maxHeightPx, Math.max(Ui.dp(context, 220),
-                Ui.dp(context, requestedHeightDp)));
+        cardWidth = Math.min(maxWidthPx, Math.max(Prefs.MIN_CARD_WIDTH_PX, requestedWidthPx));
+        cardHeight = Math.min(maxHeightPx, Math.max(Prefs.MIN_CARD_HEIGHT_PX, requestedHeightPx));
         widthScale = cardWidth / (float) Ui.dp(context, style.defaultWidthDp);
         heightScale = cardHeight / (float) Ui.dp(context, style.defaultHeightDp);
         uiScale = Math.max(0.72f, Math.min(1.75f, Math.min(widthScale, heightScale)));

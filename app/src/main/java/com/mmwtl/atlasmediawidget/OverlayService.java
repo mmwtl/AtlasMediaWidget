@@ -507,8 +507,12 @@ public final class OverlayService extends Service
                 return true;
             }
             case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                prefs.putInt(Prefs.KEY_POSITION_X, cardParams.x);
-                prefs.putInt(Prefs.KEY_POSITION_Y, cardParams.y);
+                Rect bounds = availableBounds();
+                OverlayCorner corner = storedCorner();
+                OverlayGeometry.Offset offsets = OverlayGeometry.offsetsFor(corner,
+                        bounds.left, bounds.top, bounds.right, bounds.bottom,
+                        card.cardWidth(), card.cardHeight(), cardParams.x, cardParams.y);
+                prefs.putPosition(corner, offsets.x(), offsets.y());
                 return true;
             }
             default -> { return false; }
@@ -658,7 +662,8 @@ public final class OverlayService extends Service
             }
             if (cardParams != null) {
                 Rect bounds = availableBounds();
-                clampPosition(cardParams, card, bounds);
+                migrateLegacyPosition(bounds, card.cardWidth(), card.cardHeight());
+                applyStoredPosition(cardParams, card.cardWidth(), card.cardHeight(), bounds);
                 try {
                     card.setVisibility(View.VISIBLE);
                     windowManager.addView(card, cardParams);
@@ -684,16 +689,16 @@ public final class OverlayService extends Service
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkKey = "";
         Rect bounds = availableBounds();
-        CardStyle style = CardStyle.fromPreference(
-                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+        CardStyle style = CardStyle.DEFAULT;
         int maxWidth = Math.max(1, bounds.width() - Ui.dp(this, 32));
         int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
         MediaCardView candidate = new MediaCardView(this,
-                prefs.cardWidthDp(style), prefs.cardHeightDp(style),
+                prefs.cardWidthPx(), prefs.cardHeightPx(),
                 maxWidth, maxHeight, style, prefs.appearance(style),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), this);
+        migrateLegacyPosition(bounds, candidate.cardWidth(), candidate.cardHeight());
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),
                 candidate.cardHeight(),
@@ -702,13 +707,7 @@ public final class OverlayService extends Service
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
                 PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
-        int storedX = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
-        int storedY = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
-        params.x = storedX == Prefs.POSITION_UNSET
-                ? bounds.left + Math.max(0, (bounds.width() - candidate.cardWidth()) / 2) : storedX;
-        params.y = storedY == Prefs.POSITION_UNSET
-                ? bounds.top + Math.max(0, Math.round(bounds.height() * 0.62f)) : storedY;
-        clampPosition(params, candidate, bounds);
+        applyStoredPosition(params, candidate.cardWidth(), candidate.cardHeight(), bounds);
         try {
             Trace.beginSection("AtlasOverlay.addView");
             try {
@@ -837,11 +836,46 @@ public final class OverlayService extends Service
     }
 
     private void clampPosition(WindowManager.LayoutParams params, MediaCardView target, Rect bounds) {
-        params.x = Math.max(bounds.left,
-                Math.min(params.x, Math.max(bounds.left, bounds.right - target.cardWidth())));
-        int height = target.cardHeight();
-        params.y = Math.max(bounds.top,
-                Math.min(params.y, Math.max(bounds.top, bounds.bottom - height)));
+        OverlayGeometry.Position position = OverlayGeometry.positionFor(OverlayCorner.TOP_START,
+                bounds.left, bounds.top, bounds.right, bounds.bottom,
+                target.cardWidth(), target.cardHeight(), params.x - bounds.left,
+                params.y - bounds.top);
+        params.x = position.x();
+        params.y = position.y();
+    }
+
+    private OverlayCorner storedCorner() {
+        OverlayCorner corner = OverlayCorner.fromPreference(
+                prefs.getString(Prefs.KEY_POSITION_CORNER, null));
+        return corner == null ? OverlayCorner.TOP_START : corner;
+    }
+
+    private void migrateLegacyPosition(Rect bounds, int cardWidth, int cardHeight) {
+        if (OverlayCorner.fromPreference(prefs.getString(Prefs.KEY_POSITION_CORNER, null)) != null) {
+            return;
+        }
+        int storedX = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
+        int storedY = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
+        int defaultX = bounds.left + Math.max(0, (bounds.width() - cardWidth) / 2);
+        int defaultY = bounds.top + Math.max(0, Math.round(bounds.height() * 0.62f));
+        int absoluteX = storedX == Prefs.POSITION_UNSET ? defaultX : storedX;
+        int absoluteY = storedY == Prefs.POSITION_UNSET ? defaultY : storedY;
+        OverlayGeometry.Offset offsets = OverlayGeometry.offsetsFor(OverlayCorner.TOP_START,
+                bounds.left, bounds.top, bounds.right, bounds.bottom,
+                cardWidth, cardHeight, absoluteX, absoluteY);
+        prefs.putPosition(OverlayCorner.TOP_START, offsets.x(), offsets.y());
+    }
+
+    private void applyStoredPosition(WindowManager.LayoutParams params, int cardWidth,
+            int cardHeight, Rect bounds) {
+        OverlayCorner corner = storedCorner();
+        int offsetX = Math.max(0, prefs.getInt(Prefs.KEY_POSITION_X, 0));
+        int offsetY = Math.max(0, prefs.getInt(Prefs.KEY_POSITION_Y, 0));
+        OverlayGeometry.Position position = OverlayGeometry.positionFor(corner,
+                bounds.left, bounds.top, bounds.right, bounds.bottom,
+                cardWidth, cardHeight, offsetX, offsetY);
+        params.x = position.x();
+        params.y = position.y();
     }
 
     private void createNotificationChannel() {

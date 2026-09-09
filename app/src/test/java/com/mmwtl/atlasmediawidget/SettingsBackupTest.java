@@ -28,13 +28,14 @@ public final class SettingsBackupTest {
         assertEquals(CardStyle.COMPACT, restored.selectedStyle);
         assertEquals(Integer.valueOf(321), restored.positionX);
         assertEquals(Integer.valueOf(654), restored.positionY);
+        assertNull(restored.positionCorner);
         assertEquals(481, restored.compact.widthDp);
         assertEquals(302, restored.compact.heightDp);
         assertEquals(27, restored.square.appearance.contentInsetDp);
         assertEquals(CoverDimPreset.DEFAULT, restored.compact.appearance.coverDimPreset);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(7, root.getInt("schemaVersion"));
+        assertEquals(9, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -92,6 +93,69 @@ public final class SettingsBackupTest {
         assertNull(restored.positionY);
     }
 
+    @Test public void schemaNineRoundTripPreservesGlobalCardSizeAndPositionCorner()
+            throws Exception {
+        SettingsBackup.Data original = new SettingsBackup.Data(
+                true, true, true, 15, CardStyle.SQUARE, 31, 42,
+                OverlayCorner.BOTTOM_END,
+                new SettingsBackup.StyleData(500, 500,
+                        WidgetAppearance.defaults(CardStyle.SQUARE)),
+                new SettingsBackup.StyleData(500, 500,
+                        WidgetAppearance.defaults(CardStyle.SQUARE)), 800, 810, 2, 2, false);
+
+        SettingsBackup.Data restored = SettingsBackup.decode(
+                SettingsBackup.encode(original, "test"));
+
+        assertEquals(OverlayCorner.BOTTOM_END, restored.positionCorner);
+        assertEquals(Integer.valueOf(31), restored.positionX);
+        assertEquals(Integer.valueOf(42), restored.positionY);
+        assertEquals(Integer.valueOf(800), restored.cardWidthPx);
+        assertEquals(Integer.valueOf(810), restored.cardHeightPx);
+    }
+
+    @Test public void schemaNineRejectsNegativePositionOffsets() throws Exception {
+        SettingsBackup.Data original = new SettingsBackup.Data(
+                true, true, true, 15, CardStyle.SQUARE, 31, 42,
+                OverlayCorner.BOTTOM_END,
+                new SettingsBackup.StyleData(500, 500,
+                        WidgetAppearance.defaults(CardStyle.SQUARE)),
+                new SettingsBackup.StyleData(500, 500,
+                        WidgetAppearance.defaults(CardStyle.SQUARE)), 2, 2, false);
+        JSONObject root = new JSONObject(SettingsBackup.encode(original, "test"));
+        root.getJSONObject("settings").getJSONObject("overlayPosition").put("x", -1);
+
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+    }
+
+    @Test public void schemaSevenPositionRemainsLegacyAbsolute() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.SQUARE, 321, 654), "test"));
+        root.put("schemaVersion", 7);
+        root.getJSONObject("settings").getJSONObject("overlayPosition")
+                .remove("legacyAbsolute");
+
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+
+        assertEquals(Integer.valueOf(321), restored.positionX);
+        assertEquals(Integer.valueOf(654), restored.positionY);
+        assertNull(restored.positionCorner);
+    }
+
+    @Test public void schemaNineRejectsUnknownPositionCorner() throws Exception {
+        SettingsBackup.Data original = new SettingsBackup.Data(
+                true, true, true, 15, CardStyle.SQUARE, 31, 42,
+                OverlayCorner.BOTTOM_END,
+                new SettingsBackup.StyleData(500, 500,
+                        WidgetAppearance.defaults(CardStyle.SQUARE)),
+                new SettingsBackup.StyleData(500, 500,
+                        WidgetAppearance.defaults(CardStyle.SQUARE)), 2, 2, false);
+        JSONObject root = new JSONObject(SettingsBackup.encode(original, "test"));
+        root.getJSONObject("settings").getJSONObject("overlayPosition")
+                .put("corner", "middle");
+
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+    }
+
     @Test public void jsonRoundTripPreservesHiddenDragHandle() throws Exception {
         SettingsBackup.Data restored = SettingsBackup.decode(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null, false), "test"));
@@ -102,7 +166,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 8);
+        root.put("schemaVersion", 10);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
