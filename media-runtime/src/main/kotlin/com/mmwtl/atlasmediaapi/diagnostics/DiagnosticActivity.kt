@@ -5,14 +5,11 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.StateListDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.Settings
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageView
@@ -22,7 +19,6 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.mmwtl.atlasmediaapi.MediaRuntime
@@ -61,9 +57,6 @@ class DiagnosticActivity : Activity() {
     private val activityJob = SupervisorJob()
     private val activityScope = CoroutineScope(activityJob + Dispatchers.Main.immediate)
 
-    private lateinit var permissionStatusView: TextView
-    private lateinit var notificationSettingsButton: Button
-    private lateinit var storagePermissionButton: Button
     private lateinit var demoModeSwitch: Switch
 
     private val sourceTileButtons = mutableMapOf<String, Button>()
@@ -148,33 +141,6 @@ class DiagnosticActivity : Activity() {
             ViewGroup.LayoutParams.WRAP_CONTENT,
         ))
         DiagnosticUi.topMargin(note, this, 8f)
-
-        // 1. Permissions Card (Top of screen, large buttons)
-        val accessCard = DiagnosticUi.card(this)
-        root.addView(accessCard)
-        accessCard.addView(DiagnosticUi.heading(this, "Разрешения и доступ", 20f), DiagnosticUi.fullWrap())
-
-        permissionStatusView = DiagnosticUi.text(this, "", 14f, DiagnosticUi.SECONDARY).apply {
-            setLineSpacing(0f, 1.12f)
-        }
-        accessCard.addView(permissionStatusView, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(permissionStatusView, this, 8f)
-
-        notificationSettingsButton = DiagnosticUi.permissionButton(this, "Открыть доступ к уведомлениям", false).apply {
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            }
-        }
-        accessCard.addView(notificationSettingsButton, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(notificationSettingsButton, this, 12f)
-
-        storagePermissionButton = DiagnosticUi.permissionButton(this, "Разрешить доступ к хранилищу (USB)", false).apply {
-            setOnClickListener {
-                requestStoragePermission()
-            }
-        }
-        accessCard.addView(storagePermissionButton, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(storagePermissionButton, this, 10f)
 
         val demoCard = DiagnosticUi.card(this)
         root.addView(demoCard)
@@ -607,58 +573,6 @@ class DiagnosticActivity : Activity() {
         return readGranted
     }
 
-    private fun requestStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val openedSpecific = runCatching {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-                true
-            }.getOrDefault(false)
-
-            if (openedSpecific) return
-
-            val openedGeneral = runCatching {
-                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivity(intent)
-                true
-            }.getOrDefault(false)
-
-            if (openedGeneral) return
-        }
-
-        val requested = runCatching {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                ),
-                1001,
-            )
-            true
-        }.getOrDefault(false)
-
-        if (!requested) {
-            runCatching {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-            }
-        }
-    }
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray,
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        render()
-    }
-
     private fun exportSampleZip() {
         activityScope.launch(Dispatchers.IO) {
             val file = runCatching { coordinator.radioCatalogRepository.createSampleZipFile() }.getOrNull()
@@ -767,7 +681,6 @@ class DiagnosticActivity : Activity() {
         if (demoModeSwitch.isChecked != coordinator.isDemoMode()) {
             demoModeSwitch.isChecked = coordinator.isDemoMode()
         }
-        renderPermissions()
         renderRadioCatalog()
         reportView.text = generateDiagnosticText()
         statusView.text = generateStatusText()
@@ -853,50 +766,6 @@ class DiagnosticActivity : Activity() {
             BitmapFactory.decodeStream(stream, null, options)
         }
     }.getOrNull()
-
-    private fun renderPermissions() {
-        val notifGranted = MediaNotificationListenerService.isListenerEnabled(this)
-        val storageGranted = isStoragePermissionGranted()
-
-        permissionStatusView.text = buildString {
-            append("Уведомления: ")
-            append(if (notifGranted) "включено" else "требуется")
-            append("  ·  Хранилище: ")
-            append(if (storageGranted) "доступно" else "требуется")
-        }
-
-        notificationSettingsButton.apply {
-            text = if (notifGranted) "✓ Доступ к уведомлениям включён" else "Открыть доступ к уведомлениям"
-            val normalBg = if (notifGranted) DiagnosticUi.NESTED else DiagnosticUi.ACCENT
-            val pressedBg = if (notifGranted) Color.rgb(68, 68, 68) else Color.rgb(145, 169, 180)
-            val buttonTextColor = if (notifGranted) DiagnosticUi.PRIMARY else Color.rgb(7, 16, 20)
-            setTextColor(buttonTextColor)
-            setTypeface(Typeface.DEFAULT, if (notifGranted) Typeface.NORMAL else Typeface.BOLD)
-            background = StateListDrawable().apply {
-                addState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_pressed),
-                    DiagnosticUi.background(context, pressedBg))
-                addState(intArrayOf(-android.R.attr.state_enabled),
-                    DiagnosticUi.background(context, normalBg).apply { alpha = 105 })
-                addState(intArrayOf(), DiagnosticUi.background(context, normalBg))
-            }
-        }
-
-        storagePermissionButton.apply {
-            text = if (storageGranted) "✓ Доступ к хранилищу (USB) предоставлен" else "Разрешить доступ к хранилищу (USB)"
-            val normalBg = if (storageGranted) DiagnosticUi.NESTED else DiagnosticUi.ACCENT
-            val pressedBg = if (storageGranted) Color.rgb(68, 68, 68) else Color.rgb(145, 169, 180)
-            val buttonTextColor = if (storageGranted) DiagnosticUi.PRIMARY else Color.rgb(7, 16, 20)
-            setTextColor(buttonTextColor)
-            setTypeface(Typeface.DEFAULT, if (storageGranted) Typeface.NORMAL else Typeface.BOLD)
-            background = StateListDrawable().apply {
-                addState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_pressed),
-                    DiagnosticUi.background(context, pressedBg))
-                addState(intArrayOf(-android.R.attr.state_enabled),
-                    DiagnosticUi.background(context, normalBg).apply { alpha = 105 })
-                addState(intArrayOf(), DiagnosticUi.background(context, normalBg))
-            }
-        }
-    }
 
     private fun updateSettingsUiState() {
         val selectedId = coordinator.preferences.defaultAudioSource

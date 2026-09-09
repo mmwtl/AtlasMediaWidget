@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediawidget;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Insets;
@@ -11,6 +12,7 @@ import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -43,11 +45,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends ScaledActivity {
+    private static final int REQUEST_NOTIFICATION_PERMISSION = 33;
+    private static final int REQUEST_STORAGE_PERMISSION = 1001;
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
+    private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
+            "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
     private Prefs prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private TextView permissionStatus;
+    private Button notificationAccessButton;
+    private Button storageAccessButton;
     private TextView bridgeStatus;
     private Button openBridgeButton;
     private Button installBridgeButton;
@@ -215,6 +223,16 @@ public final class MainActivity extends ScaledActivity {
         Button accessibility = actionButton(getString(R.string.allow_accessibility));
         accessibility.setOnClickListener(v -> openAccessibilitySettings());
         accessCard.addView(accessibility, buttonParams());
+        notificationAccessButton = actionButton("Разрешить доступ к уведомлениям (медиа)");
+        notificationAccessButton.setOnClickListener(v -> openNotificationAccessSettings());
+        notificationAccessButton.setVisibility(BuildConfig.INTEGRATED_MEDIA_API
+                ? View.VISIBLE : View.GONE);
+        accessCard.addView(notificationAccessButton, buttonParams());
+        storageAccessButton = actionButton("Разрешить доступ к хранилищу (USB)");
+        storageAccessButton.setOnClickListener(v -> requestStorageAccess());
+        storageAccessButton.setVisibility(BuildConfig.INTEGRATED_MEDIA_API
+                ? View.VISIBLE : View.GONE);
+        accessCard.addView(storageAccessButton, buttonParams());
 
         LinearLayout bridgeCard = card();
         bridgeCard.addView(text(getString(R.string.bridge_title),
@@ -752,10 +770,25 @@ public final class MainActivity extends ScaledActivity {
         boolean overlay = Settings.canDrawOverlays(this);
         boolean usage = ForegroundAppDetector.hasUsageAccess(this);
         boolean accessibility = AccessibilityWindowState.isEnabled(this);
-        permissionStatus.setText("Поверх окон: " + yesNo(overlay)
+        boolean mediaNotifications = !BuildConfig.INTEGRATED_MEDIA_API
+                || hasMediaNotificationAccess();
+        boolean storage = !BuildConfig.INTEGRATED_MEDIA_API || hasStorageAccess();
+        String status = "Поверх окон: " + yesNo(overlay)
                 + "\nИстория использования: " + yesNo(usage)
-                + "\nКонтроль окон: " + yesNo(accessibility));
+                + "\nКонтроль окон: " + yesNo(accessibility);
+        if (BuildConfig.INTEGRATED_MEDIA_API) {
+            status += "\nДоступ к уведомлениям (медиа): " + yesNo(mediaNotifications)
+                    + "\nХранилище (USB): " + yesNo(storage);
+            notificationAccessButton.setText(mediaNotifications
+                    ? "✓ Доступ к уведомлениям (медиа) предоставлен"
+                    : "Разрешить доступ к уведомлениям (медиа)");
+            storageAccessButton.setText(storage
+                    ? "✓ Доступ к хранилищу (USB) предоставлен"
+                    : "Разрешить доступ к хранилищу (USB)");
+        }
+        permissionStatus.setText(status);
         permissionStatus.setTextColor(overlay && usage && accessibility
+                && mediaNotifications && storage
                 ? Ui.ACCENT : Ui.ERROR);
         refreshBridgeStatus();
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
@@ -959,6 +992,67 @@ public final class MainActivity extends ScaledActivity {
                 "настройки контроля окон");
     }
 
+    private void openNotificationAccessSettings() {
+        openPermissionSettings(
+                new Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
+                new Intent(Settings.ACTION_SETTINGS),
+                "настройки доступа к уведомлениям");
+    }
+
+    private boolean hasMediaNotificationAccess() {
+        String enabled = Settings.Secure.getString(
+                getContentResolver(), "enabled_notification_listeners");
+        if (enabled == null || enabled.isBlank()) return false;
+        for (String value : enabled.split(":")) {
+            ComponentName component = ComponentName.unflattenFromString(value);
+            if (component != null
+                    && getPackageName().equals(component.getPackageName())
+                    && MEDIA_NOTIFICATION_LISTENER_CLASS.equals(component.getClassName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasStorageAccess() {
+        boolean readGranted = checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                == PackageManager.PERMISSION_GRANTED;
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ? Environment.isExternalStorageManager() || readGranted
+                : readGranted;
+    }
+
+    private void requestStorageAccess() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:" + getPackageName())));
+                return;
+            } catch (ActivityNotFoundException | SecurityException directError) {
+                AppLog.warn("App storage access settings unavailable", directError);
+                try {
+                    startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+                    return;
+                } catch (ActivityNotFoundException | SecurityException generalError) {
+                    AppLog.warn("General storage access settings unavailable", generalError);
+                }
+            }
+        }
+        try {
+            requestPermissions(new String[]{
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+            }, REQUEST_STORAGE_PERMISSION);
+        } catch (SecurityException error) {
+            AppLog.warn("Storage permission request unavailable", error);
+            openPermissionSettings(
+                    new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName())),
+                    new Intent(Settings.ACTION_SETTINGS),
+                    "настройки приложения");
+        }
+    }
+
     private void openPermissionSettings(Intent direct, Intent fallback, String label) {
         try {
             startActivity(direct);
@@ -1040,7 +1134,8 @@ public final class MainActivity extends ScaledActivity {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 33);
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    REQUEST_NOTIFICATION_PERMISSION);
         }
     }
 

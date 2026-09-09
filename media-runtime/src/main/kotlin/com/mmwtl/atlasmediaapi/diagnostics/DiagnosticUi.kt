@@ -123,32 +123,6 @@ internal object DiagnosticUi {
             }
         }
 
-    fun permissionButton(
-        context: Context,
-        label: String,
-        granted: Boolean,
-    ): Button = Button(context).apply {
-        text = if (granted) "✓ $label (Предоставлено)" else label
-        textSize = 15f
-        setAllCaps(false)
-        minHeight = dp(context, 48f)
-        minimumHeight = dp(context, 48f)
-        stateListAnimator = null
-        setPadding(dp(context, 16f), dp(context, 12f), dp(context, 16f), dp(context, 12f))
-        val normalBg = if (granted) NESTED else ACCENT
-        val pressedBg = if (granted) Color.rgb(68, 68, 68) else Color.rgb(145, 169, 180)
-        val buttonTextColor = if (granted) PRIMARY else Color.rgb(7, 16, 20)
-        setTextColor(buttonTextColor)
-        setTypeface(Typeface.DEFAULT, if (granted) Typeface.NORMAL else Typeface.BOLD)
-        background = StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_enabled, android.R.attr.state_pressed),
-                background(context, pressedBg))
-            addState(intArrayOf(-android.R.attr.state_enabled),
-                background(context, normalBg).apply { alpha = 105 })
-            addState(intArrayOf(), background(context, normalBg))
-        }
-    }
-
     fun tileButton(
         context: Context,
         label: String,
