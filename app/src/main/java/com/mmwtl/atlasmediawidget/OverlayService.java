@@ -689,12 +689,11 @@ public final class OverlayService extends Service
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkKey = "";
         Rect bounds = availableBounds();
-        CardStyle style = CardStyle.fromPreference(
-                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+        CardStyle style = CardStyle.DEFAULT;
         int maxWidth = Math.max(1, bounds.width() - Ui.dp(this, 32));
         int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
         MediaCardView candidate = new MediaCardView(this,
-                prefs.cardWidthDp(style), prefs.cardHeightDp(style),
+                prefs.cardWidthPx(), prefs.cardHeightPx(),
                 maxWidth, maxHeight, style, prefs.appearance(style),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),

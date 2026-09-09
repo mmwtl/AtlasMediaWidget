@@ -14,6 +14,8 @@ final class Prefs {
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_POSITION_CORNER = "position_corner";
     static final String KEY_CARD_STYLE = "card_style";
+    static final String KEY_CARD_WIDTH_PX = "card_width_px";
+    static final String KEY_CARD_HEIGHT_PX = "card_height_px";
     static final String KEY_APP_UI_SCALE_TENTHS = "app_ui_scale_tenths";
     static final String KEY_RADIO_SAVED_NAVIGATION = "radio_saved_navigation";
     static final String KEY_RADIO_FAVORITES_NAVIGATION = "radio_favorites_navigation";
@@ -43,6 +45,8 @@ final class Prefs {
     static final int MAX_CARD_WIDTH_DP = 900;
     static final int MIN_CARD_HEIGHT_DP = 220;
     static final int MAX_CARD_HEIGHT_DP = 900;
+    static final int MIN_CARD_WIDTH_PX = 320;
+    static final int MIN_CARD_HEIGHT_PX = 220;
     static final int MIN_METADATA_PROGRESS_GAP_DP = 4;
     static final int MAX_METADATA_PROGRESS_GAP_DP = 40;
     static final int MIN_CONTROL_PANEL_HEIGHT_DP = 64;
@@ -77,13 +81,16 @@ final class Prefs {
     static final int DEFAULT_RADIO_FAVORITES_GRID_COLUMNS = 2;
     static final int DEFAULT_RADIO_FAVORITES_GRID_ROWS = 2;
 
+    private final Context appContext;
     private final SharedPreferences preferences;
 
     Prefs(Context context) {
         Context app = context.getApplicationContext();
+        appContext = app;
         Context storage = app.createDeviceProtectedStorageContext();
         migrateCredentialPreferencesWhenAvailable(app, storage);
         preferences = storage.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+        migrateCardSizePx();
         // Before this setting existed, the only available gradient was the strongest one.
         // A completely empty store is a new installation and gets the gentler default.
         migrateCoverDimPreset();
@@ -135,6 +142,37 @@ final class Prefs {
 
     void putString(String key, String value) {
         preferences.edit().putString(key, value).apply();
+    }
+
+    int cardWidthPx() {
+        return Math.max(MIN_CARD_WIDTH_PX, getInt(KEY_CARD_WIDTH_PX,
+                Ui.dp(appContext, CardStyle.DEFAULT.defaultWidthDp)));
+    }
+
+    int cardHeightPx() {
+        return Math.max(MIN_CARD_HEIGHT_PX, getInt(KEY_CARD_HEIGHT_PX,
+                Ui.dp(appContext, CardStyle.DEFAULT.defaultHeightDp)));
+    }
+
+    void putCardSizePx(int widthPx, int heightPx) {
+        preferences.edit()
+                .putInt(KEY_CARD_WIDTH_PX, Math.max(MIN_CARD_WIDTH_PX, widthPx))
+                .putInt(KEY_CARD_HEIGHT_PX, Math.max(MIN_CARD_HEIGHT_PX, heightPx))
+                .apply();
+    }
+
+    private void migrateCardSizePx() {
+        if (preferences.contains(KEY_CARD_WIDTH_PX) && preferences.contains(KEY_CARD_HEIGHT_PX)) {
+            return;
+        }
+        CardStyle style = CardStyle.fromPreference(getInt(KEY_CARD_STYLE,
+                CardStyle.DEFAULT.preferenceValue));
+        int widthDp = clamp(cardWidthDp(style), MIN_CARD_WIDTH_DP, MAX_CARD_WIDTH_DP);
+        int heightDp = clamp(cardHeightDp(style), MIN_CARD_HEIGHT_DP, MAX_CARD_HEIGHT_DP);
+        preferences.edit()
+                .putInt(KEY_CARD_WIDTH_PX, Ui.dp(appContext, widthDp))
+                .putInt(KEY_CARD_HEIGHT_PX, Ui.dp(appContext, heightDp))
+                .apply();
     }
 
     int radioFavoritesColumns() {
@@ -333,6 +371,14 @@ final class Prefs {
             } else {
                 editor.putString(KEY_POSITION_CORNER, data.positionCorner.preferenceValue);
             }
+        }
+        if (data.cardWidthPx == null) {
+            SettingsBackup.StyleData legacy = data.style(data.selectedStyle);
+            editor.putInt(KEY_CARD_WIDTH_PX, Ui.dp(appContext, legacy.widthDp))
+                    .putInt(KEY_CARD_HEIGHT_PX, Ui.dp(appContext, legacy.heightDp));
+        } else {
+            editor.putInt(KEY_CARD_WIDTH_PX, Math.max(MIN_CARD_WIDTH_PX, data.cardWidthPx))
+                    .putInt(KEY_CARD_HEIGHT_PX, Math.max(MIN_CARD_HEIGHT_PX, data.cardHeightPx));
         }
         putStyle(editor, CardStyle.COMPACT, data.compact);
         putStyle(editor, CardStyle.SQUARE, data.square);

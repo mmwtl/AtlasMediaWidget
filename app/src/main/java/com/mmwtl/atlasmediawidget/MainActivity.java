@@ -22,6 +22,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.WindowMetrics;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -30,6 +32,7 @@ import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -55,15 +58,11 @@ public final class MainActivity extends ScaledActivity {
     private Switch dragHandleVisible;
     private Button exportSettingsButton;
     private Button importSettingsButton;
-    private RadioButton compactStyle;
-    private RadioButton squareStyle;
     private RadioGroup coverDimPresetGroup;
     private RadioButton[] coverDimPresetButtons;
-    private TextView sizeValue;
     private EditText widthSize;
     private EditText heightSize;
-    private RadioGroup positionCornerGroup;
-    private RadioButton[] positionCornerButtons;
+    private Spinner positionCornerSpinner;
     private EditText positionX;
     private EditText positionY;
     private OverlayCorner displayedPositionCorner;
@@ -235,30 +234,6 @@ public final class MainActivity extends ScaledActivity {
         serviceCard.addView(text(getString(R.string.appearance_title),
                 20, Ui.PRIMARY, Typeface.BOLD));
 
-        TextView styleTitle = text("Формат карточки", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams styleTitleParams = fullWrap();
-        styleTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(styleTitle, styleTitleParams);
-        RadioGroup styleGroup = new RadioGroup(this);
-        styleGroup.setOrientation(RadioGroup.HORIZONTAL);
-        compactStyle = styleButton(CardStyle.COMPACT.label);
-        squareStyle = styleButton(CardStyle.SQUARE.label);
-        styleGroup.addView(compactStyle, new RadioGroup.LayoutParams(0,
-                RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
-        styleGroup.addView(squareStyle, new RadioGroup.LayoutParams(0,
-                RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
-        styleGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (refreshingStyle) return;
-            CardStyle selected = checkedId == compactStyle.getId()
-                    ? CardStyle.COMPACT : CardStyle.SQUARE;
-            prefs.putInt(Prefs.KEY_CARD_STYLE, selected.preferenceValue);
-            refreshSizeControls(selected);
-            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                OverlayService.refreshStyle(this);
-            }
-        });
-        serviceCard.addView(styleGroup, fullWrap());
-
         TextView coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams coverDimTitleParams = fullWrap();
         coverDimTitleParams.topMargin = Ui.dp(this, 14);
@@ -283,49 +258,59 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams sizeTitleParams = fullWrap();
         sizeTitleParams.topMargin = Ui.dp(this, 14);
         serviceCard.addView(sizeTitle, sizeTitleParams);
-        sizeValue = text("", 18, Ui.PRIMARY, Typeface.BOLD);
-        LinearLayout.LayoutParams sizeValueParams = fullWrap();
-        sizeValueParams.topMargin = Ui.dp(this, 6);
-        serviceCard.addView(sizeValue, sizeValueParams);
-        serviceCard.addView(text("Ширина", 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        LinearLayout sizeRow = new LinearLayout(this);
+        sizeRow.setOrientation(LinearLayout.HORIZONTAL);
+        sizeRow.setGravity(Gravity.CENTER_VERTICAL);
         widthSize = numberInput();
-        serviceCard.addView(widthSize, fullWrap());
-        serviceCard.addView(text("Высота", 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        widthSize.setHint("Ширина");
+        widthSize.setContentDescription("Ширина карточки в пикселях");
+        sizeRow.addView(widthSize, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        sizeRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
+                compactUnitParams());
+        sizeRow.addView(text("×", 18, Ui.PRIMARY, Typeface.BOLD), compactUnitParams());
         heightSize = numberInput();
-        serviceCard.addView(heightSize, fullWrap());
+        heightSize.setHint("Высота");
+        heightSize.setContentDescription("Высота карточки в пикселях");
+        sizeRow.addView(heightSize, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        sizeRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
+                compactUnitParams());
+        serviceCard.addView(sizeRow, fullWrap());
 
         TextView positionTitle = text("Положение карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams positionTitleParams = fullWrap();
         positionTitleParams.topMargin = Ui.dp(this, 14);
         serviceCard.addView(positionTitle, positionTitleParams);
-        serviceCard.addView(text("Угол привязки", 14, Ui.SECONDARY, Typeface.NORMAL),
-                labelParams());
-        positionCornerGroup = new RadioGroup(this);
-        positionCornerGroup.setOrientation(RadioGroup.HORIZONTAL);
-        positionCornerButtons = new RadioButton[OverlayCorner.values().length];
-        for (OverlayCorner corner : OverlayCorner.values()) {
-            RadioButton button = styleButton(corner.shortLabel);
-            button.setContentDescription(corner.label);
-            button.setTag(corner);
-            positionCornerButtons[corner.ordinal()] = button;
-            positionCornerGroup.addView(button, new RadioGroup.LayoutParams(0,
-                    RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        positionCornerGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (refreshingGeometry) return;
-            View selected = group.findViewById(checkedId);
-            if (!(selected != null && selected.getTag() instanceof OverlayCorner corner)) return;
-            reanchorPositionFields(corner);
+        LinearLayout positionRow = new LinearLayout(this);
+        positionRow.setOrientation(LinearLayout.HORIZONTAL);
+        positionRow.setGravity(Gravity.CENTER_VERTICAL);
+        positionCornerSpinner = new Spinner(this);
+        positionCornerSpinner.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, cornerLabels()));
+        positionCornerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                    int position, long id) {
+                if (!refreshingGeometry && positionX != null && positionY != null) {
+                    reanchorPositionFields(OverlayCorner.values()[position]);
+                }
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
-        serviceCard.addView(positionCornerGroup, fullWrap());
-        serviceCard.addView(text("Отступ X (px)", 14, Ui.SECONDARY, Typeface.NORMAL),
-                labelParams());
+        positionRow.addView(positionCornerSpinner, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1.5f));
         positionX = numberInput();
-        serviceCard.addView(positionX, fullWrap());
-        serviceCard.addView(text("Отступ Y (px)", 14, Ui.SECONDARY, Typeface.NORMAL),
-                labelParams());
+        positionX.setHint("X");
+        positionX.setContentDescription("Отступ по X в пикселях");
+        positionRow.addView(positionX, compactInputParams());
+        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
         positionY = numberInput();
-        serviceCard.addView(positionY, fullWrap());
+        positionY.setHint("Y");
+        positionY.setContentDescription("Отступ по Y в пикселях");
+        positionRow.addView(positionY, compactInputParams());
+        positionRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
+        serviceCard.addView(positionRow, fullWrap());
         Button applyGeometry = actionButton("Применить размер и положение");
         applyGeometry.setOnClickListener(v -> applyGeometry());
         serviceCard.addView(applyGeometry, buttonParams());
@@ -393,7 +378,7 @@ public final class MainActivity extends ScaledActivity {
 
         Button resetAppearance = actionButton("Вернуть текст и отступы по умолчанию");
         resetAppearance.setOnClickListener(v -> {
-            CardStyle current = currentStyle();
+            CardStyle current = CardStyle.DEFAULT;
             WidgetAppearance defaults = WidgetAppearance.defaults(current);
             WidgetAppearance existing = currentAppearance();
             prefs.putAppearance(current, new WidgetAppearance(
@@ -470,7 +455,7 @@ public final class MainActivity extends ScaledActivity {
 
         Button resetControls = actionButton("Вернуть панель по умолчанию");
         resetControls.setOnClickListener(v -> {
-            CardStyle current = currentStyle();
+            CardStyle current = CardStyle.DEFAULT;
             prefs.putControlLayout(current, current.defaultControlPanelHeightDp,
                     Prefs.DEFAULT_CONTROL_ICON_SCALE_PERCENT,
                     Prefs.DEFAULT_CONTROL_SPREAD_PERCENT, 0);
@@ -483,9 +468,8 @@ public final class MainActivity extends ScaledActivity {
 
         Button resetSize = actionButton("Вернуть размер по умолчанию");
         resetSize.setOnClickListener(v -> {
-            CardStyle current = currentStyle();
-            prefs.putCardSize(current, current.defaultWidthDp, current.defaultHeightDp);
-            refreshSizeControls(current);
+            prefs.putCardSizePx(500, 500);
+            refreshSizeControls(CardStyle.DEFAULT);
             if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
                 OverlayService.refreshStyle(this);
             }
@@ -749,12 +733,8 @@ public final class MainActivity extends ScaledActivity {
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         refreshFavoriteGridControls();
-        CardStyle style = CardStyle.fromPreference(
-                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         refreshingStyle = true;
-        compactStyle.setChecked(style == CardStyle.COMPACT);
-        squareStyle.setChecked(style == CardStyle.SQUARE);
-        refreshSizeControls(style);
+        refreshSizeControls(CardStyle.DEFAULT);
         refreshingStyle = false;
         requestNotificationPermissionIfNeeded();
     }
@@ -1045,9 +1025,28 @@ public final class MainActivity extends ScaledActivity {
         return input;
     }
 
+    private String[] cornerLabels() {
+        String[] labels = new String[OverlayCorner.values().length];
+        for (OverlayCorner corner : OverlayCorner.values()) labels[corner.ordinal()] = corner.label;
+        return labels;
+    }
+
+    private LinearLayout.LayoutParams compactInputParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                Ui.dp(this, 66), ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = Ui.dp(this, 4);
+        return params;
+    }
+
+    private LinearLayout.LayoutParams compactUnitParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.leftMargin = Ui.dp(this, 4);
+        return params;
+    }
+
     private CardStyle currentStyle() {
-        return CardStyle.fromPreference(
-                prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+        return CardStyle.DEFAULT;
     }
 
     private void refreshSizeControls(CardStyle style) {
@@ -1058,10 +1057,10 @@ public final class MainActivity extends ScaledActivity {
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
-        widthSize.setText(Integer.toString(clamp(prefs.cardWidthDp(style),
-                Prefs.MIN_CARD_WIDTH_DP, Prefs.MAX_CARD_WIDTH_DP)));
-        heightSize.setText(Integer.toString(clamp(prefs.cardHeightDp(style),
-                Prefs.MIN_CARD_HEIGHT_DP, Prefs.MAX_CARD_HEIGHT_DP)));
+        widthSize.setText(Integer.toString(clamp(prefs.cardWidthPx(),
+                Prefs.MIN_CARD_WIDTH_PX, maxWidthPx())));
+        heightSize.setText(Integer.toString(clamp(prefs.cardHeightPx(),
+                Prefs.MIN_CARD_HEIGHT_PX, maxHeightPx())));
         metadataProgressGap.setProgress(appearance.metadataProgressGapDp);
         controlPanelHeight.setProgress(appearance.controlPanelHeightDp);
         controlIconScale.setProgress(appearance.controlIconScalePercent);
@@ -1077,28 +1076,22 @@ public final class MainActivity extends ScaledActivity {
         progressGapSetting.seek.setProgress(appearance.progressGapDp);
         progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
         coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
-        updateSizeLabel();
         updateMetadataProgressGapLabel();
         updateControlLabels();
         updateAppearanceLabels();
         refreshingStyle = previous;
-        refreshPositionControls(style);
+        refreshPositionControls();
         renderPreview();
     }
 
-    private void updateSizeLabel() {
-        sizeValue.setText(widthInput() + " × " + heightInput() + " dp");
-    }
-
     private int widthInput() {
-        return parseInput(widthSize, Prefs.MIN_CARD_WIDTH_DP, Prefs.MAX_CARD_WIDTH_DP,
-                prefs == null ? CardStyle.DEFAULT.defaultWidthDp : prefs.cardWidthDp(currentStyle()));
+        return parseInput(widthSize, Prefs.MIN_CARD_WIDTH_PX, maxWidthPx(),
+                prefs == null ? 500 : prefs.cardWidthPx());
     }
 
     private int heightInput() {
-        return parseInput(heightSize, Prefs.MIN_CARD_HEIGHT_DP, Prefs.MAX_CARD_HEIGHT_DP,
-                prefs == null ? CardStyle.DEFAULT.defaultHeightDp
-                        : prefs.cardHeightDp(currentStyle()));
+        return parseInput(heightSize, Prefs.MIN_CARD_HEIGHT_PX, maxHeightPx(),
+                prefs == null ? 500 : prefs.cardHeightPx());
     }
 
     private int parseInput(EditText input, int min, int max, int fallback) {
@@ -1173,13 +1166,13 @@ public final class MainActivity extends ScaledActivity {
                 progressThicknessSetting.seek.getProgress() + " dp");
     }
 
-    private void refreshPositionControls(CardStyle style) {
-        if (positionCornerGroup == null || positionX == null || positionY == null) return;
+    private void refreshPositionControls() {
+        if (positionCornerSpinner == null || positionX == null || positionY == null) return;
         boolean previous = refreshingGeometry;
         refreshingGeometry = true;
         Rect bounds = availableBoundsForGeometry();
-        int width = effectiveCardWidthPx(bounds, widthInput());
-        int height = effectiveCardHeightPx(bounds, heightInput());
+        int width = widthInput();
+        int height = heightInput();
         OverlayCorner corner = OverlayCorner.fromPreference(
                 prefs.getString(Prefs.KEY_POSITION_CORNER, null));
         int storedX = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
@@ -1197,7 +1190,7 @@ public final class MainActivity extends ScaledActivity {
             storedY = offsets.y();
         }
         displayedPositionCorner = corner;
-        positionCornerButtons[corner.ordinal()].setChecked(true);
+        positionCornerSpinner.setSelection(corner.ordinal());
         positionX.setText(Integer.toString(Math.max(0, storedX == Prefs.POSITION_UNSET
                 ? 0 : storedX)));
         positionY.setText(Integer.toString(Math.max(0, storedY == Prefs.POSITION_UNSET
@@ -1207,8 +1200,8 @@ public final class MainActivity extends ScaledActivity {
 
     private void reanchorPositionFields(OverlayCorner newCorner) {
         Rect bounds = availableBoundsForGeometry();
-        int width = effectiveCardWidthPx(bounds, widthInput());
-        int height = effectiveCardHeightPx(bounds, heightInput());
+        int width = widthInput();
+        int height = heightInput();
         OverlayCorner oldCorner = displayedPositionCorner == null
                 ? OverlayCorner.TOP_START : displayedPositionCorner;
         int oldX = nonNegativeInput(positionX);
@@ -1225,26 +1218,25 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void applyGeometry() {
-        Integer width = validatedInput(widthSize, Prefs.MIN_CARD_WIDTH_DP,
-                Prefs.MAX_CARD_WIDTH_DP, "Введите число от 360 до 900 dp");
-        Integer height = validatedInput(heightSize, Prefs.MIN_CARD_HEIGHT_DP,
-                Prefs.MAX_CARD_HEIGHT_DP, "Введите число от 220 до 900 dp");
+        Integer width = validatedInput(widthSize, Prefs.MIN_CARD_WIDTH_PX, maxWidthPx(),
+                "Введите число от 320 до " + maxWidthPx() + " px");
+        Integer height = validatedInput(heightSize, Prefs.MIN_CARD_HEIGHT_PX, maxHeightPx(),
+                "Введите число от 220 до " + maxHeightPx() + " px");
         if (width == null || height == null) return;
         Rect bounds = availableBoundsForGeometry();
-        int maxX = Math.max(0, bounds.width() - effectiveCardWidthPx(bounds, width));
-        int maxY = Math.max(0, bounds.height() - effectiveCardHeightPx(bounds, height));
+        int maxX = Math.max(0, bounds.width() - width);
+        int maxY = Math.max(0, bounds.height() - height);
         Integer x = validatedInput(positionX, 0, maxX,
                 "Введите число от 0 до " + maxX + " px");
         Integer y = validatedInput(positionY, 0, maxY,
                 "Введите число от 0 до " + maxY + " px");
-        View selected = positionCornerGroup.findViewById(
-                positionCornerGroup.getCheckedRadioButtonId());
-        if (selected == null || !(selected.getTag() instanceof OverlayCorner corner)
+        int selectedPosition = positionCornerSpinner.getSelectedItemPosition();
+        if (selectedPosition < 0 || selectedPosition >= OverlayCorner.values().length
                 || x == null || y == null) return;
-        prefs.putCardSize(currentStyle(), width, height);
+        OverlayCorner corner = OverlayCorner.values()[selectedPosition];
+        prefs.putCardSizePx(width, height);
         prefs.putPosition(corner, x, y);
         displayedPositionCorner = corner;
-        updateSizeLabel();
         renderPreview();
         refreshOverlayIfRunning();
     }
@@ -1267,14 +1259,14 @@ public final class MainActivity extends ScaledActivity {
         return safe.width() > 0 && safe.height() > 0 ? safe : new Rect(full);
     }
 
-    private int effectiveCardWidthPx(Rect bounds, int widthDp) {
-        return Math.min(Math.max(1, bounds.width() - Ui.dp(this, 32)),
-                Math.max(Ui.dp(this, 320), Ui.dp(this, widthDp)));
+    private int maxWidthPx() {
+        return Math.max(Prefs.MIN_CARD_WIDTH_PX,
+                availableBoundsForGeometry().width() - Ui.dp(this, 32));
     }
 
-    private int effectiveCardHeightPx(Rect bounds, int heightDp) {
-        return Math.min(Math.max(1, bounds.height() - Ui.dp(this, 32)),
-                Math.max(Ui.dp(this, 220), Ui.dp(this, heightDp)));
+    private int maxHeightPx() {
+        return Math.max(Prefs.MIN_CARD_HEIGHT_PX,
+                availableBoundsForGeometry().height() - Ui.dp(this, 32));
     }
 
     private WidgetAppearance currentAppearance() {
@@ -1340,11 +1332,9 @@ public final class MainActivity extends ScaledActivity {
             previewHost.post(this::renderPreview);
             return;
         }
-        int configuredWidthDp = widthInput();
-        int configuredHeightDp = heightInput();
+        int configuredWidthPx = widthInput();
+        int configuredHeightPx = heightInput();
         android.content.Context widgetContext = getApplicationContext();
-        int configuredWidthPx = Ui.dp(widgetContext, configuredWidthDp);
-        int configuredHeightPx = Ui.dp(widgetContext, configuredHeightDp);
         int maxWidthPx = Math.max(1, previewHost.getWidth()
                 - previewHost.getPaddingLeft() - previewHost.getPaddingRight());
         int maxContainerHeightPx = Math.max(1, Math.round(
@@ -1356,8 +1346,9 @@ public final class MainActivity extends ScaledActivity {
                 maxHeightPx / (float) configuredHeightPx));
 
         MediaCardView preview = new MediaCardView(widgetContext,
-                configuredWidthDp, configuredHeightDp,
-                configuredWidthPx, configuredHeightPx, currentStyle(), currentAppearance(),
+                configuredWidthPx, configuredHeightPx,
+                configuredWidthPx, configuredHeightPx, CardStyle.DEFAULT,
+                prefs.appearance(CardStyle.DEFAULT),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
                 favoriteColumns == null ? prefs.radioFavoritesColumns()

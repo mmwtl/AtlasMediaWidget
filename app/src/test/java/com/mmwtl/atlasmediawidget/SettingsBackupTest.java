@@ -35,7 +35,7 @@ public final class SettingsBackupTest {
         assertEquals(CoverDimPreset.DEFAULT, restored.compact.appearance.coverDimPreset);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(8, root.getInt("schemaVersion"));
+        assertEquals(9, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -93,14 +93,15 @@ public final class SettingsBackupTest {
         assertNull(restored.positionY);
     }
 
-    @Test public void schemaEightRoundTripPreservesPositionCorner() throws Exception {
+    @Test public void schemaNineRoundTripPreservesGlobalCardSizeAndPositionCorner()
+            throws Exception {
         SettingsBackup.Data original = new SettingsBackup.Data(
                 true, true, true, 15, CardStyle.SQUARE, 31, 42,
                 OverlayCorner.BOTTOM_END,
                 new SettingsBackup.StyleData(500, 500,
                         WidgetAppearance.defaults(CardStyle.SQUARE)),
                 new SettingsBackup.StyleData(500, 500,
-                        WidgetAppearance.defaults(CardStyle.SQUARE)), 2, 2, false);
+                        WidgetAppearance.defaults(CardStyle.SQUARE)), 800, 810, 2, 2, false);
 
         SettingsBackup.Data restored = SettingsBackup.decode(
                 SettingsBackup.encode(original, "test"));
@@ -108,9 +109,11 @@ public final class SettingsBackupTest {
         assertEquals(OverlayCorner.BOTTOM_END, restored.positionCorner);
         assertEquals(Integer.valueOf(31), restored.positionX);
         assertEquals(Integer.valueOf(42), restored.positionY);
+        assertEquals(Integer.valueOf(800), restored.cardWidthPx);
+        assertEquals(Integer.valueOf(810), restored.cardHeightPx);
     }
 
-    @Test public void schemaEightRejectsNegativePositionOffsets() throws Exception {
+    @Test public void schemaNineRejectsNegativePositionOffsets() throws Exception {
         SettingsBackup.Data original = new SettingsBackup.Data(
                 true, true, true, 15, CardStyle.SQUARE, 31, 42,
                 OverlayCorner.BOTTOM_END,
@@ -138,7 +141,7 @@ public final class SettingsBackupTest {
         assertNull(restored.positionCorner);
     }
 
-    @Test public void schemaEightRejectsUnknownPositionCorner() throws Exception {
+    @Test public void schemaNineRejectsUnknownPositionCorner() throws Exception {
         SettingsBackup.Data original = new SettingsBackup.Data(
                 true, true, true, 15, CardStyle.SQUARE, 31, 42,
                 OverlayCorner.BOTTOM_END,
@@ -163,7 +166,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 9);
+        root.put("schemaVersion", 10);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));

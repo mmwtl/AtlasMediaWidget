@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 8;
+    private static final int SCHEMA_VERSION = 9;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
@@ -32,6 +32,8 @@ final class SettingsBackup {
         final Integer positionX;
         final Integer positionY;
         final OverlayCorner positionCorner;
+        final Integer cardWidthPx;
+        final Integer cardHeightPx;
         final StyleData compact;
         final StyleData square;
 
@@ -41,7 +43,7 @@ final class SettingsBackup {
                 StyleData compact, StyleData square) throws IOException {
             this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
                     selectedStyle, positionX, positionY, null, compact, square,
-                    Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
+                    null, null, Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
                     Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS, false);
         }
 
@@ -52,7 +54,7 @@ final class SettingsBackup {
                 throws IOException {
             this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
                     selectedStyle, positionX, positionY, null, compact, square,
-                    favoriteColumns, favoriteRows, false);
+                    null, null, favoriteColumns, favoriteRows, false);
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -62,7 +64,7 @@ final class SettingsBackup {
                 boolean radioFavoritesNavigation) throws IOException {
             this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
                     selectedStyle, positionX, positionY, null, compact, square,
-                    favoriteColumns, favoriteRows, radioFavoritesNavigation);
+                    null, null, favoriteColumns, favoriteRows, radioFavoritesNavigation);
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -70,6 +72,18 @@ final class SettingsBackup {
                 CardStyle selectedStyle, Integer positionX, Integer positionY,
                 OverlayCorner positionCorner,
                 StyleData compact, StyleData square, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    null, null, favoriteColumns, favoriteRows, radioFavoritesNavigation);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths,
+                CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner,
+                StyleData compact, StyleData square, Integer cardWidthPx, Integer cardHeightPx,
+                int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation) throws IOException {
             this.autoStart = autoStart;
             this.radioSavedNavigation = radioSavedNavigation;
@@ -101,6 +115,15 @@ final class SettingsBackup {
                 throw invalid("Отступы overlay должны быть неотрицательными");
             }
             this.positionCorner = positionCorner;
+            if ((cardWidthPx == null) != (cardHeightPx == null)) {
+                throw invalid("Размер карточки должен содержать обе координаты");
+            }
+            if (cardWidthPx != null && (cardWidthPx < Prefs.MIN_CARD_WIDTH_PX
+                    || cardHeightPx < Prefs.MIN_CARD_HEIGHT_PX)) {
+                throw invalid("Недопустимый px-размер карточки");
+            }
+            this.cardWidthPx = cardWidthPx;
+            this.cardHeightPx = cardHeightPx;
             if (compact == null || square == null) {
                 throw invalid("Отсутствуют настройки одного из форматов карточки");
             }
@@ -188,6 +211,7 @@ final class SettingsBackup {
                 OverlayCorner.fromPreference(prefs.getString(Prefs.KEY_POSITION_CORNER, null)),
                 captureStyle(prefs, CardStyle.COMPACT),
                 captureStyle(prefs, CardStyle.SQUARE),
+                prefs.cardWidthPx(), prefs.cardHeightPx(),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false));
     }
@@ -249,6 +273,11 @@ final class SettingsBackup {
                 }
                 settings.put("overlayPosition", position);
             }
+            if (data.cardWidthPx != null) {
+                settings.put("cardSizePx", new JSONObject()
+                        .put("widthPx", data.cardWidthPx)
+                        .put("heightPx", data.cardHeightPx));
+            }
             settings.put("cardStyles", new JSONObject()
                     .put("compact", encodeStyle(data.compact))
                     .put("square", encodeStyle(data.square)));
@@ -279,6 +308,8 @@ final class SettingsBackup {
             Integer x = null;
             Integer y = null;
             OverlayCorner corner = null;
+            Integer cardWidthPx = null;
+            Integer cardHeightPx = null;
             if (positionValue != JSONObject.NULL) {
                 if (!(positionValue instanceof JSONObject position)) {
                     throw invalid("settings.overlayPosition должен быть объектом или null");
@@ -293,6 +324,12 @@ final class SettingsBackup {
                         "settings.overlayPosition.legacyAbsolute")) {
                     throw invalid("Некорректный режим положения overlay");
                 }
+            }
+            if (version >= 9 && settings.has("cardSizePx")) {
+                JSONObject cardSize = requireObject(settings, "cardSizePx",
+                        "settings.cardSizePx");
+                cardWidthPx = requireInt(cardSize, "widthPx", "settings.cardSizePx.widthPx");
+                cardHeightPx = requireInt(cardSize, "heightPx", "settings.cardSizePx.heightPx");
             }
             return new Data(
                     requireBoolean(settings, "autoStart", "settings.autoStart"),
@@ -310,8 +347,10 @@ final class SettingsBackup {
                                     "settings.cardStyles.compact"),
                             "compact", CardStyle.COMPACT, version),
                     decodeStyle(requireObject(styles, "square",
-                                    "settings.cardStyles.square"),
+                            "settings.cardStyles.square"),
                             "square", CardStyle.SQUARE, version),
+                    cardWidthPx,
+                    cardHeightPx,
                     version >= 5 ? requireInt(settings, "favoriteColumns",
                             "settings.favoriteColumns")
                             : Prefs.DEFAULT_RADIO_FAVORITES_GRID_COLUMNS,
