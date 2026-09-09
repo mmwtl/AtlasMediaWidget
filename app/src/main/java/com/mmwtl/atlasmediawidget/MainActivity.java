@@ -298,7 +298,7 @@ public final class MainActivity extends ScaledActivity {
 
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
-        positionRow.addView(text("Угол", 14, Ui.SECONDARY, Typeface.BOLD),
+        positionRow.addView(text("Угол привязки", 14, Ui.SECONDARY, Typeface.BOLD),
                 inlineLabelParams());
         positionRow.addView(positionCornerSpinner, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1.25f));
