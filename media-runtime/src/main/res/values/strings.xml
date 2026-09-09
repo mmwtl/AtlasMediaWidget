@@ -1,3 +1,4 @@
 <resources>
+    <string name="media_api_name">Atlas Media API</string>
     <string name="audio_source_radio">Радио</string>
 </resources>

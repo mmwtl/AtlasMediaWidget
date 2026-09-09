@@ -31,6 +31,17 @@
             android:process=":media"
             android:theme="@style/Theme.AtlasMediaApi" />
 
+        <activity-alias
+            android:name="com.mmwtl.atlasmediaapi.diagnostics.MediaApiLauncher"
+            android:exported="true"
+            android:label="@string/media_api_name"
+            android:targetActivity="com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
         <service
             android:name=".media.bridge.MediaBridgeService"
             android:exported="false"
