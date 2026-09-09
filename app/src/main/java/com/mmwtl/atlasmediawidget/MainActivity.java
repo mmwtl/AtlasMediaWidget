@@ -40,6 +40,8 @@ public final class MainActivity extends ScaledActivity {
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private TextView permissionStatus;
     private TextView bridgeStatus;
+    private Button openBridgeButton;
+    private Button installBridgeButton;
     private Button serviceButton;
     private Switch autoStart;
     private Switch radioSavedNavigation;
@@ -102,6 +104,20 @@ public final class MainActivity extends ScaledActivity {
     @Override protected void onResume() {
         super.onResume();
         refresh();
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (EmbeddedApiInstaller.ACTION_INSTALL_RESULT.equals(intent.getAction())
+                && bridgeStatus != null) {
+            refreshBridgeStatus();
+        }
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus && bridgeStatus != null) refreshBridgeStatus();
     }
 
     @Override protected void onDestroy() {
@@ -196,9 +212,12 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams bridgeStatusParams = fullWrap();
         bridgeStatusParams.topMargin = Ui.dp(this, 10);
         bridgeCard.addView(bridgeStatus, bridgeStatusParams);
-        Button openBridge = actionButton("Открыть Atlas Media API");
-        openBridge.setOnClickListener(v -> openAtlasMediaApi());
-        bridgeCard.addView(openBridge, buttonParams());
+        openBridgeButton = actionButton("Открыть Atlas Media API");
+        openBridgeButton.setOnClickListener(v -> openAtlasMediaApi());
+        bridgeCard.addView(openBridgeButton, buttonParams());
+        installBridgeButton = actionButton("Установить Atlas Media API");
+        installBridgeButton.setOnClickListener(v -> requestEmbeddedApiInstall());
+        bridgeCard.addView(installBridgeButton, buttonParams());
 
         LinearLayout serviceCard = card();
         serviceCard.addView(text(getString(R.string.appearance_title),
@@ -690,11 +709,7 @@ public final class MainActivity extends ScaledActivity {
                 + "\nКонтроль окон: " + yesNo(accessibility));
         permissionStatus.setTextColor(overlay && usage && accessibility
                 ? Ui.ACCENT : Ui.ERROR);
-        boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
-        bridgeStatus.setText(bridgeInstalled
-                ? "Пакет com.mmwtl.atlasmediaapi установлен."
-                : "Пакет com.mmwtl.atlasmediaapi не найден.");
-        bridgeStatus.setTextColor(bridgeInstalled ? Ui.ACCENT : Ui.ERROR);
+        refreshBridgeStatus();
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
         serviceButton.setBackground(Ui.background(enabled ? Ui.NESTED : Ui.ACCENT, 8, this));
@@ -716,6 +731,25 @@ public final class MainActivity extends ScaledActivity {
         refreshSizeControls(style);
         refreshingStyle = false;
         requestNotificationPermissionIfNeeded();
+    }
+
+    private void refreshBridgeStatus() {
+        boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
+        boolean embeddedApiAvailable = EmbeddedApiInstaller.isAvailable(this);
+        if (bridgeInstalled) {
+            bridgeStatus.setText("Пакет com.mmwtl.atlasmediaapi установлен.");
+        } else if (embeddedApiAvailable) {
+            bridgeStatus.setText("Atlas Media API не установлен. Его можно установить из этой сборки.");
+        } else {
+            bridgeStatus.setText("Пакет com.mmwtl.atlasmediaapi не найден, установщик не встроен.");
+        }
+        bridgeStatus.setTextColor(bridgeInstalled ? Ui.ACCENT : Ui.ERROR);
+        openBridgeButton.setVisibility(bridgeInstalled ? View.VISIBLE : View.GONE);
+        installBridgeButton.setVisibility(embeddedApiAvailable ? View.VISIBLE : View.GONE);
+        installBridgeButton.setEnabled(true);
+        installBridgeButton.setText(bridgeInstalled
+                ? "Установить версию API из этой сборки"
+                : "Установить Atlas Media API");
     }
 
     private void toggleService() {
@@ -894,6 +928,37 @@ public final class MainActivity extends ScaledActivity {
             return;
         }
         startActivity(launch);
+    }
+
+    private void requestEmbeddedApiInstall() {
+        if (!EmbeddedApiInstaller.isAvailable(this)) {
+            Toast.makeText(this, "В этой сборке Atlas Media API не встроен",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        installEmbeddedAtlasMediaApi();
+    }
+
+    private void installEmbeddedAtlasMediaApi() {
+        installBridgeButton.setEnabled(false);
+        installBridgeButton.setText("Подготовка установки…");
+        EmbeddedApiInstaller.install(this, ioExecutor, main,
+                new EmbeddedApiInstaller.Callback() {
+                    @Override public void onCommitted() {
+                        installBridgeButton.setEnabled(true);
+                        Toast.makeText(MainActivity.this,
+                                "Подтвердите установку Atlas Media API",
+                                Toast.LENGTH_LONG).show();
+                    }
+
+                    @Override public void onError(Exception error) {
+                        AppLog.warn("Cannot stage embedded Atlas Media API", error);
+                        refresh();
+                        Toast.makeText(MainActivity.this,
+                                "Не удалось подготовить установку Atlas Media API",
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
     }
 
     private boolean isPackageInstalled(String packageName) {

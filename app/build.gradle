@@ -21,6 +21,26 @@ def effectiveVersionName = branchName == 'main'
         : "${appVersionName}-${effectiveBranchSuffix(branchName)}"
 def secureSigningScript = providers.gradleProperty('secure.signing').orNull
 def secureSigningFile = secureSigningScript == null ? null : rootProject.file(secureSigningScript)
+def embeddedApiApk = providers.gradleProperty('embeddedApiApk')
+def embeddedApiAssets = layout.buildDirectory.dir('generated/embeddedApiAssets')
+
+def prepareEmbeddedApiApk = tasks.register('prepareEmbeddedApiApk') {
+    inputs.property('embeddedApiApk', embeddedApiApk.orElse(''))
+    outputs.dir(embeddedApiAssets)
+    if (embeddedApiApk.isPresent()) {
+        inputs.file(embeddedApiApk)
+    }
+    doLast {
+        delete(embeddedApiAssets)
+        if (embeddedApiApk.isPresent()) {
+            copy {
+                from(embeddedApiApk)
+                into(embeddedApiAssets)
+                rename { 'atlas-media-api.apk' }
+            }
+        }
+    }
+}
 
 base {
     archivesName.set("${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget")
@@ -50,6 +70,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    sourceSets {
+        main.assets.srcDir(embeddedApiAssets)
+    }
 }
 
 dependencies {
@@ -59,6 +83,10 @@ dependencies {
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
+}
+
+tasks.named('preBuild').configure {
+    dependsOn(prepareEmbeddedApiApk)
 }
 
 if (secureSigningFile != null && secureSigningFile.isFile()) {
