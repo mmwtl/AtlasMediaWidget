@@ -272,7 +272,18 @@ class MediaStateHub(
 
         repository.update { before ->
             val sameMedia = before.mediaId == mediaId && before.ownerPackage == ownerPackage
+            val targetSource = if (before.audioSource == BridgeAudioSource.UNKNOWN.name
+                || before.audioSource == BridgeAudioSource.OTHER.name
+            ) {
+                BridgeAudioSource.ONLINE.name
+            } else before.audioSource
             before.copy(
+                audioSource = targetSource,
+                sources = if (targetSource != before.audioSource) {
+                    before.sources.map { source ->
+                        source.copy(selected = source.id == targetSource)
+                    }
+                } else before.sources,
                 ownerPackage = ownerPackage,
                 ownerApp = appLabel(ownerPackage),
                 mediaId = mediaId,

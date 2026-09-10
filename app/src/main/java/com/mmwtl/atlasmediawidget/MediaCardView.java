@@ -425,8 +425,11 @@ final class MediaCardView extends FrameLayout {
         String detail = MediaPresentation.subtitle(activeSource, value.artist, value.album);
         subtitle.setText(hasMedia && !detail.isBlank()
                 ? detail : getResources().getString(R.string.empty_hint));
-        if (bridgeConnected && value.backendConnected) statusPill.setVisibility(GONE);
-        else setStatusPill("Медиасервис недоступен", true);
+        if (bridgeConnected && MediaPresentation.isBackendAvailable(activeSource, value.backendConnected, hasMedia)) {
+            statusPill.setVisibility(GONE);
+        } else {
+            setStatusPill("Медиасервис недоступен", true);
+        }
         boolean directSavedNavigation = radioSavedNavigation
                 && activeSource.displayId() == MediaSource.Id.RADIO;
         previous.setEnabled(value.supports(directSavedNavigation
