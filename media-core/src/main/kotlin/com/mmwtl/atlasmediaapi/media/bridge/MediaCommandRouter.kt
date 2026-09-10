@@ -141,7 +141,8 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
 
     private fun shouldPreferSession(target: MediaSessionCommandTarget): Boolean =
         (host.currentVisiblePackage().isNotBlank() && target.packageName == host.currentVisiblePackage()) ||
-                target.playbackState == SessionPlaybackState.PLAYING
+                target.playbackState == SessionPlaybackState.PLAYING ||
+                (host.currentMediaPackage().isNotBlank() && target.packageName == host.currentMediaPackage())
 
     private fun requiredCapability(command: MediaCommand): Long = when (command) {
         MediaCommand.PLAY -> MediaCapabilities.PLAY

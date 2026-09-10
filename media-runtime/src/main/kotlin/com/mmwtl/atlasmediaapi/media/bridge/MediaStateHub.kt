@@ -403,10 +403,11 @@ class MediaStateHub(
         val mediaId = data.id?.takeIf(String::isNotBlank)
             ?: stableMediaId(data.name.orEmpty(), data.artist.orEmpty())
         repository.update { before ->
-            val sameMedia = before.mediaId == mediaId && before.ownerPackage == ownerPackage
+            val effectiveOwner = ownerPackage.ifBlank { before.ownerPackage }
+            val sameMedia = before.mediaId == mediaId && before.ownerPackage == effectiveOwner
             before.copy(
-                ownerPackage = ownerPackage,
-                ownerApp = nativeOwnerLabel(source),
+                ownerPackage = effectiveOwner,
+                ownerApp = if (ownerPackage.isNotBlank()) nativeOwnerLabel(source) else before.ownerApp,
                 mediaId = mediaId,
                 title = data.name.orEmpty(),
                 artist = data.artist.orEmpty(),
@@ -761,7 +762,10 @@ class MediaStateHub(
         MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB -> "com.geely.usbservice"
         MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO -> "com.geely.radio.service"
         MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA -> "com.autolink.carplay"
-        else -> "com.geely.mediacenterservice"
+        MediaCenterConstant.AudioSource.AUDIO_SOURCE_YUNTING -> "com.geely.mediacenterservice"
+        MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+        MediaCenterConstant.AudioSource.AUDIO_SOURCE_OTHER,
+        MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN -> ""
     }
 
     private fun nativeOwnerLabel(source: MediaCenterConstant.AudioSource): String =

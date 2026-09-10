@@ -129,6 +129,21 @@ class MediaCommandRouterTest {
     }
 
     @Test
+    fun `current media package session wins over native source even when paused`() = runBlocking {
+        val session = FakeSession("player")
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
+            preferred = session
+            currentPackage = "player"
+        }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.PLAY))
+
+        assertTrue(result.succeeded)
+        assertEquals(listOf("play"), session.calls)
+    }
+
+    @Test
     fun `unsupported native command falls through to external session`() = runBlocking {
         val session = FakeSession("player")
         val host = FakeHost().apply {

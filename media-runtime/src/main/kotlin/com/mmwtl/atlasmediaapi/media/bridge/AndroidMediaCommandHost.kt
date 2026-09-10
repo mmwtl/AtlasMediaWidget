@@ -66,7 +66,7 @@ class AndroidMediaCommandHost(
 
             MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
             MediaCenterConstant.AudioSource.AUDIO_SOURCE_YUNTING ->
-                center.musicManagerMap[source]?.isAlive == true
+                center.musicManagerMap[source]?.isAlive == true && !hasAndroidSession()
 
             else -> false
         }
@@ -89,6 +89,14 @@ class AndroidMediaCommandHost(
         }.onFailure(Timber::e).getOrElse {
             MediaCommandResult(MediaBridgeContract.Status.FAILED, it.message.orEmpty())
         }
+    }
+    private fun hasAndroidSession(): Boolean {
+        val currentPkg = currentMediaPackage()
+        val controllers = sessionObserver.getActiveControllers()
+        if (currentPkg.isNotBlank() && controllers.any { it.packageName == currentPkg }) {
+            return true
+        }
+        return controllers.any { it.playbackState?.state == PlaybackState.STATE_PLAYING }
     }
 
     override fun preferredSession(): MediaSessionCommandTarget? {
@@ -477,23 +485,18 @@ class AndroidMediaSessionTarget(
         true
     }.getOrDefault(false)
 
-    override fun next(): Boolean = dispatchSkip(KeyEvent.KEYCODE_MEDIA_NEXT) {
+    override fun next(): Boolean = runCatching {
         controller.transportControls.skipToNext()
-    }
-
-    override fun previous(): Boolean = dispatchSkip(KeyEvent.KEYCODE_MEDIA_PREVIOUS) {
-        controller.transportControls.skipToPrevious()
-    }
-
-    override fun seekTo(position: Long): Boolean = runCatching {
-        controller.transportControls.seekTo(position)
         true
     }.getOrDefault(false)
 
-    private fun dispatchSkip(keyCode: Int, fallback: () -> Unit): Boolean = runCatching {
-        val down = controller.dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
-        val up = controller.dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
-        if (!down && !up) fallback()
+    override fun previous(): Boolean = runCatching {
+        controller.transportControls.skipToPrevious()
+        true
+    }.getOrDefault(false)
+
+    override fun seekTo(position: Long): Boolean = runCatching {
+        controller.transportControls.seekTo(position)
         true
     }.getOrDefault(false)
 }

@@ -89,7 +89,9 @@ class MediaSessionObserver(
     fun getActiveControllers(): List<MediaController> = activeControllers.toList()
 
     private fun updateControllers(controllers: List<MediaController>) {
-        val filtered = controllers.filter { it.packageName != ownPackage }
+        val filtered = controllers.filter {
+            it.packageName != ownPackage && it.packageName != "com.geely.mediacenterservice"
+        }
         activeControllers.clear()
         activeControllers.addAll(filtered)
 
