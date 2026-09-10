@@ -21,6 +21,7 @@ final class Ui {
     static final int PRIMARY = Color.rgb(245, 245, 245);
     static final int SECONDARY = Color.rgb(212, 212, 212);
     static final int ACCENT = Color.rgb(120, 147, 160);
+    static final int ON_ACCENT = Color.rgb(7, 16, 20);
     static final int ERROR = Color.rgb(217, 130, 130);
 
     private Ui() {}

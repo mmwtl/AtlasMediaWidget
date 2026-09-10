@@ -54,6 +54,9 @@ public final class MainActivity extends ScaledActivity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private TextView permissionStatus;
+    private Button overlayPermissionButton;
+    private Button usageAccessButton;
+    private Button accessibilityAccessButton;
     private Button notificationAccessButton;
     private Button storageAccessButton;
     private TextView bridgeStatus;
@@ -214,15 +217,15 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams statusParams = fullWrap();
         statusParams.topMargin = Ui.dp(this, 10);
         accessCard.addView(permissionStatus, statusParams);
-        Button overlay = actionButton("Разрешить поверх окон");
-        overlay.setOnClickListener(v -> openOverlaySettings());
-        accessCard.addView(overlay, buttonParams());
-        Button usageForApp = actionButton("Разрешить историю использования");
-        usageForApp.setOnClickListener(v -> openUsageSettingsForApp());
-        accessCard.addView(usageForApp, buttonParams());
-        Button accessibility = actionButton(getString(R.string.allow_accessibility));
-        accessibility.setOnClickListener(v -> openAccessibilitySettings());
-        accessCard.addView(accessibility, buttonParams());
+        overlayPermissionButton = actionButton("Разрешить поверх окон");
+        overlayPermissionButton.setOnClickListener(v -> openOverlaySettings());
+        accessCard.addView(overlayPermissionButton, buttonParams());
+        usageAccessButton = actionButton("Разрешить историю использования");
+        usageAccessButton.setOnClickListener(v -> openUsageSettingsForApp());
+        accessCard.addView(usageAccessButton, buttonParams());
+        accessibilityAccessButton = actionButton(getString(R.string.allow_accessibility));
+        accessibilityAccessButton.setOnClickListener(v -> openAccessibilitySettings());
+        accessCard.addView(accessibilityAccessButton, buttonParams());
         notificationAccessButton = actionButton("Разрешить доступ к уведомлениям (медиа)");
         notificationAccessButton.setOnClickListener(v -> openNotificationAccessSettings());
         notificationAccessButton.setVisibility(BuildConfig.INTEGRATED_MEDIA_API
@@ -776,15 +779,21 @@ public final class MainActivity extends ScaledActivity {
         String status = "Поверх окон: " + yesNo(overlay)
                 + "\nИстория использования: " + yesNo(usage)
                 + "\nКонтроль окон: " + yesNo(accessibility);
+        updatePermissionButton(overlayPermissionButton, overlay,
+                "Поверх окон предоставлено", "Разрешить поверх окон");
+        updatePermissionButton(usageAccessButton, usage,
+                "История использования предоставлена", "Разрешить историю использования");
+        updatePermissionButton(accessibilityAccessButton, accessibility,
+                "Спецвозможности предоставлены", getString(R.string.allow_accessibility));
         if (BuildConfig.INTEGRATED_MEDIA_API) {
             status += "\nДоступ к уведомлениям (медиа): " + yesNo(mediaNotifications)
                     + "\nХранилище (USB): " + yesNo(storage);
-            notificationAccessButton.setText(mediaNotifications
-                    ? "✓ Доступ к уведомлениям (медиа) предоставлен"
-                    : "Разрешить доступ к уведомлениям (медиа)");
-            storageAccessButton.setText(storage
-                    ? "✓ Доступ к хранилищу (USB) предоставлен"
-                    : "Разрешить доступ к хранилищу (USB)");
+            updatePermissionButton(notificationAccessButton, mediaNotifications,
+                    "Доступ к уведомлениям (медиа) предоставлен",
+                    "Разрешить доступ к уведомлениям (медиа)");
+            updatePermissionButton(storageAccessButton, storage,
+                    "Доступ к хранилищу (USB) предоставлен",
+                    "Разрешить доступ к хранилищу (USB)");
         }
         permissionStatus.setText(status);
         permissionStatus.setTextColor(overlay && usage && accessibility
@@ -1148,6 +1157,14 @@ public final class MainActivity extends ScaledActivity {
 
     private Button actionButton(String label) {
         return Ui.button(this, label);
+    }
+
+    private void updatePermissionButton(Button button, boolean granted,
+            String grantedText, String requestText) {
+        if (button == null) return;
+        button.setText(granted ? grantedText : requestText);
+        button.setBackground(Ui.background(granted ? Ui.ACCENT : Ui.NESTED, 8, this));
+        button.setTextColor(granted ? Ui.ON_ACCENT : Ui.PRIMARY);
     }
 
     private RadioButton styleButton(String label) {
