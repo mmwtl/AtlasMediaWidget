@@ -82,12 +82,15 @@ provider has been demonstrated on the real head unit.
 - A single user-requested batch is one version increment even when it contains several related
   files or commits.
 - Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
-  allow Gradle to fall back to module-derived `app-*.apk` names. Distribution variants append
-  `-plain-release.apk` or `-integrated-release.apk` to that base name. Standalone API APKs from
+  allow Gradle to fall back to module-derived `app-*.apk` names. The standard integrated release
+  build omits the flavor suffix and outputs `<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`.
+  When built separately, the plain variant appends `-plain-release.apk`. Standalone API APKs from
   `:api-app` follow `<effectiveVersionName>[<versionCode>]AtlasMediaApi-release.apk`.
 - Keep `integrated` (standard release with internal `:media` process) and `plain` (thin client
   connecting via IPC) as distribution flavors of the Widget application. They retain the same
   application ID, version code, effective version name and Widget signing identity.
+- The standard release task `:app:assembleRelease` builds the integrated variant directly without
+  producing a plain build unless `:app:assemblePlainRelease` is explicitly invoked.
 - The `plain` variant must not contain embedded API runtime components, request
   `REQUEST_INSTALL_PACKAGES`, or expose embedded installation mechanisms.
 - The `integrated` variant must include `media-runtime`, bind its non-exported Media Bridge service
@@ -102,13 +105,14 @@ Use the repository wrapper. Before handing off a completed application improveme
 sh gradlew --offline clean check assembleRelease
 ```
 
-This command builds `plainRelease` and `integratedRelease` for `:app`, and `release` for `:api-app`.
+This command builds the standard `release` for `:app` (integrated backend) and `release` for `:api-app`.
 Individual targets can be built separately:
-- Standard integrated Widget: `sh gradlew :app:assembleIntegratedRelease`
-- Plain Widget: `sh gradlew :app:assemblePlainRelease`
+- Standard Widget (with integrated API): `sh gradlew assembleRelease` or `sh gradlew :app:assembleRelease`
+- Plain Widget (thin client): `sh gradlew :app:assemblePlainRelease`
 - Standalone Media API APK: `sh gradlew :api-app:assembleRelease`
 
-Verify release outputs under `app/build/outputs/apk/integrated/release/`,
+Verify release outputs under `app/build/outputs/apk/integrated/release/`
+(`<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`),
 `app/build/outputs/apk/plain/release/`, and `api-app/build/outputs/apk/release/`. Inspect package/version
 metadata and run `apksigner verify` when the artifacts are signed.
 For integrated builds, verify the local Media Bridge, notification listener, diagnostics activity,

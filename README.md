@@ -182,22 +182,21 @@ The settings application includes a live preview and granular controls for card 
 
 ```sh
 # 1. Сборка стандартного релиза (виджет со встроенным API):
-./gradlew :app:assembleIntegratedRelease
+./gradlew assembleRelease
+# или целевая задача только для виджета:
+./gradlew :app:assembleRelease
 
-# 2. Сборка тонкого виджета (без встроенного API):
+# 2. Сборка тонкого виджета (без встроенного API, если требуется):
 ./gradlew :app:assemblePlainRelease
 
-# 3. Сборка автономного медиасервиса (Atlas Media API APK):
+# 3. Сборка автономного медиасервиса (Atlas Media API APK, если требуется):
 ./gradlew :api-app:assembleRelease
-
-# Сборка всех релизных артефактов (виджет + standalone API):
-./gradlew assembleRelease
 ```
 
 Собранные файлы:
-- Стандартный виджет: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-integrated-release.apk`
-- Тонкий виджет: `app/build/outputs/apk/plain/release/<versionName>[<versionCode>]AtlasMediaWidget-plain-release.apk`
-- Автономный API: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
+- **Стандартный виджет (с встроенным API)**: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-release.apk`
+- **Тонкий виджет (при отдельной сборке)**: `app/build/outputs/apk/plain/release/<versionName>[<versionCode>]AtlasMediaWidget-plain-release.apk`
+- **Автономный API**: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
 
 #### Запуск модульных тестов:
 ```sh
@@ -209,22 +208,21 @@ Requires JDK 17 and Android SDK 36. The build is managed via the repository Grad
 
 ```sh
 # 1. Build standard release (widget with integrated API):
-./gradlew :app:assembleIntegratedRelease
+./gradlew assembleRelease
+# or target only the widget:
+./gradlew :app:assembleRelease
 
-# 2. Build thin widget (plain overlay without integrated runtime):
+# 2. Build thin widget (plain overlay without integrated runtime, if needed):
 ./gradlew :app:assemblePlainRelease
 
-# 3. Build standalone media backend APK (Atlas Media API):
+# 3. Build standalone media backend APK (Atlas Media API, if needed):
 ./gradlew :api-app:assembleRelease
-
-# Build all release targets:
-./gradlew assembleRelease
 ```
 
 Generated artifacts:
-- Standard widget: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-integrated-release.apk`
-- Plain widget: `app/build/outputs/apk/plain/release/<versionName>[<versionCode>]AtlasMediaWidget-plain-release.apk`
-- Standalone API: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
+- **Standard widget (with integrated API)**: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-release.apk`
+- **Plain widget (when built separately)**: `app/build/outputs/apk/plain/release/<versionName>[<versionCode>]AtlasMediaWidget-plain-release.apk`
+- **Standalone API**: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
 
 #### Running Unit Tests:
 ```sh
