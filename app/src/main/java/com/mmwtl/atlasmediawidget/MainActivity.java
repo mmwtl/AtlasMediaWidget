@@ -18,6 +18,9 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.InputType;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -776,9 +779,10 @@ public final class MainActivity extends ScaledActivity {
         boolean mediaNotifications = !BuildConfig.INTEGRATED_MEDIA_API
                 || hasMediaNotificationAccess();
         boolean storage = !BuildConfig.INTEGRATED_MEDIA_API || hasStorageAccess();
-        String status = "Поверх окон: " + yesNo(overlay)
-                + "\nИстория использования: " + yesNo(usage)
-                + "\nКонтроль окон: " + yesNo(accessibility);
+        SpannableStringBuilder statusBuilder = new SpannableStringBuilder();
+        appendPermissionStatus(statusBuilder, "Поверх окон", overlay);
+        appendPermissionStatus(statusBuilder, "История использования", usage);
+        appendPermissionStatus(statusBuilder, "Контроль окон", accessibility);
         updatePermissionButton(overlayPermissionButton, overlay,
                 "Поверх окон предоставлено", "Разрешить поверх окон");
         updatePermissionButton(usageAccessButton, usage,
@@ -786,8 +790,8 @@ public final class MainActivity extends ScaledActivity {
         updatePermissionButton(accessibilityAccessButton, accessibility,
                 "Спецвозможности предоставлены", getString(R.string.allow_accessibility));
         if (BuildConfig.INTEGRATED_MEDIA_API) {
-            status += "\nДоступ к уведомлениям (медиа): " + yesNo(mediaNotifications)
-                    + "\nХранилище (USB): " + yesNo(storage);
+            appendPermissionStatus(statusBuilder, "Доступ к уведомлениям (медиа)", mediaNotifications);
+            appendPermissionStatus(statusBuilder, "Хранилище (USB)", storage);
             updatePermissionButton(notificationAccessButton, mediaNotifications,
                     "Доступ к уведомлениям (медиа) предоставлен",
                     "Разрешить доступ к уведомлениям (медиа)");
@@ -795,10 +799,7 @@ public final class MainActivity extends ScaledActivity {
                     "Доступ к хранилищу (USB) предоставлен",
                     "Разрешить доступ к хранилищу (USB)");
         }
-        permissionStatus.setText(status);
-        permissionStatus.setTextColor(overlay && usage && accessibility
-                && mediaNotifications && storage
-                ? Ui.ACCENT : Ui.ERROR);
+        permissionStatus.setText(statusBuilder);
         refreshBridgeStatus();
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
@@ -1612,6 +1613,19 @@ public final class MainActivity extends ScaledActivity {
 
     private static String yesNo(boolean value) {
         return value ? "разрешено" : "не разрешено";
+    }
+
+    private static void appendPermissionStatus(
+            SpannableStringBuilder builder, String label, boolean granted) {
+        if (builder.length() > 0) {
+            builder.append("\n");
+        }
+        String line = label + ": " + yesNo(granted);
+        int start = builder.length();
+        builder.append(line);
+        int end = builder.length();
+        int color = granted ? Ui.ACCENT : Ui.ERROR;
+        builder.setSpan(new ForegroundColorSpan(color), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
     private static final class LabeledSeek {
