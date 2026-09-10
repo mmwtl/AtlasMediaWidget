@@ -1069,10 +1069,12 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void openAtlasMediaApi() {
+        int scaleTenths = configuredScaleTenths(this);
         if (BuildConfig.INTEGRATED_MEDIA_API) {
             Intent settings = new Intent().setClassName(
                     getPackageName(),
                     "com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity");
+            settings.putExtra("app_ui_scale_tenths", scaleTenths);
             try {
                 startActivity(settings);
             } catch (ActivityNotFoundException | SecurityException error) {
@@ -1087,6 +1089,7 @@ public final class MainActivity extends ScaledActivity {
             Toast.makeText(this, "Atlas Media API не установлен", Toast.LENGTH_SHORT).show();
             return;
         }
+        launch.putExtra("app_ui_scale_tenths", scaleTenths);
         startActivity(launch);
     }
 

@@ -86,6 +86,7 @@ final class MediaBridgeContract {
     static final String K_COMMAND_SOURCE = "source";
     static final String K_COMMAND_APP_SOURCE = "appSource";
     static final String K_COMMAND_AUTOPLAY = "autoplay";
+    static final String K_UI_SCALE_TENTHS = "uiScaleTenths";
 
     private MediaBridgeContract() {}
 }

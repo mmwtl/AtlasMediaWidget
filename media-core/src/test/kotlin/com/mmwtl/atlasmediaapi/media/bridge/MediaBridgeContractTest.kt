@@ -38,6 +38,7 @@ class MediaBridgeContractTest {
         assertEquals(102, MediaBridgeContract.ServerMessage.COMMAND_RESULT)
         assertEquals(103, MediaBridgeContract.ServerMessage.ERROR)
         assertEquals(104, MediaBridgeContract.ServerMessage.RADIO_STATIONS)
+        assertEquals("uiScaleTenths", MediaBridgeContract.Key.UI_SCALE_TENTHS)
     }
 
     @Test

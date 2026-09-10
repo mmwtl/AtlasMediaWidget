@@ -2,6 +2,7 @@ package com.mmwtl.atlasmediaapi.diagnostics
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -103,8 +104,21 @@ class DiagnosticActivity : Activity() {
     private val coordinator
         get() = MediaRuntime.coordinator(this)
 
+    private var appliedScaleTenths: Int = ScaledContextHelper.DEFAULT_SCALE_TENTHS
+
+    override fun attachBaseContext(newBase: Context) {
+        val scale = ScaledContextHelper.resolveScaleTenths(newBase)
+        appliedScaleTenths = scale
+        super.attachBaseContext(ScaledContextHelper.wrap(newBase, scale))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val intentScale = ScaledContextHelper.extractAndPersistIntentScale(this, intent)
+        if (intentScale != null && intentScale != appliedScaleTenths) {
+            recreate()
+            return
+        }
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
@@ -518,6 +532,15 @@ class DiagnosticActivity : Activity() {
         }
 
         runProbe()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val intentScale = ScaledContextHelper.extractAndPersistIntentScale(this, intent)
+        if (intentScale != null && intentScale != appliedScaleTenths) {
+            recreate()
+        }
     }
 
     override fun onResume() {

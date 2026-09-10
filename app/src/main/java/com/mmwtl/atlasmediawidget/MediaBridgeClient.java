@@ -287,6 +287,8 @@ final class MediaBridgeClient {
         if (requestId != null && !requestId.isEmpty()) {
             data.putString(MediaBridgeContract.K_REQUEST_ID, requestId);
         }
+        data.putInt(MediaBridgeContract.K_UI_SCALE_TENTHS,
+                ScaledActivity.configuredScaleTenths(context));
         return data;
     }
 

@@ -102,6 +102,7 @@ class AtlasPreferencesTest {
         assertTrue(preferences.defaultAudioSourceAutoplayOnStartup)
         assertFalse(preferences.autoSwitchToDefaultOnSourceLost)
         assertTrue(preferences.autoSwitchToDefaultAutoplayOnSourceLost)
+        assertEquals(AtlasPreferences.DEFAULT_UI_SCALE_TENTHS, preferences.uiScaleTenths)
     }
 
     @Test
@@ -138,5 +139,17 @@ class AtlasPreferencesTest {
 
         preferences.autoSwitchToDefaultAutoplayOnSourceLost = false
         assertFalse(preferences.autoSwitchToDefaultAutoplayOnSourceLost)
+    }
+
+    @Test
+    fun `ui scale tenths is clamped between 10 and 20`() {
+        preferences.uiScaleTenths = 18
+        assertEquals(18, preferences.uiScaleTenths)
+
+        preferences.uiScaleTenths = 5
+        assertEquals(AtlasPreferences.MIN_UI_SCALE_TENTHS, preferences.uiScaleTenths)
+
+        preferences.uiScaleTenths = 35
+        assertEquals(AtlasPreferences.MAX_UI_SCALE_TENTHS, preferences.uiScaleTenths)
     }
 }

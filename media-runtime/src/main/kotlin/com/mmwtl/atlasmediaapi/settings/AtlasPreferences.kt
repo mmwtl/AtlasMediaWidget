@@ -15,6 +15,11 @@ class AtlasPreferences(context: Context) {
         private const val KEY_AUTO_SWITCH_TO_DEFAULT_ON_SOURCE_LOST = "auto_switch_to_default_on_source_lost"
         private const val KEY_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY_ON_SOURCE_LOST = "auto_switch_to_default_autoplay_on_source_lost"
         private const val KEY_DEMO_MODE_ENABLED = "demo_mode_enabled"
+        const val KEY_UI_SCALE_TENTHS = "ui_scale_tenths"
+        const val EXTRA_UI_SCALE_TENTHS = "app_ui_scale_tenths"
+        const val MIN_UI_SCALE_TENTHS = 10
+        const val MAX_UI_SCALE_TENTHS = 20
+        const val DEFAULT_UI_SCALE_TENTHS = 15
     }
 
     private val prefs: SharedPreferences =
@@ -56,4 +61,11 @@ class AtlasPreferences(context: Context) {
     var demoModeEnabled: Boolean
         get() = prefs.getBoolean(KEY_DEMO_MODE_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_DEMO_MODE_ENABLED, value).apply()
+
+    var uiScaleTenths: Int
+        get() = prefs.getInt(KEY_UI_SCALE_TENTHS, DEFAULT_UI_SCALE_TENTHS)
+            .coerceIn(MIN_UI_SCALE_TENTHS, MAX_UI_SCALE_TENTHS)
+        set(value) = prefs.edit()
+            .putInt(KEY_UI_SCALE_TENTHS, value.coerceIn(MIN_UI_SCALE_TENTHS, MAX_UI_SCALE_TENTHS))
+            .apply()
 }

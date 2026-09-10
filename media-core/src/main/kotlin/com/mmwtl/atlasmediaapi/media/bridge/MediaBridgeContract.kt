@@ -94,6 +94,7 @@ object MediaBridgeContract {
         const val COMMAND_SOURCE = "source"
         const val COMMAND_APP_SOURCE = "appSource"
         const val COMMAND_AUTOPLAY = "autoplay"
+        const val UI_SCALE_TENTHS = "uiScaleTenths"
     }
 
     object Status {

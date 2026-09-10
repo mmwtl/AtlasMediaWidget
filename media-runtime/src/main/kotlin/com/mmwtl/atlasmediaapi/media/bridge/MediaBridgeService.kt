@@ -129,6 +129,11 @@ class MediaBridgeService : Service() {
             existing.packageNames += packageNames
         }
 
+        val clientScale = message.data?.getInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, -1) ?: -1
+        if (clientScale in com.mmwtl.atlasmediaapi.settings.AtlasPreferences.MIN_UI_SCALE_TENTHS..com.mmwtl.atlasmediaapi.settings.AtlasPreferences.MAX_UI_SCALE_TENTHS) {
+            coordinator.preferences.uiScaleTenths = clientScale
+        }
+
         send(
             replyTo,
             MediaBridgeContract.ServerMessage.REGISTERED,

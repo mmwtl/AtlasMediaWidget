@@ -24,5 +24,6 @@ public class MediaBridgeContractTest {
         assertEquals(0x80L, MediaBridgeContract.CAP_TUNE_RADIO);
         assertEquals("radioFavoriteStations",
                 MediaBridgeContract.K_RADIO_FAVORITE_STATIONS);
+        assertEquals("uiScaleTenths", MediaBridgeContract.K_UI_SCALE_TENTHS);
     }
 }
