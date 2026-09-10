@@ -18,9 +18,6 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.InputType;
-import android.text.SpannableStringBuilder;
-import android.text.Spanned;
-import android.text.style.ForegroundColorSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -56,7 +53,6 @@ public final class MainActivity extends ScaledActivity {
     private Prefs prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
-    private TextView permissionStatus;
     private Button overlayPermissionButton;
     private Button usageAccessButton;
     private Button accessibilityAccessButton;
@@ -216,10 +212,6 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout accessCard = card();
         accessCard.addView(text(getString(R.string.permissions_title),
                 20, Ui.PRIMARY, Typeface.BOLD));
-        permissionStatus = text("", 14, Ui.SECONDARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams statusParams = fullWrap();
-        statusParams.topMargin = Ui.dp(this, 10);
-        accessCard.addView(permissionStatus, statusParams);
         overlayPermissionButton = actionButton("Разрешить поверх окон");
         overlayPermissionButton.setOnClickListener(v -> openOverlaySettings());
         accessCard.addView(overlayPermissionButton, buttonParams());
@@ -779,10 +771,6 @@ public final class MainActivity extends ScaledActivity {
         boolean mediaNotifications = !BuildConfig.INTEGRATED_MEDIA_API
                 || hasMediaNotificationAccess();
         boolean storage = !BuildConfig.INTEGRATED_MEDIA_API || hasStorageAccess();
-        SpannableStringBuilder statusBuilder = new SpannableStringBuilder();
-        appendPermissionStatus(statusBuilder, "Поверх окон", overlay);
-        appendPermissionStatus(statusBuilder, "История использования", usage);
-        appendPermissionStatus(statusBuilder, "Контроль окон", accessibility);
         updatePermissionButton(overlayPermissionButton, overlay,
                 "Поверх окон предоставлено", "Разрешить поверх окон");
         updatePermissionButton(usageAccessButton, usage,
@@ -790,8 +778,6 @@ public final class MainActivity extends ScaledActivity {
         updatePermissionButton(accessibilityAccessButton, accessibility,
                 "Спецвозможности предоставлены", getString(R.string.allow_accessibility));
         if (BuildConfig.INTEGRATED_MEDIA_API) {
-            appendPermissionStatus(statusBuilder, "Доступ к уведомлениям (медиа)", mediaNotifications);
-            appendPermissionStatus(statusBuilder, "Хранилище (USB)", storage);
             updatePermissionButton(notificationAccessButton, mediaNotifications,
                     "Доступ к уведомлениям (медиа) предоставлен",
                     "Разрешить доступ к уведомлениям (медиа)");
@@ -799,7 +785,6 @@ public final class MainActivity extends ScaledActivity {
                     "Доступ к хранилищу (USB) предоставлен",
                     "Разрешить доступ к хранилищу (USB)");
         }
-        permissionStatus.setText(statusBuilder);
         refreshBridgeStatus();
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
@@ -1163,7 +1148,7 @@ public final class MainActivity extends ScaledActivity {
     private void updatePermissionButton(Button button, boolean granted,
             String grantedText, String requestText) {
         if (button == null) return;
-        button.setText(granted ? grantedText : requestText);
+        button.setText((granted ? "✓ " : "✕ ") + (granted ? grantedText : requestText));
         button.setBackground(Ui.background(granted ? Ui.ACCENT : Ui.NESTED, 8, this));
         button.setTextColor(granted ? Ui.ON_ACCENT : Ui.PRIMARY);
     }
@@ -1609,23 +1594,6 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams params = fullWrap();
         params.topMargin = Ui.dp(this, 12);
         return params;
-    }
-
-    private static String yesNo(boolean value) {
-        return value ? "разрешено" : "не разрешено";
-    }
-
-    private static void appendPermissionStatus(
-            SpannableStringBuilder builder, String label, boolean granted) {
-        if (builder.length() > 0) {
-            builder.append("\n");
-        }
-        String line = label + ": " + yesNo(granted);
-        int start = builder.length();
-        builder.append(line);
-        int end = builder.length();
-        int color = granted ? Ui.ACCENT : Ui.ERROR;
-        builder.setSpan(new ForegroundColorSpan(color), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
     private static final class LabeledSeek {
