@@ -8,9 +8,10 @@ These instructions apply to the entire repository.
 
 AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait automotive head
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
-proven shell and lifecycle approach from AtlasAppWidget. The versioned AtlasMediaApi bound service
-is the primary media backend: it may run inside the `integrated` Widget APK or in the autonomous
-`com.mmwtl.atlasmediaapi` package for `plain`/`bundled` compatibility.
+proven shell and lifecycle approach from AtlasAppWidget. The standard release build is the
+`integrated` Widget APK where the versioned AtlasMediaApi backend (`:media-runtime`) runs directly
+inside a private `:media` process. When needed, a thin `plain` Widget APK and an autonomous
+`com.mmwtl.atlasmediaapi` package (built from `:api-app`) can be built separately.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -22,9 +23,8 @@ provider has been demonstrated on the real head unit.
 
 - Keep confirmed device behavior, Android API facts, and implementation assumptions visibly
   separate in documentation and reviews.
-- Treat `/Users/wital/dev/AtlasMediaApi` as the upstream source of truth for Media Bridge protocol v1
-  and the integrated runtime. Keep `media-core`, `media-runtime`, `vendor-oneos`, and
-  `vendor-ecarx-stub` synchronized deliberately; do not make unrelated forks of backend behavior.
+- The Media Bridge protocol v1 and runtime implementation are maintained directly in this repository
+  as modules `:media-core`, `:media-runtime`, `:vendor-oneos`, `:vendor-ecarx-stub`, and `:api-app`.
 - Treat the decompiled OEM APKs as firmware-specific evidence, not as a stable public API.
 - Target the tested Android 11 head unit first. Do not generalize OEM Binder behavior to other
   firmware versions without a device test.
@@ -83,45 +83,34 @@ provider has been demonstrated on the real head unit.
   files or commits.
 - Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
   allow Gradle to fall back to module-derived `app-*.apk` names. Distribution variants append
-  `-plain-release.apk`, `-integrated-release.apk`, or `-bundled-release.apk` to that base name.
-- Keep `plain`, `integrated`, and `bundled` as distribution flavors of the same application. They must retain the
-  same application ID, version code, effective version name and Widget signing identity so any
-  variant can update another without uninstalling the Widget.
-- The `plain` variant must not contain `assets/atlas-media-api.apk`, request
-  `REQUEST_INSTALL_PACKAGES`, or expose the embedded-API installation receiver/button.
+  `-plain-release.apk` or `-integrated-release.apk` to that base name. Standalone API APKs from
+  `:api-app` follow `<effectiveVersionName>[<versionCode>]AtlasMediaApi-release.apk`.
+- Keep `integrated` (standard release with internal `:media` process) and `plain` (thin client
+  connecting via IPC) as distribution flavors of the Widget application. They retain the same
+  application ID, version code, effective version name and Widget signing identity.
+- The `plain` variant must not contain embedded API runtime components, request
+  `REQUEST_INSTALL_PACKAGES`, or expose embedded installation mechanisms.
 - The `integrated` variant must include `media-runtime`, bind its non-exported Media Bridge service
-  in the `:media` process, and contain neither `assets/atlas-media-api.apk` nor
+  in the `:media` process, and contain neither separate API APK assets nor
   `REQUEST_INSTALL_PACKAGES`.
-- Enable the `bundled` variant only when `-PembeddedApiApk=<path>` explicitly selects an API APK.
-  Never choose the newest file from an output directory implicitly. The selected file is a build
-  input, is copied byte-for-byte into the bundled APK, and must never be committed.
 
 ## Build and verification
 
-Use the repository wrapper after the Android project is scaffolded. Before handing off a completed
-application improvement, run at minimum:
+Use the repository wrapper. Before handing off a completed application improvement, run at minimum:
 
 ```sh
 sh gradlew --offline clean check assembleRelease
 ```
 
-Without `embeddedApiApk`, this command builds `plainRelease` and `integratedRelease`. To build and
-check `bundledRelease` too, use an explicit signed AtlasMediaApi APK:
+This command builds `plainRelease` and `integratedRelease` for `:app`, and `release` for `:api-app`.
+Individual targets can be built separately:
+- Standard integrated Widget: `sh gradlew :app:assembleIntegratedRelease`
+- Plain Widget: `sh gradlew :app:assemblePlainRelease`
+- Standalone Media API APK: `sh gradlew :api-app:assembleRelease`
 
-```sh
-sh gradlew --offline clean check assembleRelease \
-  -PembeddedApiApk=/absolute/path/to/AtlasMediaApi-release.apk
-```
-
-Verify release outputs under `app/build/outputs/apk/plain/release/`,
-`app/build/outputs/apk/integrated/release/`, and, when selected,
-`app/build/outputs/apk/bundled/release/`. Inspect package/version metadata and run
-`apksigner verify` when the artifacts are signed. Confirm the plain APK has neither the embedded
-API asset nor `REQUEST_INSTALL_PACKAGES`. For bundled builds, verify the selected input is a valid
-`com.mmwtl.atlasmediaapi` package with the intended version and signing identity, confirm the
-bundled asset exists, and compare its digest with the selected input APK. The API signing identity
-must remain compatible with already installed AtlasMediaApi versions; never auto-uninstall user
-data to bypass a signature mismatch.
+Verify release outputs under `app/build/outputs/apk/integrated/release/`,
+`app/build/outputs/apk/plain/release/`, and `api-app/build/outputs/apk/release/`. Inspect package/version
+metadata and run `apksigner verify` when the artifacts are signed.
 For integrated builds, verify the local Media Bridge, notification listener, diagnostics activity,
 and FileProvider are present only in that flavor; verify that the bridge and diagnostics activity
 run in `:media`, the bridge is not exported, and the provider authority uses the Widget package.

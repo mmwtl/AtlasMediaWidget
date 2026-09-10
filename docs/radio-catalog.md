@@ -6,7 +6,7 @@
 ## 1. Архитектура / Architecture
 
 ### [RU] Централизованное управление в AtlasMediaApi
-Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi`. В `integrated` он входит в package Widget; в `plain` и `bundled` используется автономный `com.mmwtl.atlasmediaapi`.
+Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi`. В стандартном варианте `integrated` он входит прямо в состав виджета (модуль `:media-runtime`); при раздельной установке `plain` используется автономный пакет `com.mmwtl.atlasmediaapi` (модуль `:api-app`).
 
 - `AtlasMediaApi` автоматически сопоставляет текущую частоту радиоприёмника с каталогом;
 - название станции передаётся в `snapshot.title`;
@@ -15,7 +15,7 @@
 - виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов.
 
 ### [EN] Centralized Management in AtlasMediaApi
-Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service. The `integrated` variant includes it in the Widget package; `plain` and `bundled` use the standalone `com.mmwtl.atlasmediaapi` package.
+Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service. In the standard `integrated` variant, it is compiled directly into the widget package (module `:media-runtime`); in modular `plain` setups, the standalone `com.mmwtl.atlasmediaapi` package (module `:api-app`) is used.
 
 - `AtlasMediaApi` automatically matches the current radio frequency against the active catalog;
 - The resolved station name is supplied in `snapshot.title`;
