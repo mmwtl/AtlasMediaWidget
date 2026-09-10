@@ -19,12 +19,18 @@
         <activity
             android:name=".diagnostics.DiagnosticActivity"
             android:exported="false"
+            android:icon="@mipmap/ic_media_api_launcher"
+            android:roundIcon="@mipmap/ic_media_api_launcher_round"
+            android:label="@string/media_api_name"
+            android:taskAffinity="com.mmwtl.atlasmediaapi"
             android:process=":media"
             android:theme="@style/Theme.AtlasMediaApi" />
 
         <activity-alias
             android:name="com.mmwtl.atlasmediaapi.diagnostics.MediaApiLauncher"
             android:exported="true"
+            android:icon="@mipmap/ic_media_api_launcher"
+            android:roundIcon="@mipmap/ic_media_api_launcher_round"
             android:label="@string/media_api_name"
             android:targetActivity="com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity">
             <intent-filter>
