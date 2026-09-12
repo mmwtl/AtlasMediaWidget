@@ -621,6 +621,7 @@ class MediaBridgeService : Service() {
 
     private fun send(target: Messenger?, what: Int, data: Bundle): Boolean {
         if (target == null) return false
+        data.putInt(MediaBridgeContract.Key.PROTOCOL_VERSION, MediaBridgeContract.PROTOCOL_VERSION)
         return try {
             target.send(Message.obtain(null, what).apply { this.data = data })
             true
