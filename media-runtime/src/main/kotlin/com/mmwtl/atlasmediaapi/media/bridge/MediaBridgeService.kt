@@ -86,6 +86,30 @@ class MediaBridgeService : Service() {
                 MediaBridgeContract.ClientMessage.GET_RADIO_STATIONS ->
                     handleGetRadioStations(message)
 
+                MediaBridgeContract.ClientMessage.GET_SETTINGS ->
+                    handleGetSettings(message)
+
+                MediaBridgeContract.ClientMessage.UPDATE_SETTINGS ->
+                    handleUpdateSettings(message)
+
+                MediaBridgeContract.ClientMessage.EXPORT_MEDIA_BACKUP ->
+                    handleExportMediaBackup(message)
+
+                MediaBridgeContract.ClientMessage.PREPARE_MEDIA_IMPORT ->
+                    handlePrepareMediaImport(message)
+
+                MediaBridgeContract.ClientMessage.COMMIT_MEDIA_IMPORT ->
+                    handleCommitMediaImport(message)
+
+                MediaBridgeContract.ClientMessage.GET_IMPORT_STATUS ->
+                    handleGetImportStatus(message)
+
+                MediaBridgeContract.ClientMessage.ABORT_MEDIA_IMPORT ->
+                    handleAbortMediaImport(message)
+
+                MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG ->
+                    handleRestoreDefaultCatalog(message)
+
                 else -> sendError(
                     message.replyTo,
                     message.data?.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty(),
@@ -134,6 +158,9 @@ class MediaBridgeService : Service() {
             coordinator.preferences.uiScaleTenths = clientScale
         }
 
+        val isInternal = (message.sendingUid == android.os.Process.myUid()) ||
+                packageNames.contains(packageName)
+
         send(
             replyTo,
             MediaBridgeContract.ServerMessage.REGISTERED,
@@ -152,6 +179,9 @@ class MediaBridgeService : Service() {
                     message.data?.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty(),
                 )
                 putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                if (isInternal) {
+                    putInt(MediaBridgeContract.Key.SETTINGS_PROTOCOL_VERSION, 1)
+                }
             },
         )
 
@@ -352,6 +382,204 @@ class MediaBridgeService : Service() {
                 )
             },
         )
+    }
+
+    private fun isSettingsAllowed(message: Message): Boolean {
+        val sendingUid = message.sendingUid
+        if (sendingUid == android.os.Process.myUid()) return true
+        val packages = packageManager.getPackagesForUid(sendingUid).orEmpty()
+        return packages.contains(packageName)
+    }
+
+    private fun handleGetSettings(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val requestId = message.data?.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        val snapshot = coordinator.settingsController.getSnapshot()
+        val bundle = snapshot.toBundle().apply {
+            putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+            putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+        }
+        send(replyTo, MediaBridgeContract.ServerMessage.SETTINGS, bundle)
+    }
+
+    private fun handleUpdateSettings(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        val expectedRevision = if (data.containsKey(MediaBridgeContract.Key.EXPECTED_REVISION)) {
+            data.getLong(MediaBridgeContract.Key.EXPECTED_REVISION)
+        } else null
+        val result = coordinator.settingsController.updateSettings(expectedRevision, data)
+        if (result.status == MediaBridgeContract.Status.OK && result.snapshot != null) {
+            val bundle = result.snapshot.toBundle().apply {
+                putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+            }
+            send(replyTo, MediaBridgeContract.ServerMessage.SETTINGS_UPDATED, bundle)
+        } else {
+            sendError(replyTo, requestId, result.status, result.errorMessage)
+        }
+    }
+
+    private fun handleRestoreDefaultCatalog(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val requestId = message.data?.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        val snapshot = coordinator.settingsController.restoreDefaultCatalog()
+        val bundle = snapshot.toBundle().apply {
+            putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+            putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+        }
+        send(replyTo, MediaBridgeContract.ServerMessage.DEFAULT_CATALOG_RESTORED, bundle)
+    }
+
+    private fun handleExportMediaBackup(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        @Suppress("DEPRECATION")
+        val pfd = data.getParcelable<android.os.ParcelFileDescriptor>(MediaBridgeContract.Key.FILE_DESCRIPTOR)
+        if (pfd == null) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                android.os.ParcelFileDescriptor.AutoCloseOutputStream(pfd).use { out ->
+                    coordinator.settingsController.exportMediaBackup(out)
+                }
+                val bundle = Bundle().apply {
+                    putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                    putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                }
+                send(replyTo, MediaBridgeContract.ServerMessage.MEDIA_BACKUP_EXPORTED, bundle)
+            } catch (e: Exception) {
+                Timber.e(e, "Export media backup failed")
+                sendError(replyTo, requestId, MediaBridgeContract.Status.IO_ERROR, e.message ?: "Export failed")
+            }
+        }
+    }
+
+    private fun handlePrepareMediaImport(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        val operationId = data.getString(MediaBridgeContract.Key.OPERATION_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        if (operationId.isBlank()) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "operationId missing")
+            return
+        }
+        @Suppress("DEPRECATION")
+        val pfd = data.getParcelable<android.os.ParcelFileDescriptor>(MediaBridgeContract.Key.FILE_DESCRIPTOR)
+        if (pfd == null) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            try {
+                val result = android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
+                    coordinator.settingsController.prepareMediaImport(operationId, input)
+                }
+                if (result.status == MediaBridgeContract.Status.OK) {
+                    val bundle = Bundle().apply {
+                        putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                        putString(MediaBridgeContract.Key.OPERATION_ID, operationId)
+                        putString(MediaBridgeContract.Key.STAGING_TOKEN, result.stagingToken)
+                        putString(MediaBridgeContract.Key.CATALOG_TYPE, result.catalogMode)
+                        putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, result.stationCount)
+                        putStringArrayList(MediaBridgeContract.Key.IMPORT_PREVIEW, ArrayList(result.warnings))
+                        putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                    }
+                    send(replyTo, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_PREPARED, bundle)
+                } else {
+                    sendError(replyTo, requestId, result.status, result.errorMessage)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Prepare media import failed")
+                sendError(replyTo, requestId, MediaBridgeContract.Status.IO_ERROR, e.message ?: "Prepare failed")
+            }
+        }
+    }
+
+    private fun handleCommitMediaImport(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        val operationId = data.getString(MediaBridgeContract.Key.OPERATION_ID).orEmpty()
+        val stagingToken = data.getString(MediaBridgeContract.Key.STAGING_TOKEN).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            val result = coordinator.settingsController.commitMediaImport(operationId, stagingToken)
+            if (result.status == MediaBridgeContract.Status.OK && result.snapshot != null) {
+                val bundle = result.snapshot.toBundle().apply {
+                    putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                    putString(MediaBridgeContract.Key.OPERATION_ID, operationId)
+                    putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                }
+                send(replyTo, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_COMMITTED, bundle)
+            } else {
+                sendError(replyTo, requestId, result.status, result.errorMessage)
+            }
+        }
+    }
+
+    private fun handleGetImportStatus(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        val operationId = data.getString(MediaBridgeContract.Key.OPERATION_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        val status = coordinator.settingsController.getImportStatus(operationId)
+        val bundle = Bundle().apply {
+            putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+            putString(MediaBridgeContract.Key.OPERATION_ID, operationId)
+            putString(MediaBridgeContract.Key.IMPORT_STATUS, status)
+            putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+        }
+        send(replyTo, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_STATUS, bundle)
+    }
+
+    private fun handleAbortMediaImport(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        val operationId = data.getString(MediaBridgeContract.Key.OPERATION_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Settings IPC restricted")
+            return
+        }
+        coordinator.settingsController.abortMediaImport(operationId)
+        val bundle = Bundle().apply {
+            putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+            putString(MediaBridgeContract.Key.OPERATION_ID, operationId)
+            putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+        }
+        send(replyTo, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_ABORTED, bundle)
     }
 
     private fun sendProtocolError(replyTo: Messenger?, input: Bundle?, version: Int) {

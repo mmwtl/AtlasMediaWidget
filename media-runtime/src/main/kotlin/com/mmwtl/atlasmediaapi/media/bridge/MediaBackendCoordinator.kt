@@ -72,6 +72,17 @@ class MediaBackendCoordinator(
         artworkRepository = artworkRepository,
         radioCatalogRepository = radioCatalogRepository,
     )
+    val settingsController: com.mmwtl.atlasmediaapi.settings.MediaSettingsController =
+        com.mmwtl.atlasmediaapi.settings.MediaSettingsController(
+            context = context,
+            preferences = preferences,
+            radioCatalogRepository = radioCatalogRepository,
+            clusterMediaBridge = clusterMediaBridge,
+            onSettingsChanged = {
+                stateHub.refreshRadioState()
+                cancelDefaultSourceSwitch()
+            },
+        )
     val callerAccessPolicy: CallerAccessPolicy = OpenCallerAccessPolicy()
     val commandMutex: Mutex = Mutex()
 

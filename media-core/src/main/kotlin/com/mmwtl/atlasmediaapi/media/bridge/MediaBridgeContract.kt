@@ -22,6 +22,14 @@ object MediaBridgeContract {
         const val GET_SNAPSHOT = 3
         const val COMMAND = 4
         const val GET_RADIO_STATIONS = 5
+        const val GET_SETTINGS = 6
+        const val UPDATE_SETTINGS = 7
+        const val EXPORT_MEDIA_BACKUP = 8
+        const val PREPARE_MEDIA_IMPORT = 9
+        const val COMMIT_MEDIA_IMPORT = 10
+        const val GET_IMPORT_STATUS = 11
+        const val ABORT_MEDIA_IMPORT = 12
+        const val RESTORE_DEFAULT_CATALOG = 13
     }
 
     object ServerMessage {
@@ -30,6 +38,14 @@ object MediaBridgeContract {
         const val COMMAND_RESULT = 102
         const val ERROR = 103
         const val RADIO_STATIONS = 104
+        const val SETTINGS = 105
+        const val SETTINGS_UPDATED = 106
+        const val MEDIA_BACKUP_EXPORTED = 107
+        const val MEDIA_IMPORT_PREPARED = 108
+        const val MEDIA_IMPORT_COMMITTED = 109
+        const val MEDIA_IMPORT_STATUS = 110
+        const val MEDIA_IMPORT_ABORTED = 111
+        const val DEFAULT_CATALOG_RESTORED = 112
     }
 
     object Key {
@@ -95,6 +111,29 @@ object MediaBridgeContract {
         const val COMMAND_APP_SOURCE = "appSource"
         const val COMMAND_AUTOPLAY = "autoplay"
         const val UI_SCALE_TENTHS = "uiScaleTenths"
+
+        const val SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion"
+        const val SETTINGS_REVISION = "settingsRevision"
+        const val EXPECTED_REVISION = "expectedRevision"
+        const val OPERATION_ID = "operationId"
+        const val STAGING_TOKEN = "stagingToken"
+        const val IMPORT_STATUS = "importStatus"
+        const val FILE_DESCRIPTOR = "fileDescriptor"
+        const val IMPORT_PREVIEW = "importPreview"
+
+        const val DEFAULT_AUDIO_SOURCE = "defaultAudioSource"
+        const val DEFAULT_AUDIO_SOURCE_DELAY_SEC = "defaultAudioSourceDelaySec"
+        const val DEFAULT_AUDIO_SOURCE_AUTOPLAY = "defaultAudioSourceAutoplay"
+        const val AUTO_SWITCH_TO_DEFAULT = "autoSwitchToDefault"
+        const val AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay"
+        const val DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage"
+        const val SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switchToOnlineBeforeSessionPlay"
+        const val RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled"
+        const val CLUSTER_COVERS_ENABLED = "clusterCoversEnabled"
+        const val CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs"
+        const val CATALOG_TYPE = "catalogType"
+        const val CATALOG_STATION_COUNT = "catalogStationCount"
+        const val CATALOG_DESCRIPTION = "catalogDescription"
     }
 
     object Status {
@@ -107,6 +146,9 @@ object MediaBridgeContract {
         const val NOT_SUPPORTED = 6
         const val FAILED = 7
         const val NOT_REGISTERED = 8
+        const val VALIDATION_ERROR = 9
+        const val CONFLICT = 10
+        const val IO_ERROR = 11
     }
 
     object BackendError {

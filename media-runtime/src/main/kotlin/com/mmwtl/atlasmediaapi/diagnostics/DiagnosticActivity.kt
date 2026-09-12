@@ -41,6 +41,7 @@ import java.io.IOException
 class DiagnosticActivity : Activity() {
     companion object {
         private const val RC_IMPORT_RADIO_ZIP = 1002
+        private const val RC_IMPORT_MEDIA_BACKUP_ZIP = 1003
         private const val SEEK_BAR_COMMIT_DEBOUNCE_MS = 250L
     }
 
@@ -103,6 +104,9 @@ class DiagnosticActivity : Activity() {
 
     private val coordinator
         get() = MediaRuntime.coordinator(this)
+
+    private val isIntegrated
+        get() = packageName != "com.mmwtl.atlasmediaapi"
 
     private var appliedScaleTenths: Int = ScaledContextHelper.DEFAULT_SCALE_TENTHS
 
@@ -178,280 +182,315 @@ class DiagnosticActivity : Activity() {
         demoCard.addView(demoModeSwitch, DiagnosticUi.fullWrap())
         DiagnosticUi.topMargin(demoModeSwitch, this, 12f)
 
-        // 2. Source Settings Card (Full-width tiles + delay + switches)
-        val settingsCard = DiagnosticUi.card(this)
-        root.addView(settingsCard)
-        settingsCard.addView(DiagnosticUi.heading(this, "Настройки источника", 20f), DiagnosticUi.fullWrap())
+        if (isIntegrated) {
+            val infoCard = DiagnosticUi.card(this)
+            root.addView(infoCard)
+            infoCard.addView(DiagnosticUi.heading(this, "Настройки медиа и радио", 20f), DiagnosticUi.fullWrap())
+            val infoText = DiagnosticUi.text(
+                this,
+                "Настройки источника звука по умолчанию, задержки, приборной панели и каталога радио перенесены на главный экран AtlasMediaWidget.",
+                14f,
+                DiagnosticUi.SECONDARY,
+            ).apply { setLineSpacing(0f, 1.15f) }
+            infoCard.addView(infoText, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(infoText, this, 8f)
 
-        val sourceTitle = DiagnosticUi.text(this, "Источник звука по умолчанию", 15f, DiagnosticUi.SECONDARY).apply {
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        settingsCard.addView(sourceTitle, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(sourceTitle, this, 14f)
-
-        fun createTileRow(options: List<SourceOption>): LinearLayout {
-            val row = LinearLayout(this@DiagnosticActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                )
+            val openWidgetBtn = DiagnosticUi.button(this, "Открыть настройки виджета").apply {
+                setOnClickListener {
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                    if (launchIntent != null) startActivity(launchIntent)
+                }
             }
-            options.forEachIndexed { index, option ->
-                val isSelected = coordinator.preferences.defaultAudioSource == option.id
-                val btn = DiagnosticUi.tileButton(this@DiagnosticActivity, option.label, isSelected) {
-                    coordinator.preferences.defaultAudioSource = option.id
-                    updateSettingsUiState()
-                    render()
-                }
-                sourceTileButtons[option.id] = btn
-                val p = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                    if (index > 0) leftMargin = DiagnosticUi.dp(this@DiagnosticActivity, 6f)
-                }
-                row.addView(btn, p)
+            infoCard.addView(openWidgetBtn, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(openWidgetBtn, this, 12f)
+        } else {
+            // 2. Source Settings Card (Full-width tiles + delay + switches)
+            val settingsCard = DiagnosticUi.card(this)
+            root.addView(settingsCard)
+            settingsCard.addView(DiagnosticUi.heading(this, "Настройки источника", 20f), DiagnosticUi.fullWrap())
+
+            val sourceTitle = DiagnosticUi.text(this, "Источник звука по умолчанию", 15f, DiagnosticUi.SECONDARY).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
             }
-            return row
-        }
+            settingsCard.addView(sourceTitle, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(sourceTitle, this, 14f)
 
-        val row1 = createTileRow(sourceOptions.subList(0, 3))
-        settingsCard.addView(row1)
-        DiagnosticUi.topMargin(row1, this, 8f)
-
-        val row2 = createTileRow(sourceOptions.subList(3, 6))
-        settingsCard.addView(row2)
-        DiagnosticUi.topMargin(row2, this, 6f)
-
-        delayTitle = DiagnosticUi.text(this, "Задержка переключения на старте", 15f, DiagnosticUi.SECONDARY).apply {
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        settingsCard.addView(delayTitle, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(delayTitle, this, 14f)
-
-        delayValueLabel = DiagnosticUi.text(this, "${coordinator.preferences.defaultAudioSourceDelaySec} сек", 18f, DiagnosticUi.PRIMARY).apply {
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        settingsCard.addView(delayValueLabel, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(delayValueLabel, this, 4f)
-
-        delaySeekBar = DiagnosticUi.sizeSeekBar(
-            this,
-            min = 0,
-            max = 30,
-            initial = coordinator.preferences.defaultAudioSourceDelaySec,
-        ).apply {
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    if (fromUser) {
-                        pendingDelaySec = progress
-                        delayValueLabel.text = "$progress сек"
-                        if (!delaySeekBarTracking) scheduleDelayCommit()
+            fun createTileRow(options: List<SourceOption>): LinearLayout {
+                val row = LinearLayout(this@DiagnosticActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                }
+                options.forEachIndexed { index, option ->
+                    val isSelected = coordinator.preferences.defaultAudioSource == option.id
+                    val btn = DiagnosticUi.tileButton(this@DiagnosticActivity, option.label, isSelected) {
+                        coordinator.preferences.defaultAudioSource = option.id
+                        updateSettingsUiState()
+                        render()
                     }
-                }
-
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                    delaySeekBarTracking = true
-                    delayCommitJob?.cancel()
-                }
-
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                    delaySeekBarTracking = false
-                    commitPendingDelay()
-                }
-            })
-        }
-        settingsCard.addView(delaySeekBar, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(delaySeekBar, this, 6f)
-
-        startupAutoplaySwitch = DiagnosticUi.switch(
-            this,
-            "Автовоспроизведение при старте",
-            coordinator.preferences.defaultAudioSourceAutoplayOnStartup,
-        ) { checked ->
-            coordinator.preferences.defaultAudioSourceAutoplayOnStartup = checked
-            render()
-        }
-        settingsCard.addView(startupAutoplaySwitch, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(startupAutoplaySwitch, this, 12f)
-
-        sourceLostSwitch = DiagnosticUi.switch(
-            this,
-            "Автопереключение при потере источника",
-            coordinator.preferences.autoSwitchToDefaultOnSourceLost,
-        ) { checked ->
-            coordinator.preferences.autoSwitchToDefaultOnSourceLost = checked
-            updateSettingsUiState()
-            render()
-        }
-        settingsCard.addView(sourceLostSwitch, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(sourceLostSwitch, this, 12f)
-
-        sourceLostAutoplaySwitch = DiagnosticUi.switch(
-            this,
-            "Автовоспроизведение при потере источника",
-            coordinator.preferences.autoSwitchToDefaultAutoplayOnSourceLost,
-        ) { checked ->
-            coordinator.preferences.autoSwitchToDefaultAutoplayOnSourceLost = checked
-            render()
-        }
-        settingsCard.addView(sourceLostAutoplaySwitch, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(sourceLostAutoplaySwitch, this, 12f)
-
-        updateSettingsUiState()
-
-        // 3. Radio Catalog & Covers Card
-        val radioCard = DiagnosticUi.card(this)
-        root.addView(radioCard)
-        radioCard.addView(DiagnosticUi.heading(this, "Каталог радио и обложки", 20f), DiagnosticUi.fullWrap())
-
-        radioWidgetBroadcastSwitch = DiagnosticUi.switch(
-            this,
-            "Трансляция радио в виджет (название и обложка)",
-            coordinator.radioCatalogRepository.isWidgetBroadcastEnabled,
-        ) { checked ->
-            coordinator.radioCatalogRepository.setWidgetBroadcastEnabled(checked)
-            coordinator.stateHub.refreshRadioState()
-            render()
-        }
-        radioCard.addView(radioWidgetBroadcastSwitch, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(radioWidgetBroadcastSwitch, this, 12f)
-
-        clusterDimCoversSwitch = DiagnosticUi.switch(
-            this,
-            "Трансляция радио на приборку (название и обложка)",
-            coordinator.clusterMediaBridge.isClusterCoversEnabled,
-        ) { checked ->
-            coordinator.clusterMediaBridge.setClusterCoversEnabled(checked)
-            coordinator.stateHub.refreshRadioState()
-            render()
-        }
-        radioCard.addView(clusterDimCoversSwitch, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(clusterDimCoversSwitch, this, 8f)
-
-        clusterGuardIntervalTitle = DiagnosticUi.text(
-            this,
-            "Базовый интервал adaptive watchdog",
-            15f,
-            DiagnosticUi.SECONDARY,
-        ).apply {
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        radioCard.addView(clusterGuardIntervalTitle, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(clusterGuardIntervalTitle, this, 12f)
-
-        clusterGuardIntervalValueLabel = DiagnosticUi.text(
-            this,
-            "${coordinator.clusterMediaBridge.reassertWatchdogIntervalMs} мс " +
-                "±${ClusterMediaBridge.REASSERT_WATCHDOG_JITTER_MS}",
-            18f,
-            DiagnosticUi.PRIMARY,
-        ).apply {
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        radioCard.addView(clusterGuardIntervalValueLabel, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(clusterGuardIntervalValueLabel, this, 4f)
-
-        clusterGuardIntervalSeekBar = DiagnosticUi.sizeSeekBar(
-            this,
-            min = (ClusterMediaBridge.MIN_REASSERT_WATCHDOG_INTERVAL_MS / 10L).toInt(),
-            max = (ClusterMediaBridge.MAX_REASSERT_WATCHDOG_INTERVAL_MS / 10L).toInt(),
-            initial = (coordinator.clusterMediaBridge.reassertWatchdogIntervalMs / 10L).toInt(),
-        ).apply {
-            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    if (fromUser) {
-                        val intervalMs = progress * 10L
-                        pendingClusterGuardIntervalMs = intervalMs
-                        clusterGuardIntervalValueLabel.text =
-                            "$intervalMs мс ±${ClusterMediaBridge.REASSERT_WATCHDOG_JITTER_MS}"
-                        if (!clusterGuardSeekBarTracking) scheduleClusterGuardCommit()
+                    sourceTileButtons[option.id] = btn
+                    val p = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        if (index > 0) leftMargin = DiagnosticUi.dp(this@DiagnosticActivity, 6f)
                     }
+                    row.addView(btn, p)
                 }
+                return row
+            }
 
-                override fun onStartTrackingTouch(seekBar: SeekBar?) {
-                    clusterGuardSeekBarTracking = true
-                    clusterGuardCommitJob?.cancel()
-                }
+            val row1 = createTileRow(sourceOptions.subList(0, 3))
+            settingsCard.addView(row1)
+            DiagnosticUi.topMargin(row1, this, 8f)
 
-                override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                    clusterGuardSeekBarTracking = false
-                    commitPendingClusterGuardInterval()
-                }
-            })
-        }
-        radioCard.addView(clusterGuardIntervalSeekBar, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(clusterGuardIntervalSeekBar, this, 6f)
+            val row2 = createTileRow(sourceOptions.subList(3, 6))
+            settingsCard.addView(row2)
+            DiagnosticUi.topMargin(row2, this, 6f)
 
-        clusterGuardIntervalWarning = DiagnosticUi.text(
-            this,
-            "Смена станции: сразу и через 100/250/500/1000/1500 мс. " +
-                "Повторный callback: 100/250 мс. Watchdog использует jitter против синхронизации.",
-            13f,
-            DiagnosticUi.ERROR,
-        )
-        radioCard.addView(clusterGuardIntervalWarning, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(clusterGuardIntervalWarning, this, 4f)
+            delayTitle = DiagnosticUi.text(this, "Задержка переключения на старте", 15f, DiagnosticUi.SECONDARY).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            settingsCard.addView(delayTitle, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(delayTitle, this, 14f)
 
-        radioCatalogInfoView = DiagnosticUi.text(this, "", 14f, DiagnosticUi.SECONDARY).apply {
-            setLineSpacing(0f, 1.12f)
-        }
-        radioCard.addView(radioCatalogInfoView, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(radioCatalogInfoView, this, 10f)
+            delayValueLabel = DiagnosticUi.text(this, "${coordinator.preferences.defaultAudioSourceDelaySec} сек", 18f, DiagnosticUi.PRIMARY).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            settingsCard.addView(delayValueLabel, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(delayValueLabel, this, 4f)
 
-        val radioButtonsLayout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-        radioCard.addView(radioButtonsLayout, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(radioButtonsLayout, this, 12f)
+            delaySeekBar = DiagnosticUi.sizeSeekBar(
+                this,
+                min = 0,
+                max = 30,
+                initial = coordinator.preferences.defaultAudioSourceDelaySec,
+            ).apply {
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        if (fromUser) {
+                            pendingDelaySec = progress
+                            delayValueLabel.text = "$progress сек"
+                            if (!delaySeekBarTracking) scheduleDelayCommit()
+                        }
+                    }
 
-        exportSampleZipButton = DiagnosticUi.button(this, "Выгрузить образец архива (ZIP)").apply {
-            setOnClickListener { exportSampleZip() }
-        }
-        radioButtonsLayout.addView(exportSampleZipButton, DiagnosticUi.fullWrap())
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                        delaySeekBarTracking = true
+                        delayCommitJob?.cancel()
+                    }
 
-        importCustomZipButton = DiagnosticUi.button(this, "Импортировать свой архив (ZIP)", primary = true).apply {
-            setOnClickListener { importCustomZip() }
-        }
-        radioButtonsLayout.addView(importCustomZipButton, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(importCustomZipButton, this, 8f)
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                        delaySeekBarTracking = false
+                        commitPendingDelay()
+                    }
+                })
+            }
+            settingsCard.addView(delaySeekBar, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(delaySeekBar, this, 6f)
 
-        restoreDefaultCatalogButton = DiagnosticUi.outlinedButton(this, "Восстановить стандартный каталог", destructive = true).apply {
-            setOnClickListener {
-                coordinator.radioCatalogRepository.restoreDefaultCatalog()
-                coordinator.stateHub.refreshRadioState()
-                Toast.makeText(this@DiagnosticActivity, "Стандартный каталог Пензы восстановлен", Toast.LENGTH_SHORT).show()
+            startupAutoplaySwitch = DiagnosticUi.switch(
+                this,
+                "Автовоспроизведение при старте",
+                coordinator.preferences.defaultAudioSourceAutoplayOnStartup,
+            ) { checked ->
+                coordinator.preferences.defaultAudioSourceAutoplayOnStartup = checked
                 render()
             }
-        }
-        radioButtonsLayout.addView(restoreDefaultCatalogButton, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(restoreDefaultCatalogButton, this, 8f)
+            settingsCard.addView(startupAutoplaySwitch, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(startupAutoplaySwitch, this, 12f)
 
-        val previewCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(
-                DiagnosticUi.dp(this@DiagnosticActivity, 12f),
-                DiagnosticUi.dp(this@DiagnosticActivity, 12f),
-                DiagnosticUi.dp(this@DiagnosticActivity, 12f),
-                DiagnosticUi.dp(this@DiagnosticActivity, 12f),
-            )
-            background = DiagnosticUi.background(this@DiagnosticActivity, DiagnosticUi.NESTED, 8f)
-        }
-        radioCard.addView(previewCard, DiagnosticUi.fullWrap())
-        DiagnosticUi.topMargin(previewCard, this, 14f)
-
-        radioCoverThumbnailView = ImageView(this).apply {
-            val size = DiagnosticUi.dp(this@DiagnosticActivity, 56f)
-            layoutParams = LinearLayout.LayoutParams(size, size).apply {
-                rightMargin = DiagnosticUi.dp(this@DiagnosticActivity, 12f)
+            sourceLostSwitch = DiagnosticUi.switch(
+                this,
+                "Автопереключение при потере источника",
+                coordinator.preferences.autoSwitchToDefaultOnSourceLost,
+            ) { checked ->
+                coordinator.preferences.autoSwitchToDefaultOnSourceLost = checked
+                updateSettingsUiState()
+                render()
             }
-            scaleType = ImageView.ScaleType.CENTER_CROP
-            background = DiagnosticUi.outlinedBackground(this@DiagnosticActivity, strokeColor = DiagnosticUi.OUTLINE)
-        }
-        previewCard.addView(radioCoverThumbnailView)
+            settingsCard.addView(sourceLostSwitch, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(sourceLostSwitch, this, 12f)
 
-        radioStationPreviewView = DiagnosticUi.text(this, "Радио не активно", 13f, DiagnosticUi.PRIMARY).apply {
-            setLineSpacing(0f, 1.15f)
+            sourceLostAutoplaySwitch = DiagnosticUi.switch(
+                this,
+                "Автовоспроизведение при потере источника",
+                coordinator.preferences.autoSwitchToDefaultAutoplayOnSourceLost,
+            ) { checked ->
+                coordinator.preferences.autoSwitchToDefaultAutoplayOnSourceLost = checked
+                render()
+            }
+            settingsCard.addView(sourceLostAutoplaySwitch, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(sourceLostAutoplaySwitch, this, 12f)
+
+            updateSettingsUiState()
+
+            // 3. Radio Catalog & Covers Card
+            val radioCard = DiagnosticUi.card(this)
+            root.addView(radioCard)
+            radioCard.addView(DiagnosticUi.heading(this, "Каталог радио и обложки", 20f), DiagnosticUi.fullWrap())
+
+            radioWidgetBroadcastSwitch = DiagnosticUi.switch(
+                this,
+                "Трансляция радио в виджет (название и обложка)",
+                coordinator.radioCatalogRepository.isWidgetBroadcastEnabled,
+            ) { checked ->
+                coordinator.radioCatalogRepository.setWidgetBroadcastEnabled(checked)
+                coordinator.stateHub.refreshRadioState()
+                render()
+            }
+            radioCard.addView(radioWidgetBroadcastSwitch, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(radioWidgetBroadcastSwitch, this, 12f)
+
+            clusterDimCoversSwitch = DiagnosticUi.switch(
+                this,
+                "Трансляция радио на приборку (название и обложка)",
+                coordinator.clusterMediaBridge.isClusterCoversEnabled,
+            ) { checked ->
+                coordinator.clusterMediaBridge.setClusterCoversEnabled(checked)
+                coordinator.stateHub.refreshRadioState()
+                render()
+            }
+            radioCard.addView(clusterDimCoversSwitch, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterDimCoversSwitch, this, 8f)
+
+            clusterGuardIntervalTitle = DiagnosticUi.text(
+                this,
+                "Базовый интервал adaptive watchdog",
+                15f,
+                DiagnosticUi.SECONDARY,
+            ).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            radioCard.addView(clusterGuardIntervalTitle, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterGuardIntervalTitle, this, 12f)
+
+            clusterGuardIntervalValueLabel = DiagnosticUi.text(
+                this,
+                "${coordinator.clusterMediaBridge.reassertWatchdogIntervalMs} мс " +
+                    "±${ClusterMediaBridge.REASSERT_WATCHDOG_JITTER_MS}",
+                18f,
+                DiagnosticUi.PRIMARY,
+            ).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            radioCard.addView(clusterGuardIntervalValueLabel, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterGuardIntervalValueLabel, this, 4f)
+
+            clusterGuardIntervalSeekBar = DiagnosticUi.sizeSeekBar(
+                this,
+                min = (ClusterMediaBridge.MIN_REASSERT_WATCHDOG_INTERVAL_MS / 10L).toInt(),
+                max = (ClusterMediaBridge.MAX_REASSERT_WATCHDOG_INTERVAL_MS / 10L).toInt(),
+                initial = (coordinator.clusterMediaBridge.reassertWatchdogIntervalMs / 10L).toInt(),
+            ).apply {
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        if (fromUser) {
+                            val intervalMs = progress * 10L
+                            pendingClusterGuardIntervalMs = intervalMs
+                            clusterGuardIntervalValueLabel.text =
+                                "$intervalMs мс ±${ClusterMediaBridge.REASSERT_WATCHDOG_JITTER_MS}"
+                            if (!clusterGuardSeekBarTracking) scheduleClusterGuardCommit()
+                        }
+                    }
+
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                        clusterGuardSeekBarTracking = true
+                        clusterGuardCommitJob?.cancel()
+                    }
+
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                        clusterGuardSeekBarTracking = false
+                        commitPendingClusterGuardInterval()
+                    }
+                })
+            }
+            radioCard.addView(clusterGuardIntervalSeekBar, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterGuardIntervalSeekBar, this, 6f)
+
+            clusterGuardIntervalWarning = DiagnosticUi.text(
+                this,
+                "Смена станции: сразу и через 100/250/500/1000/1500 мс. " +
+                    "Повторный callback: 100/250 мс. Watchdog использует jitter против синхронизации.",
+                13f,
+                DiagnosticUi.ERROR,
+            )
+            radioCard.addView(clusterGuardIntervalWarning, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterGuardIntervalWarning, this, 4f)
+
+            radioCatalogInfoView = DiagnosticUi.text(this, "", 14f, DiagnosticUi.SECONDARY).apply {
+                setLineSpacing(0f, 1.12f)
+            }
+            radioCard.addView(radioCatalogInfoView, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(radioCatalogInfoView, this, 10f)
+
+            val radioButtonsLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+            radioCard.addView(radioButtonsLayout, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(radioButtonsLayout, this, 12f)
+
+            exportSampleZipButton = DiagnosticUi.button(this, "Выгрузить образец архива (ZIP)").apply {
+                setOnClickListener { exportSampleZip() }
+            }
+            radioButtonsLayout.addView(exportSampleZipButton, DiagnosticUi.fullWrap())
+
+            importCustomZipButton = DiagnosticUi.button(this, "Импортировать свой архив (ZIP)", primary = true).apply {
+                setOnClickListener { importCustomZip() }
+            }
+            radioButtonsLayout.addView(importCustomZipButton, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(importCustomZipButton, this, 8f)
+
+            val exportBackupBtn = DiagnosticUi.button(this, "Экспортировать резервную копию медиа (ZIP)").apply {
+                setOnClickListener { exportMediaBackupZip() }
+            }
+            radioButtonsLayout.addView(exportBackupBtn, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(exportBackupBtn, this, 8f)
+
+            val importBackupBtn = DiagnosticUi.button(this, "Импортировать резервную копию медиа (ZIP)").apply {
+                setOnClickListener { importMediaBackupZip() }
+            }
+            radioButtonsLayout.addView(importBackupBtn, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(importBackupBtn, this, 8f)
+
+            restoreDefaultCatalogButton = DiagnosticUi.outlinedButton(this, "Восстановить стандартный каталог", destructive = true).apply {
+                setOnClickListener {
+                    coordinator.radioCatalogRepository.restoreDefaultCatalog()
+                    coordinator.stateHub.refreshRadioState()
+                    Toast.makeText(this@DiagnosticActivity, "Стандартный каталог Пензы восстановлен", Toast.LENGTH_SHORT).show()
+                    render()
+                }
+            }
+            radioButtonsLayout.addView(restoreDefaultCatalogButton, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(restoreDefaultCatalogButton, this, 8f)
+
+            val previewCard = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(
+                    DiagnosticUi.dp(this@DiagnosticActivity, 12f),
+                    DiagnosticUi.dp(this@DiagnosticActivity, 12f),
+                    DiagnosticUi.dp(this@DiagnosticActivity, 12f),
+                    DiagnosticUi.dp(this@DiagnosticActivity, 12f),
+                )
+                background = DiagnosticUi.background(this@DiagnosticActivity, DiagnosticUi.NESTED, 8f)
+            }
+            radioCard.addView(previewCard, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(previewCard, this, 14f)
+
+            radioCoverThumbnailView = ImageView(this).apply {
+                val size = DiagnosticUi.dp(this@DiagnosticActivity, 56f)
+                layoutParams = LinearLayout.LayoutParams(size, size).apply {
+                    rightMargin = DiagnosticUi.dp(this@DiagnosticActivity, 12f)
+                }
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = DiagnosticUi.outlinedBackground(this@DiagnosticActivity, strokeColor = DiagnosticUi.OUTLINE)
+            }
+            previewCard.addView(radioCoverThumbnailView)
+
+            radioStationPreviewView = DiagnosticUi.text(this, "Радио не активно", 13f, DiagnosticUi.PRIMARY).apply {
+                setLineSpacing(0f, 1.15f)
+            }
+            previewCard.addView(radioStationPreviewView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         }
-        previewCard.addView(radioStationPreviewView, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
         // 4. Service Status Card
         val statusCard = DiagnosticUi.card(this)
@@ -549,8 +588,10 @@ class DiagnosticActivity : Activity() {
     }
 
     override fun onPause() {
-        commitPendingDelay()
-        commitPendingClusterGuardInterval()
+        if (!isIntegrated) {
+            commitPendingDelay()
+            commitPendingClusterGuardInterval()
+        }
         super.onPause()
     }
 
@@ -620,6 +661,47 @@ class DiagnosticActivity : Activity() {
         }
     }
 
+    private fun exportMediaBackupZip() {
+        activityScope.launch(Dispatchers.IO) {
+            val file = runCatching {
+                val exportDir = java.io.File(cacheDir, "exports").apply { mkdirs() }
+                val target = java.io.File(exportDir, "AtlasMediaApi-backup.zip")
+                target.delete()
+                java.io.FileOutputStream(target).use { fos ->
+                    coordinator.settingsController.exportMediaBackup(fos)
+                }
+                target
+            }.getOrNull()
+            withContext(Dispatchers.Main) {
+                if (file != null && file.isFile) {
+                    val uri = FileProvider.getUriForFile(
+                        this@DiagnosticActivity,
+                        "$packageName.fileprovider",
+                        file,
+                    )
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        type = "application/zip"
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(sendIntent, "Экспорт резервной копии медиа"))
+                } else {
+                    Toast.makeText(this@DiagnosticActivity, "Ошибка создания архива", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun importMediaBackupZip() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+        }
+        startActivityForResult(intent, RC_IMPORT_MEDIA_BACKUP_ZIP)
+    }
+
     private fun importCustomZip() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -643,6 +725,33 @@ class DiagnosticActivity : Activity() {
                     result.onSuccess { count ->
                         coordinator.stateHub.refreshRadioState()
                         Toast.makeText(this@DiagnosticActivity, "Успешно импортировано $count станций (каталог заменён)", Toast.LENGTH_LONG).show()
+                        render()
+                    }.onFailure { error ->
+                        Toast.makeText(this@DiagnosticActivity, "Ошибка импорта: ${error.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        } else if (requestCode == RC_IMPORT_MEDIA_BACKUP_ZIP && resultCode == RESULT_OK) {
+            val uri = data?.data ?: return
+            activityScope.launch(Dispatchers.IO) {
+                val result = runCatching {
+                    contentResolver.openInputStream(uri)?.use { stream ->
+                        val opId = java.util.UUID.randomUUID().toString()
+                        val prep = coordinator.settingsController.prepareMediaImport(opId, stream)
+                        if (prep.status != MediaBridgeContract.Status.OK) {
+                            throw IOException(prep.warnings.joinToString("; ").ifBlank { "Ошибка валидации архива (статус ${prep.status})" })
+                        }
+                        val commitResult = coordinator.settingsController.commitMediaImport(opId, prep.stagingToken)
+                        if (commitResult.status != MediaBridgeContract.Status.OK) {
+                            throw IOException("Ошибка применения архива: статус ${commitResult.status}")
+                        }
+                        prep.stationCount
+                    } ?: throw IOException("Не удалось открыть файл")
+                }
+                withContext(Dispatchers.Main) {
+                    result.onSuccess { count ->
+                        coordinator.stateHub.refreshRadioState()
+                        Toast.makeText(this@DiagnosticActivity, "Медианастройки успешно импортированы ($count станций)", Toast.LENGTH_LONG).show()
                         render()
                     }.onFailure { error ->
                         Toast.makeText(this@DiagnosticActivity, "Ошибка импорта: ${error.message}", Toast.LENGTH_LONG).show()
@@ -704,7 +813,9 @@ class DiagnosticActivity : Activity() {
         if (demoModeSwitch.isChecked != coordinator.isDemoMode()) {
             demoModeSwitch.isChecked = coordinator.isDemoMode()
         }
-        renderRadioCatalog()
+        if (!isIntegrated) {
+            renderRadioCatalog()
+        }
         reportView.text = generateDiagnosticText()
         statusView.text = generateStatusText()
     }
@@ -791,6 +902,7 @@ class DiagnosticActivity : Activity() {
     }.getOrNull()
 
     private fun updateSettingsUiState() {
+        if (isIntegrated) return
         val selectedId = coordinator.preferences.defaultAudioSource
         sourceTileButtons.forEach { (id, button) ->
             button.updateTileState(id == selectedId)

@@ -13,7 +13,7 @@
 ### [RU]
 Atlas Media Widget показывает на домашнем экране обложку, метаданные, прогресс воспроизведения, кнопки управления и переключатель источников. Состояние и команды передаются через Media Bridge `protocol v1`.
 
-- **Стандартный релиз (`integrated`)** — виджет поставляется со встроенным медиабэкендом: рантайм (`:media-runtime`) работает прямо внутри виджета в изолированном фоновом процессе `:media` как приватный сервис. Отдельный ярлык «Atlas Media API» в лаунчере открывает экран настроек и диагностики медиасервиса.
+- **Стандартный релиз (`integrated`)** — виджет поставляется со встроенным медиабэкендом: рантайм (`:media-runtime`) работает прямо внутри виджета в изолированном фоновом процессе `:media` как приватный сервис. Настройки виджета, медиасервиса, разрешений, каталога радиостанций и диагностики объединены в один экран `MainActivity` из 5 секций. Дублирующий ярлык «Atlas Media API» в лаунчере скрыт, а экран диагностики медиасервиса доступен прямо из виджета.
 - **Раздельная сборка (при необходимости)** — виджет можно собрать в виде тонкого UI-клиента (`plain`), а медиабэкенд скомпилировать и установить отдельно в виде автономного пакета `Atlas Media API` (`com.mmwtl.atlasmediaapi`) из модуля `:api-app`.
 
 > Atlas Media Widget использует `TYPE_APPLICATION_OVERLAY`, а не системный `AppWidget`. Карточка отображается только поверх HOME и не блокирует управление остальной частью экрана.
@@ -21,7 +21,7 @@ Atlas Media Widget показывает на домашнем экране об�
 ### [EN]
 Atlas Media Widget displays album artwork, track metadata, playback progress, playback controls, and an audio source switcher directly on the home screen. State and commands are exchanged via Media Bridge `protocol v1`.
 
-- **Standard release (`integrated`)** — The widget includes the built-in media backend: the runtime (`:media-runtime`) runs directly inside the widget in an isolated `:media` background process as a private service. A dedicated "Atlas Media API" launcher icon opens the media service diagnostic and settings screen.
+- **Standard release (`integrated`)** — The widget includes the built-in media backend: the runtime (`:media-runtime`) runs directly inside the widget in an isolated `:media` background process as a private service. Card appearance, media backend preferences, permissions, radio catalog, and diagnostics are unified into a 5-section `MainActivity` screen. The redundant "Atlas Media API" launcher icon is removed, and the backend diagnostic screen is launched directly from the widget.
 - **Modular build (optional)** — The widget can be built as a thin UI client (`plain`), while the media backend is built and installed separately as the standalone `Atlas Media API` package (`com.mmwtl.atlasmediaapi`) from the `:api-app` module.
 
 > Atlas Media Widget utilizes `TYPE_APPLICATION_OVERLAY` rather than a standard `AppWidget`. The card is rendered exclusively over the HOME screen without blocking touch events outside its bounds.
@@ -91,12 +91,17 @@ The settings application includes a live preview and granular controls for card 
 - Единая медиакарточка с точной настройкой ширины и высоты в пикселях;
 - Настройка типографики, отступов, прогресс-бара и панели управления;
 - Живой предпросмотр в настройках, использующий тот же `MediaCardView`, что и overlay;
-- Поддержка обложек и названий станций радио из встроенного или автономного Atlas Media API;
+- Единое окно настроек из 5 логических секций («Виджет», «Медиасервис», «Система и разрешения», «Резервная копия», «Диагностика»);
+- Управление источником звука по умолчанию, задержками автозапуска, действиями при потере источника и Online-плеером;
+- Управление трансляцией названия и обложки радио на приборную панель Geely OneOS DIM и интервалом watchdog;
+- Поддержка встроенного и пользовательского каталога радиостанций с обложками;
 - Список лайкнутых радиостанций с обложками, сеткой от 2×2 до 4×4 и прямым переключением внутри карточки;
 - Опциональная навигация кнопками назад/вперёд по всем сохранённым или только избранным станциям без поиска по эфиру;
 - Открытие активного медиаприложения или штатного экрана Radio, Bluetooth и USB по клику на карточку;
 - Отображение только поверх HOME, привязка к выбранному углу, перетаскивание и отключаемые маркеры перемещения;
-- Импорт и экспорт настроек в версионированный JSON-файл в папке «Загрузки»;
+- Единая резервная копия в ZIP (`AtlasMediaWidget-backup.zip`): настройки виджета, параметры медиасервиса и каталог радио с обложками;
+- Двухфазный защищённый импорт с персистентным журналом восстановления (`import_journal.json`) для защиты от сбоев питания;
+- Полная обратная совместимость со старыми файлами настроек JSON (схемы 1–9);
 - Foreground service, автозапуск после загрузки ГУ и восстановление соединения с медиасервисом;
 - Явное состояние недоступного сервиса вместо бессрочного показа устаревших данных.
 
@@ -108,12 +113,17 @@ The settings application includes a live preview and granular controls for card 
 - Single unified media card with pixel-accurate width and height configuration;
 - Customization of typography, paddings, progress bar, and playback controls;
 - Live preview in settings using the exact same `MediaCardView` component;
-- Radio station names and logo artwork supplied via integrated or standalone Atlas Media API;
+- Unified settings interface featuring 5 sections ("Widget", "Media Service", "System & Permissions", "Backup & Restore", "Diagnostics");
+- Configuration of startup source, startup delays, source-loss behavior, and preferred Online player;
+- OneOS DIM cluster broadcast control (radio cover and title) with adaptive watchdog interval adjustment;
+- Built-in and custom radio station catalog support with station logo art;
 - Favorite stations grid (from 2×2 up to 4×4) with station logos and direct in-card switching;
 - Optional next/previous button navigation cycling through saved presets or favorites without ether scanning;
 - Tap-to-open shortcuts for active media applications or stock Radio, Bluetooth, and USB screens;
 - Automatic visibility management (visible only on HOME), anchor corner alignment, and drag-and-drop support;
-- Configuration export and import via versioned JSON files in the Downloads folder;
+- Unified backup ZIP container (`AtlasMediaWidget-backup.zip`): widget config, media service preferences, and custom radio catalog;
+- Two-phase crash-safe import protocol with persistent journal (`import_journal.json`) protecting against power loss;
+- Full backward compatibility with legacy JSON settings files (schemas 1–9);
 - Foreground service with boot auto-start and resilient IPC reconnection with backoff;
 - Explicit disconnected/unavailable indicators instead of indefinite stale state presentation.
 
@@ -147,13 +157,15 @@ The settings application includes a live preview and granular controls for card 
 1. **Установите стандартный APK `integrated`**:
    - Он содержит виджет и встроенный медиабэкенд в одном пакете.
    - Второй APK устанавливать не требуется.
-2. Откройте **Atlas Media Widget** и в разделе «Системные разрешения» предоставьте:
+2. Откройте **Atlas Media Widget** и в разделе **«Система и разрешения»** предоставьте необходимые доступы:
    - Отображение поверх других окон;
    - Доступ к истории использования;
-   - Контроль окон (служба доступности).
-3. В разделе разрешений медиасервиса (или через ярлык «Atlas Media API» в лаунчере) выдайте доступ к уведомлениям и хранилищу.
-4. Настройте геометрию, отступы и привязку карточки на экране настроек.
-5. Нажмите кнопку **«Запустить»**.
+   - Контроль окон (служба доступности);
+   - Доступ к уведомлениям (для чтения сессий плееров);
+   - Доступ к файлам и медиа (для USB-музыки и архивов каталогов).
+3. Настройте геометрию, отступы и привязку карточки в секции **«Виджет»**.
+4. Настройте параметры автозапуска и источников в секции **«Медиасервис»**.
+5. Нажмите кнопку **«Запустить виджет»**.
 6. При необходимости включите тумблер «Автозапуск после загрузки».
 
 *(При использовании раздельной сборки `plain` сначала установите и настройте отдельный пакет `AtlasMediaApi.apk`, затем установите `plain` APK виджета).*
@@ -162,13 +174,15 @@ The settings application includes a live preview and granular controls for card 
 1. **Install the standard `integrated` APK**:
    - Contains both the overlay widget and the media backend in a single package.
    - No secondary APK is required.
-2. Launch **Atlas Media Widget** and grant required system permissions:
+2. Launch **Atlas Media Widget** and grant required permissions under the **"System & Permissions"** section:
    - Display over other apps;
    - Usage Access;
-   - Window Control (Accessibility service).
-3. Under media permissions (or via the "Atlas Media API" launcher icon), grant Notification Access and Storage access.
-4. Configure card geometry, padding, and anchor corner using the live preview.
-5. Tap **"Start"**.
+   - Window Control (Accessibility service);
+   - Notification Access (to observe third-party media players);
+   - Storage Access (for USB music and catalog archives).
+3. Configure card geometry, padding, and anchor corner in the **"Widget"** section.
+4. Configure playback behavior and sources in the **"Media Service"** section.
+5. Tap **"Start Widget"**.
 6. Enable "Launch on boot" if automatic startup is desired.
 
 *(If choosing the modular `plain` setup, install and configure `AtlasMediaApi.apk` first, then install the `plain` widget APK).*

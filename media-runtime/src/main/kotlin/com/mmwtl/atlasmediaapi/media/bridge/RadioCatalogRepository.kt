@@ -54,6 +54,8 @@ class RadioCatalogRepository(
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val customDirectory: File = File(context.filesDir, "custom_radio")
+    private val customDirectoryPrev: File = File(context.filesDir, "custom_radio_prev")
+    private val customDirectoryNext: File = File(context.filesDir, "custom_radio_next")
     private val widgetCoverDirectory: File = File(context.cacheDir, "radio_station_covers")
 
     @Volatile
@@ -84,6 +86,12 @@ class RadioCatalogRepository(
     @Synchronized
     fun reloadCatalog() {
         widgetCoverDirectory.deleteRecursively()
+        if (customDirectoryNext.exists()) {
+            customDirectoryNext.deleteRecursively()
+        }
+        if (!customDirectory.exists() && customDirectoryPrev.isDirectory) {
+            customDirectoryPrev.renameTo(customDirectory)
+        }
         val useCustom = prefs.getBoolean(KEY_CUSTOM_CATALOG_ACTIVE, false)
         if (useCustom && customDirectory.isDirectory) {
             val manifestFile = File(customDirectory, MANIFEST_NAME)
@@ -183,82 +191,240 @@ class RadioCatalogRepository(
 
     @Synchronized
     fun restoreDefaultCatalog() {
-        customDirectory.deleteRecursively()
+        if (customDirectory.exists()) {
+            customDirectoryPrev.deleteRecursively()
+            if (!customDirectory.renameTo(customDirectoryPrev)) {
+                customDirectory.deleteRecursively()
+            } else {
+                customDirectoryPrev.deleteRecursively()
+            }
+        }
         prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, false).apply()
         reloadCatalog()
     }
 
+    private fun validateCoverFile(coverFile: File, coverName: String) {
+        val safeNameRegex = Regex("^[a-zA-Z0-9._-]+$")
+        if (!safeNameRegex.matches(coverName) || coverName == "." || coverName == "..") {
+            throw IllegalArgumentException("Небезопасное имя файла обложки: $coverName")
+        }
+        val ext = coverFile.extension.lowercase()
+        if (ext !in listOf("png", "jpg", "jpeg", "webp")) {
+            throw IllegalArgumentException("Неподдерживаемый формат обложки: $coverName ($ext)")
+        }
+        if (!coverFile.isFile || coverFile.length() <= 0L) {
+            throw IllegalArgumentException("Файл обложки отсутствует или пуст: $coverName")
+        }
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        coverFile.inputStream().buffered().use { fis ->
+            android.graphics.BitmapFactory.decodeStream(fis, null, bounds)
+        }
+        val width = bounds.outWidth
+        val height = bounds.outHeight
+        val mime = bounds.outMimeType?.lowercase().orEmpty()
+        if (width in 32..4096 && height in 32..4096) {
+            if (mime.isNotEmpty() && mime !in listOf("image/png", "image/jpeg", "image/webp")) {
+                throw IllegalArgumentException("Недопустимый MIME-тип обложки $coverName: $mime")
+            }
+            return
+        }
+        throw IllegalArgumentException("Недопустимый размер обложки $coverName: ${width}x${height} (требуется от 32 до 4096 px)")
+    }
+
     @Synchronized
     fun importCustomZip(inputStream: InputStream): Result<Int> = runCatching {
-        val tempStagingDir = File(context.cacheDir, "staging_radio_${System.currentTimeMillis()}")
+        val tempStagingDir = File(context.filesDir, "staging_radio_${System.currentTimeMillis()}")
         tempStagingDir.deleteRecursively()
         tempStagingDir.mkdirs()
+        try {
+            var totalExtractedBytes = 0L
+            var totalEntries = 0
+            val stagingCanonical = tempStagingDir.canonicalPath
 
-        var totalExtractedBytes = 0L
-        var totalEntries = 0
+            ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
+                var entry: ZipEntry? = zis.nextEntry
+                while (entry != null) {
+                    totalEntries++
+                    if (totalEntries > MAX_ZIP_ENTRIES) {
+                        throw IllegalStateException("Превышено максимальное количество файлов в архиве ($MAX_ZIP_ENTRIES)")
+                    }
 
-        ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
-            var entry: ZipEntry? = zis.nextEntry
-            while (entry != null) {
-                totalEntries++
-                if (totalEntries > MAX_ZIP_ENTRIES) {
-                    throw IllegalStateException("Превышено максимальное количество файлов в архиве ($MAX_ZIP_ENTRIES)")
-                }
+                    val normalizedName = entry.name.replace('\\', '/').trimStart('/')
+                    val targetFile = File(tempStagingDir, normalizedName)
+                    val targetCanonical = targetFile.canonicalPath
+                    val isSafe = targetCanonical == stagingCanonical ||
+                            targetCanonical.startsWith(stagingCanonical + File.separator)
+                    if (!isSafe) {
+                        throw SecurityException("Небезопасный путь в ZIP архиве: ${entry.name}")
+                    }
 
-                val normalizedName = entry.name.replace('\\', '/').trimStart('/')
-                val targetFile = File(tempStagingDir, normalizedName)
-                if (!targetFile.canonicalPath.startsWith(tempStagingDir.canonicalPath)) {
-                    throw SecurityException("Небезопасный путь в ZIP архиве: ${entry.name}")
-                }
-
-                if (entry.isDirectory) {
-                    targetFile.mkdirs()
-                } else {
-                    targetFile.parentFile?.mkdirs()
-                    FileOutputStream(targetFile).use { fos ->
-                        val buffer = ByteArray(8192)
-                        var read: Int
-                        while (zis.read(buffer).also { read = it } != -1) {
-                            totalExtractedBytes += read
-                            if (totalExtractedBytes > MAX_ZIP_UNCOMPRESSED_BYTES) {
-                                throw IllegalStateException("Превышен допустимый размер распакованного архива (64 МБ)")
+                    if (entry.isDirectory) {
+                        targetFile.mkdirs()
+                    } else {
+                        targetFile.parentFile?.mkdirs()
+                        FileOutputStream(targetFile).use { fos ->
+                            val buffer = ByteArray(8192)
+                            var read: Int
+                            while (zis.read(buffer).also { read = it } != -1) {
+                                totalExtractedBytes += read
+                                if (totalExtractedBytes > MAX_ZIP_UNCOMPRESSED_BYTES) {
+                                    throw IllegalStateException("Превышен допустимый размер распакованного архива (64 МБ)")
+                                }
+                                fos.write(buffer, 0, read)
                             }
-                            fos.write(buffer, 0, read)
                         }
                     }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
                 }
-                zis.closeEntry()
-                entry = zis.nextEntry
             }
-        }
 
-        val manifestFile = File(tempStagingDir, MANIFEST_NAME)
-        if (!manifestFile.isFile) {
+            val manifestFile = File(tempStagingDir, MANIFEST_NAME)
+            if (!manifestFile.isFile) {
+                throw IllegalArgumentException("В корне архива отсутствует файл $MANIFEST_NAME")
+            }
+
+            val parsedStations = InputStreamReader(FileInputStream(manifestFile), StandardCharsets.UTF_8).use {
+                RadioCatalogCsv.read(it)
+            }
+
+            if (parsedStations.isEmpty()) {
+                throw IllegalArgumentException("Каталог не содержит валидных радиостанций")
+            }
+
+            val coversDir = File(tempStagingDir, COVERS_DIR)
+            for (station in parsedStations) {
+                val coverName = station.coverFileName
+                if (coverName.isNotBlank()) {
+                    val coverFile = File(coversDir, coverName)
+                    val safeCoverPath = runCatching {
+                        val canonical = coverFile.canonicalPath
+                        canonical == coversDir.canonicalPath || canonical.startsWith(coversDir.canonicalPath + File.separator)
+                    }.getOrDefault(false)
+                    if (!safeCoverPath) {
+                        throw SecurityException("Небезопасный путь к обложке: $coverName")
+                    }
+                    validateCoverFile(coverFile, coverName)
+                }
+            }
+
+            // Recoverable swap
+            customDirectoryNext.deleteRecursively()
+            if (!tempStagingDir.renameTo(customDirectoryNext)) {
+                customDirectoryNext.mkdirs()
+                tempStagingDir.copyRecursively(customDirectoryNext, overwrite = true)
+                tempStagingDir.deleteRecursively()
+            }
+            if (customDirectory.exists()) {
+                customDirectoryPrev.deleteRecursively()
+                if (!customDirectory.renameTo(customDirectoryPrev)) {
+                    customDirectory.copyRecursively(customDirectoryPrev, overwrite = true)
+                    customDirectory.deleteRecursively()
+                }
+            }
+            if (!customDirectoryNext.renameTo(customDirectory)) {
+                customDirectory.mkdirs()
+                customDirectoryNext.copyRecursively(customDirectory, overwrite = true)
+                customDirectoryNext.deleteRecursively()
+            }
+            customDirectoryPrev.deleteRecursively()
+
+            prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, true).apply()
+            reloadCatalog()
+            parsedStations.size
+        } finally {
             tempStagingDir.deleteRecursively()
-            throw IllegalArgumentException("В корне архива отсутствует файл $MANIFEST_NAME")
         }
+    }
 
+    /** Imports verified radio catalog files directly from a directory (used by full backup). */
+    @Synchronized
+    fun importFromDirectory(sourceDir: File): Result<Int> = runCatching {
+        val manifestFile = File(sourceDir, MANIFEST_NAME)
+        if (!manifestFile.isFile) {
+            throw IllegalArgumentException("В каталоге отсутствует $MANIFEST_NAME")
+        }
         val parsedStations = InputStreamReader(FileInputStream(manifestFile), StandardCharsets.UTF_8).use {
             RadioCatalogCsv.read(it)
         }
-
         if (parsedStations.isEmpty()) {
-            tempStagingDir.deleteRecursively()
             throw IllegalArgumentException("Каталог не содержит валидных радиостанций")
         }
-
-        // Atomically swap custom directory
-        customDirectory.deleteRecursively()
-        if (!tempStagingDir.renameTo(customDirectory)) {
-            // Fallback to copy if cross-device rename fails
-            customDirectory.mkdirs()
-            tempStagingDir.copyRecursively(customDirectory, overwrite = true)
-            tempStagingDir.deleteRecursively()
+        val coversDir = File(sourceDir, COVERS_DIR)
+        for (station in parsedStations) {
+            val coverName = station.coverFileName
+            if (coverName.isNotBlank()) {
+                val coverFile = File(coversDir, coverName)
+                validateCoverFile(coverFile, coverName)
+            }
         }
+
+        customDirectoryNext.deleteRecursively()
+        customDirectoryNext.mkdirs()
+        sourceDir.copyRecursively(customDirectoryNext, overwrite = true)
+
+        if (customDirectory.exists()) {
+            customDirectoryPrev.deleteRecursively()
+            if (!customDirectory.renameTo(customDirectoryPrev)) {
+                customDirectory.copyRecursively(customDirectoryPrev, overwrite = true)
+                customDirectory.deleteRecursively()
+            }
+        }
+        if (!customDirectoryNext.renameTo(customDirectory)) {
+            customDirectory.mkdirs()
+            customDirectoryNext.copyRecursively(customDirectory, overwrite = true)
+            customDirectoryNext.deleteRecursively()
+        }
+        customDirectoryPrev.deleteRecursively()
 
         prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, true).apply()
         reloadCatalog()
         parsedStations.size
+    }
+
+    fun exportCatalogZip(outputStream: OutputStream) {
+        if (currentType == RadioCatalogType.CUSTOM && customDirectory.isDirectory) {
+            ZipOutputStream(BufferedOutputStream(outputStream)).use { zos ->
+                val manifestFile = File(customDirectory, MANIFEST_NAME)
+                if (manifestFile.isFile) {
+                    zos.putNextEntry(ZipEntry(MANIFEST_NAME))
+                    manifestFile.inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+                val coversDir = File(customDirectory, COVERS_DIR)
+                if (coversDir.isDirectory) {
+                    coversDir.listFiles()?.forEach { file ->
+                        if (file.isFile && file.length() > 0) {
+                            zos.putNextEntry(ZipEntry("$COVERS_DIR/${file.name}"))
+                            file.inputStream().use { it.copyTo(zos) }
+                            zos.closeEntry()
+                        }
+                    }
+                }
+            }
+        } else {
+            exportSampleZip(outputStream)
+        }
+    }
+
+    fun writeRadioSectionToZip(zos: ZipOutputStream, prefix: String = "radio/") {
+        if (currentType != RadioCatalogType.CUSTOM || !customDirectory.isDirectory) return
+        val manifestFile = File(customDirectory, MANIFEST_NAME)
+        if (manifestFile.isFile) {
+            zos.putNextEntry(ZipEntry("$prefix$MANIFEST_NAME"))
+            manifestFile.inputStream().use { it.copyTo(zos) }
+            zos.closeEntry()
+        }
+        val coversDir = File(customDirectory, COVERS_DIR)
+        if (coversDir.isDirectory) {
+            coversDir.listFiles()?.forEach { file ->
+                if (file.isFile && file.length() > 0) {
+                    zos.putNextEntry(ZipEntry("$prefix$COVERS_DIR/${file.name}"))
+                    file.inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+            }
+        }
     }
 
     fun exportSampleZip(outputStream: OutputStream) {

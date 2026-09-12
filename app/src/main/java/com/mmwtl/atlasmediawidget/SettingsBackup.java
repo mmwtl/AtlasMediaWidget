@@ -216,9 +216,13 @@ final class SettingsBackup {
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false));
     }
 
+    static String encode(Context context, Prefs prefs) throws IOException {
+        return encode(capture(prefs), appVersion(context));
+    }
+
     static void write(Context context, Prefs prefs, Uri uri) throws IOException {
         if (uri == null) throw invalid("Файл не выбран");
-        byte[] contents = encode(capture(prefs), appVersion(context))
+        byte[] contents = encode(context, prefs)
                 .getBytes(StandardCharsets.UTF_8);
         try (OutputStream output = context.getContentResolver().openOutputStream(uri, "wt")) {
             if (output == null) throw invalid("Не удалось открыть файл для записи");

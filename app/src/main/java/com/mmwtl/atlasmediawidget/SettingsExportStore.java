@@ -47,4 +47,39 @@ final class SettingsExportStore {
             throw new IOException("Не удалось сохранить файл в «Загрузки»", error);
         }
     }
+
+    static Result exportZip(Context context, java.io.File zipSource) throws IOException {
+        ContentResolver resolver = context.getContentResolver();
+        ContentValues pending = new ContentValues();
+        pending.put(MediaStore.MediaColumns.DISPLAY_NAME, FullSettingsBackup.ZIP_FILE_NAME);
+        pending.put(MediaStore.MediaColumns.MIME_TYPE, "application/zip");
+        pending.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+        pending.put(MediaStore.MediaColumns.IS_PENDING, 1);
+
+        Uri uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, pending);
+        if (uri == null) throw new IOException("Хранилище «Загрузки» недоступно");
+        try {
+            try (java.io.InputStream in = new java.io.FileInputStream(zipSource);
+                 java.io.OutputStream out = resolver.openOutputStream(uri, "wt")) {
+                if (out == null) throw new IOException("Не удалось открыть целевой файл в «Загрузках»");
+                byte[] buf = new byte[8192];
+                int len;
+                while ((len = in.read(buf)) != -1) {
+                    out.write(buf, 0, len);
+                }
+                out.flush();
+            }
+            ContentValues published = new ContentValues();
+            published.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            if (resolver.update(uri, published, null, null) != 1) {
+                throw new IOException("Не удалось опубликовать файл в «Загрузках»");
+            }
+            return new Result(uri,
+                    Environment.DIRECTORY_DOWNLOADS + "/" + FullSettingsBackup.ZIP_FILE_NAME);
+        } catch (Exception error) {
+            resolver.delete(uri, null, null);
+            if (error instanceof IOException ioError) throw ioError;
+            throw new IOException("Не удалось сохранить файл в «Загрузки»", error);
+        }
+    }
 }

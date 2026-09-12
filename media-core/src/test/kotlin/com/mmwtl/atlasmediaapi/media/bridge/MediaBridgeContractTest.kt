@@ -4,7 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 
+@RunWith(RobolectricTestRunner::class)
 class MediaBridgeContractTest {
     @Test
     fun `only the advertised protocol version is accepted`() {
@@ -38,7 +41,52 @@ class MediaBridgeContractTest {
         assertEquals(102, MediaBridgeContract.ServerMessage.COMMAND_RESULT)
         assertEquals(103, MediaBridgeContract.ServerMessage.ERROR)
         assertEquals(104, MediaBridgeContract.ServerMessage.RADIO_STATIONS)
+        assertEquals(6, MediaBridgeContract.ClientMessage.GET_SETTINGS)
+        assertEquals(7, MediaBridgeContract.ClientMessage.UPDATE_SETTINGS)
+        assertEquals(8, MediaBridgeContract.ClientMessage.EXPORT_MEDIA_BACKUP)
+        assertEquals(9, MediaBridgeContract.ClientMessage.PREPARE_MEDIA_IMPORT)
+        assertEquals(10, MediaBridgeContract.ClientMessage.COMMIT_MEDIA_IMPORT)
+        assertEquals(11, MediaBridgeContract.ClientMessage.GET_IMPORT_STATUS)
+        assertEquals(12, MediaBridgeContract.ClientMessage.ABORT_MEDIA_IMPORT)
+        assertEquals(13, MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG)
+        assertEquals(105, MediaBridgeContract.ServerMessage.SETTINGS)
+        assertEquals(106, MediaBridgeContract.ServerMessage.SETTINGS_UPDATED)
+        assertEquals(107, MediaBridgeContract.ServerMessage.MEDIA_BACKUP_EXPORTED)
+        assertEquals(108, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_PREPARED)
+        assertEquals(109, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_COMMITTED)
+        assertEquals(110, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_STATUS)
+        assertEquals(111, MediaBridgeContract.ServerMessage.MEDIA_IMPORT_ABORTED)
+        assertEquals(112, MediaBridgeContract.ServerMessage.DEFAULT_CATALOG_RESTORED)
+        assertEquals(9, MediaBridgeContract.Status.VALIDATION_ERROR)
+        assertEquals(10, MediaBridgeContract.Status.CONFLICT)
+        assertEquals(11, MediaBridgeContract.Status.IO_ERROR)
         assertEquals("uiScaleTenths", MediaBridgeContract.Key.UI_SCALE_TENTHS)
+        assertEquals("settingsRevision", MediaBridgeContract.Key.SETTINGS_REVISION)
+        assertEquals("defaultAudioSource", MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE)
+    }
+
+    @Test
+    fun `media settings snapshot bundle round trip preserves all fields`() {
+        val snapshot = MediaSettingsSnapshot(
+            revision = 42L,
+            defaultAudioSource = "RADIO",
+            defaultAudioSourceDelaySec = 5,
+            defaultAudioSourceAutoplayOnStartup = false,
+            autoSwitchToDefaultOnSourceLost = true,
+            autoSwitchToDefaultAutoplayOnSourceLost = false,
+            defaultMediaPackage = "ru.yandex.music",
+            switchToOnlineBeforeSessionPlay = true,
+            radioWidgetBroadcastEnabled = false,
+            clusterCoversEnabled = false,
+            clusterWatchdogIntervalMs = 2500L,
+            catalogType = "CUSTOM",
+            catalogStationCount = 10,
+            catalogDescription = "Custom Catalog",
+            uiScaleTenths = 18,
+        )
+        val bundle = snapshot.toBundle()
+        val restored = bundle.toMediaSettingsSnapshot()
+        assertEquals(snapshot, restored)
     }
 
     @Test

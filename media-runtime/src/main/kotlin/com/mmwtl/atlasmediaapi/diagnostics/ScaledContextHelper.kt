@@ -17,45 +17,14 @@ object ScaledContextHelper {
     const val MAX_SCALE_TENTHS = AtlasPreferences.MAX_UI_SCALE_TENTHS
     const val DEFAULT_SCALE_TENTHS = AtlasPreferences.DEFAULT_UI_SCALE_TENTHS
 
-    private const val WIDGET_PREFS_NAME = "atlas_media_widget"
-    private const val KEY_WIDGET_SCALE = "app_ui_scale_tenths"
-
     /**
      * Разрешает текущий масштаб в десятых долях (10..20, дефолт 15 = 1.5×).
-     * Приоритеты:
-     * 1. Настройки виджета (Device-protected или Credential storage)
-     * 2. Настройки медиасервиса (AtlasPreferences)
-     * 3. Значение по умолчанию (15 = 1.5×)
+     * Значение читается из настроек медиасервиса (AtlasPreferences), синхронизируемых через IPC / Intent.
      *
      * Resolves the current scale in tenths (10..20, default 15 = 1.5×).
-     * Priority:
-     * 1. Widget preferences (Device-protected or Credential storage)
-     * 2. Media API preferences (AtlasPreferences)
-     * 3. Default scale (15 = 1.5×)
+     * Value is read from media service preferences (AtlasPreferences), synchronized via IPC / Intent.
      */
     fun resolveScaleTenths(context: Context): Int {
-        // 1. Проверяем настройки виджета (для integrated сборки и прямого доступа)
-        try {
-            val deviceContext = try {
-                context.createDeviceProtectedStorageContext()
-            } catch (_: Throwable) {
-                context
-            }
-            val widgetPrefs = deviceContext.getSharedPreferences(WIDGET_PREFS_NAME, Context.MODE_PRIVATE)
-            if (widgetPrefs.contains(KEY_WIDGET_SCALE)) {
-                val scale = widgetPrefs.getInt(KEY_WIDGET_SCALE, DEFAULT_SCALE_TENTHS)
-                if (scale in MIN_SCALE_TENTHS..MAX_SCALE_TENTHS) return scale
-            }
-            val credPrefs = context.getSharedPreferences(WIDGET_PREFS_NAME, Context.MODE_PRIVATE)
-            if (credPrefs.contains(KEY_WIDGET_SCALE)) {
-                val scale = credPrefs.getInt(KEY_WIDGET_SCALE, DEFAULT_SCALE_TENTHS)
-                if (scale in MIN_SCALE_TENTHS..MAX_SCALE_TENTHS) return scale
-            }
-        } catch (_: Throwable) {
-            // Игнорируем ошибки доступа к SharedPreferences другого процесса/хранилища
-        }
-
-        // 2. Проверяем настройки самого API (синхронизируются через IPC / Intent)
         try {
             val apiPrefs = AtlasPreferences(context)
             val scale = apiPrefs.uiScaleTenths

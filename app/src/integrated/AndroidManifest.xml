@@ -10,4 +10,15 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <application>
+        <activity
+            android:name="com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity"
+            android:taskAffinity=""
+            tools:replace="android:taskAffinity" />
+
+        <activity-alias
+            android:name="com.mmwtl.atlasmediaapi.diagnostics.MediaApiLauncher"
+            tools:node="remove" />
+    </application>
+
 </manifest>

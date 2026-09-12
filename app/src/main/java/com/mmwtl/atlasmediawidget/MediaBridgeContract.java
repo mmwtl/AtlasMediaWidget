@@ -11,11 +11,28 @@ final class MediaBridgeContract {
     static final int GET_SNAPSHOT = 3;
     static final int COMMAND = 4;
     static final int GET_RADIO_STATIONS = 5;
+    static final int GET_SETTINGS = 6;
+    static final int UPDATE_SETTINGS = 7;
+    static final int EXPORT_MEDIA_BACKUP = 8;
+    static final int PREPARE_MEDIA_IMPORT = 9;
+    static final int COMMIT_MEDIA_IMPORT = 10;
+    static final int GET_IMPORT_STATUS = 11;
+    static final int ABORT_MEDIA_IMPORT = 12;
+    static final int RESTORE_DEFAULT_CATALOG = 13;
+
     static final int REGISTERED = 100;
     static final int SNAPSHOT = 101;
     static final int COMMAND_RESULT = 102;
     static final int ERROR = 103;
     static final int RADIO_STATIONS = 104;
+    static final int SETTINGS = 105;
+    static final int SETTINGS_UPDATED = 106;
+    static final int MEDIA_BACKUP_EXPORTED = 107;
+    static final int MEDIA_IMPORT_PREPARED = 108;
+    static final int MEDIA_IMPORT_COMMITTED = 109;
+    static final int MEDIA_IMPORT_STATUS = 110;
+    static final int MEDIA_IMPORT_ABORTED = 111;
+    static final int DEFAULT_CATALOG_RESTORED = 112;
 
     static final long CAP_PLAY = 0x01L;
     static final long CAP_PAUSE = 0x02L;
@@ -27,7 +44,17 @@ final class MediaBridgeContract {
     static final long CAP_TUNE_RADIO = 0x80L;
 
     static final int STATUS_OK = 0;
+    static final int STATUS_INVALID_REQUEST = 1;
     static final int STATUS_UNSUPPORTED_VERSION = 2;
+    static final int STATUS_UNAUTHORIZED = 3;
+    static final int STATUS_UNKNOWN_COMMAND = 4;
+    static final int STATUS_BACKEND_UNAVAILABLE = 5;
+    static final int STATUS_NOT_SUPPORTED = 6;
+    static final int STATUS_FAILED = 7;
+    static final int STATUS_NOT_REGISTERED = 8;
+    static final int STATUS_VALIDATION_ERROR = 9;
+    static final int STATUS_CONFLICT = 10;
+    static final int STATUS_IO_ERROR = 11;
 
     static final String K_VERSION = "protocolVersion";
     static final String K_MIN_VERSION = "minProtocolVersion";
@@ -87,6 +114,29 @@ final class MediaBridgeContract {
     static final String K_COMMAND_APP_SOURCE = "appSource";
     static final String K_COMMAND_AUTOPLAY = "autoplay";
     static final String K_UI_SCALE_TENTHS = "uiScaleTenths";
+
+    static final String K_SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion";
+    static final String K_SETTINGS_REVISION = "settingsRevision";
+    static final String K_EXPECTED_REVISION = "expectedRevision";
+    static final String K_OPERATION_ID = "operationId";
+    static final String K_STAGING_TOKEN = "stagingToken";
+    static final String K_IMPORT_STATUS = "importStatus";
+    static final String K_FILE_DESCRIPTOR = "fileDescriptor";
+    static final String K_IMPORT_PREVIEW = "importPreview";
+
+    static final String K_DEFAULT_AUDIO_SOURCE = "defaultAudioSource";
+    static final String K_DEFAULT_AUDIO_SOURCE_DELAY_SEC = "defaultAudioSourceDelaySec";
+    static final String K_DEFAULT_AUDIO_SOURCE_AUTOPLAY = "defaultAudioSourceAutoplay";
+    static final String K_AUTO_SWITCH_TO_DEFAULT = "autoSwitchToDefault";
+    static final String K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay";
+    static final String K_DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage";
+    static final String K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switchToOnlineBeforeSessionPlay";
+    static final String K_RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled";
+    static final String K_CLUSTER_COVERS_ENABLED = "clusterCoversEnabled";
+    static final String K_CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs";
+    static final String K_CATALOG_TYPE = "catalogType";
+    static final String K_CATALOG_STATION_COUNT = "catalogStationCount";
+    static final String K_CATALOG_DESCRIPTION = "catalogDescription";
 
     private MediaBridgeContract() {}
 }

@@ -34,22 +34,7 @@ class ScaledContextHelperTest {
     }
 
     @Test
-    fun `resolveScaleTenths prefers widget preference when available`() {
-        context.getSharedPreferences("atlas_media_widget", Context.MODE_PRIVATE)
-            .edit()
-            .putInt("app_ui_scale_tenths", 17)
-            .commit()
-
-        context.getSharedPreferences("atlas_media_api_settings", Context.MODE_PRIVATE)
-            .edit()
-            .putInt("ui_scale_tenths", 12)
-            .commit()
-
-        assertEquals(17, ScaledContextHelper.resolveScaleTenths(context))
-    }
-
-    @Test
-    fun `resolveScaleTenths uses API preference when widget preference is absent`() {
+    fun `resolveScaleTenths uses API preference when available`() {
         context.getSharedPreferences("atlas_media_api_settings", Context.MODE_PRIVATE)
             .edit()
             .putInt("ui_scale_tenths", 13)
