@@ -85,7 +85,6 @@ public final class MainActivity extends ScaledActivity {
     private Button accessibilityAccessButton;
     private Button notificationAccessButton;
     private Button storageAccessButton;
-    private TextView bridgeStatus;
     private Button openBridgeButton;
     private Button installBridgeButton;
     private Button serviceButton;
@@ -205,14 +204,14 @@ public final class MainActivity extends ScaledActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (EmbeddedApiInstaller.ACTION_INSTALL_RESULT.equals(intent.getAction())
-                && bridgeStatus != null) {
+                && !BuildConfig.INTEGRATED_MEDIA_API) {
             refreshBridgeStatus();
         }
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && bridgeStatus != null) refreshBridgeStatus();
+        if (hasFocus && openBridgeButton != null) refreshBridgeStatus();
     }
 
     @Override protected void onDestroy() {
@@ -890,23 +889,10 @@ public final class MainActivity extends ScaledActivity {
 
     private void refreshBridgeStatus() {
         if (BuildConfig.INTEGRATED_MEDIA_API) {
-            bridgeStatus.setText("Медиасервис встроен в Atlas Media Widget.");
-            bridgeStatus.setTextColor(Ui.ACCENT);
-            openBridgeButton.setText("Настройки медиасервиса");
-            openBridgeButton.setVisibility(View.VISIBLE);
-            installBridgeButton.setVisibility(View.GONE);
             return;
         }
         boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
         boolean embeddedApiAvailable = EmbeddedApiInstaller.isAvailable(this);
-        if (bridgeInstalled) {
-            bridgeStatus.setText("Пакет com.mmwtl.atlasmediaapi установлен.");
-        } else if (embeddedApiAvailable) {
-            bridgeStatus.setText("Atlas Media API не установлен. Его можно установить из этой сборки.");
-        } else {
-            bridgeStatus.setText("Пакет com.mmwtl.atlasmediaapi не найден, установщик не встроен.");
-        }
-        bridgeStatus.setTextColor(bridgeInstalled ? Ui.ACCENT : Ui.ERROR);
         openBridgeButton.setText("Открыть Atlas Media API");
         openBridgeButton.setVisibility(bridgeInstalled ? View.VISIBLE : View.GONE);
         installBridgeButton.setVisibility(embeddedApiAvailable ? View.VISIBLE : View.GONE);
