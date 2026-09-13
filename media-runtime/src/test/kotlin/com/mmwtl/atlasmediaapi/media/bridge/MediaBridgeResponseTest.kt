@@ -33,7 +33,9 @@ class MediaBridgeResponseTest {
             MediaBridgeContract.ServerMessage.MEDIA_IMPORT_COMMITTED,
             MediaBridgeContract.ServerMessage.MEDIA_IMPORT_STATUS,
             MediaBridgeContract.ServerMessage.MEDIA_IMPORT_ABORTED,
-            MediaBridgeContract.ServerMessage.DEFAULT_CATALOG_RESTORED
+            MediaBridgeContract.ServerMessage.DEFAULT_CATALOG_RESTORED,
+            MediaBridgeContract.ServerMessage.RADIO_CATALOG_EXPORTED,
+            MediaBridgeContract.ServerMessage.RADIO_CATALOG_IMPORTED,
         )
         responses.forEach { what ->
             val payload = Bundle().apply {

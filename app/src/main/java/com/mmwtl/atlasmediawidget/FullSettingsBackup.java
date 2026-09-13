@@ -321,7 +321,6 @@ final class FullSettingsBackup {
 
         byte[] mediaBytes = null;
         File extractedMediaDir = null;
-        boolean isCustomCatalog = false;
 
         if (mediaPartZip != null && mediaPartZip.isFile()) {
             extractedMediaDir = new File(exportDir, "extracted_media_" + System.currentTimeMillis());
@@ -330,20 +329,18 @@ final class FullSettingsBackup {
             File mediaFile = new File(extractedMediaDir, "media.json");
             if (mediaFile.isFile()) {
                 sections.put("media");
-                mediaBytes = readFileToBytes(mediaFile);
+                try {
+                    JSONObject mediaSettings = new JSONObject(readFileToString(mediaFile));
+                    mediaSettings.remove("catalogMode");
+                    mediaBytes = mediaSettings.toString(2).getBytes(StandardCharsets.UTF_8);
+                } catch (JSONException error) {
+                    throw new IOException("Повреждённый media.json", error);
+                }
                 try {
                     hashes.put("media.json", computeBytesSha256(mediaBytes));
                 } catch (JSONException ignored) {}
             }
-            File radioDir = new File(extractedMediaDir, "radio");
-            File stationsCsv = new File(radioDir, "stations.csv");
-            if (stationsCsv.isFile()) {
-                isCustomCatalog = true;
-                sections.put("radio");
-                try {
-                    addDirectoryHashes(hashes, radioDir, "radio/");
-                } catch (JSONException ignored) {}
-            }
+
         }
 
         JSONObject manifest = new JSONObject();
@@ -378,11 +375,7 @@ final class FullSettingsBackup {
                 zos.closeEntry();
             }
 
-            // 4. radio/
-            if (isCustomCatalog && extractedMediaDir != null) {
-                File radioDir = new File(extractedMediaDir, "radio");
-                addDirectoryToZip(zos, radioDir, "radio/");
-            }
+
         } finally {
             if (extractedMediaDir != null) {
                 deleteRecursively(extractedMediaDir);
@@ -390,35 +383,6 @@ final class FullSettingsBackup {
         }
 
         return zipFile;
-    }
-
-    private static void addDirectoryHashes(JSONObject hashes, File dir, String prefix) throws IOException, JSONException {
-        File[] files = dir.listFiles();
-        if (files == null) return;
-        for (File file : files) {
-            if (file.isDirectory()) addDirectoryHashes(hashes, file, prefix + file.getName() + "/");
-            else if (file.isFile()) hashes.put(prefix + file.getName(), computeFileSha256(file));
-        }
-    }
-
-    private static void addDirectoryToZip(ZipOutputStream zos, File dir, String prefix) throws IOException {
-        File[] files = dir.listFiles();
-        if (files == null) return;
-        for (File file : files) {
-            if (file.isDirectory()) {
-                addDirectoryToZip(zos, file, prefix + file.getName() + "/");
-            } else if (file.isFile()) {
-                zos.putNextEntry(new ZipEntry(prefix + file.getName()));
-                try (InputStream in = new FileInputStream(file)) {
-                    byte[] buf = new byte[8192];
-                    int len;
-                    while ((len = in.read(buf)) != -1) {
-                        zos.write(buf, 0, len);
-                    }
-                }
-                zos.closeEntry();
-            }
-        }
     }
 
     private static void unpackZip(File zipFile, File targetDir) throws IOException {

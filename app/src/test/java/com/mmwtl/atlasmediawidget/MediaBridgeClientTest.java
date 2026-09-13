@@ -7,6 +7,8 @@ import static org.junit.Assert.assertTrue;
 import android.content.Context;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
+import android.os.Bundle;
+import android.os.Message;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -107,6 +109,40 @@ public final class MediaBridgeClientTest {
         assertEquals(1, errors.get());
         assertTrue(pendingCallbacks(client).isEmpty());
         assertTrue(file.delete());
+    }
+
+    @Test
+    public void radioCatalogExportResponseCompletesCallbackWithStationCount() throws Exception {
+        MediaBridgeClient client = newClient();
+        AtomicInteger count = new AtomicInteger(-1);
+        MediaBridgeClient.RadioCatalogExportCallback callback =
+                new MediaBridgeClient.RadioCatalogExportCallback() {
+                    @Override public void onCatalogExported(int stationCount) {
+                        count.set(stationCount);
+                    }
+
+                    @Override public void onError(int status, String message) {
+                        count.set(-2);
+                    }
+                };
+        Method addPending = MediaBridgeClient.class.getDeclaredMethod(
+                "addPendingCallback", String.class, Object.class);
+        addPending.setAccessible(true);
+        addPending.invoke(client, "radio-export-test", callback);
+
+        Message response = Message.obtain(null, MediaBridgeContract.RADIO_CATALOG_EXPORTED);
+        Bundle data = new Bundle();
+        data.putInt(MediaBridgeContract.K_VERSION, MediaBridgeContract.VERSION);
+        data.putString(MediaBridgeContract.K_REQUEST_ID, "radio-export-test");
+        data.putInt(MediaBridgeContract.K_STATUS, MediaBridgeContract.STATUS_OK);
+        data.putInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, 7);
+        response.setData(data);
+        Method incoming = MediaBridgeClient.class.getDeclaredMethod("handleIncoming", Message.class);
+        incoming.setAccessible(true);
+        incoming.invoke(client, response);
+        ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+
+        assertEquals(7, count.get());
     }
 
     private static MediaBridgeClient newClient() {

@@ -5,6 +5,7 @@ import android.os.Bundle
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
 import com.mmwtl.atlasmediaapi.media.cluster.ClusterMediaBridge
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -38,8 +39,12 @@ class MediaSettingsControllerTest {
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
         context.getSharedPreferences("atlas_media_api_settings", Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences("radio_catalog_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("cluster_dim_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("media_settings_meta", Context.MODE_PRIVATE).edit().clear().commit()
+        listOf("custom_radio", "custom_radio_prev", "custom_radio_next").forEach {
+            java.io.File(context.filesDir, it).deleteRecursively()
+        }
 
         preferences = AtlasPreferences(context)
         radioCatalogRepository = RadioCatalogRepository(context)
@@ -157,6 +162,125 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("defaultAudioSource"))
         assertTrue(json.has("radioWidgetBroadcastEnabled"))
         assertTrue(json.has("clusterCoversEnabled"))
+    }
+
+    @Test
+    fun `settings export excludes the active custom radio catalog`() {
+        assertEquals(1, radioCatalogRepository.importCustomZip(ByteArrayInputStream(radioZip("90000,Custom,FM,\n"))).getOrThrow())
+
+        val output = ByteArrayOutputStream()
+        controller.exportMediaBackup(output)
+        val names = mutableListOf<String>()
+        var mediaJson: JSONObject? = null
+        ZipInputStream(ByteArrayInputStream(output.toByteArray())).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                names += entry.name
+                if (entry.name == "media.json") mediaJson = JSONObject(String(zip.readBytes(), StandardCharsets.UTF_8))
+                entry = zip.nextEntry
+            }
+        }
+
+        assertEquals(listOf("manifest.json", "media.json"), names)
+        assertNotNull(mediaJson)
+        assertFalse(mediaJson!!.has("catalogMode"))
+    }
+
+    @Test
+    fun `radio export contains the active custom catalog`() {
+        assertEquals(1, radioCatalogRepository.importCustomZip(ByteArrayInputStream(radioZip("90000,Custom,FM,\n"))).getOrThrow())
+
+        val output = ByteArrayOutputStream()
+        radioCatalogRepository.exportCatalogZip(output)
+        var stationsCsv = ""
+        ZipInputStream(ByteArrayInputStream(output.toByteArray())).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (entry.name == "stations.csv") stationsCsv = String(zip.readBytes(), StandardCharsets.UTF_8)
+                entry = zip.nextEntry
+            }
+        }
+
+        assertTrue(stationsCsv.contains("90000,Custom,FM,"))
+    }
+
+    @Test
+    fun `legacy full settings import validates radio but preserves active catalog`() {
+        assertEquals(1, radioCatalogRepository.importCustomZip(ByteArrayInputStream(radioZip("90000,Active,FM,\n"))).getOrThrow())
+        val before = controller.getSnapshot()
+
+        val operation = UUID.randomUUID().toString()
+        val prepared = controller.prepareMediaImport(
+            operation,
+            ByteArrayInputStream(mediaArchiveWithRadio("BT", "91000,Legacy,FM,\n")),
+        )
+        assertEquals(MediaBridgeContract.Status.OK, prepared.status)
+        assertEquals("custom", prepared.catalogMode)
+        assertEquals(MediaBridgeContract.Status.OK, controller.commitMediaImport(operation, prepared.stagingToken).status)
+
+        val after = controller.getSnapshot()
+        assertEquals("BT", after.defaultAudioSource)
+        assertEquals("CUSTOM", after.catalogType)
+        assertEquals(before.catalogStationCount, after.catalogStationCount)
+        assertEquals("Active", radioCatalogRepository.stations().single().name)
+    }
+
+    @Test
+    fun `invalid legacy radio section is rejected without mutating active catalog`() {
+        assertEquals(1, radioCatalogRepository.importCustomZip(ByteArrayInputStream(radioZip("90000,Active,FM,\n"))).getOrThrow())
+        val operation = UUID.randomUUID().toString()
+        val prepared = controller.prepareMediaImport(
+            operation,
+            ByteArrayInputStream(mediaArchiveWithRadio("USB", "91000,Legacy,FM,missing.png\n")),
+        )
+
+        assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, prepared.status)
+        assertEquals("CUSTOM", controller.getSnapshot().catalogType)
+        assertEquals("Active", radioCatalogRepository.stations().single().name)
+        assertEquals("", preferences.defaultAudioSource)
+    }
+
+    @Test
+    fun `settings import resets omitted portable fields to defaults`() {
+        preferences.defaultAudioSource = "BT"
+        preferences.defaultAudioSourceDelaySec = 12
+        preferences.defaultAudioSourceAutoplayOnStartup = false
+        preferences.autoSwitchToDefaultOnSourceLost = true
+        preferences.autoSwitchToDefaultAutoplayOnSourceLost = false
+        preferences.defaultMediaPackage = "com.example.player"
+        preferences.switchToOnlineBeforeSessionPlay = true
+        radioCatalogRepository.setWidgetBroadcastEnabled(false)
+        clusterMediaBridge.setClusterCoversEnabled(false)
+        clusterMediaBridge.setReassertWatchdogIntervalMs(4000L)
+        preferences.uiScaleTenths = 19
+
+        val operation = UUID.randomUUID().toString()
+        val minimal = JSONObject().put("format", "atlas-media-settings").put("schemaVersion", 1)
+        val archive = ByteArrayOutputStream()
+        ZipOutputStream(archive).use { zip ->
+            zip.putNextEntry(ZipEntry("manifest.json"))
+            zip.write(JSONObject().put("format", "atlas-media-backup").put("schemaVersion", 1).toString().toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("media.json"))
+            zip.write(minimal.toString().toByteArray(StandardCharsets.UTF_8))
+            zip.closeEntry()
+        }
+
+        val prepared = controller.prepareMediaImport(operation, ByteArrayInputStream(archive.toByteArray()))
+        assertEquals(MediaBridgeContract.Status.OK, prepared.status)
+        assertEquals(MediaBridgeContract.Status.OK, controller.commitMediaImport(operation, prepared.stagingToken).status)
+        val snapshot = controller.getSnapshot()
+        assertEquals("", snapshot.defaultAudioSource)
+        assertEquals(0, snapshot.defaultAudioSourceDelaySec)
+        assertTrue(snapshot.defaultAudioSourceAutoplayOnStartup)
+        assertFalse(snapshot.autoSwitchToDefaultOnSourceLost)
+        assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
+        assertEquals("", snapshot.defaultMediaPackage)
+        assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
+        assertTrue(snapshot.radioWidgetBroadcastEnabled)
+        assertTrue(snapshot.clusterCoversEnabled)
+        assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
+        assertEquals(15, snapshot.uiScaleTenths)
     }
 
     @Test
@@ -324,6 +448,35 @@ class MediaSettingsControllerTest {
                 "media.json" to json.toString()).forEach { (name, contents) ->
                 zip.putNextEntry(ZipEntry(name)); zip.write(contents.toByteArray()); zip.closeEntry()
             }
+        }
+        return output.toByteArray()
+    }
+
+    private fun mediaArchiveWithRadio(source: String, stationsCsv: String): ByteArray {
+        val json = JSONObject().put("format", "atlas-media-settings").put("schemaVersion", 1)
+            .put("defaultAudioSource", source).put("catalogMode", "custom")
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("manifest.json"))
+            zip.write(JSONObject().put("format", "atlas-media-backup").put("schemaVersion", 1)
+                .put("sections", JSONArray().put("media").put("radio")).toString().toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("media.json"))
+            zip.write(json.toString().toByteArray(StandardCharsets.UTF_8))
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("radio/stations.csv"))
+            zip.write(("frequency_khz,name,band,cover\n" + stationsCsv).toByteArray(StandardCharsets.UTF_8))
+            zip.closeEntry()
+        }
+        return output.toByteArray()
+    }
+
+    private fun radioZip(stationsCsv: String): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("stations.csv"))
+            zip.write(("frequency_khz,name,band,cover\n" + stationsCsv).toByteArray(StandardCharsets.UTF_8))
+            zip.closeEntry()
         }
         return output.toByteArray()
     }

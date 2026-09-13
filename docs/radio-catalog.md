@@ -6,7 +6,7 @@
 ## 1. Архитектура / Architecture
 
 ### [RU] Централизованное управление в AtlasMediaApi
-Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi`. В стандартном варианте `integrated` он входит прямо в состав виджета (модуль `:media-runtime`); при раздельной установке `plain` используется автономный пакет `com.mmwtl.atlasmediaapi` (модуль `:api-app`).
+Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi`. В стандартном варианте `integrated` он входит прямо в состав виджета (модуль `:media-runtime`); автономный пакет `com.mmwtl.atlasmediaapi` (модуль `:api-app`) можно собрать отдельно.
 
 - `AtlasMediaApi` автоматически сопоставляет текущую частоту радиоприёмника с каталогом;
 - название станции передаётся в `snapshot.title`;
@@ -16,7 +16,7 @@
 - в `integrated` сборке управление каталогом (информация о станциях, сброс к встроенному, импорт и экспорт) доступно прямо из единого экрана настроек `MainActivity` в секции «Медиасервис».
 
 ### [EN] Centralized Management in AtlasMediaApi
-Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service. In the standard `integrated` variant, it is compiled directly into the widget package (module `:media-runtime`); in modular `plain` setups, the standalone `com.mmwtl.atlasmediaapi` package (module `:api-app`) is used.
+Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service. In the standard `integrated` variant, it is compiled directly into the widget package (module `:media-runtime`); the standalone `com.mmwtl.atlasmediaapi` package (module `:api-app`) can also be built separately.
 
 - `AtlasMediaApi` automatically matches the current radio frequency against the active catalog;
 - The resolved station name is supplied in `snapshot.title`;
@@ -30,13 +30,13 @@ Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are m
 ## 2. Структура архива каталога / Catalog Archive Structure
 
 ### [RU]
-Пользовательский каталог радиостанций может импортироваться как в виде отдельного ZIP-архива, так и в составе единого контейнера полного резервного копирования `AtlasMediaWidget-backup.zip` (в поддиректории `radio/`). Структура каталога:
+Каталог радиостанций экспортируется и импортируется отдельно от настроек. Прежние ZIP-архивы остаются совместимыми: `stations.csv` находится в корне, обложки — в `covers/`. Импорт радио полностью заменяет текущие станции и обложки, без объединения наборов. Импорт настроек полностью заменяет переносимые параметры (отсутствующие параметры получают значения по умолчанию) и не меняет текущий каталог, в том числе при загрузке старой полной копии с секцией `radio/`. Структура каталога:
 
 ### [EN]
-A custom radio catalog can be imported either as a standalone ZIP archive or as part of the unified full backup container `AtlasMediaWidget-backup.zip` (under the `radio/` directory). Catalog structure:
+Radio catalogs are exported and imported separately from settings. Existing ZIP archives remain compatible: `stations.csv` at the root and artwork in `covers/`. Radio imports replace all current stations and covers. Settings imports replace portable preferences, defaulting omitted parameters, and preserve the current catalog, including imports of older full backups with a `radio/` section. Catalog structure:
 
 ```text
-my-radio.zip (или подкаталог radio/ в AtlasMediaWidget-backup.zip)
+my-radio.zip
 ├── stations.csv
 └── covers
     ├── radio7.webp

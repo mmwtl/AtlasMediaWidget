@@ -19,6 +19,8 @@ final class MediaBridgeContract {
     static final int GET_IMPORT_STATUS = 11;
     static final int ABORT_MEDIA_IMPORT = 12;
     static final int RESTORE_DEFAULT_CATALOG = 13;
+    static final int EXPORT_RADIO_CATALOG = 14;
+    static final int IMPORT_RADIO_CATALOG = 15;
 
     static final int REGISTERED = 100;
     static final int SNAPSHOT = 101;
@@ -33,6 +35,8 @@ final class MediaBridgeContract {
     static final int MEDIA_IMPORT_STATUS = 110;
     static final int MEDIA_IMPORT_ABORTED = 111;
     static final int DEFAULT_CATALOG_RESTORED = 112;
+    static final int RADIO_CATALOG_EXPORTED = 114;
+    static final int RADIO_CATALOG_IMPORTED = 115;
 
     static final long CAP_PLAY = 0x01L;
     static final long CAP_PAUSE = 0x02L;

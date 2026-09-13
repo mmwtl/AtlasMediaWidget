@@ -97,7 +97,7 @@ The settings application includes a live preview and granular controls for card 
 - Опциональная навигация кнопками назад/вперёд по всем сохранённым или только избранным станциям без поиска по эфиру;
 - Открытие активного медиаприложения или штатного экрана Radio, Bluetooth и USB по клику на карточку;
 - Отображение только поверх HOME, привязка к выбранному углу, перетаскивание и отключаемые маркеры перемещения;
-- Единая резервная копия в ZIP (`AtlasMediaWidget-backup.zip`): настройки виджета, параметры медиасервиса и каталог радио с обложками;
+- Экспорт и импорт настроек в ZIP (`AtlasMediaWidget-backup.zip`), включая прежние JSON-настройки; каталог радио переносится отдельно в ZIP (`stations.csv` и `covers/`), старые архивы совместимы;
 - Двухфазный защищённый импорт с персистентным журналом восстановления (`import_journal.json`) для защиты от сбоев питания;
 - Полная обратная совместимость со старыми файлами настроек JSON (схемы 1–9);
 - Foreground service, автозапуск после загрузки ГУ и восстановление соединения с медиасервисом;
@@ -119,7 +119,7 @@ The settings application includes a live preview and granular controls for card 
 - Optional next/previous button navigation cycling through saved presets or favorites without ether scanning;
 - Tap-to-open shortcuts for active media applications or stock Radio, Bluetooth, and USB screens;
 - Automatic visibility management (visible only on HOME), anchor corner alignment, and drag-and-drop support;
-- Unified backup ZIP container (`AtlasMediaWidget-backup.zip`): widget config, media service preferences, and custom radio catalog;
+- Settings backup ZIP (`AtlasMediaWidget-backup.zip`) for widget and media preferences; separate radio catalog ZIP (`stations.csv` and `covers/`), compatible with existing archives;
 - Two-phase crash-safe import protocol with persistent journal (`import_journal.json`) protecting against power loss;
 - Full backward compatibility with legacy JSON settings files (schemas 1–9);
 - Foreground service with boot auto-start and resilient IPC reconnection with backoff;

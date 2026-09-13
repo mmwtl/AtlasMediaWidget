@@ -53,6 +53,7 @@ public final class MainActivity extends ScaledActivity {
     private static final int REQUEST_NOTIFICATION_PERMISSION = 33;
     private static final int REQUEST_STORAGE_PERMISSION = 1001;
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
+    private static final int REQUEST_IMPORT_RADIO_CATALOG = 4103;
     private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
     private Prefs prefs;
@@ -63,6 +64,9 @@ public final class MainActivity extends ScaledActivity {
     private boolean importInProgress;
     private boolean recoveryInProgress;
     private boolean mediaSettingsBusy;
+    private boolean settingsTransferBusy;
+    private boolean radioCatalogBusy;
+    private File pendingRadioImportFile;
     private final Map<String, Button> sourceTileButtons = new HashMap<>();
     private TextView defaultSourceTitle;
     private TextView defaultSourceDelayLabel;
@@ -91,6 +95,8 @@ public final class MainActivity extends ScaledActivity {
     private Switch dragHandleVisible;
     private Button exportSettingsButton;
     private Button importSettingsButton;
+    private Button exportRadioCatalogButton;
+    private Button importRadioCatalogButton;
     private RadioGroup coverDimPresetGroup;
     private RadioButton[] coverDimPresetButtons;
     private EditText widthSize;
@@ -152,11 +158,13 @@ public final class MainActivity extends ScaledActivity {
                     } else if (state == MediaBridgeClient.State.CONNECTING) {
                         currentMediaSettings = null;
                         setMediaControlsEnabled(mediaSettingsGroup, false);
+                        setRadioCatalogTransferEnabled(false);
                         mediaStatusText.setText("Подключение к медиасервису…");
                         mediaStatusText.setTextColor(Ui.SECONDARY);
                     } else {
                         currentMediaSettings = null;
                         setMediaControlsEnabled(mediaSettingsGroup, false);
+                        setRadioCatalogTransferEnabled(false);
                         mediaStatusText.setText("Медиасервис недоступен: " + (detail != null ? detail : state.name()));
                         mediaStatusText.setTextColor(Ui.ERROR);
                     }
@@ -206,6 +214,10 @@ public final class MainActivity extends ScaledActivity {
         if (mediaBridgeClient != null) {
             mediaBridgeClient.stop();
         }
+        if (pendingRadioImportFile != null) {
+            pendingRadioImportFile.delete();
+            pendingRadioImportFile = null;
+        }
         main.removeCallbacksAndMessages(null);
         ioExecutor.shutdownNow();
         super.onDestroy();
@@ -217,6 +229,9 @@ public final class MainActivity extends ScaledActivity {
         if (requestCode == REQUEST_IMPORT_SETTINGS && resultCode == RESULT_OK
                 && data != null && data.getData() != null) {
             readSettingsForImport(data.getData());
+        } else if (requestCode == REQUEST_IMPORT_RADIO_CATALOG && resultCode == RESULT_OK
+                && data != null && data.getData() != null) {
+            readRadioCatalogForImport(data.getData());
         }
     }
 
@@ -721,20 +736,20 @@ public final class MainActivity extends ScaledActivity {
         addScaleSlider(scaleCard);
 
         LinearLayout settingsBackupCard = card();
-        settingsBackupCard.addView(text("Резервная копия и восстановление",
+        settingsBackupCard.addView(text("Настройки: резервная копия",
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView settingsBackupHint = text(
-                "Архив ZIP содержит настройки карточки, источника звука, приборной панели "
-                        + "и каталог радиостанций с обложками. Также поддерживается импорт прежних JSON-настроек.",
+                "Архив ZIP содержит настройки карточки, источника звука и приборной панели. "
+                        + "Также поддерживается импорт прежних JSON-настроек.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         settingsBackupHint.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams settingsBackupHintParams = fullWrap();
         settingsBackupHintParams.topMargin = Ui.dp(this, 8);
         settingsBackupCard.addView(settingsBackupHint, settingsBackupHintParams);
-        exportSettingsButton = actionButton("Экспортировать резервную копию (ZIP)");
+        exportSettingsButton = actionButton("Экспортировать настройки (ZIP)");
         exportSettingsButton.setOnClickListener(v -> chooseSettingsExport());
         settingsBackupCard.addView(exportSettingsButton, buttonParams());
-        importSettingsButton = actionButton("Импортировать резервную копию (ZIP / JSON)");
+        importSettingsButton = actionButton("Импортировать настройки (ZIP / JSON)");
         importSettingsButton.setOnClickListener(v -> chooseSettingsImport());
         settingsBackupCard.addView(importSettingsButton, buttonParams());
 
@@ -747,6 +762,7 @@ public final class MainActivity extends ScaledActivity {
         addSectionHeading(root, getString(R.string.section_media), false);
         LinearLayout mediaCard = createMediaCard();
         root.addView(mediaCard);
+        root.addView(createRadioCatalogTransferCard());
 
         // 3. Секция «Виджет»
         addSectionHeading(root, getString(R.string.section_widget), false);
@@ -898,6 +914,16 @@ public final class MainActivity extends ScaledActivity {
         launchFilePicker(picker, REQUEST_IMPORT_SETTINGS);
     }
 
+    private void chooseRadioCatalogImport() {
+        Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*");
+        picker.putExtra(Intent.EXTRA_MIME_TYPES,
+                new String[]{"application/zip", "application/x-zip-compressed",
+                        "application/octet-stream"});
+        launchFilePicker(picker, REQUEST_IMPORT_RADIO_CATALOG);
+    }
+
     @SuppressWarnings("deprecation")
     private void launchFilePicker(Intent picker, int requestCode) {
         try {
@@ -909,7 +935,9 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void exportSettings() {
+        settingsTransferBusy = true;
         setSettingsTransferEnabled(false);
+        setRadioCatalogTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
         ioExecutor.execute(() -> {
             File tempMediaZip = null;
@@ -946,8 +974,10 @@ public final class MainActivity extends ScaledActivity {
                     fullZip.delete();
 
                     main.post(() -> {
+                        settingsTransferBusy = false;
                         if (isDestroyed()) return;
                         setSettingsTransferEnabled(true);
+                        setRadioCatalogTransferEnabled(true);
                         Toast.makeText(this, "Резервная копия сохранена: " + result.location,
                                 Toast.LENGTH_LONG).show();
                     });
@@ -965,8 +995,206 @@ public final class MainActivity extends ScaledActivity {
         });
     }
 
-    private void readSettingsForImport(Uri uri) {
+    private void exportRadioCatalog() {
+        if (radioCatalogBusy || mediaSettingsBusy || settingsTransferBusy || recoveryInProgress
+                || importInProgress || mediaBridgeClient == null
+                || !mediaBridgeClient.isSettingsSupported()) return;
+        radioCatalogBusy = true;
+        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setRadioCatalogTransferEnabled(false);
         setSettingsTransferEnabled(false);
+        android.content.Context appContext = getApplicationContext();
+        ioExecutor.execute(() -> {
+            File exportFile = null;
+            try {
+                File exportDir = new File(getCacheDir(), "exports");
+                if (!exportDir.exists() && !exportDir.mkdirs()) {
+                    throw new IOException("Не удалось создать временное хранилище экспорта");
+                }
+                exportFile = new File(exportDir,
+                        "radio_export_" + System.currentTimeMillis() + ".zip");
+                if (exportFile.exists() && !exportFile.delete()) {
+                    throw new IOException("Не удалось подготовить временный файл экспорта");
+                }
+
+                final CountDownLatch latch = new CountDownLatch(1);
+                final boolean[] success = new boolean[1];
+                final String[] errorHolder = new String[1];
+                mediaBridgeClient.exportRadioCatalog(exportFile,
+                        new MediaBridgeClient.RadioCatalogExportCallback() {
+                            @Override public void onCatalogExported(int stationCount) {
+                                success[0] = true;
+                                latch.countDown();
+                            }
+
+                            @Override public void onError(int code, String message) {
+                                errorHolder[0] = message;
+                                latch.countDown();
+                            }
+                        });
+                latch.await(17, TimeUnit.SECONDS);
+                if (!success[0]) {
+                    throw new IOException("Ошибка экспорта каталога радио: "
+                            + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
+                }
+                SettingsExportStore.Result result = SettingsExportStore.exportZip(
+                        appContext, exportFile, SettingsExportStore.RADIO_ZIP_FILE_NAME);
+                main.post(() -> {
+                    if (isDestroyed()) return;
+                    Toast.makeText(this, "Каталог радио сохранён: " + result.location,
+                            Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception error) {
+                AppLog.warn("Cannot export radio catalog", error);
+                showRadioCatalogTransferError("Не удалось экспортировать каталог радио", error);
+            } finally {
+                if (exportFile != null) exportFile.delete();
+                main.post(() -> {
+                    radioCatalogBusy = false;
+                    if (!isDestroyed()) {
+                        if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
+                            updateMediaSettingsUi(currentMediaSettings);
+                        } else {
+                            setMediaControlsEnabled(mediaSettingsGroup, false);
+                        }
+                        setRadioCatalogTransferEnabled(true);
+                        setSettingsTransferEnabled(true);
+                    }
+                });
+            }
+        });
+    }
+
+    private void readRadioCatalogForImport(Uri uri) {
+        // File-picker results arrive before the bridge reconnects after onStop().
+        if (radioCatalogBusy || settingsTransferBusy || recoveryInProgress
+                || importInProgress) return;
+        radioCatalogBusy = true;
+        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setRadioCatalogTransferEnabled(false);
+        setSettingsTransferEnabled(false);
+        android.content.Context appContext = getApplicationContext();
+        ioExecutor.execute(() -> {
+            File staged = null;
+            try {
+                File importDir = new File(getCacheDir(), "imports");
+                if (!importDir.exists() && !importDir.mkdirs()) {
+                    throw new IOException("Не удалось создать временное хранилище импорта");
+                }
+                staged = new File(importDir,
+                        "radio_import_" + System.currentTimeMillis() + ".zip");
+                try (java.io.InputStream in = appContext.getContentResolver().openInputStream(uri);
+                     java.io.OutputStream out = new java.io.FileOutputStream(staged)) {
+                    if (in == null) throw new IOException("Не удалось открыть выбранный файл");
+                    byte[] buffer = new byte[8192];
+                    long totalBytes = 0L;
+                    int length;
+                    while ((length = in.read(buffer)) != -1) {
+                        totalBytes += length;
+                        if (totalBytes > FullSettingsBackup.MAX_ZIP_BYTES) {
+                            throw new IOException("Архив каталога радио слишком большой");
+                        }
+                        out.write(buffer, 0, length);
+                    }
+                }
+                File readyFile = staged;
+                main.post(() -> {
+                    if (isDestroyed()) {
+                        readyFile.delete();
+                        radioCatalogBusy = false;
+                        return;
+                    }
+                    pendingRadioImportFile = readyFile;
+                    showRadioCatalogImportConfirmation(readyFile);
+                });
+            } catch (Exception error) {
+                if (staged != null) staged.delete();
+                AppLog.warn("Cannot stage radio catalog import", error);
+                showRadioCatalogTransferError("Не удалось прочитать каталог радио", error);
+            }
+        });
+    }
+
+    private void showRadioCatalogImportConfirmation(File stagedFile) {
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Заменить каталог радио?")
+                .setMessage("Текущий каталог радиостанций и обложек будет полностью заменён "
+                        + "содержимым выбранного ZIP-файла.")
+                .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
+                .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
+                .setPositiveButton("Заменить", (d, w) -> importRadioCatalog(stagedFile)));
+    }
+
+    private void importRadioCatalog(File stagedFile) {
+        ioExecutor.execute(() -> {
+            try {
+                final CountDownLatch latch = new CountDownLatch(1);
+                final boolean[] success = new boolean[1];
+                final int[] stationCount = new int[1];
+                final String[] errorHolder = new String[1];
+                mediaBridgeClient.importRadioCatalog(stagedFile,
+                        new MediaBridgeClient.RadioCatalogImportCallback() {
+                            @Override public void onCatalogImported(int count) {
+                                stationCount[0] = count;
+                                success[0] = true;
+                                latch.countDown();
+                            }
+
+                            @Override public void onError(int code, String message) {
+                                errorHolder[0] = message;
+                                latch.countDown();
+                            }
+                        });
+                latch.await(17, TimeUnit.SECONDS);
+                if (!success[0]) {
+                    throw new IOException("Ошибка импорта каталога радио: "
+                            + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
+                }
+                main.post(() -> {
+                    if (isDestroyed()) return;
+                    Toast.makeText(this, "Каталог радио импортирован ("
+                                    + stationCount[0] + " станций)", Toast.LENGTH_LONG).show();
+                });
+            } catch (Exception error) {
+                AppLog.warn("Cannot import radio catalog", error);
+                showRadioCatalogTransferError("Не удалось импортировать каталог радио", error);
+            } finally {
+                stagedFile.delete();
+                main.post(() -> {
+                    pendingRadioImportFile = null;
+                    radioCatalogBusy = false;
+                    if (!isDestroyed()) {
+                        if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
+                            updateMediaSettingsUi(currentMediaSettings);
+                        } else {
+                            setMediaControlsEnabled(mediaSettingsGroup, false);
+                        }
+                        setRadioCatalogTransferEnabled(true);
+                        setSettingsTransferEnabled(true);
+                        loadMediaSettings();
+                    }
+                });
+            }
+        });
+    }
+
+    private void finishRadioCatalogImport(File stagedFile) {
+        stagedFile.delete();
+        pendingRadioImportFile = null;
+        radioCatalogBusy = false;
+        if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
+            updateMediaSettingsUi(currentMediaSettings);
+        } else {
+            setMediaControlsEnabled(mediaSettingsGroup, false);
+        }
+        setRadioCatalogTransferEnabled(true);
+        setSettingsTransferEnabled(true);
+    }
+
+    private void readSettingsForImport(Uri uri) {
+        settingsTransferBusy = true;
+        setSettingsTransferEnabled(false);
+        setRadioCatalogTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
         ioExecutor.execute(() -> {
             try {
@@ -974,9 +1202,9 @@ public final class MainActivity extends ScaledActivity {
                 main.post(() -> {
                     if (isDestroyed()) {
                         FullSettingsBackup.deleteRecursively(preview.stagedDir);
+                        settingsTransferBusy = false;
                         return;
                     }
-                    setSettingsTransferEnabled(true);
                     showImportPreviewDialog(preview);
                 });
             } catch (Exception error) {
@@ -996,7 +1224,7 @@ public final class MainActivity extends ScaledActivity {
             sb.append("• Настройки медиа и источника звука\n");
         }
         if (preview.hasRadio) {
-            sb.append("• Каталог радиостанций (").append(preview.stationCount).append(" станций)\n");
+            sb.append("• Каталог радио в архиве будет проигнорирован (текущий каталог сохранится)\n");
         }
         if (!preview.warnings.isEmpty()) {
             sb.append("\nВнимание:\n");
@@ -1007,18 +1235,31 @@ public final class MainActivity extends ScaledActivity {
         sb.append("\nТекущие переносимые настройки будут заменены.");
 
         CompactDialog.show(new AlertDialog.Builder(this)
-                .setOnCancelListener(d -> FullSettingsBackup.deleteRecursively(preview.stagedDir))
-                .setTitle(preview.isZip ? "Импортировать резервную копию?" : "Импортировать настройки?")
+                .setOnCancelListener(d -> {
+                    settingsTransferBusy = false;
+                    FullSettingsBackup.deleteRecursively(preview.stagedDir);
+                    setSettingsTransferEnabled(true);
+                    setRadioCatalogTransferEnabled(true);
+                })
+                .setTitle("Импортировать настройки?")
                 .setMessage(sb.toString().trim())
                 .setNegativeButton("Отмена", (d, w) -> {
+                    settingsTransferBusy = false;
                     FullSettingsBackup.deleteRecursively(preview.stagedDir);
+                    setSettingsTransferEnabled(true);
+                    setRadioCatalogTransferEnabled(true);
                 })
-                .setPositiveButton("Импортировать", (d, w) -> applyFullImport(preview)));
+                .setPositiveButton("Импортировать", (d, w) -> {
+                    settingsTransferBusy = false;
+                    setRadioCatalogTransferEnabled(false);
+                    applyFullImport(preview);
+                }));
     }
 
     private void applyFullImport(FullSettingsBackup.Preview preview) {
         importInProgress = true;
         setSettingsTransferEnabled(false);
+        setRadioCatalogTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
         ioExecutor.execute(() -> {
             boolean journalStarted = false;
@@ -1108,6 +1349,10 @@ public final class MainActivity extends ScaledActivity {
                 main.post(() -> {
                     importInProgress = false;
                     checkPendingImportRecovery();
+                    if (!recoveryInProgress && ImportJournal.checkPendingRecovery(this) == null) {
+                        setSettingsTransferEnabled(true);
+                        setRadioCatalogTransferEnabled(true);
+                    }
                 });
             }
         });
@@ -1121,6 +1366,7 @@ public final class MainActivity extends ScaledActivity {
             if (!mediaBridgeClient.isSettingsSupported()) return;
             recoveryInProgress = true;
             setSettingsTransferEnabled(false);
+            setRadioCatalogTransferEnabled(false);
             mediaBridgeClient.getImportStatus(recovery.id, new MediaBridgeClient.ImportStatusCallback() {
                 @Override public void onStatus(String status) {
                     recoveryInProgress = false;
@@ -1140,8 +1386,16 @@ public final class MainActivity extends ScaledActivity {
                                 .setTitle("Импорт не завершён")
                                 .setMessage("Медиасервис сообщает: " + status
                                         + ". Журнал сохранён. После устранения ошибки можно повторить проверку и завершение импорта.")
-                                .setOnCancelListener(d -> recoveryInProgress = false)
-                                .setNegativeButton("Позже", (d, w) -> recoveryInProgress = false)
+                                .setOnCancelListener(d -> {
+                                    recoveryInProgress = false;
+                                    setSettingsTransferEnabled(true);
+                                    setRadioCatalogTransferEnabled(true);
+                                })
+                                .setNegativeButton("Позже", (d, w) -> {
+                                    recoveryInProgress = false;
+                                    setSettingsTransferEnabled(true);
+                                    setRadioCatalogTransferEnabled(true);
+                                })
                                 .setPositiveButton("Повторить", (d, w) -> {
                                     recoveryInProgress = false;
                                     checkPendingImportRecovery();
@@ -1151,6 +1405,8 @@ public final class MainActivity extends ScaledActivity {
                 @Override public void onError(int code, String message) {
                     recoveryInProgress = false;
                     if (isDestroyed()) return;
+                    setSettingsTransferEnabled(true);
+                    setRadioCatalogTransferEnabled(true);
                     Toast.makeText(MainActivity.this,
                             "Не удалось проверить результат импорта: " + message,
                             Toast.LENGTH_LONG).show();
@@ -1168,15 +1424,25 @@ public final class MainActivity extends ScaledActivity {
         if (!recovery.hasWidget) {
             ImportJournal.markCommitted(this);
             setSettingsTransferEnabled(true);
+            setRadioCatalogTransferEnabled(true);
             return;
         }
         recoveryInProgress = true;
         setSettingsTransferEnabled(false);
+        setRadioCatalogTransferEnabled(false);
         CompactDialog.show(new AlertDialog.Builder(this)
                 .setTitle("Прерванный импорт настроек")
                 .setMessage("Импорт не завершён. Восстановить настройки карточки до импорта?")
-                .setOnCancelListener(d -> recoveryInProgress = false)
-                .setNegativeButton("Позже", (d, w) -> recoveryInProgress = false)
+                .setOnCancelListener(d -> {
+                    recoveryInProgress = false;
+                    setSettingsTransferEnabled(true);
+                    setRadioCatalogTransferEnabled(true);
+                })
+                .setNegativeButton("Позже", (d, w) -> {
+                    recoveryInProgress = false;
+                    setSettingsTransferEnabled(true);
+                    setRadioCatalogTransferEnabled(true);
+                })
                 .setPositiveButton("Восстановить", (d, w) -> {
                     recoveryInProgress = false;
                     if (ImportJournal.rollback(this, prefs)) {
@@ -1388,6 +1654,29 @@ public final class MainActivity extends ScaledActivity {
         return diagnosticCard;
     }
 
+    private LinearLayout createRadioCatalogTransferCard() {
+        LinearLayout radioCard = card();
+        radioCard.addView(text("Каталог радио", 20, Ui.PRIMARY, Typeface.BOLD));
+        TextView hint = text(
+                "Отдельный ZIP-каталог содержит stations.csv и обложки радиостанций. "
+                        + "Импорт заменяет текущий каталог после подтверждения.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        hint.setLineSpacing(0, 1.15f);
+        LinearLayout.LayoutParams hintParams = fullWrap();
+        hintParams.topMargin = Ui.dp(this, 8);
+        radioCard.addView(hint, hintParams);
+
+        exportRadioCatalogButton = actionButton("Экспортировать каталог радио (ZIP)");
+        exportRadioCatalogButton.setOnClickListener(v -> exportRadioCatalog());
+        radioCard.addView(exportRadioCatalogButton, buttonParams());
+
+        importRadioCatalogButton = actionButton("Импортировать каталог радио (ZIP)");
+        importRadioCatalogButton.setOnClickListener(v -> chooseRadioCatalogImport());
+        radioCard.addView(importRadioCatalogButton, buttonParams());
+        setRadioCatalogTransferEnabled(false);
+        return radioCard;
+    }
+
     private LinearLayout createSourceTileRow(String[][] options) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -1411,15 +1700,18 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void loadMediaSettings() {
-        if (mediaBridgeClient == null || !mediaBridgeClient.isSettingsSupported() || mediaSettingsBusy) return;
+        if (mediaBridgeClient == null || !mediaBridgeClient.isSettingsSupported()
+                || mediaSettingsBusy || settingsTransferBusy || radioCatalogBusy) return;
         mediaSettingsBusy = true;
         setMediaControlsEnabled(mediaSettingsGroup, false);
+        setSettingsTransferEnabled(false);
         mediaBridgeClient.getSettings(new MediaBridgeClient.SettingsCallback() {
             @Override public void onSettings(MediaSettingsSnapshot snapshot) {
                 mediaSettingsBusy = false;
                 if (isDestroyed()) return;
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
+                setSettingsTransferEnabled(true);
             }
             @Override public void onError(int code, String message) {
                 mediaSettingsBusy = false;
@@ -1427,6 +1719,7 @@ public final class MainActivity extends ScaledActivity {
                 mediaStatusText.setText("Не удалось загрузить медианастройки: " + message);
                 mediaStatusText.setTextColor(Ui.ERROR);
                 setMediaControlsEnabled(mediaSettingsGroup, false);
+                setSettingsTransferEnabled(true);
                 AppLog.warn("Failed to load media settings: " + code + " " + message, null);
             }
         });
@@ -1434,6 +1727,7 @@ public final class MainActivity extends ScaledActivity {
 
     private void updateMediaSettingsUi(MediaSettingsSnapshot snapshot) {
         setMediaControlsEnabled(mediaSettingsGroup, true);
+        setRadioCatalogTransferEnabled(true);
         for (Map.Entry<String, Button> entry : sourceTileButtons.entrySet()) {
             boolean isSelected = entry.getKey().equals(snapshot.defaultAudioSource);
             Button btn = entry.getValue();
@@ -1502,9 +1796,11 @@ public final class MainActivity extends ScaledActivity {
 
     private void sendMediaSettingChange(String key, Object value) {
         if (mediaBridgeClient == null || currentMediaSettings == null || mediaSettingsBusy
+                || settingsTransferBusy || radioCatalogBusy
                 || !mediaBridgeClient.isSettingsSupported()) return;
         mediaSettingsBusy = true;
         setMediaControlsEnabled(mediaSettingsGroup, false);
+        setSettingsTransferEnabled(false);
         Bundle b = new Bundle();
         if (value instanceof Boolean) {
             b.putBoolean(key, (Boolean) value);
@@ -1522,12 +1818,14 @@ public final class MainActivity extends ScaledActivity {
                 if (isDestroyed()) return;
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
+                setSettingsTransferEnabled(true);
             }
             @Override public void onError(int code, String message) {
                 mediaSettingsBusy = false;
                 if (isDestroyed()) return;
                 AppLog.warn("Failed to update media setting " + key + ": " + code + " " + message, null);
                 Toast.makeText(MainActivity.this, "Ошибка сохранения настройки: " + message, Toast.LENGTH_SHORT).show();
+                setSettingsTransferEnabled(true);
                 loadMediaSettings();
             }
         });
@@ -1545,17 +1843,20 @@ public final class MainActivity extends ScaledActivity {
     private void applyDefaultRadioCatalog() {
         mediaSettingsBusy = true;
         setMediaControlsEnabled(mediaSettingsGroup, false);
+        setSettingsTransferEnabled(false);
         mediaBridgeClient.restoreDefaultCatalog(new MediaBridgeClient.RestoreCatalogCallback() {
             @Override public void onCatalogRestored(MediaSettingsSnapshot snapshot) {
                 mediaSettingsBusy = false;
                 if (isDestroyed()) return;
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
+                setSettingsTransferEnabled(true);
                 Toast.makeText(MainActivity.this, "Стандартный каталог радио восстановлен", Toast.LENGTH_SHORT).show();
             }
             @Override public void onError(int code, String message) {
                 mediaSettingsBusy = false;
                 if (isDestroyed()) return;
+                setSettingsTransferEnabled(true);
                 loadMediaSettings();
                 Toast.makeText(MainActivity.this, "Ошибка восстановления каталога: " + message, Toast.LENGTH_SHORT).show();
             }
@@ -1584,16 +1885,46 @@ public final class MainActivity extends ScaledActivity {
         String detail = error.getMessage() == null || error.getMessage().isBlank()
                 ? fallback : error.getMessage();
         main.post(() -> {
+            settingsTransferBusy = false;
             if (isDestroyed()) return;
+            setSettingsTransferEnabled(true);
+            setRadioCatalogTransferEnabled(true);
+            Toast.makeText(this, detail, Toast.LENGTH_LONG).show();
+        });
+    }
+
+    private void showRadioCatalogTransferError(String fallback, Exception error) {
+        String detail = error.getMessage() == null || error.getMessage().isBlank()
+                ? fallback : error.getMessage();
+        main.post(() -> {
+            radioCatalogBusy = false;
+            if (isDestroyed()) return;
+            if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
+                updateMediaSettingsUi(currentMediaSettings);
+            } else {
+                setMediaControlsEnabled(mediaSettingsGroup, false);
+            }
+            setRadioCatalogTransferEnabled(true);
             setSettingsTransferEnabled(true);
             Toast.makeText(this, detail, Toast.LENGTH_LONG).show();
         });
     }
 
     private void setSettingsTransferEnabled(boolean enabled) {
-        enabled = enabled && !recoveryInProgress && ImportJournal.checkPendingRecovery(this) == null;
+        enabled = enabled && !recoveryInProgress && !importInProgress
+                && !settingsTransferBusy && !radioCatalogBusy && !mediaSettingsBusy
+                && ImportJournal.checkPendingRecovery(this) == null;
         if (exportSettingsButton != null) exportSettingsButton.setEnabled(enabled);
         if (importSettingsButton != null) importSettingsButton.setEnabled(enabled);
+    }
+
+    private void setRadioCatalogTransferEnabled(boolean enabled) {
+        enabled = enabled && !recoveryInProgress && !importInProgress
+                && !settingsTransferBusy && !radioCatalogBusy && !mediaSettingsBusy
+                && mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()
+                && ImportJournal.checkPendingRecovery(this) == null;
+        if (exportRadioCatalogButton != null) exportRadioCatalogButton.setEnabled(enabled);
+        if (importRadioCatalogButton != null) importRadioCatalogButton.setEnabled(enabled);
     }
 
     private void openOverlaySettings() {

@@ -390,6 +390,7 @@ class RadioCatalogRepository(
         reloadCatalog()
     }
 
+    @Synchronized
     fun exportCatalogZip(outputStream: OutputStream) {
         if (currentType == RadioCatalogType.CUSTOM && customDirectory.isDirectory) {
             ZipOutputStream(BufferedOutputStream(outputStream)).use { zos ->
@@ -480,12 +481,12 @@ class RadioCatalogRepository(
         }
     }
 
-    fun createSampleZipFile(): File {
-        val exportDir = File(context.cacheDir, "exported_samples")
+    fun createCatalogZipFile(): File {
+        val exportDir = File(context.cacheDir, "exported_catalogs")
         exportDir.mkdirs()
-        val sampleZip = File(exportDir, "radio-catalog-sample.zip")
-        FileOutputStream(sampleZip).use { exportSampleZip(it) }
-        return sampleZip
+        val catalogZip = File(exportDir, "radio-catalog.zip")
+        FileOutputStream(catalogZip).use { exportCatalogZip(it) }
+        return catalogZip
     }
 
     private fun buildCatalogInfo(): RadioCatalogInfo {

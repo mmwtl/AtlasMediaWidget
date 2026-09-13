@@ -86,7 +86,7 @@ class MediaBridgeService : Service() {
                 MediaBridgeContract.ClientMessage.GET_RADIO_STATIONS ->
                     handleGetRadioStations(message)
 
-                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG -> {
+                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.IMPORT_RADIO_CATALOG -> {
                     // Handler recycles the incoming Message after returning; retain a copy for IO work.
                     val request = Message.obtain(message)
                     scope.launch(Dispatchers.IO) {
@@ -139,6 +139,12 @@ class MediaBridgeService : Service() {
 
             MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG ->
                 handleRestoreDefaultCatalog(message)
+
+            MediaBridgeContract.ClientMessage.EXPORT_RADIO_CATALOG ->
+                handleExportRadioCatalog(message)
+
+            MediaBridgeContract.ClientMessage.IMPORT_RADIO_CATALOG ->
+                handleImportRadioCatalog(message)
 
         }
     }
@@ -495,6 +501,87 @@ class MediaBridgeService : Service() {
                 Timber.e(e, "Export media backup failed")
                 sendError(replyTo, requestId, MediaBridgeContract.Status.IO_ERROR, e.message ?: "Export failed")
             }
+        }
+    }
+
+    private fun handleExportRadioCatalog(message: Message) {
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        @Suppress("DEPRECATION")
+        val pfd = data.getParcelable<android.os.ParcelFileDescriptor>(MediaBridgeContract.Key.FILE_DESCRIPTOR)
+        val replyTo = message.replyTo
+        if (replyTo == null) {
+            runCatching { pfd?.close() }
+            return
+        }
+        if (!isSettingsAllowed(message)) {
+            runCatching { pfd?.close() }
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Radio catalog IPC restricted")
+            return
+        }
+        if (pfd == null) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
+            return
+        }
+        try {
+            android.os.ParcelFileDescriptor.AutoCloseOutputStream(pfd).use { out ->
+                coordinator.radioCatalogRepository.exportCatalogZip(out)
+            }
+            val info = coordinator.radioCatalogRepository.getCatalogInfo()
+            send(
+                replyTo,
+                MediaBridgeContract.ServerMessage.RADIO_CATALOG_EXPORTED,
+                Bundle().apply {
+                    putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                    putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                    putString(MediaBridgeContract.Key.MESSAGE, "Radio catalog exported")
+                    putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, info.stationCount)
+                },
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Export radio catalog failed")
+            sendError(replyTo, requestId, MediaBridgeContract.Status.IO_ERROR, e.message ?: "Radio catalog export failed")
+        }
+    }
+
+    private fun handleImportRadioCatalog(message: Message) {
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        @Suppress("DEPRECATION")
+        val pfd = data.getParcelable<android.os.ParcelFileDescriptor>(MediaBridgeContract.Key.FILE_DESCRIPTOR)
+        val replyTo = message.replyTo
+        if (replyTo == null) {
+            runCatching { pfd?.close() }
+            return
+        }
+        if (!isSettingsAllowed(message)) {
+            runCatching { pfd?.close() }
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Radio catalog IPC restricted")
+            return
+        }
+        if (pfd == null) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
+            return
+        }
+        try {
+            val count = android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
+                coordinator.radioCatalogRepository.importCustomZip(input).getOrThrow()
+            }
+            val snapshot = coordinator.settingsController.onRadioCatalogChanged()
+            send(
+                replyTo,
+                MediaBridgeContract.ServerMessage.RADIO_CATALOG_IMPORTED,
+                Bundle().apply {
+                    putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                    putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                    putString(MediaBridgeContract.Key.MESSAGE, "Radio catalog imported")
+                    putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, count)
+                    putLong(MediaBridgeContract.Key.SETTINGS_REVISION, snapshot.revision)
+                },
+            )
+        } catch (e: Exception) {
+            Timber.e(e, "Import radio catalog failed")
+            sendError(replyTo, requestId, MediaBridgeContract.Status.VALIDATION_ERROR, e.message ?: "Radio catalog import failed")
         }
     }
 

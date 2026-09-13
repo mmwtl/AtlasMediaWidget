@@ -41,6 +41,16 @@ final class MediaBridgeClient {
         void onError(int status, String message);
     }
 
+    interface RadioCatalogExportCallback {
+        void onCatalogExported(int stationCount);
+        void onError(int status, String message);
+    }
+
+    interface RadioCatalogImportCallback {
+        void onCatalogImported(int stationCount);
+        void onError(int status, String message);
+    }
+
     interface PrepareImportCallback {
         void onImportPrepared(String stagingToken, String catalogMode, int stationCount, java.util.List<String> warnings);
         void onError(int status, String message);
@@ -465,6 +475,36 @@ final class MediaBridgeClient {
                         main.post(bcb::onBackupExported);
                     }
                 }
+                case MediaBridgeContract.RADIO_CATALOG_EXPORTED -> {
+                    String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
+                    int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
+                    Object cb = takePendingCallback(requestId);
+                    if (cb instanceof RadioCatalogExportCallback rcb) {
+                        if (status == MediaBridgeContract.STATUS_OK) {
+                            int stationCount = data.getInt(
+                                    MediaBridgeContract.K_CATALOG_STATION_COUNT, 0);
+                            main.post(() -> rcb.onCatalogExported(stationCount));
+                        } else {
+                            dispatchError(rcb, status,
+                                    data.getString(MediaBridgeContract.K_MESSAGE, ""));
+                        }
+                    }
+                }
+                case MediaBridgeContract.RADIO_CATALOG_IMPORTED -> {
+                    String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
+                    int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
+                    Object cb = takePendingCallback(requestId);
+                    if (cb instanceof RadioCatalogImportCallback rcb) {
+                        if (status == MediaBridgeContract.STATUS_OK) {
+                            int stationCount = data.getInt(
+                                    MediaBridgeContract.K_CATALOG_STATION_COUNT, 0);
+                            main.post(() -> rcb.onCatalogImported(stationCount));
+                        } else {
+                            dispatchError(rcb, status,
+                                    data.getString(MediaBridgeContract.K_MESSAGE, ""));
+                        }
+                    }
+                }
                 case MediaBridgeContract.MEDIA_IMPORT_PREPARED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
                     Object cb = takePendingCallback(requestId);
@@ -575,6 +615,55 @@ final class MediaBridgeClient {
         sendSimple(MediaBridgeContract.EXPORT_MEDIA_BACKUP, reqId, extra);
     }
 
+    void exportRadioCatalog(File destinationFile, RadioCatalogExportCallback callback) {
+        try {
+            android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
+                    destinationFile,
+                    android.os.ParcelFileDescriptor.MODE_WRITE_ONLY
+                            | android.os.ParcelFileDescriptor.MODE_CREATE
+                            | android.os.ParcelFileDescriptor.MODE_TRUNCATE);
+            exportRadioCatalog(pfd, callback);
+        } catch (Exception e) {
+            if (callback != null) {
+                main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
+                        e.getMessage()));
+            }
+        }
+    }
+
+    /** The descriptor overload takes ownership and closes the descriptor after send or drop. */
+    void exportRadioCatalog(android.os.ParcelFileDescriptor pfd,
+            RadioCatalogExportCallback callback) {
+        String reqId = requestId("export-radio-catalog");
+        if (callback != null) addPendingCallback(reqId, callback);
+        Bundle extra = new Bundle();
+        extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
+        sendSimple(MediaBridgeContract.EXPORT_RADIO_CATALOG, reqId, extra);
+    }
+
+    void importRadioCatalog(File zipFile, RadioCatalogImportCallback callback) {
+        try {
+            android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
+                    zipFile, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
+            importRadioCatalog(pfd, callback);
+        } catch (Exception e) {
+            if (callback != null) {
+                main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
+                        e.getMessage()));
+            }
+        }
+    }
+
+    /** The descriptor overload takes ownership and closes the descriptor after send or drop. */
+    void importRadioCatalog(android.os.ParcelFileDescriptor pfd,
+            RadioCatalogImportCallback callback) {
+        String reqId = requestId("import-radio-catalog");
+        if (callback != null) addPendingCallback(reqId, callback);
+        Bundle extra = new Bundle();
+        extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
+        sendSimple(MediaBridgeContract.IMPORT_RADIO_CATALOG, reqId, extra);
+    }
+
     void prepareMediaImport(String operationId, File zipFile, PrepareImportCallback callback) {
         try {
             android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
@@ -667,6 +756,10 @@ final class MediaBridgeClient {
             } else if (callback instanceof UpdateSettingsCallback cb) {
                 cb.onError(status, message);
             } else if (callback instanceof BackupCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof RadioCatalogExportCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof RadioCatalogImportCallback cb) {
                 cb.onError(status, message);
             } else if (callback instanceof PrepareImportCallback cb) {
                 cb.onError(status, message);

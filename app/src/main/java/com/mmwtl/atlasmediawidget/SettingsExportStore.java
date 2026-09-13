@@ -10,6 +10,7 @@ import android.provider.MediaStore;
 import java.io.IOException;
 
 final class SettingsExportStore {
+    static final String RADIO_ZIP_FILE_NAME = "AtlasMediaWidget-radio.zip";
     static final class Result {
         final Uri uri;
         final String location;
@@ -49,9 +50,14 @@ final class SettingsExportStore {
     }
 
     static Result exportZip(Context context, java.io.File zipSource) throws IOException {
+        return exportZip(context, zipSource, FullSettingsBackup.ZIP_FILE_NAME);
+    }
+
+    static Result exportZip(Context context, java.io.File zipSource, String displayName)
+            throws IOException {
         ContentResolver resolver = context.getContentResolver();
         ContentValues pending = new ContentValues();
-        pending.put(MediaStore.MediaColumns.DISPLAY_NAME, FullSettingsBackup.ZIP_FILE_NAME);
+        pending.put(MediaStore.MediaColumns.DISPLAY_NAME, displayName);
         pending.put(MediaStore.MediaColumns.MIME_TYPE, "application/zip");
         pending.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
         pending.put(MediaStore.MediaColumns.IS_PENDING, 1);
@@ -75,7 +81,7 @@ final class SettingsExportStore {
                 throw new IOException("Не удалось опубликовать файл в «Загрузках»");
             }
             return new Result(uri,
-                    Environment.DIRECTORY_DOWNLOADS + "/" + FullSettingsBackup.ZIP_FILE_NAME);
+                    Environment.DIRECTORY_DOWNLOADS + "/" + displayName);
         } catch (Exception error) {
             resolver.delete(uri, null, null);
             if (error instanceof IOException ioError) throw ioError;

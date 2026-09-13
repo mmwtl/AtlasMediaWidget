@@ -429,7 +429,7 @@ class DiagnosticActivity : Activity() {
             radioCard.addView(radioButtonsLayout, DiagnosticUi.fullWrap())
             DiagnosticUi.topMargin(radioButtonsLayout, this, 12f)
 
-            exportSampleZipButton = DiagnosticUi.button(this, "Выгрузить образец архива (ZIP)").apply {
+            exportSampleZipButton = DiagnosticUi.button(this, "Экспортировать каталог радио (ZIP)").apply {
                 setOnClickListener { exportSampleZip() }
             }
             radioButtonsLayout.addView(exportSampleZipButton, DiagnosticUi.fullWrap())
@@ -440,13 +440,13 @@ class DiagnosticActivity : Activity() {
             radioButtonsLayout.addView(importCustomZipButton, DiagnosticUi.fullWrap())
             DiagnosticUi.topMargin(importCustomZipButton, this, 8f)
 
-            val exportBackupBtn = DiagnosticUi.button(this, "Экспортировать резервную копию медиа (ZIP)").apply {
+            val exportBackupBtn = DiagnosticUi.button(this, "Экспортировать настройки медиа (ZIP)").apply {
                 setOnClickListener { exportMediaBackupZip() }
             }
             radioButtonsLayout.addView(exportBackupBtn, DiagnosticUi.fullWrap())
             DiagnosticUi.topMargin(exportBackupBtn, this, 8f)
 
-            val importBackupBtn = DiagnosticUi.button(this, "Импортировать резервную копию медиа (ZIP)").apply {
+            val importBackupBtn = DiagnosticUi.button(this, "Импортировать настройки медиа (ZIP)").apply {
                 setOnClickListener { importMediaBackupZip() }
             }
             radioButtonsLayout.addView(importBackupBtn, DiagnosticUi.fullWrap())
@@ -454,8 +454,7 @@ class DiagnosticActivity : Activity() {
 
             restoreDefaultCatalogButton = DiagnosticUi.outlinedButton(this, "Восстановить стандартный каталог", destructive = true).apply {
                 setOnClickListener {
-                    coordinator.radioCatalogRepository.restoreDefaultCatalog()
-                    coordinator.stateHub.refreshRadioState()
+                    coordinator.settingsController.restoreDefaultCatalog()
                     Toast.makeText(this@DiagnosticActivity, "Стандартный каталог Пензы восстановлен", Toast.LENGTH_SHORT).show()
                     render()
                 }
@@ -639,7 +638,7 @@ class DiagnosticActivity : Activity() {
 
     private fun exportSampleZip() {
         activityScope.launch(Dispatchers.IO) {
-            val file = runCatching { coordinator.radioCatalogRepository.createSampleZipFile() }.getOrNull()
+            val file = runCatching { coordinator.radioCatalogRepository.createCatalogZipFile() }.getOrNull()
             withContext(Dispatchers.Main) {
                 if (file != null && file.isFile) {
                     val uri = FileProvider.getUriForFile(
@@ -723,7 +722,7 @@ class DiagnosticActivity : Activity() {
                 }
                 withContext(Dispatchers.Main) {
                     result.onSuccess { count ->
-                        coordinator.stateHub.refreshRadioState()
+                        coordinator.settingsController.onRadioCatalogChanged()
                         Toast.makeText(this@DiagnosticActivity, "Успешно импортировано $count станций (каталог заменён)", Toast.LENGTH_LONG).show()
                         render()
                     }.onFailure { error ->
@@ -749,9 +748,9 @@ class DiagnosticActivity : Activity() {
                     } ?: throw IOException("Не удалось открыть файл")
                 }
                 withContext(Dispatchers.Main) {
-                    result.onSuccess { count ->
+                    result.onSuccess { _ ->
                         coordinator.stateHub.refreshRadioState()
-                        Toast.makeText(this@DiagnosticActivity, "Медианастройки успешно импортированы ($count станций)", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@DiagnosticActivity, "Настройки медиа успешно импортированы; каталог радио сохранён", Toast.LENGTH_LONG).show()
                         render()
                     }.onFailure { error ->
                         Toast.makeText(this@DiagnosticActivity, "Ошибка импорта: ${error.message}", Toast.LENGTH_LONG).show()

@@ -123,6 +123,34 @@ public final class FullSettingsBackupTest {
     }
 
     @Test
+    public void settingsExportDoesNotCopyRadioFromLegacyMediaPart() throws Exception {
+        File mediaZip = temporaryFolder.newFile("legacy-media.zip");
+        try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(mediaZip))) {
+            zip.putNextEntry(new ZipEntry("media.json"));
+            zip.write("{\"format\":\"atlas-media-settings\",\"schemaVersion\":1,\"catalogMode\":\"custom\"}".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+            zip.putNextEntry(new ZipEntry("radio/stations.csv"));
+            zip.write("frequency_khz,name,band,cover\n98800,Old,FM,\n".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        File settingsZip = FullSettingsBackup.createFullBackupZip(context, prefs, mediaZip);
+        try (ZipInputStream zip = new ZipInputStream(new java.io.FileInputStream(settingsZip))) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                assertFalse(entry.getName().startsWith("radio/"));
+                if ("manifest.json".equals(entry.getName())) {
+                    JSONObject manifest = new JSONObject(new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+                    assertEquals(2, manifest.getJSONArray("sections").length());
+                    assertFalse(manifest.getJSONObject("hashes").has("radio/stations.csv"));
+                } else if ("media.json".equals(entry.getName())) {
+                    JSONObject media = new JSONObject(new String(zip.readAllBytes(), StandardCharsets.UTF_8));
+                    assertFalse(media.has("catalogMode"));
+                }
+            }
+        }
+    }
+
+    @Test
     public void inspectFullZipParsesWidgetAndMediaSections() throws Exception {
         File zipFile = temporaryFolder.newFile("backup.zip");
 

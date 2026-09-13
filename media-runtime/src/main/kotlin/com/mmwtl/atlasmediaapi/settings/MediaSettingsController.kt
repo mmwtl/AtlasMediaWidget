@@ -7,7 +7,6 @@ import android.util.AtomicFile
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
-import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogType
 import com.mmwtl.atlasmediaapi.media.cluster.ClusterMediaBridge
 import org.json.JSONArray
 import org.json.JSONObject
@@ -236,14 +235,19 @@ class MediaSettingsController(
         return getSnapshot()
     }
 
+    /** Publishes a radio catalog mutation to the coordinator and settings clients. */
+    fun onRadioCatalogChanged(): MediaSettingsSnapshot = synchronized(importLock) {
+        nextRevision()
+        onSettingsChanged?.invoke()
+        return getSnapshot()
+    }
+
     fun exportMediaBackup(outputStream: OutputStream) = synchronized(importLock) {
         val snapshot = getSnapshot()
-        val isCustomCatalog = snapshot.catalogType == "CUSTOM"
 
         val mediaJsonObj = JSONObject().apply {
             put("format", "atlas-media-settings")
             put("schemaVersion", 1)
-            put("catalogMode", if (isCustomCatalog) "custom" else "builtin")
             put("defaultAudioSource", snapshot.defaultAudioSource)
             put("defaultAudioSourceDelaySec", snapshot.defaultAudioSourceDelaySec)
             put("defaultAudioSourceAutoplayOnStartup", snapshot.defaultAudioSourceAutoplayOnStartup)
@@ -265,14 +269,10 @@ class MediaSettingsController(
             put("createdAt", System.currentTimeMillis())
             val sections = JSONArray().apply {
                 put("media")
-                if (isCustomCatalog) put("radio")
             }
             put("sections", sections)
             val hashes = JSONObject().apply {
                 put("media.json", sha256(mediaJsonBytes))
-                if (isCustomCatalog) {
-                    radioCatalogRepository.radioSectionHashes().forEach { (path, hash) -> put(path, hash) }
-                }
             }
             put("hashes", hashes)
         }
@@ -287,9 +287,6 @@ class MediaSettingsController(
             zos.write(mediaJsonBytes)
             zos.closeEntry()
 
-            if (isCustomCatalog) {
-                radioCatalogRepository.writeRadioSectionToZip(zos, "radio/")
-            }
         }
     }
 
@@ -476,48 +473,9 @@ class MediaSettingsController(
             persistStaged(staged)
             commitStarted = true
 
-            // Swap the catalog first. All input was validated before this mutation.
-            if (staged.catalogMode == "custom") {
-                val importedCount = radioCatalogRepository.importFromDirectory(File(staged.stagingDir, "radio")).getOrThrow()
-                Timber.i("Imported $importedCount custom radio stations from backup")
-            } else {
-                radioCatalogRepository.restoreDefaultCatalog()
-            }
-
-            // Apply media settings after the catalog is valid and active.
-            if (mediaJson.has("defaultAudioSource")) {
-                preferences.defaultAudioSource = mediaJson.getString("defaultAudioSource")
-            }
-            if (mediaJson.has("defaultAudioSourceDelaySec")) {
-                preferences.defaultAudioSourceDelaySec = mediaJson.getInt("defaultAudioSourceDelaySec")
-            }
-            if (mediaJson.has("defaultAudioSourceAutoplayOnStartup")) {
-                preferences.defaultAudioSourceAutoplayOnStartup = mediaJson.getBoolean("defaultAudioSourceAutoplayOnStartup")
-            }
-            if (mediaJson.has("autoSwitchToDefaultOnSourceLost")) {
-                preferences.autoSwitchToDefaultOnSourceLost = mediaJson.getBoolean("autoSwitchToDefaultOnSourceLost")
-            }
-            if (mediaJson.has("autoSwitchToDefaultAutoplayOnSourceLost")) {
-                preferences.autoSwitchToDefaultAutoplayOnSourceLost = mediaJson.getBoolean("autoSwitchToDefaultAutoplayOnSourceLost")
-            }
-            if (mediaJson.has("defaultMediaPackage")) {
-                preferences.defaultMediaPackage = mediaJson.getString("defaultMediaPackage")
-            }
-            if (mediaJson.has("switchToOnlineBeforeSessionPlay")) {
-                preferences.switchToOnlineBeforeSessionPlay = mediaJson.getBoolean("switchToOnlineBeforeSessionPlay")
-            }
-            if (mediaJson.has("radioWidgetBroadcastEnabled")) {
-                radioCatalogRepository.setWidgetBroadcastEnabled(mediaJson.getBoolean("radioWidgetBroadcastEnabled"))
-            }
-            if (mediaJson.has("clusterCoversEnabled")) {
-                clusterMediaBridge.setClusterCoversEnabled(mediaJson.getBoolean("clusterCoversEnabled"))
-            }
-            if (mediaJson.has("clusterWatchdogIntervalMs")) {
-                clusterMediaBridge.setReassertWatchdogIntervalMs(mediaJson.getLong("clusterWatchdogIntervalMs"))
-            }
-            if (mediaJson.has("uiScaleTenths")) {
-                preferences.uiScaleTenths = mediaJson.getInt("uiScaleTenths")
-            }
+            // Settings imports are full replacements. Missing portable fields therefore return
+            // to their canonical defaults; the active radio catalog remains untouched.
+            applyImportedSettings(mediaJson)
 
             // Advance the revision before publishing the durable marker. This keeps CAS updates
             // from accepting the pre-import revision after a process death.
@@ -570,6 +528,44 @@ class MediaSettingsController(
             return if (result.status == MediaBridgeContract.Status.OK) "COMMITTED" else staged.status
         }
         return staged?.status ?: "IDLE"
+    }
+
+    private fun applyImportedSettings(mediaJson: JSONObject) {
+        preferences.defaultAudioSource = mediaJson.optString("defaultAudioSource", "")
+        preferences.defaultAudioSourceDelaySec = if (mediaJson.has("defaultAudioSourceDelaySec")) {
+            mediaJson.getInt("defaultAudioSourceDelaySec")
+        } else 0
+        preferences.defaultAudioSourceAutoplayOnStartup = mediaJson.optBoolean(
+            "defaultAudioSourceAutoplayOnStartup",
+            true,
+        )
+        preferences.autoSwitchToDefaultOnSourceLost = mediaJson.optBoolean(
+            "autoSwitchToDefaultOnSourceLost",
+            false,
+        )
+        preferences.autoSwitchToDefaultAutoplayOnSourceLost = mediaJson.optBoolean(
+            "autoSwitchToDefaultAutoplayOnSourceLost",
+            true,
+        )
+        preferences.defaultMediaPackage = mediaJson.optString("defaultMediaPackage", "")
+        preferences.switchToOnlineBeforeSessionPlay = mediaJson.optBoolean(
+            "switchToOnlineBeforeSessionPlay",
+            false,
+        )
+        radioCatalogRepository.setWidgetBroadcastEnabled(
+            mediaJson.optBoolean("radioWidgetBroadcastEnabled", true),
+        )
+        clusterMediaBridge.setClusterCoversEnabled(
+            mediaJson.optBoolean("clusterCoversEnabled", true),
+        )
+        clusterMediaBridge.setReassertWatchdogIntervalMs(
+            if (mediaJson.has("clusterWatchdogIntervalMs")) {
+                mediaJson.getLong("clusterWatchdogIntervalMs")
+            } else ClusterMediaBridge.DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS,
+        )
+        preferences.uiScaleTenths = if (mediaJson.has("uiScaleTenths")) {
+            mediaJson.getInt("uiScaleTenths")
+        } else AtlasPreferences.DEFAULT_UI_SCALE_TENTHS
     }
 
     private fun validateBundleTypes(update: Bundle): String? {

@@ -30,6 +30,8 @@ object MediaBridgeContract {
         const val GET_IMPORT_STATUS = 11
         const val ABORT_MEDIA_IMPORT = 12
         const val RESTORE_DEFAULT_CATALOG = 13
+        const val EXPORT_RADIO_CATALOG = 14
+        const val IMPORT_RADIO_CATALOG = 15
     }
 
     object ServerMessage {
@@ -46,6 +48,8 @@ object MediaBridgeContract {
         const val MEDIA_IMPORT_STATUS = 110
         const val MEDIA_IMPORT_ABORTED = 111
         const val DEFAULT_CATALOG_RESTORED = 112
+        const val RADIO_CATALOG_EXPORTED = 114
+        const val RADIO_CATALOG_IMPORTED = 115
     }
 
     object Key {
