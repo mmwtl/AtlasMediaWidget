@@ -1,6 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
+import android.util.AtomicFile;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -28,19 +29,24 @@ final class ImportJournal {
         final boolean hasWidget;
         final boolean hasMedia;
         final boolean canRestoreWidget;
+        final boolean mediaCommitRequested;
 
-        RecoveryInfo(String id, long timestamp, boolean hasWidget, boolean hasMedia, boolean canRestoreWidget) {
+        RecoveryInfo(String id, long timestamp, boolean hasWidget, boolean hasMedia, boolean canRestoreWidget, boolean mediaCommitRequested) {
             this.id = id;
             this.timestamp = timestamp;
             this.hasWidget = hasWidget;
             this.hasMedia = hasMedia;
             this.canRestoreWidget = canRestoreWidget;
+            this.mediaCommitRequested = mediaCommitRequested;
         }
     }
 
     private ImportJournal() {}
 
     static String startImport(Context context, Prefs prefs, boolean hasWidget, boolean hasMedia) throws IOException {
+        if (checkPendingRecovery(context) != null) {
+            throw new IOException("Сначала завершите восстановление предыдущего импорта");
+        }
         String id = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
 
@@ -54,6 +60,8 @@ final class ImportJournal {
                 throw new IOException("Не удалось создать точку восстановления настроек виджета", e);
             }
         }
+
+        if (!hasWidget) new AtomicFile(new File(context.getFilesDir(), PRE_IMPORT_WIDGET_FILE)).delete();
 
         JSONObject journal = new JSONObject();
         try {
@@ -71,15 +79,27 @@ final class ImportJournal {
         return id;
     }
 
+    static void markMediaCommitRequested(Context context) throws IOException {
+        File file = new File(context.getFilesDir(), JOURNAL_FILE);
+        try {
+            JSONObject journal = new JSONObject(readFileToString(file));
+            journal.put("mediaCommitRequested", true);
+            writeAtomic(file, journal.toString().getBytes(StandardCharsets.UTF_8));
+        } catch (JSONException error) {
+            throw new IOException("Не удалось записать этап импорта", error);
+        }
+    }
+
     static void markCommitted(Context context) {
-        new File(context.getFilesDir(), PRE_IMPORT_WIDGET_FILE).delete();
-        new File(context.getFilesDir(), JOURNAL_FILE).delete();
+        // Remove the journal first: a crash during cleanup must not offer a rollback of a committed import.
+        new AtomicFile(new File(context.getFilesDir(), JOURNAL_FILE)).delete();
+        new AtomicFile(new File(context.getFilesDir(), PRE_IMPORT_WIDGET_FILE)).delete();
     }
 
     static boolean rollback(Context context, Prefs prefs) {
         boolean rolledBack = false;
         File preImportFile = new File(context.getFilesDir(), PRE_IMPORT_WIDGET_FILE);
-        if (preImportFile.isFile()) {
+        if (preImportFile.isFile() || new File(preImportFile.getPath() + ".bak").isFile()) {
             try {
                 String json = readFileToString(preImportFile);
                 SettingsBackup.Data data = SettingsBackup.decode(json);
@@ -88,14 +108,14 @@ final class ImportJournal {
                 AppLog.warn("Failed to rollback widget settings from pre-import backup", e);
             }
         }
-        preImportFile.delete();
-        new File(context.getFilesDir(), JOURNAL_FILE).delete();
+        if (rolledBack || (!preImportFile.isFile()
+                && !new File(preImportFile.getPath() + ".bak").isFile())) markCommitted(context);
         return rolledBack;
     }
 
     static RecoveryInfo checkPendingRecovery(Context context) {
         File journalFile = new File(context.getFilesDir(), JOURNAL_FILE);
-        if (!journalFile.isFile()) return null;
+        if (!journalFile.isFile() && !new File(journalFile.getPath() + ".bak").isFile()) return null;
 
         try {
             String json = readFileToString(journalFile);
@@ -107,8 +127,10 @@ final class ImportJournal {
                 boolean hasWidget = obj.optBoolean("hasWidget", false);
                 boolean hasMedia = obj.optBoolean("hasMedia", false);
                 File preImportFile = new File(context.getFilesDir(), PRE_IMPORT_WIDGET_FILE);
-                boolean canRestore = hasWidget && preImportFile.isFile();
-                return new RecoveryInfo(id, timestamp, hasWidget, hasMedia, canRestore);
+                boolean canRestore = hasWidget && (preImportFile.isFile()
+                        || new File(preImportFile.getPath() + ".bak").isFile());
+                return new RecoveryInfo(id, timestamp, hasWidget, hasMedia, canRestore,
+                        obj.optBoolean("mediaCommitRequested", false));
             }
         } catch (Exception e) {
             AppLog.warn("Failed to read import journal", e);
@@ -117,24 +139,24 @@ final class ImportJournal {
     }
 
     static void dismissPending(Context context) {
-        new File(context.getFilesDir(), PRE_IMPORT_WIDGET_FILE).delete();
-        new File(context.getFilesDir(), JOURNAL_FILE).delete();
+        markCommitted(context);
     }
 
     private static void writeAtomic(File target, byte[] bytes) throws IOException {
-        File tmp = new File(target.getParentFile(), target.getName() + ".tmp");
-        try (FileOutputStream out = new FileOutputStream(tmp)) {
+        AtomicFile file = new AtomicFile(target);
+        FileOutputStream out = null;
+        try {
+            out = file.startWrite();
             out.write(bytes);
-            out.flush();
-        }
-        if (target.exists()) target.delete();
-        if (!tmp.renameTo(target)) {
-            throw new IOException("Не удалось записать файл " + target.getName());
+            file.finishWrite(out);
+        } catch (IOException error) {
+            if (out != null) file.failWrite(out);
+            throw error;
         }
     }
 
     private static String readFileToString(File file) throws IOException {
-        try (InputStream in = new FileInputStream(file);
+        try (InputStream in = new AtomicFile(file).openRead();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buf = new byte[4096];
             int r;

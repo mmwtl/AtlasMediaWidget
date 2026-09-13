@@ -79,8 +79,10 @@ class MediaBackendCoordinator(
             radioCatalogRepository = radioCatalogRepository,
             clusterMediaBridge = clusterMediaBridge,
             onSettingsChanged = {
-                stateHub.refreshRadioState()
-                cancelDefaultSourceSwitch()
+                scope.launch {
+                    stateHub.refreshRadioState()
+                    cancelDefaultSourceSwitch()
+                }
             },
         )
     val callerAccessPolicy: CallerAccessPolicy = OpenCallerAccessPolicy()

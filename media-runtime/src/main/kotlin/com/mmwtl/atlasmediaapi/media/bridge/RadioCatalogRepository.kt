@@ -86,11 +86,21 @@ class RadioCatalogRepository(
     @Synchronized
     fun reloadCatalog() {
         widgetCoverDirectory.deleteRecursively()
-        if (customDirectoryNext.exists()) {
+        if (!customDirectory.exists()) {
+            when {
+                customDirectoryNext.isDirectory -> {
+                    if (customDirectoryPrev.isDirectory) {
+                        // The previous tree is known-good if a swap stopped before activation.
+                        customDirectoryPrev.renameTo(customDirectory)
+                        customDirectoryNext.deleteRecursively()
+                    } else if (validateDirectory(customDirectoryNext).isSuccess) {
+                        check(customDirectoryNext.renameTo(customDirectory))
+                    }
+                }
+                customDirectoryPrev.isDirectory -> customDirectoryPrev.renameTo(customDirectory)
+            }
+        } else if (customDirectoryNext.exists()) {
             customDirectoryNext.deleteRecursively()
-        }
-        if (!customDirectory.exists() && customDirectoryPrev.isDirectory) {
-            customDirectoryPrev.renameTo(customDirectory)
         }
         val useCustom = prefs.getBoolean(KEY_CUSTOM_CATALOG_ACTIVE, false)
         if (useCustom && customDirectory.isDirectory) {
@@ -193,13 +203,9 @@ class RadioCatalogRepository(
     fun restoreDefaultCatalog() {
         if (customDirectory.exists()) {
             customDirectoryPrev.deleteRecursively()
-            if (!customDirectory.renameTo(customDirectoryPrev)) {
-                customDirectory.deleteRecursively()
-            } else {
-                customDirectoryPrev.deleteRecursively()
-            }
+            check(customDirectory.renameTo(customDirectoryPrev)) { "Не удалось сохранить предыдущий каталог" }
         }
-        prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, false).apply()
+        check(prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, false).commit())
         reloadCatalog()
     }
 
@@ -229,6 +235,42 @@ class RadioCatalogRepository(
             return
         }
         throw IllegalArgumentException("Недопустимый размер обложки $coverName: ${width}x${height} (требуется от 32 до 4096 px)")
+    }
+
+    /** Validates a catalog directory without changing the active catalog or preferences. */
+    fun validateDirectory(sourceDir: File): Result<Int> = runCatching {
+        if (!sourceDir.isDirectory) throw IllegalArgumentException("Каталог radio отсутствует")
+        val manifestFile = File(sourceDir, MANIFEST_NAME)
+        if (!manifestFile.isFile) throw IllegalArgumentException("В каталоге отсутствует $MANIFEST_NAME")
+        val parsedStations = InputStreamReader(FileInputStream(manifestFile), StandardCharsets.UTF_8).use {
+            RadioCatalogCsv.read(it)
+        }
+        val coversDir = File(sourceDir, COVERS_DIR)
+        for (station in parsedStations) {
+            val coverName = station.coverFileName
+            if (coverName.isNotBlank()) {
+                val coverFile = File(coversDir, coverName)
+                if (coverFile.canonicalFile.parentFile != coversDir.canonicalFile) {
+                    throw SecurityException("Небезопасный путь к обложке: $coverName")
+                }
+                validateCoverFile(coverFile, coverName)
+            }
+        }
+        if (coversDir.exists() && !coversDir.isDirectory) {
+            throw IllegalArgumentException("Путь covers не является каталогом")
+        }
+        coversDir.listFiles()?.forEach { file ->
+            if (!file.isFile || file.canonicalFile.parentFile != coversDir.canonicalFile) {
+                throw IllegalArgumentException("Недопустимый объект в каталоге обложек: ${file.name}")
+            }
+            validateCoverFile(file, file.name)
+        }
+        sourceDir.listFiles()?.forEach { child ->
+            if (child.name != MANIFEST_NAME && child.name != COVERS_DIR) {
+                throw IllegalArgumentException("Недопустимый файл в каталоге radio: ${child.name}")
+            }
+        }
+        parsedStations.size
     }
 
     @Synchronized
@@ -308,29 +350,8 @@ class RadioCatalogRepository(
                 }
             }
 
-            // Recoverable swap
-            customDirectoryNext.deleteRecursively()
-            if (!tempStagingDir.renameTo(customDirectoryNext)) {
-                customDirectoryNext.mkdirs()
-                tempStagingDir.copyRecursively(customDirectoryNext, overwrite = true)
-                tempStagingDir.deleteRecursively()
-            }
-            if (customDirectory.exists()) {
-                customDirectoryPrev.deleteRecursively()
-                if (!customDirectory.renameTo(customDirectoryPrev)) {
-                    customDirectory.copyRecursively(customDirectoryPrev, overwrite = true)
-                    customDirectory.deleteRecursively()
-                }
-            }
-            if (!customDirectoryNext.renameTo(customDirectory)) {
-                customDirectory.mkdirs()
-                customDirectoryNext.copyRecursively(customDirectory, overwrite = true)
-                customDirectoryNext.deleteRecursively()
-            }
-            customDirectoryPrev.deleteRecursively()
-
-            prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, true).apply()
-            reloadCatalog()
+            check(tempStagingDir.renameTo(customDirectoryNext)) { "Не удалось подготовить каталог для замены" }
+            installValidatedCustomDirectory()
             parsedStations.size
         } finally {
             tempStagingDir.deleteRecursively()
@@ -340,46 +361,33 @@ class RadioCatalogRepository(
     /** Imports verified radio catalog files directly from a directory (used by full backup). */
     @Synchronized
     fun importFromDirectory(sourceDir: File): Result<Int> = runCatching {
-        val manifestFile = File(sourceDir, MANIFEST_NAME)
-        if (!manifestFile.isFile) {
-            throw IllegalArgumentException("В каталоге отсутствует $MANIFEST_NAME")
-        }
-        val parsedStations = InputStreamReader(FileInputStream(manifestFile), StandardCharsets.UTF_8).use {
-            RadioCatalogCsv.read(it)
-        }
-        if (parsedStations.isEmpty()) {
-            throw IllegalArgumentException("Каталог не содержит валидных радиостанций")
-        }
-        val coversDir = File(sourceDir, COVERS_DIR)
-        for (station in parsedStations) {
-            val coverName = station.coverFileName
-            if (coverName.isNotBlank()) {
-                val coverFile = File(coversDir, coverName)
-                validateCoverFile(coverFile, coverName)
-            }
-        }
+        val stationCount = validateDirectory(sourceDir).getOrThrow()
 
         customDirectoryNext.deleteRecursively()
-        customDirectoryNext.mkdirs()
+        check(sourceDir.isDirectory)
         sourceDir.copyRecursively(customDirectoryNext, overwrite = true)
+        installValidatedCustomDirectory()
+        stationCount
+    }
 
+    private fun installValidatedCustomDirectory() {
+        customDirectoryPrev.deleteRecursively()
         if (customDirectory.exists()) {
-            customDirectoryPrev.deleteRecursively()
-            if (!customDirectory.renameTo(customDirectoryPrev)) {
-                customDirectory.copyRecursively(customDirectoryPrev, overwrite = true)
-                customDirectory.deleteRecursively()
-            }
+            check(customDirectory.renameTo(customDirectoryPrev)) { "Не удалось сохранить предыдущий каталог" }
         }
-        if (!customDirectoryNext.renameTo(customDirectory)) {
-            customDirectory.mkdirs()
-            customDirectoryNext.copyRecursively(customDirectory, overwrite = true)
-            customDirectoryNext.deleteRecursively()
+        try {
+            check(customDirectoryNext.renameTo(customDirectory)) { "Не удалось активировать каталог" }
+        } catch (error: Exception) {
+            if (!customDirectory.exists() && customDirectoryPrev.isDirectory) {
+                customDirectoryPrev.renameTo(customDirectory)
+            }
+            throw error
         }
         customDirectoryPrev.deleteRecursively()
-
-        prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, true).apply()
+        check(prefs.edit().putBoolean(KEY_CUSTOM_CATALOG_ACTIVE, true).commit()) {
+            "Не удалось сохранить состояние каталога"
+        }
         reloadCatalog()
-        parsedStations.size
     }
 
     fun exportCatalogZip(outputStream: OutputStream) {
@@ -425,6 +433,28 @@ class RadioCatalogRepository(
                 }
             }
         }
+    }
+
+    /** Returns SHA-256 hashes for every file included in the custom radio section. */
+    fun radioSectionHashes(prefix: String = "radio/"): Map<String, String> {
+        if (currentType != RadioCatalogType.CUSTOM || !customDirectory.isDirectory) return emptyMap()
+        val result = linkedMapOf<String, String>()
+        fun visit(dir: File, relative: String) {
+            dir.listFiles()?.sortedBy(File::getName)?.forEach { file ->
+                if (file.isDirectory) visit(file, "$relative${file.name}/")
+                else if (file.isFile) {
+                    val digest = java.security.MessageDigest.getInstance("SHA-256")
+                    file.inputStream().use { input ->
+                        val buffer = ByteArray(8192)
+                        var read: Int
+                        while (input.read(buffer).also { read = it } != -1) digest.update(buffer, 0, read)
+                    }
+                    result["$prefix$relative${file.name}"] = digest.digest().joinToString("") { "%02x".format(it) }
+                }
+            }
+        }
+        visit(customDirectory, "")
+        return result
     }
 
     fun exportSampleZip(outputStream: OutputStream) {

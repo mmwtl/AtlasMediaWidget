@@ -178,6 +178,9 @@ class MediaSettingsControllerTest {
 
         val zipBaos = ByteArrayOutputStream()
         ZipOutputStream(zipBaos).use { zos ->
+            zos.putNextEntry(ZipEntry("manifest.json"))
+            zos.write(JSONObject().put("format", "atlas-media-backup").put("schemaVersion", 1).toString().toByteArray())
+            zos.closeEntry()
             zos.putNextEntry(ZipEntry("media.json"))
             zos.write(mediaJson.toString().toByteArray(StandardCharsets.UTF_8))
             zos.closeEntry()
@@ -213,6 +216,9 @@ class MediaSettingsControllerTest {
         }
         val zipBaos = ByteArrayOutputStream()
         ZipOutputStream(zipBaos).use { zos ->
+            zos.putNextEntry(ZipEntry("manifest.json"))
+            zos.write(JSONObject().put("format", "atlas-media-backup").put("schemaVersion", 1).toString().toByteArray())
+            zos.closeEntry()
             zos.putNextEntry(ZipEntry("media.json"))
             zos.write(mediaJson.toString().toByteArray(StandardCharsets.UTF_8))
             zos.closeEntry()
@@ -221,8 +227,8 @@ class MediaSettingsControllerTest {
         val prepResult = controller.prepareMediaImport(opId, ByteArrayInputStream(zipBaos.toByteArray()))
         assertEquals(MediaBridgeContract.Status.OK, prepResult.status)
 
-        val abortResult = controller.abortMediaImport(opId)
-        assertEquals(true, abortResult)
+        controller.abortMediaImport(opId)
+        assertEquals("IDLE", controller.getImportStatus(opId))
 
         // Attempting commit after abort must fail
         val commitResult = controller.commitMediaImport(opId, prepResult.stagingToken)
@@ -243,4 +249,83 @@ class MediaSettingsControllerTest {
         assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, prepResult.status)
         assertTrue(prepResult.errorMessage.contains("Небезопасный путь"))
     }
+    @Test
+    fun `prepared import survives recreation and commit is idempotent`() {
+        val operation = UUID.randomUUID().toString()
+        val prepared = controller.prepareMediaImport(operation, ByteArrayInputStream(mediaArchive("USB")))
+        assertEquals(MediaBridgeContract.Status.OK, prepared.status)
+        val restarted = restartController()
+        assertEquals("PREPARED", restarted.getImportStatus(operation))
+        assertEquals(MediaBridgeContract.Status.OK, restarted.commitMediaImport(operation, prepared.stagingToken).status)
+        val revision = restarted.getRevision()
+        assertEquals("COMMITTED", restartController().getImportStatus(operation))
+        assertEquals(MediaBridgeContract.Status.OK, restarted.commitMediaImport(operation, prepared.stagingToken).status)
+        assertEquals(revision, restarted.getRevision())
+    }
+
+    @Test
+    fun `committing import is finished when status is queried after recreation`() {
+        val operation = UUID.randomUUID().toString()
+        val prepared = controller.prepareMediaImport(operation, ByteArrayInputStream(mediaArchive("BT")))
+        assertEquals(MediaBridgeContract.Status.OK, prepared.status)
+        val metadata = java.io.File(context.filesDir, "staging_media_import_$operation/operation.json")
+        val journal = JSONObject(metadata.readText()).put("status", "COMMITTING")
+        metadata.writeText(journal.toString())
+        val restarted = restartController()
+        assertEquals("COMMITTED", restarted.getImportStatus(operation))
+        assertEquals("BT", restarted.getSnapshot().defaultAudioSource)
+    }
+
+    @Test
+    fun `invalid source and wrong bundle types leave settings unchanged`() {
+        val revision = controller.getRevision()
+        val prepared = controller.prepareMediaImport(UUID.randomUUID().toString(), ByteArrayInputStream(mediaArchive("INVALID")))
+        assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, prepared.status)
+        val invalid = Bundle().apply { putString(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY, "true") }
+        assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, controller.updateSettings(revision, invalid).status)
+        assertEquals(revision, controller.getRevision())
+        assertEquals("", controller.getSnapshot().defaultAudioSource)
+    }
+
+    @Test
+    fun `missing custom cover is rejected before settings change`() {
+        val json = JSONObject().put("format", "atlas-media-settings").put("schemaVersion", 1)
+            .put("defaultAudioSource", "BT").put("catalogMode", "custom")
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            listOf(
+                "manifest.json" to JSONObject().put("format", "atlas-media-backup").put("schemaVersion", 1).toString(),
+                "media.json" to json.toString(),
+                "radio/stations.csv" to "frequency_khz,name,band,cover\n98800,Test,FM,missing.png\n"
+            ).forEach { (name, contents) ->
+                zip.putNextEntry(ZipEntry(name)); zip.write(contents.toByteArray()); zip.closeEntry()
+            }
+        }
+        val prepared = controller.prepareMediaImport(UUID.randomUUID().toString(), ByteArrayInputStream(output.toByteArray()))
+        assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, prepared.status)
+        assertTrue(prepared.errorMessage.contains("missing.png"))
+        assertEquals("", controller.getSnapshot().defaultAudioSource)
+    }
+
+    @Test
+    fun `unsafe operation id is rejected without creating directories`() {
+        val prepared = controller.prepareMediaImport("../../escape", ByteArrayInputStream(mediaArchive("BT")))
+        assertEquals(MediaBridgeContract.Status.INVALID_REQUEST, prepared.status)
+    }
+
+    private fun restartController() = MediaSettingsController(context, preferences, radioCatalogRepository, clusterMediaBridge)
+
+    private fun mediaArchive(source: String): ByteArray {
+        val json = JSONObject().put("format", "atlas-media-settings").put("schemaVersion", 1)
+            .put("defaultAudioSource", source).put("catalogMode", "builtin")
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            listOf("manifest.json" to JSONObject().put("format", "atlas-media-backup").put("schemaVersion", 1).toString(),
+                "media.json" to json.toString()).forEach { (name, contents) ->
+                zip.putNextEntry(ZipEntry(name)); zip.write(contents.toByteArray()); zip.closeEntry()
+            }
+        }
+        return output.toByteArray()
+    }
+
 }

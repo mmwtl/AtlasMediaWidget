@@ -68,6 +68,8 @@ final class MediaBridgeClient {
     private final AtomicLong nextRequest = new AtomicLong();
     private final BridgeConnectionState connectionState = new BridgeConnectionState();
     private final java.util.Map<String, Object> pendingCallbacks = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<String, Runnable> pendingTimeouts = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long REQUEST_TIMEOUT_MS = 15_000L;
     private volatile boolean settingsSupported;
     private Handler ipc;
     private Messenger incoming;
@@ -149,9 +151,17 @@ final class MediaBridgeClient {
 
     void stop() {
         main.post(() -> {
-            if (!started) return;
+            if (!started) {
+                settingsSupported = false;
+                failPendingCallbacks(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                        "Atlas Media API остановлен");
+                return;
+            }
             started = false;
             removeConnectionCallbacks();
+            settingsSupported = false;
+            failPendingCallbacks(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                    "Atlas Media API остановлен");
             boolean hadBinding = connectionState.hasBinding();
             connectionState.onStopped();
             Handler oldIpc = ipc;
@@ -279,26 +289,8 @@ final class MediaBridgeClient {
                 }
             }
             if (ipc != null) ipc.post(() -> remote = null);
-            settingsSupported = false;
-            for (java.util.Map.Entry<String, Object> entry : pendingCallbacks.entrySet()) {
-                Object cb = entry.getValue();
-                if (cb instanceof SettingsCallback scb) {
-                    main.post(() -> scb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                } else if (cb instanceof UpdateSettingsCallback ucb) {
-                    main.post(() -> ucb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                } else if (cb instanceof BackupCallback bcb) {
-                    main.post(() -> bcb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                } else if (cb instanceof PrepareImportCallback pcb) {
-                    main.post(() -> pcb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                } else if (cb instanceof CommitImportCallback ccb) {
-                    main.post(() -> ccb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                } else if (cb instanceof ImportStatusCallback scb) {
-                    main.post(() -> scb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                } else if (cb instanceof RestoreCatalogCallback rcb) {
-                    main.post(() -> rcb.onError(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, "Atlas Media API отключён"));
-                }
-            }
-            pendingCallbacks.clear();
+            failPendingCallbacks(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                    "Atlas Media API отключён");
             AppLog.info(detail + " at t+" + elapsedSince(startedAt) + " ms");
             notifyState(State.DISCONNECTED, detail);
             scheduleRebind(delayMs);
@@ -324,18 +316,47 @@ final class MediaBridgeClient {
 
     private void sendSimple(int what, String requestId, Bundle extra) {
         Handler target = ipc;
-        if (!started || target == null) return;
-        target.post(() -> {
-            if (!connectionState.canSend() || remote == null) {
+        if (!started || target == null) {
+            closeFileDescriptor(extra);
+            if (what == MediaBridgeContract.COMMAND) {
+                postCommandResult(requestId, MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                        "Atlas Media API не подключён", 0L);
+            } else {
+                dispatchError(requestId, MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                        "Atlas Media API не подключён");
+            }
+            return;
+        }
+        boolean posted = target.post(() -> {
+            if (!started || !connectionState.canSend() || remote == null) {
+                closeFileDescriptor(extra);
                 if (what == MediaBridgeContract.COMMAND) {
-                    postCommandResult(requestId, 5, "Atlas Media API не подключён", 0L);
+                    postCommandResult(requestId, MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                            "Atlas Media API не подключён", 0L);
+                } else {
+                    dispatchError(requestId, MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                            "Atlas Media API не подключён");
                 }
                 return;
             }
             Bundle data = baseData(requestId);
             if (extra != null) data.putAll(extra);
-            sendMessage(what, data);
+            try {
+                sendMessage(what, data);
+            } finally {
+                closeFileDescriptor(data);
+            }
         });
+        if (!posted) {
+            closeFileDescriptor(extra);
+            if (what == MediaBridgeContract.COMMAND) {
+                postCommandResult(requestId, MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                        "Atlas Media API не подключён", 0L);
+            } else {
+                dispatchError(requestId, MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                        "Atlas Media API не подключён");
+            }
+        }
     }
 
     private Bundle baseData(String requestId) {
@@ -375,7 +396,8 @@ final class MediaBridgeClient {
                 case MediaBridgeContract.REGISTERED -> {
                     int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
                     if (status == MediaBridgeContract.STATUS_OK) {
-                        settingsSupported = data.containsKey(MediaBridgeContract.K_SETTINGS_PROTOCOL_VERSION);
+                        settingsSupported = data.getInt(
+                                MediaBridgeContract.K_SETTINGS_PROTOCOL_VERSION, -1) == 1;
                         if (!connectionState.onRegistered()) return true;
                         main.post(() -> {
                             main.removeCallbacks(registerTimeout);
@@ -414,38 +436,38 @@ final class MediaBridgeClient {
                 }
                 case MediaBridgeContract.SETTINGS -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof SettingsCallback scb) {
-                        MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
                         main.post(() -> scb.onSettings(snapshot));
                     }
                 }
                 case MediaBridgeContract.SETTINGS_UPDATED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof UpdateSettingsCallback ucb) {
-                        MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
                         main.post(() -> ucb.onSettingsUpdated(snapshot));
                     }
                 }
                 case MediaBridgeContract.DEFAULT_CATALOG_RESTORED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof RestoreCatalogCallback rcb) {
-                        MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
                         main.post(() -> rcb.onCatalogRestored(snapshot));
                     }
                 }
                 case MediaBridgeContract.MEDIA_BACKUP_EXPORTED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof BackupCallback bcb) {
                         main.post(bcb::onBackupExported);
                     }
                 }
                 case MediaBridgeContract.MEDIA_IMPORT_PREPARED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof PrepareImportCallback pcb) {
                         String token = data.getString(MediaBridgeContract.K_STAGING_TOKEN, "");
                         String catalogMode = data.getString(MediaBridgeContract.K_CATALOG_TYPE, "");
@@ -457,15 +479,15 @@ final class MediaBridgeClient {
                 }
                 case MediaBridgeContract.MEDIA_IMPORT_COMMITTED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof CommitImportCallback ccb) {
-                        MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
                         main.post(() -> ccb.onImportCommitted(snapshot));
                     }
                 }
                 case MediaBridgeContract.MEDIA_IMPORT_STATUS -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
-                    Object cb = pendingCallbacks.remove(requestId);
+                    Object cb = takePendingCallback(requestId);
                     if (cb instanceof ImportStatusCallback scb) {
                         String status = data.getString(MediaBridgeContract.K_IMPORT_STATUS, "IDLE");
                         main.post(() -> scb.onStatus(status));
@@ -475,24 +497,10 @@ final class MediaBridgeClient {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
                     int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
                     String detail = data.getString(MediaBridgeContract.K_MESSAGE, "");
-                    Object cb = pendingCallbacks.remove(requestId);
-                    if (cb instanceof SettingsCallback scb) {
-                        main.post(() -> scb.onError(status, detail));
-                    } else if (cb instanceof UpdateSettingsCallback ucb) {
-                        main.post(() -> ucb.onError(status, detail));
-                    } else if (cb instanceof BackupCallback bcb) {
-                        main.post(() -> bcb.onError(status, detail));
-                    } else if (cb instanceof PrepareImportCallback pcb) {
-                        main.post(() -> pcb.onError(status, detail));
-                    } else if (cb instanceof CommitImportCallback ccb) {
-                        main.post(() -> ccb.onError(status, detail));
-                    } else if (cb instanceof ImportStatusCallback scb) {
-                        main.post(() -> scb.onError(status, detail));
-                    } else if (cb instanceof RestoreCatalogCallback rcb) {
-                        main.post(() -> rcb.onError(status, detail));
-                    } else if (requestId.startsWith("radio-stations-")) {
+                    boolean handled = dispatchError(requestId, status, detail);
+                    if (!handled && requestId.startsWith("radio-stations-")) {
                         postRadioStationsError(status, detail);
-                    } else {
+                    } else if (!handled && !requestId.startsWith("radio-stations-")) {
                         postCommandResult(requestId, status, detail,
                                 data.getLong(MediaBridgeContract.K_GENERATION));
                     }
@@ -507,6 +515,8 @@ final class MediaBridgeClient {
             }
         } catch (RuntimeException error) {
             AppLog.warn("Invalid Media Bridge payload", error);
+            dispatchError(data.getString(MediaBridgeContract.K_REQUEST_ID, ""),
+                    MediaBridgeContract.STATUS_FAILED, "Некорректный ответ медиасервиса");
             if (message.what == MediaBridgeContract.RADIO_STATIONS) {
                 postRadioStationsError(1, "Некорректный список радиостанций");
             }
@@ -520,13 +530,13 @@ final class MediaBridgeClient {
 
     void getSettings(SettingsCallback callback) {
         String reqId = requestId("get-settings");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         sendSimple(MediaBridgeContract.GET_SETTINGS, reqId, null);
     }
 
     void updateSettings(Long expectedRevision, Bundle changes, UpdateSettingsCallback callback) {
         String reqId = requestId("update-settings");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = changes != null ? new Bundle(changes) : new Bundle();
         if (expectedRevision != null) {
             extra.putLong(MediaBridgeContract.K_EXPECTED_REVISION, expectedRevision);
@@ -536,7 +546,7 @@ final class MediaBridgeClient {
 
     void restoreDefaultCatalog(RestoreCatalogCallback callback) {
         String reqId = requestId("restore-catalog");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         sendSimple(MediaBridgeContract.RESTORE_DEFAULT_CATALOG, reqId, null);
     }
 
@@ -550,14 +560,16 @@ final class MediaBridgeClient {
             exportMediaBackup(pfd, callback);
         } catch (Exception e) {
             if (callback != null) {
-                callback.onError(MediaBridgeContract.STATUS_IO_ERROR, e.getMessage());
+                main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
+                        e.getMessage()));
             }
         }
     }
 
+    /** The descriptor overload takes ownership and closes the descriptor after send or drop. */
     void exportMediaBackup(android.os.ParcelFileDescriptor pfd, BackupCallback callback) {
         String reqId = requestId("export-media-backup");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = new Bundle();
         extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
         sendSimple(MediaBridgeContract.EXPORT_MEDIA_BACKUP, reqId, extra);
@@ -571,14 +583,16 @@ final class MediaBridgeClient {
             prepareMediaImport(operationId, pfd, callback);
         } catch (Exception e) {
             if (callback != null) {
-                callback.onError(MediaBridgeContract.STATUS_IO_ERROR, e.getMessage());
+                main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
+                        e.getMessage()));
             }
         }
     }
 
+    /** The descriptor overload takes ownership and closes the descriptor after send or drop. */
     void prepareMediaImport(String operationId, android.os.ParcelFileDescriptor pfd, PrepareImportCallback callback) {
         String reqId = requestId("prepare-media-import");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = new Bundle();
         extra.putString(MediaBridgeContract.K_OPERATION_ID, operationId);
         extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
@@ -587,7 +601,7 @@ final class MediaBridgeClient {
 
     void commitMediaImport(String operationId, String stagingToken, CommitImportCallback callback) {
         String reqId = requestId("commit-media-import");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = new Bundle();
         extra.putString(MediaBridgeContract.K_OPERATION_ID, operationId);
         extra.putString(MediaBridgeContract.K_STAGING_TOKEN, stagingToken);
@@ -596,7 +610,7 @@ final class MediaBridgeClient {
 
     void getImportStatus(String operationId, ImportStatusCallback callback) {
         String reqId = requestId("get-import-status");
-        if (callback != null) pendingCallbacks.put(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = new Bundle();
         extra.putString(MediaBridgeContract.K_OPERATION_ID, operationId);
         sendSimple(MediaBridgeContract.GET_IMPORT_STATUS, reqId, extra);
@@ -617,12 +631,84 @@ final class MediaBridgeClient {
         main.post(() -> listener.onRadioStationsError(status, message));
     }
 
+    private void addPendingCallback(String requestId, Object callback) {
+        pendingCallbacks.put(requestId, callback);
+        Runnable timeout = () -> {
+            if (pendingCallbacks.remove(requestId, callback)) {
+                pendingTimeouts.remove(requestId);
+                dispatchError(callback, MediaBridgeContract.STATUS_FAILED,
+                        "Таймаут запроса к Atlas Media API");
+            }
+        };
+        pendingTimeouts.put(requestId, timeout);
+        main.postDelayed(timeout, REQUEST_TIMEOUT_MS);
+    }
+
+    private Object takePendingCallback(String requestId) {
+        Object callback = pendingCallbacks.remove(requestId);
+        if (callback != null) {
+            Runnable timeout = pendingTimeouts.remove(requestId);
+            if (timeout != null) main.removeCallbacks(timeout);
+        }
+        return callback;
+    }
+
+    private boolean dispatchError(String requestId, int status, String message) {
+        Object callback = takePendingCallback(requestId);
+        if (callback == null) return false;
+        dispatchError(callback, status, message);
+        return true;
+    }
+
+    private void dispatchError(Object callback, int status, String message) {
+        main.post(() -> {
+            if (callback instanceof SettingsCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof UpdateSettingsCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof BackupCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof PrepareImportCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof CommitImportCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof ImportStatusCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof RestoreCatalogCallback cb) {
+                cb.onError(status, message);
+            }
+        });
+    }
+
+    private void failPendingCallbacks(int status, String message) {
+        for (java.util.Map.Entry<String, Object> entry : pendingCallbacks.entrySet()) {
+            if (pendingCallbacks.remove(entry.getKey(), entry.getValue())) {
+                Runnable timeout = pendingTimeouts.remove(entry.getKey());
+                if (timeout != null) main.removeCallbacks(timeout);
+                dispatchError(entry.getValue(), status, message);
+            }
+        }
+    }
+
+    private static void closeFileDescriptor(Bundle data) {
+        if (data == null) return;
+        android.os.Parcelable value = data.getParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR);
+        if (!(value instanceof android.os.ParcelFileDescriptor pfd)) return;
+        try {
+            pfd.close();
+        } catch (java.io.IOException error) {
+            AppLog.warn("Cannot close Media Bridge file descriptor", error);
+        }
+    }
+
     private void notifyState(State state, String detail) {
         main.post(() -> listener.onBridgeState(state, detail));
     }
 
     private void markIncompatible(String detail) {
         if (!started) return;
+        settingsSupported = false;
+        failPendingCallbacks(MediaBridgeContract.STATUS_UNSUPPORTED_VERSION, detail);
         connectionState.onIncompatible();
         main.post(() -> {
             removeConnectionTimeouts();

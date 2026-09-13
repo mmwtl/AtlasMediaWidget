@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediaapi.settings
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.util.AtomicFile
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
@@ -21,6 +22,7 @@ import java.io.OutputStream
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.UUID
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -36,6 +38,7 @@ class MediaSettingsController(
         private const val META_PREFS = "media_settings_meta"
         private const val KEY_REVISION = "revision"
         private const val KEY_LAST_COMMITTED_OPERATION = "last_committed_operation"
+        private const val STAGING_METADATA = "operation.json"
 
         const val MAX_BACKUP_FILE_BYTES = 70L * 1024L * 1024L // 70 MB
         const val MAX_UNCOMPRESSED_BYTES = 65L * 1024L * 1024L // 65 MB
@@ -61,7 +64,7 @@ class MediaSettingsController(
         val catalogMode: String,
         val stationCount: Int,
         val warnings: List<String>,
-        var status: String, // "PREPARED", "COMMITTED", "FAILED"
+        var status: String, // "PREPARED", "COMMITTING", "COMMITTED", "FAILED"
     )
 
     data class UpdateResult(
@@ -85,16 +88,20 @@ class MediaSettingsController(
         val errorMessage: String = "",
     )
 
+    init {
+        synchronized(importLock) { loadStagedOperations() }
+    }
+
     fun getRevision(): Long = revision
 
     @Synchronized
     private fun nextRevision(): Long {
         revision++
-        metaPrefs.edit().putLong(KEY_REVISION, revision).apply()
+        metaPrefs.edit().putLong(KEY_REVISION, revision).commit()
         return revision
     }
 
-    fun getSnapshot(): MediaSettingsSnapshot {
+    fun getSnapshot(): MediaSettingsSnapshot = synchronized(importLock) {
         val catalogInfo = radioCatalogRepository.getCatalogInfo()
         return MediaSettingsSnapshot(
             revision = revision,
@@ -115,8 +122,7 @@ class MediaSettingsController(
         )
     }
 
-    @Synchronized
-    fun updateSettings(expectedRevision: Long?, update: Bundle): UpdateResult {
+    fun updateSettings(expectedRevision: Long?, update: Bundle): UpdateResult = synchronized(importLock) {
         if (expectedRevision != null && expectedRevision != revision) {
             return UpdateResult(
                 snapshot = null,
@@ -126,6 +132,9 @@ class MediaSettingsController(
         }
 
         // 1. Validation
+        validateBundleTypes(update)?.let {
+            return UpdateResult(null, MediaBridgeContract.Status.VALIDATION_ERROR, it)
+        }
         if (update.containsKey(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE)) {
             val source = update.getString(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE).orEmpty()
             if (source !in ALLOWED_AUDIO_SOURCES) {
@@ -220,15 +229,14 @@ class MediaSettingsController(
         )
     }
 
-    @Synchronized
-    fun restoreDefaultCatalog(): MediaSettingsSnapshot {
+    fun restoreDefaultCatalog(): MediaSettingsSnapshot = synchronized(importLock) {
         radioCatalogRepository.restoreDefaultCatalog()
         nextRevision()
         onSettingsChanged?.invoke()
         return getSnapshot()
     }
 
-    fun exportMediaBackup(outputStream: OutputStream) {
+    fun exportMediaBackup(outputStream: OutputStream) = synchronized(importLock) {
         val snapshot = getSnapshot()
         val isCustomCatalog = snapshot.catalogType == "CUSTOM"
 
@@ -246,6 +254,7 @@ class MediaSettingsController(
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
+            put("uiScaleTenths", snapshot.uiScaleTenths)
         }
         val mediaJsonBytes = mediaJsonObj.toString(2).toByteArray(StandardCharsets.UTF_8)
 
@@ -261,6 +270,9 @@ class MediaSettingsController(
             put("sections", sections)
             val hashes = JSONObject().apply {
                 put("media.json", sha256(mediaJsonBytes))
+                if (isCustomCatalog) {
+                    radioCatalogRepository.radioSectionHashes().forEach { (path, hash) -> put(path, hash) }
+                }
             }
             put("hashes", hashes)
         }
@@ -282,8 +294,11 @@ class MediaSettingsController(
     }
 
     fun prepareMediaImport(operationId: String, inputStream: InputStream): PrepareImportResult = synchronized(importLock) {
+        if (!isValidOperationId(operationId)) {
+            return PrepareImportResult(MediaBridgeContract.Status.INVALID_REQUEST, errorMessage = "operationId должен быть UUID")
+        }
         val lastCommitted = metaPrefs.getString(KEY_LAST_COMMITTED_OPERATION, "")
-        if (operationId.isNotBlank() && operationId == lastCommitted) {
+        if (operationId == lastCommitted) {
             return PrepareImportResult(
                 status = MediaBridgeContract.Status.OK,
                 stagingToken = "already_committed",
@@ -291,6 +306,16 @@ class MediaSettingsController(
                 stationCount = radioCatalogRepository.getCatalogInfo().stationCount,
                 warnings = listOf("Операция уже была применена"),
             )
+        }
+
+        val existing = stagedOperations[operationId] ?: loadStagedOperation(operationId)
+        if (existing != null) {
+            if (existing.status == "COMMITTING") {
+                return PrepareImportResult(MediaBridgeContract.Status.CONFLICT, errorMessage = "Импорт операции уже выполняется")
+            }
+            if (existing.status == "PREPARED") {
+                return PrepareImportResult(MediaBridgeContract.Status.OK, existing.stagingToken, existing.catalogMode, existing.stationCount, existing.warnings)
+            }
         }
 
         val stagingDir = File(context.filesDir, "staging_media_import_$operationId")
@@ -302,7 +327,8 @@ class MediaSettingsController(
             var totalEntries = 0
             val stagingCanonical = stagingDir.canonicalPath
 
-            ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
+            ZipInputStream(BufferedInputStream(LimitedInputStream(inputStream, MAX_BACKUP_FILE_BYTES))).use { zis ->
+                val entries = HashSet<String>()
                 var entry: ZipEntry? = zis.nextEntry
                 while (entry != null) {
                     totalEntries++
@@ -310,13 +336,19 @@ class MediaSettingsController(
                         throw IllegalStateException("Превышено максимальное количество файлов в архиве ($MAX_ZIP_ENTRIES)")
                     }
 
-                    val normalizedName = entry.name.replace('\\', '/').trimStart('/')
+                    if (entry.name.isEmpty() || entry.name.startsWith('/') || entry.name.contains('\\')) {
+                        throw SecurityException("Небезопасный путь в ZIP архиве: ${entry.name}")
+                    }
+                    val normalizedName = entry.name
                     val targetFile = File(stagingDir, normalizedName)
                     val targetCanonical = targetFile.canonicalPath
                     val isSafe = targetCanonical == stagingCanonical ||
                             targetCanonical.startsWith(stagingCanonical + File.separator)
                     if (!isSafe) {
                         throw SecurityException("Небезопасный путь в ZIP архиве: ${entry.name}")
+                    }
+                    if (!entries.add(targetCanonical)) {
+                        throw IllegalArgumentException("Дублирующийся путь в ZIP архиве: ${entry.name}")
                     }
 
                     if (entry.isDirectory) {
@@ -347,32 +379,20 @@ class MediaSettingsController(
 
             val mediaJsonStr = mediaFile.readText(StandardCharsets.UTF_8)
             val mediaJson = JSONObject(mediaJsonStr)
-            val format = mediaJson.optString("format", "")
-            if (format != "atlas-media-settings") {
-                throw IllegalArgumentException("Неверный формат media.json: $format")
-            }
-            val schemaVersion = mediaJson.optInt("schemaVersion", 0)
-            if (schemaVersion != 1) {
-                throw IllegalArgumentException("Неподдерживаемая версия схемы media.json: $schemaVersion")
-            }
-
-            val catalogMode = mediaJson.optString("catalogMode", "builtin")
+            val manifestFile = File(stagingDir, "manifest.json")
+            if (!manifestFile.isFile) throw IllegalArgumentException("В архиве отсутствует manifest.json")
+            val manifest = JSONObject(manifestFile.readText(StandardCharsets.UTF_8))
+            validateManifest(manifest, stagingDir)
+            validateArchiveEntries(stagingDir)
+            val catalogMode = validateMediaJson(mediaJson)
             val warnings = mutableListOf<String>()
             var stationCount = 0
 
             if (catalogMode == "custom") {
                 val radioDir = File(stagingDir, "radio")
-                if (!radioDir.isDirectory) {
-                    throw IllegalArgumentException("Указан catalogMode=custom, но каталог radio/ отсутствует")
-                }
-                val manifestFile = File(radioDir, "stations.csv")
-                if (!manifestFile.isFile) {
-                    throw IllegalArgumentException("В архиве отсутствует radio/stations.csv")
-                }
-                val parsedStations = manifestFile.reader(StandardCharsets.UTF_8).use {
-                    com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogCsv.read(it)
-                }
-                stationCount = parsedStations.size
+                stationCount = radioCatalogRepository.validateDirectory(radioDir).getOrThrow()
+            } else if (File(stagingDir, "radio").exists()) {
+                throw IllegalArgumentException("Каталог radio присутствует при catalogMode=builtin")
             }
 
             val defaultMediaPkg = mediaJson.optString("defaultMediaPackage", "")
@@ -398,6 +418,7 @@ class MediaSettingsController(
                 status = "PREPARED",
             )
             stagedOperations[operationId] = staged
+            persistStaged(staged)
 
             return PrepareImportResult(
                 status = MediaBridgeContract.Status.OK,
@@ -417,15 +438,18 @@ class MediaSettingsController(
     }
 
     fun commitMediaImport(operationId: String, stagingToken: String): CommitImportResult = synchronized(importLock) {
+        if (!isValidOperationId(operationId)) {
+            return CommitImportResult(MediaBridgeContract.Status.INVALID_REQUEST, errorMessage = "operationId должен быть UUID")
+        }
         val lastCommitted = metaPrefs.getString(KEY_LAST_COMMITTED_OPERATION, "")
-        if (operationId.isNotBlank() && operationId == lastCommitted) {
+        if (operationId == lastCommitted) {
             return CommitImportResult(
                 status = MediaBridgeContract.Status.OK,
                 snapshot = getSnapshot(),
             )
         }
 
-        val staged = stagedOperations[operationId]
+        val staged = stagedOperations[operationId] ?: loadStagedOperation(operationId)
             ?: return CommitImportResult(
                 status = MediaBridgeContract.Status.INVALID_REQUEST,
                 errorMessage = "Операция импорта $operationId не найдена или не подготовлена",
@@ -437,56 +461,79 @@ class MediaSettingsController(
                 errorMessage = "Неверный токен подготовки импорта",
             )
         }
+        if (staged.status == "COMMITTED") {
+            return CommitImportResult(MediaBridgeContract.Status.OK, snapshot = getSnapshot())
+        }
 
+        var commitStarted = false
         try {
             val mediaJson = staged.mediaJson
-            // Apply media settings
-            if (mediaJson.has("defaultAudioSource")) {
-                preferences.defaultAudioSource = mediaJson.optString("defaultAudioSource", "")
-            }
-            if (mediaJson.has("defaultAudioSourceDelaySec")) {
-                preferences.defaultAudioSourceDelaySec = mediaJson.optInt("defaultAudioSourceDelaySec", 0)
-            }
-            if (mediaJson.has("defaultAudioSourceAutoplayOnStartup")) {
-                preferences.defaultAudioSourceAutoplayOnStartup = mediaJson.optBoolean("defaultAudioSourceAutoplayOnStartup", true)
-            }
-            if (mediaJson.has("autoSwitchToDefaultOnSourceLost")) {
-                preferences.autoSwitchToDefaultOnSourceLost = mediaJson.optBoolean("autoSwitchToDefaultOnSourceLost", false)
-            }
-            if (mediaJson.has("autoSwitchToDefaultAutoplayOnSourceLost")) {
-                preferences.autoSwitchToDefaultAutoplayOnSourceLost = mediaJson.optBoolean("autoSwitchToDefaultAutoplayOnSourceLost", true)
-            }
-            if (mediaJson.has("defaultMediaPackage")) {
-                preferences.defaultMediaPackage = mediaJson.optString("defaultMediaPackage", "")
-            }
-            if (mediaJson.has("switchToOnlineBeforeSessionPlay")) {
-                preferences.switchToOnlineBeforeSessionPlay = mediaJson.optBoolean("switchToOnlineBeforeSessionPlay", false)
-            }
-            if (mediaJson.has("radioWidgetBroadcastEnabled")) {
-                radioCatalogRepository.setWidgetBroadcastEnabled(mediaJson.optBoolean("radioWidgetBroadcastEnabled", true))
-            }
-            if (mediaJson.has("clusterCoversEnabled")) {
-                clusterMediaBridge.setClusterCoversEnabled(mediaJson.optBoolean("clusterCoversEnabled", true))
-            }
-            if (mediaJson.has("clusterWatchdogIntervalMs")) {
-                clusterMediaBridge.setReassertWatchdogIntervalMs(mediaJson.optLong("clusterWatchdogIntervalMs", 1250L))
-            }
-
-            // Radio catalog swap
+            validateMediaJson(mediaJson)
             if (staged.catalogMode == "custom") {
-                val radioDir = File(staged.stagingDir, "radio")
-                val importedCount = radioCatalogRepository.importFromDirectory(radioDir).getOrThrow()
+                radioCatalogRepository.validateDirectory(File(staged.stagingDir, "radio")).getOrThrow()
+            }
+            staged.status = "COMMITTING"
+            persistStaged(staged)
+            commitStarted = true
+
+            // Swap the catalog first. All input was validated before this mutation.
+            if (staged.catalogMode == "custom") {
+                val importedCount = radioCatalogRepository.importFromDirectory(File(staged.stagingDir, "radio")).getOrThrow()
                 Timber.i("Imported $importedCount custom radio stations from backup")
             } else {
                 radioCatalogRepository.restoreDefaultCatalog()
             }
 
+            // Apply media settings after the catalog is valid and active.
+            if (mediaJson.has("defaultAudioSource")) {
+                preferences.defaultAudioSource = mediaJson.getString("defaultAudioSource")
+            }
+            if (mediaJson.has("defaultAudioSourceDelaySec")) {
+                preferences.defaultAudioSourceDelaySec = mediaJson.getInt("defaultAudioSourceDelaySec")
+            }
+            if (mediaJson.has("defaultAudioSourceAutoplayOnStartup")) {
+                preferences.defaultAudioSourceAutoplayOnStartup = mediaJson.getBoolean("defaultAudioSourceAutoplayOnStartup")
+            }
+            if (mediaJson.has("autoSwitchToDefaultOnSourceLost")) {
+                preferences.autoSwitchToDefaultOnSourceLost = mediaJson.getBoolean("autoSwitchToDefaultOnSourceLost")
+            }
+            if (mediaJson.has("autoSwitchToDefaultAutoplayOnSourceLost")) {
+                preferences.autoSwitchToDefaultAutoplayOnSourceLost = mediaJson.getBoolean("autoSwitchToDefaultAutoplayOnSourceLost")
+            }
+            if (mediaJson.has("defaultMediaPackage")) {
+                preferences.defaultMediaPackage = mediaJson.getString("defaultMediaPackage")
+            }
+            if (mediaJson.has("switchToOnlineBeforeSessionPlay")) {
+                preferences.switchToOnlineBeforeSessionPlay = mediaJson.getBoolean("switchToOnlineBeforeSessionPlay")
+            }
+            if (mediaJson.has("radioWidgetBroadcastEnabled")) {
+                radioCatalogRepository.setWidgetBroadcastEnabled(mediaJson.getBoolean("radioWidgetBroadcastEnabled"))
+            }
+            if (mediaJson.has("clusterCoversEnabled")) {
+                clusterMediaBridge.setClusterCoversEnabled(mediaJson.getBoolean("clusterCoversEnabled"))
+            }
+            if (mediaJson.has("clusterWatchdogIntervalMs")) {
+                clusterMediaBridge.setReassertWatchdogIntervalMs(mediaJson.getLong("clusterWatchdogIntervalMs"))
+            }
+            if (mediaJson.has("uiScaleTenths")) {
+                preferences.uiScaleTenths = mediaJson.getInt("uiScaleTenths")
+            }
+
+            // Advance the revision before publishing the durable marker. This keeps CAS updates
+            // from accepting the pre-import revision after a process death.
+            nextRevision()
+            // Drain the asynchronous preference writes before publishing the durable marker.
+            check(context.getSharedPreferences("atlas_media_api_settings", Context.MODE_PRIVATE).edit().commit())
+            check(context.getSharedPreferences("radio_catalog_prefs", Context.MODE_PRIVATE).edit().commit())
+            check(context.getSharedPreferences("cluster_dim_prefs", Context.MODE_PRIVATE).edit().commit())
+            check(metaPrefs.edit().putString(KEY_LAST_COMMITTED_OPERATION, operationId).commit()) {
+                "Не удалось сохранить маркер завершённого импорта"
+            }
             staged.status = "COMMITTED"
-            metaPrefs.edit().putString(KEY_LAST_COMMITTED_OPERATION, operationId).apply()
+            persistStaged(staged)
             staged.stagingDir.deleteRecursively()
             stagedOperations.remove(operationId)
 
-            nextRevision()
             onSettingsChanged?.invoke()
             return CommitImportResult(
                 status = MediaBridgeContract.Status.OK,
@@ -494,7 +541,8 @@ class MediaSettingsController(
             )
         } catch (e: Exception) {
             Timber.e(e, "commitMediaImport failed for operation $operationId")
-            staged.status = "FAILED"
+            staged.status = if (commitStarted) "COMMITTING" else "PREPARED"
+            runCatching { persistStaged(staged) }
             return CommitImportResult(
                 status = MediaBridgeContract.Status.FAILED,
                 errorMessage = e.message ?: "Не удалось применить импорт медиа",
@@ -503,21 +551,265 @@ class MediaSettingsController(
     }
 
     fun abortMediaImport(operationId: String) = synchronized(importLock) {
-        val staged = stagedOperations.remove(operationId)
+        if (!isValidOperationId(operationId)) return@synchronized
+        val staged = stagedOperations[operationId] ?: loadStagedOperation(operationId)
+        if (staged?.status == "COMMITTING") return@synchronized
+        stagedOperations.remove(operationId)
         staged?.stagingDir?.deleteRecursively()
     }
 
     fun getImportStatus(operationId: String): String = synchronized(importLock) {
+        if (!isValidOperationId(operationId)) return@synchronized "IDLE"
         val lastCommitted = metaPrefs.getString(KEY_LAST_COMMITTED_OPERATION, "")
-        if (operationId.isNotBlank() && operationId == lastCommitted) {
+        if (operationId == lastCommitted) {
             return "COMMITTED"
         }
-        return stagedOperations[operationId]?.status ?: "IDLE"
+        val staged = stagedOperations[operationId] ?: loadStagedOperation(operationId)
+        if (staged?.status == "COMMITTING") {
+            val result = commitMediaImport(operationId, staged.stagingToken)
+            return if (result.status == MediaBridgeContract.Status.OK) "COMMITTED" else staged.status
+        }
+        return staged?.status ?: "IDLE"
+    }
+
+    private fun validateBundleTypes(update: Bundle): String? {
+        val expected = mapOf(
+            MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE to String::class.java,
+            MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_DELAY_SEC to Integer::class.java,
+            MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE to String::class.java,
+            MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS to java.lang.Long::class.java,
+            MediaBridgeContract.Key.UI_SCALE_TENTHS to Integer::class.java,
+        )
+        expected.forEach { (key, type) ->
+            if (update.containsKey(key) && !type.isInstance(update.get(key))) {
+                return "Недопустимый тип поля $key"
+            }
+        }
+        return null
+    }
+
+    private fun validateMediaJson(mediaJson: JSONObject): String {
+        if (mediaJson.opt("format") !is String || mediaJson.getString("format") != "atlas-media-settings") {
+            throw IllegalArgumentException("Неверный формат media.json")
+        }
+        if (mediaJson.opt("schemaVersion") !is Number || jsonInt(mediaJson, "schemaVersion") != 1) {
+            throw IllegalArgumentException("Неподдерживаемая версия схемы media.json")
+        }
+        val catalogMode = if (mediaJson.has("catalogMode")) {
+            if (mediaJson.opt("catalogMode") !is String) throw IllegalArgumentException("Недопустимый тип catalogMode")
+            mediaJson.getString("catalogMode").lowercase(Locale.ROOT)
+        } else "builtin"
+        if (catalogMode != "builtin" && catalogMode != "custom") {
+            throw IllegalArgumentException("Неверный режим каталога радио: $catalogMode")
+        }
+        val stringFields = listOf("defaultAudioSource", "defaultMediaPackage")
+        val booleanFields = listOf(
+            "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
+            "autoSwitchToDefaultAutoplayOnSourceLost", "switchToOnlineBeforeSessionPlay",
+            "radioWidgetBroadcastEnabled", "clusterCoversEnabled",
+        )
+        stringFields.forEach { if (mediaJson.has(it) && mediaJson.opt(it) !is String) throw IllegalArgumentException("Недопустимый тип поля $it") }
+        booleanFields.forEach { if (mediaJson.has(it) && mediaJson.opt(it) !is Boolean) throw IllegalArgumentException("Недопустимый тип поля $it") }
+        if (mediaJson.has("defaultAudioSource") && mediaJson.getString("defaultAudioSource") !in ALLOWED_AUDIO_SOURCES) {
+            throw IllegalArgumentException("Недопустимый источник звука")
+        }
+        if (mediaJson.has("defaultAudioSourceDelaySec")) {
+            val value = jsonInt(mediaJson, "defaultAudioSourceDelaySec")
+            if (value !in 0..30) throw IllegalArgumentException("Задержка источника должна быть от 0 до 30 секунд: $value")
+        }
+        if (mediaJson.has("clusterWatchdogIntervalMs")) {
+            val value = jsonLong(mediaJson, "clusterWatchdogIntervalMs")
+            if (value !in 1000L..5000L) throw IllegalArgumentException("Интервал watchdog должен быть от 1000 до 5000 мс: $value")
+        }
+        if (mediaJson.has("uiScaleTenths")) {
+            val value = jsonInt(mediaJson, "uiScaleTenths")
+            if (value !in 10..20) throw IllegalArgumentException("Масштаб должен быть от 10 до 20 десятых: $value")
+        }
+        if (mediaJson.has("defaultMediaPackage") && mediaJson.getString("defaultMediaPackage").length > 128) {
+            throw IllegalArgumentException("Слишком длинное имя пакета проигрывателя")
+        }
+        return catalogMode
+    }
+
+    private fun jsonInt(json: JSONObject, key: String): Int {
+        val value = json.opt(key)
+        if (value !is Number || value.toLong().toDouble() != value.toDouble() || value.toLong() !in Int.MIN_VALUE..Int.MAX_VALUE) {
+            throw IllegalArgumentException("Недопустимый тип поля $key")
+        }
+        return value.toInt()
+    }
+
+    private fun jsonLong(json: JSONObject, key: String): Long {
+        val value = json.opt(key)
+        if (value !is Number || value.toLong().toDouble() != value.toDouble()) throw IllegalArgumentException("Недопустимый тип поля $key")
+        return value.toLong()
+    }
+
+    private fun validateManifest(manifest: JSONObject, stagingDir: File) {
+        if (manifest.opt("format") !is String || manifest.getString("format") != "atlas-media-backup") {
+            throw IllegalArgumentException("Неверный формат manifest.json")
+        }
+        if (manifest.opt("schemaVersion") !is Number || jsonInt(manifest, "schemaVersion") != 1) {
+            throw IllegalArgumentException("Неподдерживаемая версия схемы manifest.json")
+        }
+        val hasMedia = File(stagingDir, "media.json").isFile
+        val hasWidget = File(stagingDir, "widget.json").isFile
+        val hasRadio = File(stagingDir, "radio/stations.csv").isFile
+        if (!hasMedia) throw IllegalArgumentException("В архиве отсутствует файл media.json")
+        if (manifest.has("sections")) {
+            val sections = manifest.opt("sections") as? JSONArray ?: throw IllegalArgumentException("Повреждённый список секций")
+            val actual = linkedSetOf<String>()
+            for (i in 0 until sections.length()) {
+                val section = sections.opt(i)
+                if (section !is String || !actual.add(section) || section !in setOf("widget", "media", "radio")) {
+                    throw IllegalArgumentException("Неверный список секций архива")
+                }
+            }
+            if (("widget" in actual) != hasWidget || ("media" in actual) != hasMedia || ("radio" in actual) != hasRadio) {
+                throw IllegalArgumentException("Состав архива не соответствует manifest.json")
+            }
+        }
+        if (manifest.has("hashes")) {
+            val hashes = manifest.opt("hashes") as? JSONObject ?: throw IllegalArgumentException("Повреждённый список контрольных сумм")
+            val keys = hashes.keys()
+            while (keys.hasNext()) {
+                val path = keys.next()
+                val expected = hashes.opt(path)
+                if (expected !is String || !expected.matches(Regex("[0-9a-fA-F]{64}"))) throw IllegalArgumentException("Повреждённая контрольная сумма $path")
+                val target = safeStagingFile(stagingDir, path)
+                if (!target.isFile || sha256(target) != expected.lowercase(Locale.ROOT)) throw IllegalArgumentException("Нарушена целостность файла $path")
+            }
+        }
+    }
+
+    private fun validateArchiveEntries(stagingDir: File) {
+        fun visit(dir: File, relative: String) {
+            dir.listFiles()?.forEach { file ->
+                if (relative.isEmpty() && file.name == STAGING_METADATA) return@forEach
+                val path = if (relative.isEmpty()) file.name else "$relative/${file.name}"
+                if (file.isDirectory) {
+                    if (relative.isEmpty() && file.name !in setOf("radio")) {
+                        throw IllegalArgumentException("Недопустимый раздел архива: ${file.name}")
+                    }
+                    visit(file, path)
+                } else if (relative.isEmpty() && file.name !in setOf("manifest.json", "media.json", "widget.json")) {
+                    throw IllegalArgumentException("Недопустимый файл архива: $path")
+                }
+            }
+        }
+        visit(stagingDir, "")
+    }
+
+    private fun safeStagingFile(stagingDir: File, path: String): File {
+        if (path.isEmpty() || path.startsWith('/') || path.contains('\\')) throw SecurityException("Небезопасный путь в manifest: $path")
+        val target = File(stagingDir, path)
+        if (!target.canonicalPath.startsWith(stagingDir.canonicalPath + File.separator)) throw SecurityException("Небезопасный путь в manifest: $path")
+        return target
+    }
+
+    private fun isValidOperationId(value: String): Boolean =
+        value.matches(Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}"))
+
+    private fun persistStaged(staged: StagedImport) {
+        val json = JSONObject().apply {
+            put("operationId", staged.operationId)
+            put("stagingToken", staged.stagingToken)
+            put("catalogMode", staged.catalogMode)
+            put("stationCount", staged.stationCount)
+            put("status", staged.status)
+            put("mediaJson", staged.mediaJson.toString())
+            put("warnings", JSONArray(staged.warnings))
+        }
+        val atomic = AtomicFile(File(staged.stagingDir, STAGING_METADATA))
+        staged.stagingDir.mkdirs()
+        val stream = atomic.startWrite()
+        try {
+            stream.write(json.toString().toByteArray(StandardCharsets.UTF_8))
+            stream.flush()
+            atomic.finishWrite(stream)
+        } catch (error: Exception) {
+            atomic.failWrite(stream)
+            throw error
+        }
+    }
+
+    private fun loadStagedOperations() {
+        context.filesDir.listFiles()?.forEach { dir ->
+            val name = dir.name
+            if (!dir.isDirectory || !name.startsWith("staging_media_import_")) return@forEach
+            val operationId = name.removePrefix("staging_media_import_")
+            if (!isValidOperationId(operationId)) return@forEach
+            loadStagedOperation(operationId)
+        }
+    }
+
+    private fun loadStagedOperation(operationId: String): StagedImport? {
+        val dir = File(context.filesDir, "staging_media_import_$operationId")
+        val metadata = File(dir, STAGING_METADATA)
+        if (!metadata.isFile && !File(metadata.path + ".bak").isFile) return null
+        return runCatching {
+            val json = JSONObject(String(AtomicFile(metadata).openRead().use { it.readBytes() }, StandardCharsets.UTF_8))
+            val staged = StagedImport(
+                operationId = json.getString("operationId"),
+                stagingToken = json.getString("stagingToken"),
+                stagingDir = dir,
+                mediaJson = JSONObject(json.getString("mediaJson")),
+                catalogMode = json.getString("catalogMode"),
+                stationCount = json.getInt("stationCount"),
+                warnings = buildList {
+                    val array = json.optJSONArray("warnings") ?: JSONArray()
+                    for (i in 0 until array.length()) add(array.getString(i))
+                },
+                status = json.getString("status"),
+            )
+            if (staged.status in setOf("PREPARED", "COMMITTING", "COMMITTED", "FAILED")) stagedOperations[operationId] = staged
+            staged
+        }.getOrNull()
     }
 
     private fun sha256(bytes: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(bytes)
         return hash.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var read = input.read(buffer)
+            while (read != -1) {
+                digest.update(buffer, 0, read)
+                read = input.read(buffer)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private class LimitedInputStream(
+        private val delegate: InputStream,
+        private val limit: Long,
+    ) : InputStream() {
+        private var count = 0L
+        override fun read(): Int {
+            val value = delegate.read()
+            if (value >= 0 && ++count > limit) throw IllegalStateException("Размер файла превышает допустимый лимит (70 МБ)")
+            return value
+        }
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            val value = delegate.read(buffer, offset, length)
+            if (value > 0) {
+                count += value
+                if (count > limit) throw IllegalStateException("Размер файла превышает допустимый лимит (70 МБ)")
+            }
+            return value
+        }
+        override fun close() = delegate.close()
     }
 }

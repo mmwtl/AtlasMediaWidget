@@ -22,6 +22,9 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -80,9 +83,17 @@ final class FullSettingsBackup {
     private FullSettingsBackup() {}
 
     static Preview inspect(Context context, Uri sourceUri) throws IOException {
-        File stagingDir = new File(context.getFilesDir(), "staging_inspect_" + System.currentTimeMillis());
-        stagingDir.delete();
-        stagingDir.mkdirs();
+        File stagingDir = new File(context.getFilesDir(), "staging_inspect_" + UUID.randomUUID());
+        if (!stagingDir.mkdirs()) throw new IOException("Не удалось подготовить импорт");
+        try {
+            return inspectStaged(context, sourceUri, stagingDir);
+        } catch (IOException | RuntimeException error) {
+            deleteRecursively(stagingDir);
+            throw error;
+        }
+    }
+
+    private static Preview inspectStaged(Context context, Uri sourceUri, File stagingDir) throws IOException {
         File incomingFile = new File(stagingDir, "incoming.bin");
 
         try (InputStream in = context.getContentResolver().openInputStream(sourceUri);
@@ -138,43 +149,7 @@ final class FullSettingsBackup {
         // Unpack ZIP and validate
         File extractedDir = new File(stagingDir, "extracted");
         extractedDir.mkdirs();
-        int entriesCount = 0;
-        long totalUncompressed = 0;
-        String stagingCanonical = extractedDir.getCanonicalPath();
-
-        try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(incomingFile)))) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                entriesCount++;
-                if (entriesCount > MAX_ENTRIES) {
-                    throw new IOException("Превышено максимальное количество файлов в архиве (" + MAX_ENTRIES + ")");
-                }
-                String name = entry.getName().replace('\\', '/').replaceAll("^/+", "");
-                File target = new File(extractedDir, name);
-                String targetCanonical = target.getCanonicalPath();
-                if (!targetCanonical.equals(stagingCanonical) && !targetCanonical.startsWith(stagingCanonical + File.separator)) {
-                    throw new SecurityException("Небезопасный путь в ZIP архиве: " + entry.getName());
-                }
-
-                if (entry.isDirectory()) {
-                    target.mkdirs();
-                } else {
-                    target.getParentFile().mkdirs();
-                    try (FileOutputStream fos = new FileOutputStream(target)) {
-                        byte[] buf = new byte[8192];
-                        int len;
-                        while ((len = zis.read(buf)) != -1) {
-                            totalUncompressed += len;
-                            if (totalUncompressed > MAX_UNCOMPRESSED_BYTES) {
-                                throw new IOException("Превышен допустимый размер распакованного архива (65 МБ)");
-                            }
-                            fos.write(buf, 0, len);
-                        }
-                    }
-                }
-                zis.closeEntry();
-            }
-        }
+        unpackZip(incomingFile, extractedDir);
 
         File manifestFile = new File(extractedDir, "manifest.json");
         if (!manifestFile.isFile()) {
@@ -197,7 +172,7 @@ final class FullSettingsBackup {
             throw new IOException("Повреждённый manifest.json", e);
         }
 
-        // Verify hashes if present
+        // Older archives may lack hashes; every declared hash must be valid.
         if (manifest.has("hashes")) {
             try {
                 JSONObject hashes = manifest.getJSONObject("hashes");
@@ -205,8 +180,11 @@ final class FullSettingsBackup {
                 while (keys.hasNext()) {
                     String relativePath = keys.next();
                     String expectedHash = hashes.getString(relativePath);
-                    File f = new File(extractedDir, relativePath);
-                    if (f.isFile()) {
+                    File f = safeEntryFile(extractedDir, relativePath);
+                    if (!f.isFile() || !expectedHash.matches("[0-9a-fA-F]{64}")) {
+                        throw new IOException("Отсутствует или повреждён файл " + relativePath);
+                    }
+                    {
                         String actualHash = computeFileSha256(f);
                         if (!actualHash.equalsIgnoreCase(expectedHash)) {
                             throw new IOException("Нарушена целостность файла " + relativePath);
@@ -214,7 +192,7 @@ final class FullSettingsBackup {
                     }
                 }
             } catch (JSONException e) {
-                AppLog.warn("Failed to check hashes in manifest", e);
+                throw new IOException("Повреждённый список контрольных сумм", e);
             }
         }
 
@@ -238,7 +216,14 @@ final class FullSettingsBackup {
             String mediaJsonStr = readFileToString(mediaFile);
             try {
                 JSONObject mediaJson = new JSONObject(mediaJsonStr);
+                if (!FORMAT_MEDIA.equals(mediaJson.optString("format"))
+                        || mediaJson.optInt("schemaVersion", 0) != SCHEMA_VERSION) {
+                    throw new IOException("Неподдерживаемый формат или версия media.json");
+                }
                 catalogMode = mediaJson.optString("catalogMode", "builtin");
+                if (!"builtin".equals(catalogMode) && !"custom".equals(catalogMode)) {
+                    throw new IOException("Неверный режим каталога радио");
+                }
                 mediaData = new MediaSettingsSnapshot(
                         0L,
                         mediaJson.optString("defaultAudioSource", ""),
@@ -273,10 +258,31 @@ final class FullSettingsBackup {
         if ("custom".equalsIgnoreCase(catalogMode)) {
             File radioDir = new File(extractedDir, "radio");
             File stationsCsv = new File(radioDir, "stations.csv");
+            if (!stationsCsv.isFile()) throw new IOException("Отсутствует radio/stations.csv");
             if (stationsCsv.isFile()) {
                 hasRadio = true;
                 // Count lines / stations
                 stationCount = countCsvStations(stationsCsv);
+            }
+        }
+
+        if (!hasWidget && !hasMedia) throw new IOException("Архив не содержит настроек");
+        if (manifest.has("sections")) {
+            try {
+                JSONArray sections = manifest.getJSONArray("sections");
+                Set<String> declared = new HashSet<>();
+                for (int i = 0; i < sections.length(); i++) {
+                    String section = sections.getString(i);
+                    if (!declared.add(section) || !Set.of("widget", "media", "radio").contains(section)) {
+                        throw new IOException("Неверный список секций архива");
+                    }
+                }
+                if (declared.contains("widget") != hasWidget || declared.contains("media") != hasMedia
+                        || declared.contains("radio") != hasRadio) {
+                    throw new IOException("Состав архива не соответствует manifest.json");
+                }
+            } catch (JSONException error) {
+                throw new IOException("Повреждённый список секций", error);
             }
         }
 
@@ -335,7 +341,7 @@ final class FullSettingsBackup {
                 isCustomCatalog = true;
                 sections.put("radio");
                 try {
-                    hashes.put("radio/stations.csv", computeFileSha256(stationsCsv));
+                    addDirectoryHashes(hashes, radioDir, "radio/");
                 } catch (JSONException ignored) {}
             }
         }
@@ -386,6 +392,15 @@ final class FullSettingsBackup {
         return zipFile;
     }
 
+    private static void addDirectoryHashes(JSONObject hashes, File dir, String prefix) throws IOException, JSONException {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File file : files) {
+            if (file.isDirectory()) addDirectoryHashes(hashes, file, prefix + file.getName() + "/");
+            else if (file.isFile()) hashes.put(prefix + file.getName(), computeFileSha256(file));
+        }
+    }
+
     private static void addDirectoryToZip(ZipOutputStream zos, File dir, String prefix) throws IOException {
         File[] files = dir.listFiles();
         if (files == null) return;
@@ -407,16 +422,15 @@ final class FullSettingsBackup {
     }
 
     private static void unpackZip(File zipFile, File targetDir) throws IOException {
-        String canonicalTarget = targetDir.getCanonicalPath();
+        Set<String> entries = new HashSet<>();
+        long totalBytes = 0;
+        int entryCount = 0;
         try (ZipInputStream zis = new ZipInputStream(new BufferedInputStream(new FileInputStream(zipFile)))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                String name = entry.getName().replace('\\', '/').replaceAll("^/+", "");
-                File dest = new File(targetDir, name);
-                String destCanonical = dest.getCanonicalPath();
-                if (!destCanonical.equals(canonicalTarget) && !destCanonical.startsWith(canonicalTarget + File.separator)) {
-                    throw new SecurityException("Небезопасный путь: " + entry.getName());
-                }
+                if (++entryCount > MAX_ENTRIES) throw new IOException("Слишком много файлов в архиве");
+                File dest = safeEntryFile(targetDir, entry.getName());
+                if (!entries.add(dest.getCanonicalPath())) throw new IOException("Дублирующийся путь в архиве");
                 if (entry.isDirectory()) {
                     dest.mkdirs();
                 } else {
@@ -425,6 +439,8 @@ final class FullSettingsBackup {
                         byte[] buf = new byte[8192];
                         int len;
                         while ((len = zis.read(buf)) != -1) {
+                            totalBytes += len;
+                            if (totalBytes > MAX_UNCOMPRESSED_BYTES) throw new IOException("Архив слишком большой");
                             fos.write(buf, 0, len);
                         }
                     }
@@ -432,6 +448,17 @@ final class FullSettingsBackup {
                 zis.closeEntry();
             }
         }
+    }
+
+    private static File safeEntryFile(File directory, String name) throws IOException {
+        if (name.isEmpty() || name.startsWith("/") || name.contains("\\")) {
+            throw new SecurityException("Небезопасный путь в архиве: " + name);
+        }
+        File target = new File(directory, name);
+        if (!target.getCanonicalPath().startsWith(directory.getCanonicalPath() + File.separator)) {
+            throw new SecurityException("Небезопасный путь в архиве: " + name);
+        }
+        return target;
     }
 
     private static int countCsvStations(File csvFile) {
@@ -453,6 +480,7 @@ final class FullSettingsBackup {
     }
 
     private static byte[] readFileToBytes(File file) throws IOException {
+        if (file.length() > 256L * 1024L) throw new IOException("Файл настроек слишком большой");
         try (InputStream in = new FileInputStream(file);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buf = new byte[8192];
@@ -465,7 +493,19 @@ final class FullSettingsBackup {
     }
 
     private static String computeFileSha256(File file) throws IOException {
-        return computeBytesSha256(readFileToBytes(file));
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream in = new FileInputStream(file)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = in.read(buffer)) != -1) digest.update(buffer, 0, read);
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte value : digest.digest()) hex.append(String.format("%02x", value));
+            return hex.toString();
+        } catch (java.security.NoSuchAlgorithmException error) {
+            throw new IllegalStateException(error);
+        }
     }
 
     private static String computeBytesSha256(byte[] bytes) {

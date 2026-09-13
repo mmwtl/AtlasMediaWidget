@@ -14,7 +14,6 @@
 Atlas Media Widget показывает на домашнем экране обложку, метаданные, прогресс воспроизведения, кнопки управления и переключатель источников. Состояние и команды передаются через Media Bridge `protocol v1`.
 
 - **Стандартный релиз (`integrated`)** — виджет поставляется со встроенным медиабэкендом: рантайм (`:media-runtime`) работает прямо внутри виджета в изолированном фоновом процессе `:media` как приватный сервис. Настройки виджета, медиасервиса, разрешений, каталога радиостанций и диагностики объединены в один экран `MainActivity` из 5 секций. Дублирующий ярлык «Atlas Media API» в лаунчере скрыт, а экран диагностики медиасервиса доступен прямо из виджета.
-- **Раздельная сборка (при необходимости)** — виджет можно собрать в виде тонкого UI-клиента (`plain`), а медиабэкенд скомпилировать и установить отдельно в виде автономного пакета `Atlas Media API` (`com.mmwtl.atlasmediaapi`) из модуля `:api-app`.
 
 > Atlas Media Widget использует `TYPE_APPLICATION_OVERLAY`, а не системный `AppWidget`. Карточка отображается только поверх HOME и не блокирует управление остальной частью экрана.
 
@@ -22,7 +21,6 @@ Atlas Media Widget показывает на домашнем экране об�
 Atlas Media Widget displays album artwork, track metadata, playback progress, playback controls, and an audio source switcher directly on the home screen. State and commands are exchanged via Media Bridge `protocol v1`.
 
 - **Standard release (`integrated`)** — The widget includes the built-in media backend: the runtime (`:media-runtime`) runs directly inside the widget in an isolated `:media` background process as a private service. Card appearance, media backend preferences, permissions, radio catalog, and diagnostics are unified into a 5-section `MainActivity` screen. The redundant "Atlas Media API" launcher icon is removed, and the backend diagnostic screen is launched directly from the widget.
-- **Modular build (optional)** — The widget can be built as a thin UI client (`plain`), while the media backend is built and installed separately as the standalone `Atlas Media API` package (`com.mmwtl.atlasmediaapi`) from the `:api-app` module.
 
 > Atlas Media Widget utilizes `TYPE_APPLICATION_OVERLAY` rather than a standard `AppWidget`. The card is rendered exclusively over the HOME screen without blocking touch events outside its bounds.
 
@@ -91,8 +89,8 @@ The settings application includes a live preview and granular controls for card 
 - Единая медиакарточка с точной настройкой ширины и высоты в пикселях;
 - Настройка типографики, отступов, прогресс-бара и панели управления;
 - Живой предпросмотр в настройках, использующий тот же `MediaCardView`, что и overlay;
-- Единое окно настроек из 5 логических секций («Виджет», «Медиасервис», «Система и разрешения», «Резервная копия», «Диагностика»);
-- Управление источником звука по умолчанию, задержками автозапуска, действиями при потере источника и Online-плеером;
+- Единое окно настроек из 5 логических секций («Система и разрешения», «Медиасервис», «Виджет», «Резервная копия», «Диагностика»), с масштабом интерфейса последней карточкой;
+- Управление источником звука по умолчанию, задержками автозапуска, действиями при потере источника и переключением на Online перед запуском сессии;
 - Управление трансляцией названия и обложки радио на приборную панель Geely OneOS DIM и интервалом watchdog;
 - Поддержка встроенного и пользовательского каталога радиостанций с обложками;
 - Список лайкнутых радиостанций с обложками, сеткой от 2×2 до 4×4 и прямым переключением внутри карточки;
@@ -113,8 +111,8 @@ The settings application includes a live preview and granular controls for card 
 - Single unified media card with pixel-accurate width and height configuration;
 - Customization of typography, paddings, progress bar, and playback controls;
 - Live preview in settings using the exact same `MediaCardView` component;
-- Unified settings interface featuring 5 sections ("Widget", "Media Service", "System & Permissions", "Backup & Restore", "Diagnostics");
-- Configuration of startup source, startup delays, source-loss behavior, and preferred Online player;
+- Unified settings interface featuring 5 sections ("System & Permissions", "Media Service", "Widget", "Backup & Restore", "Diagnostics"), with interface scale as the final card;
+- Configuration of startup source, startup delays, source-loss behavior, and switching to Online before session playback;
 - OneOS DIM cluster broadcast control (radio cover and title) with adaptive watchdog interval adjustment;
 - Built-in and custom radio station catalog support with station logo art;
 - Favorite stations grid (from 2×2 up to 4×4) with station logos and direct in-card switching;
@@ -135,7 +133,6 @@ The settings application includes a live preview and granular controls for card 
 - Android 11 (`compileSdk 36`, `minSdk 30`);
 - Портретный автомобильный экран (целевое разрешение — 1440×1920);
 - **Стандартно**: встроенный рантайм `integrated` (всё включено в один APK);
-- **При раздельной установке**: установленный пакет `Atlas Media API` (`com.mmwtl.atlasmediaapi`);
 - Разрешения для виджета: «Поверх других приложений», «Доступ к истории использования» и «Контроль окон» (специальные возможности);
 - Разрешение «Доступ к уведомлениям» для медиасервиса (необходимо для чтения сессий Android-плееров);
 - Разрешение на доступ к хранилищу для USB-обложек и импорта радио-каталогов.
@@ -144,7 +141,6 @@ The settings application includes a live preview and granular controls for card 
 - Android 11 (`compileSdk 36`, `minSdk 30`);
 - Portrait automotive display (target resolution: 1440×1920);
 - **Standard**: `integrated` runtime variant (all-in-one APK);
-- **Modular setup**: Installed `Atlas Media API` package (`com.mmwtl.atlasmediaapi`);
 - Widget permissions: "Display over other apps", "Usage Access", and "Window Control" (Accessibility service);
 - "Notification Access" for the media service to observe Android media sessions;
 - Storage access permission for USB audio artwork and radio catalog imports.
@@ -168,8 +164,6 @@ The settings application includes a live preview and granular controls for card 
 5. Нажмите кнопку **«Запустить виджет»**.
 6. При необходимости включите тумблер «Автозапуск после загрузки».
 
-*(При использовании раздельной сборки `plain` сначала установите и настройте отдельный пакет `AtlasMediaApi.apk`, затем установите `plain` APK виджета).*
-
 ### [EN]
 1. **Install the standard `integrated` APK**:
    - Contains both the overlay widget and the media backend in a single package.
@@ -185,8 +179,6 @@ The settings application includes a live preview and granular controls for card 
 5. Tap **"Start Widget"**.
 6. Enable "Launch on boot" if automatic startup is desired.
 
-*(If choosing the modular `plain` setup, install and configure `AtlasMediaApi.apk` first, then install the `plain` widget APK).*
-
 ---
 
 ## [RU] Сборка проекта / [EN] Building the Project
@@ -200,16 +192,12 @@ The settings application includes a live preview and granular controls for card 
 # или целевая задача только для виджета:
 ./gradlew :app:assembleRelease
 
-# 2. Сборка тонкого виджета (без встроенного API, если требуется):
-./gradlew :app:assemblePlainRelease
-
-# 3. Сборка автономного медиасервиса (Atlas Media API APK, если требуется):
+# 2. Сборка автономного медиасервиса (Atlas Media API APK, если требуется):
 ./gradlew :api-app:assembleRelease
 ```
 
 Собранные файлы:
 - **Стандартный виджет (с встроенным API)**: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-release.apk`
-- **Тонкий виджет (при отдельной сборке)**: `app/build/outputs/apk/plain/release/<versionName>[<versionCode>]AtlasMediaWidget-plain-release.apk`
 - **Автономный API**: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
 
 #### Запуск модульных тестов:
@@ -226,16 +214,12 @@ Requires JDK 17 and Android SDK 36. The build is managed via the repository Grad
 # or target only the widget:
 ./gradlew :app:assembleRelease
 
-# 2. Build thin widget (plain overlay without integrated runtime, if needed):
-./gradlew :app:assemblePlainRelease
-
-# 3. Build standalone media backend APK (Atlas Media API, if needed):
+# 2. Build standalone media backend APK (Atlas Media API, if needed):
 ./gradlew :api-app:assembleRelease
 ```
 
 Generated artifacts:
 - **Standard widget (with integrated API)**: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-release.apk`
-- **Plain widget (when built separately)**: `app/build/outputs/apk/plain/release/<versionName>[<versionCode>]AtlasMediaWidget-plain-release.apk`
 - **Standalone API**: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
 
 #### Running Unit Tests:

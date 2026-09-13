@@ -37,18 +37,13 @@ android {
         versionCode = appVersionCode
         versionName = effectiveVersionName
         testInstrumentationRunner = 'android.test.InstrumentationTestRunner'
-        buildConfigField 'boolean', 'INTEGRATED_MEDIA_API', 'false'
         buildConfigField 'String', 'MEDIA_BRIDGE_PACKAGE', '"com.mmwtl.atlasmediaapi"'
     }
 
     flavorDimensions += 'distribution'
     productFlavors {
-        plain {
-            dimension 'distribution'
-        }
         integrated {
             dimension 'distribution'
-            buildConfigField 'boolean', 'INTEGRATED_MEDIA_API', 'true'
             buildConfigField 'String', 'MEDIA_BRIDGE_PACKAGE', '"com.mmwtl.atlasmediawidget"'
         }
     }
@@ -68,14 +63,16 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
 }
 
 android.applicationVariants.configureEach { variant ->
     variant.outputs.configureEach { output ->
         if (variant.flavorName == 'integrated') {
             output.outputFileName = "${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget-${variant.buildType.name}.apk"
-        } else if (variant.flavorName == 'plain') {
-            output.outputFileName = "${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget-plain-${variant.buildType.name}.apk"
         }
     }
 }

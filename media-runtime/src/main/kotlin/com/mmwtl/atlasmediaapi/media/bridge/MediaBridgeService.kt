@@ -86,29 +86,23 @@ class MediaBridgeService : Service() {
                 MediaBridgeContract.ClientMessage.GET_RADIO_STATIONS ->
                     handleGetRadioStations(message)
 
-                MediaBridgeContract.ClientMessage.GET_SETTINGS ->
-                    handleGetSettings(message)
-
-                MediaBridgeContract.ClientMessage.UPDATE_SETTINGS ->
-                    handleUpdateSettings(message)
-
-                MediaBridgeContract.ClientMessage.EXPORT_MEDIA_BACKUP ->
-                    handleExportMediaBackup(message)
-
-                MediaBridgeContract.ClientMessage.PREPARE_MEDIA_IMPORT ->
-                    handlePrepareMediaImport(message)
-
-                MediaBridgeContract.ClientMessage.COMMIT_MEDIA_IMPORT ->
-                    handleCommitMediaImport(message)
-
-                MediaBridgeContract.ClientMessage.GET_IMPORT_STATUS ->
-                    handleGetImportStatus(message)
-
-                MediaBridgeContract.ClientMessage.ABORT_MEDIA_IMPORT ->
-                    handleAbortMediaImport(message)
-
-                MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG ->
-                    handleRestoreDefaultCatalog(message)
+                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG -> {
+                    // Handler recycles the incoming Message after returning; retain a copy for IO work.
+                    val request = Message.obtain(message)
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            handleSettingsRequest(request)
+                        } catch (error: Exception) {
+                            Timber.e(error, "Settings IPC failed")
+                            sendError(request.replyTo,
+                                request.data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty(),
+                                MediaBridgeContract.Status.IO_ERROR,
+                                error.message ?: "Settings operation failed")
+                        } finally {
+                            request.recycle()
+                        }
+                    }
+                }
 
                 else -> sendError(
                     message.replyTo,
@@ -117,6 +111,35 @@ class MediaBridgeService : Service() {
                     "unknown message type",
                 )
             }
+        }
+    }
+
+    private fun handleSettingsRequest(message: Message) {
+        when (message.what) {
+            MediaBridgeContract.ClientMessage.GET_SETTINGS ->
+                handleGetSettings(message)
+
+            MediaBridgeContract.ClientMessage.UPDATE_SETTINGS ->
+                handleUpdateSettings(message)
+
+            MediaBridgeContract.ClientMessage.EXPORT_MEDIA_BACKUP ->
+                handleExportMediaBackup(message)
+
+            MediaBridgeContract.ClientMessage.PREPARE_MEDIA_IMPORT ->
+                handlePrepareMediaImport(message)
+
+            MediaBridgeContract.ClientMessage.COMMIT_MEDIA_IMPORT ->
+                handleCommitMediaImport(message)
+
+            MediaBridgeContract.ClientMessage.GET_IMPORT_STATUS ->
+                handleGetImportStatus(message)
+
+            MediaBridgeContract.ClientMessage.ABORT_MEDIA_IMPORT ->
+                handleAbortMediaImport(message)
+
+            MediaBridgeContract.ClientMessage.RESTORE_DEFAULT_CATALOG ->
+                handleRestoreDefaultCatalog(message)
+
         }
     }
 

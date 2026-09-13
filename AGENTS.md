@@ -10,8 +10,8 @@ AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait au
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
 proven shell and lifecycle approach from AtlasAppWidget. The standard release build is the
 `integrated` Widget APK where the versioned AtlasMediaApi backend (`:media-runtime`) runs directly
-inside a private `:media` process. When needed, a thin `plain` Widget APK and an autonomous
-`com.mmwtl.atlasmediaapi` package (built from `:api-app`) can be built separately.
+inside a private `:media` process. The autonomous `com.mmwtl.atlasmediaapi` package can still be
+built separately from `:api-app` when a standalone backend is needed.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -84,15 +84,9 @@ provider has been demonstrated on the real head unit.
 - Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
   allow Gradle to fall back to module-derived `app-*.apk` names. The standard integrated release
   build omits the flavor suffix and outputs `<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`.
-  When built separately, the plain variant appends `-plain-release.apk`. Standalone API APKs from
-  `:api-app` follow `<effectiveVersionName>[<versionCode>]AtlasMediaApi-release.apk`.
-- Keep `integrated` (standard release with internal `:media` process) and `plain` (thin client
-  connecting via IPC) as distribution flavors of the Widget application. They retain the same
-  application ID, version code, effective version name and Widget signing identity.
-- The standard release task `:app:assembleRelease` builds the integrated variant directly without
-  producing a plain build unless `:app:assemblePlainRelease` is explicitly invoked.
-- The `plain` variant must not contain embedded API runtime components, request
-  `REQUEST_INSTALL_PACKAGES`, or expose embedded installation mechanisms.
+  Standalone API APKs from `:api-app` follow `<effectiveVersionName>[<versionCode>]AtlasMediaApi-release.apk`.
+- The Widget application has only the `integrated` distribution flavor. Its standard release task
+  `:app:assembleRelease` outputs the integrated Widget APK with the private `:media` process.
 - The `integrated` variant must include `media-runtime`, bind its non-exported Media Bridge service
   in the `:media` process, and contain neither separate API APK assets nor
   `REQUEST_INSTALL_PACKAGES`.
@@ -108,12 +102,11 @@ sh gradlew --offline clean check assembleRelease
 This command builds the standard `release` for `:app` (integrated backend) and `release` for `:api-app`.
 Individual targets can be built separately:
 - Standard Widget (with integrated API): `sh gradlew assembleRelease` or `sh gradlew :app:assembleRelease`
-- Plain Widget (thin client): `sh gradlew :app:assemblePlainRelease`
 - Standalone Media API APK: `sh gradlew :api-app:assembleRelease`
 
 Verify release outputs under `app/build/outputs/apk/integrated/release/`
-(`<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`),
-`app/build/outputs/apk/plain/release/`, and `api-app/build/outputs/apk/release/`. Inspect package/version
+(`<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`) and
+`api-app/build/outputs/apk/release/`. Inspect package/version
 metadata and run `apksigner verify` when the artifacts are signed.
 For integrated builds, verify the local Media Bridge, notification listener, diagnostics activity,
 and FileProvider are present only in that flavor; verify that the bridge and diagnostics activity

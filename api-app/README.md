@@ -18,15 +18,15 @@
 `Atlas Media API` — это медиабэкенд, объединяющий штатные источники Geely OneOS (Радио, Bluetooth, USB, CPAA/CarPlay) со сторонними Android-медиаплеерами (`MediaSession`: Яндекс Музыка, Spotify, VK и др.). Сервис предоставляет единую точку интеграции через Messenger IPC (`protocol v1`) для виджетов и сторонних клиентов.
 
 В проекте реализовано два режима работы:
-1. **Стандартный (встроенный в виджет)** — поставляется в составе `AtlasMediaWidget` (сборка `integratedRelease`). Рантайм медиасервиса (`:media-runtime`) работает внутри процесса `:media` пакета `com.mmwtl.atlasmediawidget` как приватная неэкспортируемая служба. Диагностический экран и настройки доступны через отдельную иконку «Atlas Media API» в лаунчере.
-2. **Автономный (отдельный APK)** — собирается из данного модуля (`:api-app`) в отдельный пакет `com.mmwtl.atlasmediaapi`. Экспортирует службу `MediaBridgeService` для взаимодействия с тонкими клиентами (сборка `plainRelease` виджета или другие приложения).
+1. **Стандартный (встроенный в виджет)** — поставляется в составе `AtlasMediaWidget` (сборка `integratedRelease`). Рантайм медиасервиса (`:media-runtime`) работает внутри процесса `:media` пакета `com.mmwtl.atlasmediawidget` как приватная неэкспортируемая служба. Диагностический экран и настройки доступны из самого Widget.
+2. **Автономный (отдельный APK)** — собирается из данного модуля (`:api-app`) в отдельный пакет `com.mmwtl.atlasmediaapi`. Экспортирует службу `MediaBridgeService` для взаимодействия с внешними IPC-клиентами и инструментами.
 
 ### [EN]
 `Atlas Media API` is a unified media backend bridging native Geely OneOS sources (Radio, Bluetooth, USB, CPAA/CarPlay) and standard Android `MediaSession` players (Yandex Music, Spotify, VK, etc.). It exposes a single versioned Messenger IPC (`protocol v1`) for widgets and client applications.
 
 The backend operates in two distribution modes:
-1. **Standard (Integrated into Widget)** — Delivered inside `AtlasMediaWidget` (`integratedRelease` variant). The media runtime (`:media-runtime`) runs within a private `:media` process inside `com.mmwtl.atlasmediawidget` as a non-exported service. Settings and diagnostics are accessible via a separate "Atlas Media API" launcher icon.
-2. **Standalone (Separate APK)** — Built from this module (`:api-app`) as `com.mmwtl.atlasmediaapi`. It exports `MediaBridgeService` over IPC for thin clients (`plainRelease` variant of the widget or external tools).
+1. **Standard (Integrated into Widget)** — Delivered inside `AtlasMediaWidget` (`integratedRelease` variant). The media runtime (`:media-runtime`) runs within a private `:media` process inside `com.mmwtl.atlasmediawidget` as a non-exported service. Settings and diagnostics are accessible from the Widget.
+2. **Standalone (Separate APK)** — Built from this module (`:api-app`) as `com.mmwtl.atlasmediaapi`. It exports `MediaBridgeService` over IPC for external clients and tools.
 
 ---
 

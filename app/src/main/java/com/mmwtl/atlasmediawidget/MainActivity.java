@@ -44,7 +44,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,10 +57,12 @@ public final class MainActivity extends ScaledActivity {
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
     private Prefs prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Handler debounceHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private MediaBridgeClient mediaBridgeClient;
     private MediaSettingsSnapshot currentMediaSettings;
+    private boolean importInProgress;
+    private boolean recoveryInProgress;
+    private boolean mediaSettingsBusy;
     private final Map<String, Button> sourceTileButtons = new HashMap<>();
     private TextView defaultSourceTitle;
     private TextView defaultSourceDelayLabel;
@@ -78,15 +79,11 @@ public final class MainActivity extends ScaledActivity {
     private Button restoreDefaultRadioCatalogButton;
     private TextView mediaStatusText;
     private LinearLayout mediaSettingsGroup;
-    private Runnable pendingDelayCommit;
-    private Runnable pendingWatchdogCommit;
     private Button overlayPermissionButton;
     private Button usageAccessButton;
     private Button accessibilityAccessButton;
     private Button notificationAccessButton;
     private Button storageAccessButton;
-    private Button openBridgeButton;
-    private Button installBridgeButton;
     private Button serviceButton;
     private Switch autoStart;
     private Switch radioSavedNavigation;
@@ -149,12 +146,17 @@ public final class MainActivity extends ScaledActivity {
                         mediaStatusText.setText("Медиасервис подключён.");
                         mediaStatusText.setTextColor(Ui.ACCENT);
                         if (mediaBridgeClient.isSettingsSupported()) {
+                            checkPendingImportRecovery();
                             loadMediaSettings();
                         }
                     } else if (state == MediaBridgeClient.State.CONNECTING) {
+                        currentMediaSettings = null;
+                        setMediaControlsEnabled(mediaSettingsGroup, false);
                         mediaStatusText.setText("Подключение к медиасервису…");
                         mediaStatusText.setTextColor(Ui.SECONDARY);
                     } else {
+                        currentMediaSettings = null;
+                        setMediaControlsEnabled(mediaSettingsGroup, false);
                         mediaStatusText.setText("Медиасервис недоступен: " + (detail != null ? detail : state.name()));
                         mediaStatusText.setTextColor(Ui.ERROR);
                     }
@@ -200,25 +202,10 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        if (EmbeddedApiInstaller.ACTION_INSTALL_RESULT.equals(intent.getAction())
-                && !BuildConfig.INTEGRATED_MEDIA_API) {
-            refreshBridgeStatus();
-        }
-    }
-
-    @Override public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus && openBridgeButton != null) refreshBridgeStatus();
-    }
-
     @Override protected void onDestroy() {
         if (mediaBridgeClient != null) {
             mediaBridgeClient.stop();
         }
-        debounceHandler.removeCallbacksAndMessages(null);
         main.removeCallbacksAndMessages(null);
         ioExecutor.shutdownNow();
         super.onDestroy();
@@ -300,13 +287,9 @@ public final class MainActivity extends ScaledActivity {
         accessCard.addView(accessibilityAccessButton, buttonParams());
         notificationAccessButton = actionButton("Разрешить доступ к уведомлениям (медиа)");
         notificationAccessButton.setOnClickListener(v -> openNotificationAccessSettings());
-        notificationAccessButton.setVisibility(BuildConfig.INTEGRATED_MEDIA_API
-                ? View.VISIBLE : View.GONE);
         accessCard.addView(notificationAccessButton, buttonParams());
         storageAccessButton = actionButton("Разрешить доступ к хранилищу (USB)");
         storageAccessButton.setOnClickListener(v -> requestStorageAccess());
-        storageAccessButton.setVisibility(BuildConfig.INTEGRATED_MEDIA_API
-                ? View.VISIBLE : View.GONE);
         accessCard.addView(storageAccessButton, buttonParams());
 
         LinearLayout serviceCard = card();
@@ -428,6 +411,25 @@ public final class MainActivity extends ScaledActivity {
         positionRow.addView(yCell, positionColumnParams(1f, 8));
         positionGrid.addView(positionRow, fullWrap());
         serviceCard.addView(positionGrid, fullWrap());
+        dragHandleVisible = new Switch(this);
+        dragHandleVisible.setText("Показывать точки перемещения на виджете");
+        dragHandleVisible.setTextColor(Ui.PRIMARY);
+        dragHandleVisible.setTextSize(15);
+        dragHandleVisible.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, checked);
+            renderPreview();
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams dragHandleParams = fullWrap();
+        dragHandleParams.topMargin = Ui.dp(this, 14);
+        serviceCard.addView(dragHandleVisible, dragHandleParams);
+        TextView dragHandleHint = text(
+                "Если точки скрыты, включите их здесь снова, чтобы переместить виджет.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams dragHandleHintParams = fullWrap();
+        dragHandleHintParams.topMargin = Ui.dp(this, 5);
+        serviceCard.addView(dragHandleHint, dragHandleHintParams);
         Button applyGeometry = actionButton("Применить размер и положение");
         applyGeometry.setOnClickListener(v -> applyGeometry());
         serviceCard.addView(applyGeometry, buttonParams());
@@ -666,26 +668,6 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams radioFavoritesHintParams = fullWrap();
         radioFavoritesHintParams.topMargin = Ui.dp(this, 5);
         behaviorCard.addView(radioFavoritesNavigationHint, radioFavoritesHintParams);
-        dragHandleVisible = new Switch(this);
-        dragHandleVisible.setText("Показывать точки перемещения на виджете");
-        dragHandleVisible.setTextColor(Ui.PRIMARY);
-        dragHandleVisible.setTextSize(15);
-        dragHandleVisible.setOnCheckedChangeListener((button, checked) -> {
-            if (!button.isPressed()) return;
-            prefs.putBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, checked);
-            renderPreview();
-            refreshOverlayIfRunning();
-        });
-        LinearLayout.LayoutParams dragHandleParams = fullWrap();
-        dragHandleParams.topMargin = Ui.dp(this, 14);
-        behaviorCard.addView(dragHandleVisible, dragHandleParams);
-        TextView dragHandleHint = text(
-                "Если точки скрыты, включите их здесь снова, чтобы переместить виджет.",
-                13, Ui.SECONDARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams dragHandleHintParams = fullWrap();
-        dragHandleHintParams.topMargin = Ui.dp(this, 5);
-        behaviorCard.addView(dragHandleHint, dragHandleHintParams);
-
         LinearLayout favoritesGridCard = card();
         favoritesGridCard.addView(text("Сетка избранных радиостанций",
                 20, Ui.PRIMARY, Typeface.BOLD));
@@ -742,45 +724,37 @@ public final class MainActivity extends ScaledActivity {
         settingsBackupCard.addView(text("Резервная копия и восстановление",
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView settingsBackupHint = text(
-                BuildConfig.INTEGRATED_MEDIA_API
-                        ? "Архив ZIP содержит настройки карточки, источника звука, приборной панели "
-                                + "и каталог радиостанций с обложками. Также поддерживается импорт прежних JSON-настроек."
-                        : "JSON содержит настройки внешнего вида карточки, геометрии и поведения. "
-                                + "Разрешения и состояние запущенного сервиса не переносятся.",
+                "Архив ZIP содержит настройки карточки, источника звука, приборной панели "
+                        + "и каталог радиостанций с обложками. Также поддерживается импорт прежних JSON-настроек.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         settingsBackupHint.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams settingsBackupHintParams = fullWrap();
         settingsBackupHintParams.topMargin = Ui.dp(this, 8);
         settingsBackupCard.addView(settingsBackupHint, settingsBackupHintParams);
-        exportSettingsButton = actionButton(BuildConfig.INTEGRATED_MEDIA_API
-                ? "Экспортировать резервную копию (ZIP)"
-                : "Экспортировать настройки в JSON");
+        exportSettingsButton = actionButton("Экспортировать резервную копию (ZIP)");
         exportSettingsButton.setOnClickListener(v -> chooseSettingsExport());
         settingsBackupCard.addView(exportSettingsButton, buttonParams());
-        importSettingsButton = actionButton(BuildConfig.INTEGRATED_MEDIA_API
-                ? "Импортировать резервную копию (ZIP / JSON)"
-                : "Импортировать настройки из JSON");
+        importSettingsButton = actionButton("Импортировать резервную копию (ZIP / JSON)");
         importSettingsButton.setOnClickListener(v -> chooseSettingsImport());
         settingsBackupCard.addView(importSettingsButton, buttonParams());
 
-        // 1. Секция «Виджет»
-        addSectionHeading(root, getString(R.string.section_widget), true);
-        root.addView(serviceCard);
-        root.addView(typographyCard);
-        root.addView(controlsCard);
-        root.addView(behaviorCard);
-        root.addView(favoritesGridCard);
-        root.addView(scaleCard);
+        // 1. Секция «Система»
+        addSectionHeading(root, getString(R.string.section_system), true);
+        root.addView(accessCard);
+        root.addView(runtimeCard);
 
         // 2. Секция «Медиа»
         addSectionHeading(root, getString(R.string.section_media), false);
         LinearLayout mediaCard = createMediaCard();
         root.addView(mediaCard);
 
-        // 3. Секция «Система»
-        addSectionHeading(root, getString(R.string.section_system), false);
-        root.addView(runtimeCard);
-        root.addView(accessCard);
+        // 3. Секция «Виджет»
+        addSectionHeading(root, getString(R.string.section_widget), false);
+        root.addView(serviceCard);
+        root.addView(typographyCard);
+        root.addView(controlsCard);
+        root.addView(behaviorCard);
+        root.addView(favoritesGridCard);
 
         // 4. Секция «Резервная копия»
         addSectionHeading(root, getString(R.string.section_backup), false);
@@ -790,6 +764,7 @@ public final class MainActivity extends ScaledActivity {
         addSectionHeading(root, getString(R.string.section_diagnostics), false);
         LinearLayout diagnosticCard = createDiagnosticCard();
         root.addView(diagnosticCard);
+        root.addView(scaleCard);
 
         screen.addView(scroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -850,24 +825,20 @@ public final class MainActivity extends ScaledActivity {
         boolean overlay = Settings.canDrawOverlays(this);
         boolean usage = ForegroundAppDetector.hasUsageAccess(this);
         boolean accessibility = AccessibilityWindowState.isEnabled(this);
-        boolean mediaNotifications = !BuildConfig.INTEGRATED_MEDIA_API
-                || hasMediaNotificationAccess();
-        boolean storage = !BuildConfig.INTEGRATED_MEDIA_API || hasStorageAccess();
+        boolean mediaNotifications = hasMediaNotificationAccess();
+        boolean storage = hasStorageAccess();
         updatePermissionButton(overlayPermissionButton, overlay,
                 "Поверх окон предоставлено", "Разрешить поверх окон");
         updatePermissionButton(usageAccessButton, usage,
                 "История использования предоставлена", "Разрешить историю использования");
         updatePermissionButton(accessibilityAccessButton, accessibility,
                 "Спецвозможности предоставлены", getString(R.string.allow_accessibility));
-        if (BuildConfig.INTEGRATED_MEDIA_API) {
-            updatePermissionButton(notificationAccessButton, mediaNotifications,
-                    "Доступ к уведомлениям (медиа) предоставлен",
-                    "Разрешить доступ к уведомлениям (медиа)");
-            updatePermissionButton(storageAccessButton, storage,
-                    "Доступ к хранилищу (USB) предоставлен",
-                    "Разрешить доступ к хранилищу (USB)");
-        }
-        refreshBridgeStatus();
+        updatePermissionButton(notificationAccessButton, mediaNotifications,
+                "Доступ к уведомлениям (медиа) предоставлен",
+                "Разрешить доступ к уведомлениям (медиа)");
+        updatePermissionButton(storageAccessButton, storage,
+                "Доступ к хранилищу (USB) предоставлен",
+                "Разрешить доступ к хранилищу (USB)");
         boolean enabled = prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false);
         serviceButton.setText(enabled ? "Остановить" : "Запустить");
         serviceButton.setBackground(Ui.background(enabled ? Ui.NESTED : Ui.ACCENT, 8, this));
@@ -885,21 +856,6 @@ public final class MainActivity extends ScaledActivity {
         refreshSizeControls(CardStyle.DEFAULT);
         refreshingStyle = false;
         requestNotificationPermissionIfNeeded();
-    }
-
-    private void refreshBridgeStatus() {
-        if (BuildConfig.INTEGRATED_MEDIA_API) {
-            return;
-        }
-        boolean bridgeInstalled = isPackageInstalled(MediaBridgeContract.SERVICE_PACKAGE);
-        boolean embeddedApiAvailable = EmbeddedApiInstaller.isAvailable(this);
-        openBridgeButton.setText("Открыть Atlas Media API");
-        openBridgeButton.setVisibility(bridgeInstalled ? View.VISIBLE : View.GONE);
-        installBridgeButton.setVisibility(embeddedApiAvailable ? View.VISIBLE : View.GONE);
-        installBridgeButton.setEnabled(true);
-        installBridgeButton.setText(bridgeInstalled
-                ? "Установить версию API из этой сборки"
-                : "Установить Atlas Media API");
     }
 
     private void toggleService() {
@@ -956,11 +912,13 @@ public final class MainActivity extends ScaledActivity {
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
         ioExecutor.execute(() -> {
+            File tempMediaZip = null;
+            File fullZip = null;
             try {
-                if (BuildConfig.INTEGRATED_MEDIA_API && mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()) {
+                if (mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()) {
                     File exportDir = new File(getCacheDir(), "exports");
                     exportDir.mkdirs();
-                    File tempMediaZip = new File(exportDir, "media_export_" + System.currentTimeMillis() + ".zip");
+                    tempMediaZip = new File(exportDir, "media_export_" + System.currentTimeMillis() + ".zip");
                     tempMediaZip.delete();
 
                     final CountDownLatch latch = new CountDownLatch(1);
@@ -982,7 +940,7 @@ public final class MainActivity extends ScaledActivity {
                                 + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
                     }
 
-                    File fullZip = FullSettingsBackup.createFullBackupZip(appContext, prefs, tempMediaZip);
+                    fullZip = FullSettingsBackup.createFullBackupZip(appContext, prefs, tempMediaZip);
                     tempMediaZip.delete();
                     SettingsExportStore.Result result = SettingsExportStore.exportZip(appContext, fullZip);
                     fullZip.delete();
@@ -994,17 +952,15 @@ public final class MainActivity extends ScaledActivity {
                                 Toast.LENGTH_LONG).show();
                     });
                 } else {
-                    SettingsExportStore.Result result = SettingsExportStore.export(appContext, prefs);
-                    main.post(() -> {
-                        if (isDestroyed()) return;
-                        setSettingsTransferEnabled(true);
-                        Toast.makeText(this, "Настройки сохранены: " + result.location,
-                                Toast.LENGTH_LONG).show();
-                    });
+                    throw new IOException("Медиасервис недоступен. Полная резервная копия не создана.");
+
                 }
             } catch (Exception error) {
                 AppLog.warn("Cannot export settings", error);
                 showSettingsTransferError("Не удалось экспортировать настройки", error);
+            } finally {
+                if (tempMediaZip != null) tempMediaZip.delete();
+                if (fullZip != null) fullZip.delete();
             }
         });
     }
@@ -1016,7 +972,10 @@ public final class MainActivity extends ScaledActivity {
             try {
                 FullSettingsBackup.Preview preview = FullSettingsBackup.inspect(appContext, uri);
                 main.post(() -> {
-                    if (isDestroyed()) return;
+                    if (isDestroyed()) {
+                        FullSettingsBackup.deleteRecursively(preview.stagedDir);
+                        return;
+                    }
                     setSettingsTransferEnabled(true);
                     showImportPreviewDialog(preview);
                 });
@@ -1048,6 +1007,7 @@ public final class MainActivity extends ScaledActivity {
         sb.append("\nТекущие переносимые настройки будут заменены.");
 
         CompactDialog.show(new AlertDialog.Builder(this)
+                .setOnCancelListener(d -> FullSettingsBackup.deleteRecursively(preview.stagedDir))
                 .setTitle(preview.isZip ? "Импортировать резервную копию?" : "Импортировать настройки?")
                 .setMessage(sb.toString().trim())
                 .setNegativeButton("Отмена", (d, w) -> {
@@ -1057,21 +1017,27 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void applyFullImport(FullSettingsBackup.Preview preview) {
+        importInProgress = true;
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
         ioExecutor.execute(() -> {
             boolean journalStarted = false;
+            boolean commitRequested = false;
+            String operationId = null;
             try {
-                ImportJournal.startImport(appContext, prefs, preview.hasWidget, preview.hasMedia);
+                if (preview.hasMedia && !mediaBridgeClient.isSettingsSupported()) {
+                    throw new IOException("Медиасервис недоступен. Импорт не выполнен.");
+                }
+                operationId = ImportJournal.startImport(appContext, prefs, preview.hasWidget, preview.hasMedia);
                 journalStarted = true;
 
                 String stagingToken = null;
-                final String operationId = UUID.randomUUID().toString();
+                final String mediaOperationId = operationId;
                 if (preview.hasMedia && mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()) {
                     final CountDownLatch prepLatch = new CountDownLatch(1);
                     final String[] tokenHolder = new String[1];
                     final String[] errHolder = new String[1];
-                    mediaBridgeClient.prepareMediaImport(operationId, preview.stagedFile, new MediaBridgeClient.PrepareImportCallback() {
+                    mediaBridgeClient.prepareMediaImport(mediaOperationId, preview.stagedFile, new MediaBridgeClient.PrepareImportCallback() {
                         @Override public void onImportPrepared(String token, String catalogMode, int stationCount, java.util.List<String> warnings) {
                             tokenHolder[0] = token;
                             prepLatch.countDown();
@@ -1101,7 +1067,9 @@ public final class MainActivity extends ScaledActivity {
                     final boolean[] commitOk = new boolean[1];
                     final String[] commitErr = new String[1];
                     final String finalStagingToken = stagingToken;
-                    mediaBridgeClient.commitMediaImport(operationId, finalStagingToken, new MediaBridgeClient.CommitImportCallback() {
+                    ImportJournal.markMediaCommitRequested(appContext);
+                    commitRequested = true;
+                    mediaBridgeClient.commitMediaImport(mediaOperationId, finalStagingToken, new MediaBridgeClient.CommitImportCallback() {
                         @Override public void onImportCommitted(MediaSettingsSnapshot snapshot) {
                             commitOk[0] = true;
                             commitLatch.countDown();
@@ -1113,9 +1081,7 @@ public final class MainActivity extends ScaledActivity {
                     });
                     commitLatch.await(15, TimeUnit.SECONDS);
                     if (!commitOk[0]) {
-                        ImportJournal.rollback(appContext, prefs);
-                        mediaBridgeClient.abortMediaImport(operationId);
-                        throw new IOException("Ошибка применения настроек медиа: "
+                        throw new IOException("Результат импорта медиа не подтверждён. Состояние будет проверено при подключении: "
                                 + (commitErr[0] != null ? commitErr[0] : "таймаут"));
                     }
                 }
@@ -1131,43 +1097,96 @@ public final class MainActivity extends ScaledActivity {
                     recreate();
                 });
             } catch (Exception error) {
-                if (journalStarted) {
+                if (journalStarted && !commitRequested) {
+                    if (preview.hasMedia) mediaBridgeClient.abortMediaImport(operationId);
                     ImportJournal.rollback(appContext, prefs);
                 }
                 FullSettingsBackup.deleteRecursively(preview.stagedDir);
                 AppLog.warn("Import failed", error);
                 showSettingsTransferError("Не удалось импортировать настройки", error);
+            } finally {
+                main.post(() -> {
+                    importInProgress = false;
+                    checkPendingImportRecovery();
+                });
             }
         });
     }
 
     private void checkPendingImportRecovery() {
+        if (importInProgress || recoveryInProgress || isDestroyed()) return;
         ImportJournal.RecoveryInfo recovery = ImportJournal.checkPendingRecovery(this);
-        if (recovery != null) {
-            String msg = "Предыдущий импорт настроек не был завершён (возможен сбой процесса). "
-                    + (recovery.canRestoreWidget
-                       ? "Вы можете восстановить настройки карточки виджета к состоянию до импорта."
-                       : "Рекомендуется проверить настройки виджета и медиа.");
-            AlertDialog.Builder b = new AlertDialog.Builder(this)
-                    .setTitle("Прерванный импорт настроек")
-                    .setMessage(msg)
-                    .setNegativeButton("Закрыть", (d, w) -> {
-                        ImportJournal.dismissPending(this);
-                    });
-            if (recovery.canRestoreWidget) {
-                b.setPositiveButton("Восстановить настройки", (d, w) -> {
-                    boolean restored = ImportJournal.rollback(this, prefs);
-                    if (restored) {
+        if (recovery == null) return;
+        if (recovery.hasMedia && recovery.mediaCommitRequested) {
+            if (!mediaBridgeClient.isSettingsSupported()) return;
+            recoveryInProgress = true;
+            setSettingsTransferEnabled(false);
+            mediaBridgeClient.getImportStatus(recovery.id, new MediaBridgeClient.ImportStatusCallback() {
+                @Override public void onStatus(String status) {
+                    recoveryInProgress = false;
+                    if (isDestroyed()) return;
+                    if ("COMMITTED".equals(status)) {
+                        ImportJournal.markCommitted(MainActivity.this);
                         refreshOverlayIfRunning();
-                        Toast.makeText(this, "Настройки виджета восстановлены", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MainActivity.this, "Импорт настроек подтверждён", Toast.LENGTH_LONG).show();
+                        recreate();
+                    } else if ("PREPARED".equals(status) || "IDLE".equals(status)) {
+                        mediaBridgeClient.abortMediaImport(recovery.id);
+                        offerWidgetImportRollback(recovery);
+                    } else {
+                        setSettingsTransferEnabled(false);
+                        recoveryInProgress = true;
+                        CompactDialog.show(new AlertDialog.Builder(MainActivity.this)
+                                .setTitle("Импорт не завершён")
+                                .setMessage("Медиасервис сообщает: " + status
+                                        + ". Журнал сохранён. После устранения ошибки можно повторить проверку и завершение импорта.")
+                                .setOnCancelListener(d -> recoveryInProgress = false)
+                                .setNegativeButton("Позже", (d, w) -> recoveryInProgress = false)
+                                .setPositiveButton("Повторить", (d, w) -> {
+                                    recoveryInProgress = false;
+                                    checkPendingImportRecovery();
+                                }));
+                    }
+                }
+                @Override public void onError(int code, String message) {
+                    recoveryInProgress = false;
+                    if (isDestroyed()) return;
+                    Toast.makeText(MainActivity.this,
+                            "Не удалось проверить результат импорта: " + message,
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        } else {
+            if (recovery.hasMedia && mediaBridgeClient.isSettingsSupported()) {
+                mediaBridgeClient.abortMediaImport(recovery.id);
+            }
+            offerWidgetImportRollback(recovery);
+        }
+    }
+
+    private void offerWidgetImportRollback(ImportJournal.RecoveryInfo recovery) {
+        if (!recovery.hasWidget) {
+            ImportJournal.markCommitted(this);
+            setSettingsTransferEnabled(true);
+            return;
+        }
+        recoveryInProgress = true;
+        setSettingsTransferEnabled(false);
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Прерванный импорт настроек")
+                .setMessage("Импорт не завершён. Восстановить настройки карточки до импорта?")
+                .setOnCancelListener(d -> recoveryInProgress = false)
+                .setNegativeButton("Позже", (d, w) -> recoveryInProgress = false)
+                .setPositiveButton("Восстановить", (d, w) -> {
+                    recoveryInProgress = false;
+                    if (ImportJournal.rollback(this, prefs)) {
+                        refreshOverlayIfRunning();
                         recreate();
                     } else {
-                        ImportJournal.dismissPending(this);
+                        Toast.makeText(this, "Не удалось восстановить настройки. Журнал сохранён.",
+                                Toast.LENGTH_LONG).show();
                     }
-                });
-            }
-            CompactDialog.show(b);
-        }
+                }));
     }
 
     private LinearLayout createMediaCard() {
@@ -1180,196 +1199,175 @@ public final class MainActivity extends ScaledActivity {
         statusParams.topMargin = Ui.dp(this, 8);
         mediaCard.addView(mediaStatusText, statusParams);
 
-        if (BuildConfig.INTEGRATED_MEDIA_API) {
-            mediaSettingsGroup = new LinearLayout(this);
-            mediaSettingsGroup.setOrientation(LinearLayout.VERTICAL);
-            mediaCard.addView(mediaSettingsGroup, fullWrap());
+        mediaSettingsGroup = new LinearLayout(this);
+        mediaSettingsGroup.setOrientation(LinearLayout.VERTICAL);
+        mediaCard.addView(mediaSettingsGroup, fullWrap());
 
-            defaultSourceTitle = text("Источник звука по умолчанию", 15, Ui.SECONDARY, Typeface.BOLD);
-            LinearLayout.LayoutParams dstParams = fullWrap();
-            dstParams.topMargin = Ui.dp(this, 14);
-            mediaSettingsGroup.addView(defaultSourceTitle, dstParams);
+        defaultSourceTitle = text("Источник звука по умолчанию", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams dstParams = fullWrap();
+        dstParams.topMargin = Ui.dp(this, 14);
+        mediaSettingsGroup.addView(defaultSourceTitle, dstParams);
 
-            LinearLayout row1 = createSourceTileRow(new String[][]{
-                    {"Отключено", ""},
-                    {"Radio", "RADIO"},
-                    {"Bluetooth", "BT"}
-            });
-            mediaSettingsGroup.addView(row1);
-            LinearLayout.LayoutParams r1Params = fullWrap();
-            r1Params.topMargin = Ui.dp(this, 8);
-            row1.setLayoutParams(r1Params);
+        LinearLayout row1 = createSourceTileRow(new String[][]{
+                {"Отключено", ""},
+                {"Radio", "RADIO"},
+                {"Bluetooth", "BT"}
+        });
+        mediaSettingsGroup.addView(row1);
+        LinearLayout.LayoutParams r1Params = fullWrap();
+        r1Params.topMargin = Ui.dp(this, 8);
+        row1.setLayoutParams(r1Params);
 
-            LinearLayout row2 = createSourceTileRow(new String[][]{
-                    {"USB", "USB"},
-                    {"Online", "ONLINE"},
-                    {"CarPlay", "CPAA"}
-            });
-            mediaSettingsGroup.addView(row2);
-            LinearLayout.LayoutParams r2Params = fullWrap();
-            r2Params.topMargin = Ui.dp(this, 6);
-            row2.setLayoutParams(r2Params);
+        LinearLayout row2 = createSourceTileRow(new String[][]{
+                {"USB", "USB"},
+                {"Online", "ONLINE"},
+                {"CarPlay", "CPAA"}
+        });
+        mediaSettingsGroup.addView(row2);
+        LinearLayout.LayoutParams r2Params = fullWrap();
+        r2Params.topMargin = Ui.dp(this, 6);
+        row2.setLayoutParams(r2Params);
 
-            TextView delayTitle = text("Задержка переключения на старте", 15, Ui.SECONDARY, Typeface.BOLD);
-            LinearLayout.LayoutParams dtParams = fullWrap();
-            dtParams.topMargin = Ui.dp(this, 14);
-            mediaSettingsGroup.addView(delayTitle, dtParams);
+        TextView delayTitle = text("Задержка переключения на старте", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams dtParams = fullWrap();
+        dtParams.topMargin = Ui.dp(this, 14);
+        mediaSettingsGroup.addView(delayTitle, dtParams);
 
-            defaultSourceDelayLabel = text("0 сек", 18, Ui.PRIMARY, Typeface.BOLD);
-            LinearLayout.LayoutParams dslParams = fullWrap();
-            dslParams.topMargin = Ui.dp(this, 4);
-            mediaSettingsGroup.addView(defaultSourceDelayLabel, dslParams);
+        defaultSourceDelayLabel = text("0 сек", 18, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams dslParams = fullWrap();
+        dslParams.topMargin = Ui.dp(this, 4);
+        mediaSettingsGroup.addView(defaultSourceDelayLabel, dslParams);
 
-            defaultSourceDelaySeekBar = sizeSeekBar(0, 30);
-            defaultSourceDelaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                    if (fromUser) {
-                        defaultSourceDelayLabel.setText(progress + " сек");
-                        scheduleDelaySettingCommit(progress);
-                    }
+        defaultSourceDelaySeekBar = sizeSeekBar(0, 30);
+        defaultSourceDelaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    defaultSourceDelayLabel.setText(progress + " сек");
                 }
-                @Override public void onStartTrackingTouch(SeekBar bar) {}
-                @Override public void onStopTrackingTouch(SeekBar bar) {
-                    commitDelaySetting(bar.getProgress());
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                commitDelaySetting(bar.getProgress());
+            }
+        });
+        mediaSettingsGroup.addView(defaultSourceDelaySeekBar, fullWrap());
+
+        startupAutoplaySwitch = new Switch(this);
+        startupAutoplaySwitch.setText("Автовоспроизведение при старте");
+        startupAutoplaySwitch.setTextColor(Ui.PRIMARY);
+        startupAutoplaySwitch.setTextSize(15);
+        startupAutoplaySwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY, checked);
+        });
+        LinearLayout.LayoutParams s1 = fullWrap();
+        s1.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(startupAutoplaySwitch, s1);
+
+        sourceLostSwitch = new Switch(this);
+        sourceLostSwitch.setText("Автопереключение при потере источника");
+        sourceLostSwitch.setTextColor(Ui.PRIMARY);
+        sourceLostSwitch.setTextSize(15);
+        sourceLostSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT, checked);
+        });
+        LinearLayout.LayoutParams s2 = fullWrap();
+        s2.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(sourceLostSwitch, s2);
+
+        sourceLostAutoplaySwitch = new Switch(this);
+        sourceLostAutoplaySwitch.setText("Автовоспроизведение при потере источника");
+        sourceLostAutoplaySwitch.setTextColor(Ui.PRIMARY);
+        sourceLostAutoplaySwitch.setTextSize(15);
+        sourceLostAutoplaySwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY, checked);
+        });
+        LinearLayout.LayoutParams s3 = fullWrap();
+        s3.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(sourceLostAutoplaySwitch, s3);
+
+        switchToOnlineSwitch = new Switch(this);
+        switchToOnlineSwitch.setText("Переключать на Online перед воспроизведением сессии");
+        switchToOnlineSwitch.setTextColor(Ui.PRIMARY);
+        switchToOnlineSwitch.setTextSize(15);
+        switchToOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, checked);
+        });
+        LinearLayout.LayoutParams s4 = fullWrap();
+        s4.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(switchToOnlineSwitch, s4);
+
+        TextView radioClusterTitle = text("Радио и приборная панель", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams rctParams = fullWrap();
+        rctParams.topMargin = Ui.dp(this, 16);
+        mediaSettingsGroup.addView(radioClusterTitle, rctParams);
+
+        radioWidgetBroadcastSwitch = new Switch(this);
+        radioWidgetBroadcastSwitch.setText("Трансляция радио в виджет (название и обложка)");
+        radioWidgetBroadcastSwitch.setTextColor(Ui.PRIMARY);
+        radioWidgetBroadcastSwitch.setTextSize(15);
+        radioWidgetBroadcastSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, checked);
+        });
+        LinearLayout.LayoutParams s5 = fullWrap();
+        s5.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(radioWidgetBroadcastSwitch, s5);
+
+        clusterCoversSwitch = new Switch(this);
+        clusterCoversSwitch.setText("Трансляция радио на приборку (название и обложка)");
+        clusterCoversSwitch.setTextColor(Ui.PRIMARY);
+        clusterCoversSwitch.setTextSize(15);
+        clusterCoversSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, checked);
+        });
+        LinearLayout.LayoutParams s6 = fullWrap();
+        s6.topMargin = Ui.dp(this, 10);
+        mediaSettingsGroup.addView(clusterCoversSwitch, s6);
+
+        TextView clusterWatchdogTitle = text("Базовый интервал watchdog приборки", 14, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams cwtParams = fullWrap();
+        cwtParams.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(clusterWatchdogTitle, cwtParams);
+
+        clusterWatchdogLabel = text("1250 мс", 16, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams cwlParams = fullWrap();
+        cwlParams.topMargin = Ui.dp(this, 4);
+        mediaSettingsGroup.addView(clusterWatchdogLabel, cwlParams);
+
+        clusterWatchdogSeekBar = sizeSeekBar(100, 500); // 1000..5000 ms
+        clusterWatchdogSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    long ms = progress * 10L;
+                    clusterWatchdogLabel.setText(ms + " мс");
                 }
-            });
-            mediaSettingsGroup.addView(defaultSourceDelaySeekBar, fullWrap());
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                commitWatchdog(bar.getProgress() * 10L);
+            }
+        });
+        mediaSettingsGroup.addView(clusterWatchdogSeekBar, fullWrap());
 
-            startupAutoplaySwitch = new Switch(this);
-            startupAutoplaySwitch.setText("Автовоспроизведение при старте");
-            startupAutoplaySwitch.setTextColor(Ui.PRIMARY);
-            startupAutoplaySwitch.setTextSize(15);
-            startupAutoplaySwitch.setOnCheckedChangeListener((btn, checked) -> {
-                if (!btn.isPressed()) return;
-                sendMediaSettingChange(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY, checked);
-            });
-            LinearLayout.LayoutParams s1 = fullWrap();
-            s1.topMargin = Ui.dp(this, 12);
-            mediaSettingsGroup.addView(startupAutoplaySwitch, s1);
+        TextView radioCatalogSectionTitle = text("Каталог радио", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams rcsParams = fullWrap();
+        rcsParams.topMargin = Ui.dp(this, 16);
+        mediaSettingsGroup.addView(radioCatalogSectionTitle, rcsParams);
 
-            sourceLostSwitch = new Switch(this);
-            sourceLostSwitch.setText("Автопереключение при потере источника");
-            sourceLostSwitch.setTextColor(Ui.PRIMARY);
-            sourceLostSwitch.setTextSize(15);
-            sourceLostSwitch.setOnCheckedChangeListener((btn, checked) -> {
-                if (!btn.isPressed()) return;
-                sendMediaSettingChange(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT, checked);
-            });
-            LinearLayout.LayoutParams s2 = fullWrap();
-            s2.topMargin = Ui.dp(this, 12);
-            mediaSettingsGroup.addView(sourceLostSwitch, s2);
+        radioCatalogInfoText = text("Каталог: ...", 13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams rciParams = fullWrap();
+        rciParams.topMargin = Ui.dp(this, 4);
+        mediaSettingsGroup.addView(radioCatalogInfoText, rciParams);
 
-            sourceLostAutoplaySwitch = new Switch(this);
-            sourceLostAutoplaySwitch.setText("Автовоспроизведение при потере источника");
-            sourceLostAutoplaySwitch.setTextColor(Ui.PRIMARY);
-            sourceLostAutoplaySwitch.setTextSize(15);
-            sourceLostAutoplaySwitch.setOnCheckedChangeListener((btn, checked) -> {
-                if (!btn.isPressed()) return;
-                sendMediaSettingChange(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY, checked);
-            });
-            LinearLayout.LayoutParams s3 = fullWrap();
-            s3.topMargin = Ui.dp(this, 12);
-            mediaSettingsGroup.addView(sourceLostAutoplaySwitch, s3);
-
-            switchToOnlineSwitch = new Switch(this);
-            switchToOnlineSwitch.setText("Переключать на Online перед воспроизведением сессии");
-            switchToOnlineSwitch.setTextColor(Ui.PRIMARY);
-            switchToOnlineSwitch.setTextSize(15);
-            switchToOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
-                if (!btn.isPressed()) return;
-                sendMediaSettingChange(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, checked);
-            });
-            LinearLayout.LayoutParams s4 = fullWrap();
-            s4.topMargin = Ui.dp(this, 12);
-            mediaSettingsGroup.addView(switchToOnlineSwitch, s4);
-
-            TextView radioClusterTitle = text("Радио и приборная панель", 15, Ui.SECONDARY, Typeface.BOLD);
-            LinearLayout.LayoutParams rctParams = fullWrap();
-            rctParams.topMargin = Ui.dp(this, 16);
-            mediaSettingsGroup.addView(radioClusterTitle, rctParams);
-
-            radioWidgetBroadcastSwitch = new Switch(this);
-            radioWidgetBroadcastSwitch.setText("Трансляция радио в виджет (название и обложка)");
-            radioWidgetBroadcastSwitch.setTextColor(Ui.PRIMARY);
-            radioWidgetBroadcastSwitch.setTextSize(15);
-            radioWidgetBroadcastSwitch.setOnCheckedChangeListener((btn, checked) -> {
-                if (!btn.isPressed()) return;
-                sendMediaSettingChange(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, checked);
-            });
-            LinearLayout.LayoutParams s5 = fullWrap();
-            s5.topMargin = Ui.dp(this, 12);
-            mediaSettingsGroup.addView(radioWidgetBroadcastSwitch, s5);
-
-            clusterCoversSwitch = new Switch(this);
-            clusterCoversSwitch.setText("Трансляция радио на приборку (название и обложка)");
-            clusterCoversSwitch.setTextColor(Ui.PRIMARY);
-            clusterCoversSwitch.setTextSize(15);
-            clusterCoversSwitch.setOnCheckedChangeListener((btn, checked) -> {
-                if (!btn.isPressed()) return;
-                sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, checked);
-            });
-            LinearLayout.LayoutParams s6 = fullWrap();
-            s6.topMargin = Ui.dp(this, 10);
-            mediaSettingsGroup.addView(clusterCoversSwitch, s6);
-
-            TextView clusterWatchdogTitle = text("Базовый интервал watchdog приборки", 14, Ui.SECONDARY, Typeface.BOLD);
-            LinearLayout.LayoutParams cwtParams = fullWrap();
-            cwtParams.topMargin = Ui.dp(this, 12);
-            mediaSettingsGroup.addView(clusterWatchdogTitle, cwtParams);
-
-            clusterWatchdogLabel = text("1250 мс", 16, Ui.PRIMARY, Typeface.BOLD);
-            LinearLayout.LayoutParams cwlParams = fullWrap();
-            cwlParams.topMargin = Ui.dp(this, 4);
-            mediaSettingsGroup.addView(clusterWatchdogLabel, cwlParams);
-
-            clusterWatchdogSeekBar = sizeSeekBar(100, 500); // 1000..5000 ms
-            clusterWatchdogSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                    if (fromUser) {
-                        long ms = progress * 10L;
-                        clusterWatchdogLabel.setText(ms + " мс");
-                        scheduleWatchdogCommit(ms);
-                    }
-                }
-                @Override public void onStartTrackingTouch(SeekBar bar) {}
-                @Override public void onStopTrackingTouch(SeekBar bar) {
-                    commitWatchdog(bar.getProgress() * 10L);
-                }
-            });
-            mediaSettingsGroup.addView(clusterWatchdogSeekBar, fullWrap());
-
-            TextView radioCatalogSectionTitle = text("Каталог радио", 15, Ui.SECONDARY, Typeface.BOLD);
-            LinearLayout.LayoutParams rcsParams = fullWrap();
-            rcsParams.topMargin = Ui.dp(this, 16);
-            mediaSettingsGroup.addView(radioCatalogSectionTitle, rcsParams);
-
-            radioCatalogInfoText = text("Каталог: ...", 13, Ui.SECONDARY, Typeface.NORMAL);
-            LinearLayout.LayoutParams rciParams = fullWrap();
-            rciParams.topMargin = Ui.dp(this, 4);
-            mediaSettingsGroup.addView(radioCatalogInfoText, rciParams);
-
-            restoreDefaultRadioCatalogButton = actionButton("Восстановить стандартный каталог радио");
-            restoreDefaultRadioCatalogButton.setOnClickListener(v -> restoreDefaultRadioCatalog());
-            mediaSettingsGroup.addView(restoreDefaultRadioCatalogButton, buttonParams());
-        } else {
-            TextView plainHint = text(
-                "В данной plain-сборке медиасервис вынесен в отдельный пакет com.mmwtl.atlasmediaapi. "
-                + "Настройки источника звука, приборной панели и каталога радио задаются в приложении Atlas Media API.",
-                13, Ui.SECONDARY, Typeface.NORMAL
-            );
-            plainHint.setLineSpacing(0, 1.15f);
-            LinearLayout.LayoutParams phParams = fullWrap();
-            phParams.topMargin = Ui.dp(this, 8);
-            mediaCard.addView(plainHint, phParams);
-
-            openBridgeButton = actionButton("Открыть Atlas Media API");
-            openBridgeButton.setOnClickListener(v -> openAtlasMediaApi());
-            mediaCard.addView(openBridgeButton, buttonParams());
-
-            installBridgeButton = actionButton("Установить Atlas Media API");
-            installBridgeButton.setOnClickListener(v -> requestEmbeddedApiInstall());
-            mediaCard.addView(installBridgeButton, buttonParams());
-        }
+        restoreDefaultRadioCatalogButton = actionButton("Восстановить стандартный каталог радио");
+        restoreDefaultRadioCatalogButton.setOnClickListener(v -> restoreDefaultRadioCatalog());
+        mediaSettingsGroup.addView(restoreDefaultRadioCatalogButton, buttonParams());
+        setMediaControlsEnabled(mediaSettingsGroup, false);
         return mediaCard;
     }
 
@@ -1385,7 +1383,7 @@ public final class MainActivity extends ScaledActivity {
         diagNoteParams.topMargin = Ui.dp(this, 8);
         diagnosticCard.addView(diagNote, diagNoteParams);
         Button openDiagButton = actionButton("Открыть диагностику OneOS");
-        openDiagButton.setOnClickListener(v -> openAtlasMediaApi());
+        openDiagButton.setOnClickListener(v -> openDiagnostics());
         diagnosticCard.addView(openDiagButton, buttonParams());
         return diagnosticCard;
     }
@@ -1413,19 +1411,29 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void loadMediaSettings() {
-        if (mediaBridgeClient == null) return;
+        if (mediaBridgeClient == null || !mediaBridgeClient.isSettingsSupported() || mediaSettingsBusy) return;
+        mediaSettingsBusy = true;
+        setMediaControlsEnabled(mediaSettingsGroup, false);
         mediaBridgeClient.getSettings(new MediaBridgeClient.SettingsCallback() {
             @Override public void onSettings(MediaSettingsSnapshot snapshot) {
+                mediaSettingsBusy = false;
+                if (isDestroyed()) return;
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
             }
             @Override public void onError(int code, String message) {
+                mediaSettingsBusy = false;
+                if (isDestroyed()) return;
+                mediaStatusText.setText("Не удалось загрузить медианастройки: " + message);
+                mediaStatusText.setTextColor(Ui.ERROR);
+                setMediaControlsEnabled(mediaSettingsGroup, false);
                 AppLog.warn("Failed to load media settings: " + code + " " + message, null);
             }
         });
     }
 
     private void updateMediaSettingsUi(MediaSettingsSnapshot snapshot) {
+        setMediaControlsEnabled(mediaSettingsGroup, true);
         for (Map.Entry<String, Button> entry : sourceTileButtons.entrySet()) {
             boolean isSelected = entry.getKey().equals(snapshot.defaultAudioSource);
             Button btn = entry.getValue();
@@ -1472,7 +1480,13 @@ public final class MainActivity extends ScaledActivity {
         if (clusterWatchdogLabel != null) {
             clusterWatchdogLabel.setText(snapshot.clusterWatchdogIntervalMs + " мс");
         }
+        if (clusterWatchdogLabel != null) {
+            clusterWatchdogLabel.setEnabled(snapshot.clusterCoversEnabled);
+            clusterWatchdogLabel.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
+        }
         if (clusterWatchdogSeekBar != null) {
+            clusterWatchdogSeekBar.setEnabled(snapshot.clusterCoversEnabled);
+            clusterWatchdogSeekBar.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
             clusterWatchdogSeekBar.setProgress((int) (snapshot.clusterWatchdogIntervalMs / 10L));
         }
         if (radioCatalogInfoText != null) {
@@ -1487,7 +1501,10 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void sendMediaSettingChange(String key, Object value) {
-        if (mediaBridgeClient == null) return;
+        if (mediaBridgeClient == null || currentMediaSettings == null || mediaSettingsBusy
+                || !mediaBridgeClient.isSettingsSupported()) return;
+        mediaSettingsBusy = true;
+        setMediaControlsEnabled(mediaSettingsGroup, false);
         Bundle b = new Bundle();
         if (value instanceof Boolean) {
             b.putBoolean(key, (Boolean) value);
@@ -1501,10 +1518,14 @@ public final class MainActivity extends ScaledActivity {
         Long expectedRev = currentMediaSettings != null ? currentMediaSettings.revision : null;
         mediaBridgeClient.updateSettings(expectedRev, b, new MediaBridgeClient.UpdateSettingsCallback() {
             @Override public void onSettingsUpdated(MediaSettingsSnapshot snapshot) {
+                mediaSettingsBusy = false;
+                if (isDestroyed()) return;
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
             }
             @Override public void onError(int code, String message) {
+                mediaSettingsBusy = false;
+                if (isDestroyed()) return;
                 AppLog.warn("Failed to update media setting " + key + ": " + code + " " + message, null);
                 Toast.makeText(MainActivity.this, "Ошибка сохранения настройки: " + message, Toast.LENGTH_SHORT).show();
                 loadMediaSettings();
@@ -1513,45 +1534,50 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void restoreDefaultRadioCatalog() {
-        if (mediaBridgeClient == null) return;
+        if (mediaBridgeClient == null || mediaSettingsBusy || !mediaBridgeClient.isSettingsSupported()) return;
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Восстановить стандартный каталог радио?")
+                .setMessage("Пользовательские названия и обложки радиостанций будут удалены.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Восстановить", (d, w) -> applyDefaultRadioCatalog()));
+    }
+
+    private void applyDefaultRadioCatalog() {
+        mediaSettingsBusy = true;
+        setMediaControlsEnabled(mediaSettingsGroup, false);
         mediaBridgeClient.restoreDefaultCatalog(new MediaBridgeClient.RestoreCatalogCallback() {
             @Override public void onCatalogRestored(MediaSettingsSnapshot snapshot) {
+                mediaSettingsBusy = false;
+                if (isDestroyed()) return;
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
                 Toast.makeText(MainActivity.this, "Стандартный каталог радио восстановлен", Toast.LENGTH_SHORT).show();
             }
             @Override public void onError(int code, String message) {
+                mediaSettingsBusy = false;
+                if (isDestroyed()) return;
+                loadMediaSettings();
                 Toast.makeText(MainActivity.this, "Ошибка восстановления каталога: " + message, Toast.LENGTH_SHORT).show();
             }
         });
     }
 
-    private void scheduleDelaySettingCommit(int seconds) {
-        if (pendingDelayCommit != null) debounceHandler.removeCallbacks(pendingDelayCommit);
-        pendingDelayCommit = () -> commitDelaySetting(seconds);
-        debounceHandler.postDelayed(pendingDelayCommit, 250);
-    }
-
     private void commitDelaySetting(int seconds) {
-        if (pendingDelayCommit != null) {
-            debounceHandler.removeCallbacks(pendingDelayCommit);
-            pendingDelayCommit = null;
-        }
         sendMediaSettingChange(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_DELAY_SEC, seconds);
     }
 
-    private void scheduleWatchdogCommit(long ms) {
-        if (pendingWatchdogCommit != null) debounceHandler.removeCallbacks(pendingWatchdogCommit);
-        pendingWatchdogCommit = () -> commitWatchdog(ms);
-        debounceHandler.postDelayed(pendingWatchdogCommit, 250);
+    private void commitWatchdog(long ms) {
+        sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, ms);
     }
 
-    private void commitWatchdog(long ms) {
-        if (pendingWatchdogCommit != null) {
-            debounceHandler.removeCallbacks(pendingWatchdogCommit);
-            pendingWatchdogCommit = null;
+    private void setMediaControlsEnabled(View view, boolean enabled) {
+        if (view == null) return;
+        view.setEnabled(enabled);
+        if (view instanceof ViewGroup group) {
+            for (int i = 0; i < group.getChildCount(); i++) {
+                setMediaControlsEnabled(group.getChildAt(i), enabled);
+            }
         }
-        sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, ms);
     }
 
     private void showSettingsTransferError(String fallback, Exception error) {
@@ -1565,6 +1591,7 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void setSettingsTransferEnabled(boolean enabled) {
+        enabled = enabled && !recoveryInProgress && ImportJournal.checkPendingRecovery(this) == null;
         if (exportSettingsButton != null) exportSettingsButton.setEnabled(enabled);
         if (importSettingsButton != null) importSettingsButton.setEnabled(enabled);
     }
@@ -1668,68 +1695,18 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void openAtlasMediaApi() {
+    private void openDiagnostics() {
         int scaleTenths = configuredScaleTenths(this);
-        if (BuildConfig.INTEGRATED_MEDIA_API) {
-            Intent settings = new Intent().setClassName(
-                    getPackageName(),
-                    "com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity");
-            settings.putExtra("app_ui_scale_tenths", scaleTenths);
-            try {
-                startActivity(settings);
-            } catch (ActivityNotFoundException | SecurityException error) {
-                AppLog.warn("Integrated media service settings unavailable", error);
-                Toast.makeText(this, "Настройки медиасервиса недоступны",
-                        Toast.LENGTH_LONG).show();
-            }
-            return;
-        }
-        Intent launch = getPackageManager().getLaunchIntentForPackage(MediaBridgeContract.SERVICE_PACKAGE);
-        if (launch == null) {
-            Toast.makeText(this, "Atlas Media API не установлен", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        launch.putExtra("app_ui_scale_tenths", scaleTenths);
-        startActivity(launch);
-    }
-
-    private void requestEmbeddedApiInstall() {
-        if (!EmbeddedApiInstaller.isAvailable(this)) {
-            Toast.makeText(this, "В этой сборке Atlas Media API не встроен",
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        installEmbeddedAtlasMediaApi();
-    }
-
-    private void installEmbeddedAtlasMediaApi() {
-        installBridgeButton.setEnabled(false);
-        installBridgeButton.setText("Подготовка установки…");
-        EmbeddedApiInstaller.install(this, ioExecutor, main,
-                new EmbeddedApiInstaller.Callback() {
-                    @Override public void onCommitted() {
-                        installBridgeButton.setEnabled(true);
-                        Toast.makeText(MainActivity.this,
-                                "Подтвердите установку Atlas Media API",
-                                Toast.LENGTH_LONG).show();
-                    }
-
-                    @Override public void onError(Exception error) {
-                        AppLog.warn("Cannot stage embedded Atlas Media API", error);
-                        refresh();
-                        Toast.makeText(MainActivity.this,
-                                "Не удалось подготовить установку Atlas Media API",
-                                Toast.LENGTH_LONG).show();
-                    }
-                });
-    }
-
-    private boolean isPackageInstalled(String packageName) {
+        Intent settings = new Intent().setClassName(
+                getPackageName(),
+                "com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity");
+        settings.putExtra("app_ui_scale_tenths", scaleTenths);
         try {
-            getPackageManager().getPackageInfo(packageName, 0);
-            return true;
-        } catch (PackageManager.NameNotFoundException ignored) {
-            return false;
+            startActivity(settings);
+        } catch (ActivityNotFoundException | SecurityException error) {
+            AppLog.warn("Integrated media service settings unavailable", error);
+            Toast.makeText(this, "Настройки медиасервиса недоступны",
+                    Toast.LENGTH_LONG).show();
         }
     }
 

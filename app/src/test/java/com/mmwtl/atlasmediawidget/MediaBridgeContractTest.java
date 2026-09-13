@@ -12,9 +12,7 @@ import static org.junit.Assert.assertEquals;
 public class MediaBridgeContractTest {
     @Test public void protocolV1ConstantsMatchAtlasMediaApi() {
         assertEquals("com.mmwtl.atlasmediaapi.media.BIND", MediaBridgeContract.SERVICE_ACTION);
-        assertEquals(BuildConfig.INTEGRATED_MEDIA_API
-                        ? "com.mmwtl.atlasmediawidget"
-                        : "com.mmwtl.atlasmediaapi",
+        assertEquals("com.mmwtl.atlasmediawidget",
                 MediaBridgeContract.SERVICE_PACKAGE);
         assertEquals("com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService",
                 MediaBridgeContract.SERVICE_CLASS);

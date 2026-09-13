@@ -98,4 +98,31 @@ public final class ImportJournalTest {
         assertFalse(new File(context.getFilesDir(), "import_journal.json").exists());
         assertFalse(new File(context.getFilesDir(), "pre_import_widget.json").exists());
     }
+    @Test
+    public void commitBoundarySurvivesJournalReload() throws Exception {
+        String id = ImportJournal.startImport(context, prefs, true, true);
+        ImportJournal.markMediaCommitRequested(context);
+        ImportJournal.RecoveryInfo info = ImportJournal.checkPendingRecovery(context);
+        assertEquals(id, info.id);
+        assertTrue(info.mediaCommitRequested);
+        assertThrowsPendingImport();
+    }
+
+    private void assertThrowsPendingImport() {
+        org.junit.Assert.assertThrows(java.io.IOException.class,
+                () -> ImportJournal.startImport(context, prefs, true, true));
+    }
+
+    @Test
+    public void failedRollbackPreservesRecoveryFiles() throws Exception {
+        ImportJournal.startImport(context, prefs, true, false);
+        File snapshot = new File(context.getFilesDir(), "pre_import_widget.json");
+        try (java.io.FileOutputStream out = new java.io.FileOutputStream(snapshot)) {
+            out.write("invalid".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+        assertFalse(ImportJournal.rollback(context, prefs));
+        assertNotNull(ImportJournal.checkPendingRecovery(context));
+        assertTrue(snapshot.isFile());
+    }
+
 }

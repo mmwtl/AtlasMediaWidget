@@ -243,4 +243,50 @@ public final class FullSettingsBackupTest {
 
         FullSettingsBackup.deleteRecursively(preview.stagedDir);
     }
+    @Test
+    public void inspectRejectsMissingHashedFileAndCleansStaging() throws Exception {
+        File zip = temporaryFolder.newFile("missing.zip");
+        JSONObject manifest = new JSONObject().put("format", FullSettingsBackup.FORMAT_BACKUP)
+                .put("schemaVersion", 1)
+                .put("hashes", new JSONObject().put("media.json", "0".repeat(64)));
+        writeEntries(zip, new String[]{"manifest.json"}, new String[]{manifest.toString()});
+        long before = stagingCount();
+        assertThrows(IOException.class, () -> FullSettingsBackup.inspect(context, Uri.fromFile(zip)));
+        assertEquals(before, stagingCount());
+    }
+
+    @Test
+    public void inspectRejectsCanonicalDuplicateEntries() throws Exception {
+        File zip = temporaryFolder.newFile("duplicate.zip");
+        writeEntries(zip, new String[]{"media.json", "./media.json"}, new String[]{"{}", "{}"});
+        assertThrows(IOException.class, () -> FullSettingsBackup.inspect(context, Uri.fromFile(zip)));
+    }
+
+    @Test
+    public void inspectRejectsFutureMediaSchema() throws Exception {
+        File zip = temporaryFolder.newFile("future.zip");
+        JSONObject manifest = new JSONObject().put("format", FullSettingsBackup.FORMAT_BACKUP)
+                .put("schemaVersion", 1);
+        JSONObject media = new JSONObject().put("format", FullSettingsBackup.FORMAT_MEDIA)
+                .put("schemaVersion", 2);
+        writeEntries(zip, new String[]{"manifest.json", "media.json"},
+                new String[]{manifest.toString(), media.toString()});
+        assertThrows(IOException.class, () -> FullSettingsBackup.inspect(context, Uri.fromFile(zip)));
+    }
+
+    private long stagingCount() {
+        File[] files = context.getFilesDir().listFiles((dir, name) -> name.startsWith("staging_inspect_"));
+        return files == null ? 0 : files.length;
+    }
+
+    private static void writeEntries(File file, String[] names, String[] contents) throws IOException {
+        try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(file))) {
+            for (int i = 0; i < names.length; i++) {
+                out.putNextEntry(new ZipEntry(names[i]));
+                out.write(contents[i].getBytes(StandardCharsets.UTF_8));
+                out.closeEntry();
+            }
+        }
+    }
+
 }
