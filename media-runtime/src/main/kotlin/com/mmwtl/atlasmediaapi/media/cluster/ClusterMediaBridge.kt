@@ -1,0 +1,718 @@
+package com.mmwtl.atlasmediaapi.media.cluster
+
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.net.Uri
+import com.ecarx.xui.adaptapi.diminteraction.DimInteraction
+import com.ecarx.xui.adaptapi.diminteraction.IMediaInteraction
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.random.Random
+
+internal enum class ReassertScheduleKind {
+    FULL,
+    DUPLICATE_REPAIR,
+}
+
+internal class ReassertWatchdogIntervalStore(
+    private val prefs: SharedPreferences,
+) {
+    private val hasStoredValue = prefs.contains(
+        ClusterMediaBridge.KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS,
+    )
+    private val storedValue = prefs.getLong(
+        ClusterMediaBridge.KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS,
+        ClusterMediaBridge.DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS,
+    )
+
+    @Volatile
+    var value: Long = ClusterMediaBridge.normalizeReassertWatchdogInterval(storedValue)
+        private set
+
+    init {
+        if (!hasStoredValue || storedValue != value) {
+            prefs.edit()
+                .putLong(ClusterMediaBridge.KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS, value)
+                .apply()
+        }
+    }
+
+    fun set(intervalMs: Long): Long {
+        val normalized = ClusterMediaBridge.normalizeReassertWatchdogInterval(intervalMs)
+        if (normalized == value) return normalized
+        value = normalized
+        prefs.edit()
+            .putLong(ClusterMediaBridge.KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS, normalized)
+            .apply()
+        return normalized
+    }
+}
+
+/**
+ * Manages playback metadata and artwork broadcast to the vehicle digital instrument cluster (DIM/QNX)
+ * via the ECarX DimInteraction hardware abstraction layer.
+ */
+class ClusterMediaBridge(
+    private val context: Context,
+) {
+    data class Status(
+        val available: Boolean,
+        val initializationError: String,
+        val lastUpdate: String,
+        val lastUpdateError: String,
+        val artworkFilePath: String,
+        val artworkWirePath: String,
+        val artworkQnxPath: String,
+        val artworkGrantReport: String,
+        val sendCount: Int,
+        val directDimBound: Boolean,
+        val directDimSendCount: Int,
+        val directDimLastResult: String,
+        val directDimLastError: String,
+    )
+
+    companion object {
+        const val PREFS_NAME = "cluster_dim_prefs"
+        const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
+        const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
+        private const val NFS_SHARED_DIR = "/data/vendor/nfs/shared"
+
+        /**
+         * The stock radio process is another DIM producer and can publish its FM-only
+         * metadata after our update. A changed radio payload gets a bounded 1.5-second
+         * repair burst; duplicate callbacks get only a short repair and cannot extend
+         * the aggressive window indefinitely.
+         */
+        internal val REASSERT_BURST_DELAYS_MS = listOf(100L, 150L, 250L, 500L, 500L)
+        internal val DUPLICATE_REPAIR_DELAYS_MS = listOf(100L, 150L)
+        const val MIN_REASSERT_WATCHDOG_INTERVAL_MS = 1_000L
+        const val MAX_REASSERT_WATCHDOG_INTERVAL_MS = 5_000L
+        const val RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS = 1_250L
+        const val DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS = RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS
+        const val REASSERT_WATCHDOG_JITTER_MS = 150L
+        private const val MAX_REASSERT_RETRY_INTERVAL_MS = 30_000L
+
+        internal fun normalizeReassertWatchdogInterval(intervalMs: Long): Long =
+            intervalMs.coerceIn(
+                MIN_REASSERT_WATCHDOG_INTERVAL_MS,
+                MAX_REASSERT_WATCHDOG_INTERVAL_MS,
+            )
+
+        internal fun jitteredReassertWatchdogDelayMs(
+            intervalMs: Long,
+            jitterMs: Long,
+        ): Long = normalizeReassertWatchdogInterval(intervalMs) +
+            jitterMs.coerceIn(-REASSERT_WATCHDOG_JITTER_MS, REASSERT_WATCHDOG_JITTER_MS)
+
+        internal fun reassertScheduleKind(
+            currentPayloadKey: String,
+            currentScheduleActive: Boolean,
+            incomingPayloadKey: String,
+        ): ReassertScheduleKind = if (
+            currentScheduleActive && currentPayloadKey == incomingPayloadKey
+        ) {
+            ReassertScheduleKind.DUPLICATE_REPAIR
+        } else {
+            ReassertScheduleKind.FULL
+        }
+
+        internal fun reassertRetryDelayMs(intervalMs: Long, consecutiveFailures: Int): Long {
+            val exponent = consecutiveFailures.coerceIn(1, 5)
+            val multiplier = 1L shl exponent
+            return (normalizeReassertWatchdogInterval(intervalMs) * multiplier)
+                .coerceAtMost(MAX_REASSERT_RETRY_INTERVAL_MS)
+        }
+
+        /**
+         * Known OneOS processes which can sit behind the ECarX DIM facade or consume its result.
+         * Grants are limited to a single normalized artwork URI, not the whole provider.
+         */
+        private val ARTWORK_URI_GRANT_TARGETS = listOf(
+            "android",
+            "com.autolink.diminteraction",
+            "com.geely.dimservice",
+            "android.car.cluster",
+            "com.geely.service.oneosapi",
+            "com.geely.usbservice",
+            "com.geely.radio.service",
+            "com.geely.mediacenterservice",
+            "com.geely.mediawidget",
+            "com.android.launcher3",
+            "com.android.systemui",
+            "com.tencent.wecarflow",
+        )
+
+        internal fun qnxCoverWirePath(sharedFile: File): String {
+            require(sharedFile.parentFile?.absolutePath == NFS_SHARED_DIR) {
+                "Artwork must be inside $NFS_SHARED_DIR"
+            }
+            return "/${sharedFile.name}"
+        }
+
+        internal fun qnxCoverUriString(sharedFile: File): String =
+            "file://${qnxCoverWirePath(sharedFile)}"
+
+        private const val DIM_TRANSPORT_MARKER = "atlas_dim=online-qnx-owned-v9"
+
+        /**
+         * DIM caches artwork paths by the complete Uri string. A stable query marker
+         * separates the device-independent ONLINE transport from previous USB tests,
+         * while AndroidX FileProvider still resolves the same encoded path.
+         */
+        internal fun dimTransportUriString(uriString: String): String {
+            if (uriString.contains(DIM_TRANSPORT_MARKER)) return uriString
+            val separator = if ('?' in uriString) '&' else '?'
+            return "$uriString$separator$DIM_TRANSPORT_MARKER"
+        }
+
+        /**
+         * DIMInteraction V9.03 deliberately replaces artwork with "-999" for FM/AM.
+         * ONLINE preserves our text and lets DIM convert the shared Android file into
+         * the /images path consumed by QNX. This changes only the cluster presentation;
+         * OneOS audio remains RADIO.
+         */
+        internal fun displaySourceType(radioSourceType: Int, hasArtwork: Boolean): Int =
+            if (hasArtwork) IMediaInteraction.SOURCE_TYPE_ONLINE else radioSourceType
+    }
+
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val reassertWatchdogIntervalStore = ReassertWatchdogIntervalStore(prefs)
+
+    @Volatile
+    var isClusterCoversEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_COVERS_ENABLED, true)
+        private set
+
+    val reassertWatchdogIntervalMs: Long
+        get() = reassertWatchdogIntervalStore.value
+
+    @Volatile
+    private var lastUpdate = "none"
+
+    @Volatile
+    private var lastUpdateError = ""
+
+    @Volatile
+    private var lastArtworkFilePath = ""
+
+    @Volatile
+    private var lastArtworkWirePath = ""
+
+    @Volatile
+    private var lastArtworkQnxPath = ""
+
+    @Volatile
+    private var lastArtworkGrantReport = ""
+
+    @Volatile
+    private var dimInitializationError = ""
+
+    @Volatile
+    private var dimAvailable = false
+
+    @Volatile
+    private var radioActive = false
+
+    private val sendCount = AtomicInteger(0)
+
+    private val directDimMediaClient = DirectDimMediaClient(context)
+
+    init {
+        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled)
+    }
+
+    private val reassertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val reassertLock = Any()
+    private var reassertJob: Job? = null
+    private var duplicateRepairJob: Job? = null
+    private var reassertPayloadKey = ""
+    private val reassertGeneration = AtomicInteger(0)
+
+    private val dimInteraction: DimInteraction? by lazy {
+        runCatching {
+            DimInteraction.create(context)
+        }.onFailure {
+            dimInitializationError = it.diagnosticMessage()
+            Timber.w(it, "DimInteraction initialization failed")
+        }.getOrNull()
+    }
+
+    /**
+     * Controls the complete custom radio DIM producer. When disabled, no metadata or
+     * artwork packets are emitted so the stock radio remains the only DIM owner.
+     */
+    fun setClusterCoversEnabled(enabled: Boolean) {
+        isClusterCoversEnabled = enabled
+        prefs.edit().putBoolean(KEY_CLUSTER_COVERS_ENABLED, enabled).apply()
+        directDimMediaClient.setTransmissionEnabled(enabled)
+        if (!enabled) {
+            cancelReassertions()
+        }
+    }
+
+    /**
+     * Changes the adaptive watchdog base interval. Each steady delay adds random
+     * +/- jitter so periodic stock refreshes cannot remain phase-locked with Atlas.
+     */
+    fun setReassertWatchdogIntervalMs(intervalMs: Long) {
+        reassertWatchdogIntervalStore.set(intervalMs)
+    }
+
+    fun isDimAvailable(): Boolean {
+        return dimAvailable
+    }
+
+    fun getStatus(): Status {
+        val directStatus = directDimMediaClient.status()
+        return Status(
+            available = dimAvailable,
+            initializationError = dimInitializationError,
+            lastUpdate = lastUpdate,
+            lastUpdateError = lastUpdateError,
+            artworkFilePath = lastArtworkFilePath,
+            artworkWirePath = lastArtworkWirePath,
+            artworkQnxPath = lastArtworkQnxPath,
+            artworkGrantReport = lastArtworkGrantReport,
+            sendCount = sendCount.get(),
+            directDimBound = directStatus.bound,
+            directDimSendCount = directStatus.sendCount,
+            directDimLastResult = directStatus.lastResult,
+            directDimLastError = directStatus.lastError,
+        )
+    }
+
+    fun setRadioActive(active: Boolean) {
+        radioActive = active
+        if (!active) {
+            cancelReassertions()
+        }
+    }
+
+    fun updateRadioPlayback(
+        frequencyKHz: Int,
+        band: Int,
+        stationName: String,
+        isPlaying: Boolean,
+        coverFile: File? = null,
+        coverUri: Uri? = null,
+    ) {
+        if (!isClusterCoversEnabled) {
+            cancelReassertions()
+            return
+        }
+        radioActive = true
+        val mediaInteraction = runCatching {
+            dimInteraction?.mediaInteraction
+        }.onFailure {
+            dimAvailable = false
+            dimInitializationError = it.diagnosticMessage()
+            lastUpdateError = it.diagnosticMessage()
+            Timber.e(it, "Failed to initialize cluster DIM media interaction")
+        }.getOrNull()
+        if (mediaInteraction == null) {
+            Timber.d("Cluster DIM mediaInteraction is null, skipping cluster update")
+            return
+        }
+
+        runCatching {
+            val isAm = band == 2 || (frequencyKHz in 500..1800)
+            val formattedFreq = if (isAm) {
+                "$frequencyKHz"
+            } else {
+                val mhz = if (frequencyKHz > 50000) frequencyKHz / 1000f else frequencyKHz / 100f
+                String.format(Locale.US, "%.1f", mhz)
+            }
+
+            var clusterArtworkUri: Uri? = null
+            var clusterArtworkFile: File? = null
+            var artworkGrantReport = "none"
+            if (isClusterCoversEnabled && coverFile != null && coverFile.exists()) {
+                coverFile.setReadable(true, false)
+
+                val nfsSharedDir = File(NFS_SHARED_DIR)
+                if (nfsSharedDir.exists() && nfsSharedDir.isDirectory && nfsSharedDir.canWrite()) {
+                    val nfsTarget = copyArtworkAtomically(coverFile, nfsSharedDir)
+                    clusterArtworkFile = nfsTarget
+                } else {
+                    Timber.w("Cluster NFS share is unavailable or read-only: %s", nfsSharedDir)
+                }
+            }
+            if (isClusterCoversEnabled && coverUri != null) {
+                // Stock Android media APIs transport artwork as a content URI. Let the
+                // privileged ECarX backend open the normalized JPEG and perform its own
+                // Android -> QNX conversion instead of guessing the backend's wire path.
+                clusterArtworkUri = Uri.parse(dimTransportUriString(coverUri.toString()))
+                artworkGrantReport = grantArtworkReadAccess(clusterArtworkUri)
+            } else if (isClusterCoversEnabled && clusterArtworkFile != null) {
+                // Fallback for callers which only have a file. Two earlier firmware tests
+                // showed that this representation is accepted, although not rendered.
+                clusterArtworkUri = Uri.parse(qnxCoverUriString(clusterArtworkFile))
+                artworkGrantReport = "fallback-file-uri"
+            }
+
+            val radioSourceType = if (isAm) IMediaInteraction.SOURCE_TYPE_AM else IMediaInteraction.SOURCE_TYPE_FM
+            val displaySourceType = displaySourceType(radioSourceType, clusterArtworkUri != null)
+
+            val playInfo = ClusterRadioPlaybackInfo(
+                "atlas-radio:$band:$frequencyKHz",
+                displaySourceType,
+                formattedFreq,
+                stationName,
+                stationName,
+                if (isAm) "$formattedFreq kHz" else "$formattedFreq MHz",
+                if (isAm) "AM Radio" else "FM Radio",
+                0L,
+                if (isPlaying) {
+                    IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING
+                } else {
+                    IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED
+                },
+                IMediaInteraction.IPlaybackInfo.RADIO_MODE_PLAYING,
+                clusterArtworkUri,
+            )
+
+            sendToDim(
+                mediaInteraction = mediaInteraction,
+                playInfo = playInfo,
+                formattedFreq = formattedFreq,
+                stationName = stationName,
+                radioSourceType = radioSourceType,
+                displaySourceType = displaySourceType,
+                artworkUri = clusterArtworkUri,
+                artworkFile = clusterArtworkFile,
+                artworkGrantReport = artworkGrantReport,
+                attempt = "initial",
+            )
+            scheduleReassertions(
+                mediaInteraction = mediaInteraction,
+                playInfo = playInfo,
+                formattedFreq = formattedFreq,
+                stationName = stationName,
+                radioSourceType = radioSourceType,
+                displaySourceType = displaySourceType,
+                artworkUri = clusterArtworkUri,
+                artworkFile = clusterArtworkFile,
+                artworkGrantReport = artworkGrantReport,
+                payloadKey = listOf(
+                    frequencyKHz,
+                    band,
+                    stationName,
+                    isPlaying,
+                    clusterArtworkUri,
+                ).joinToString("|"),
+            )
+        }.onFailure {
+            dimAvailable = false
+            dimInitializationError = it.diagnosticMessage()
+            lastUpdateError = it.diagnosticMessage()
+            Timber.e(it, "Failed to update cluster DIM radio playback info")
+        }
+    }
+
+    private fun scheduleReassertions(
+        mediaInteraction: IMediaInteraction,
+        playInfo: IMediaInteraction.IPlaybackInfo,
+        formattedFreq: String,
+        stationName: String,
+        radioSourceType: Int,
+        displaySourceType: Int,
+        artworkUri: Uri?,
+        artworkFile: File?,
+        artworkGrantReport: String,
+        payloadKey: String,
+    ) {
+        synchronized(reassertLock) {
+            val scheduleKind = reassertScheduleKind(
+                currentPayloadKey = reassertPayloadKey,
+                currentScheduleActive = reassertJob?.isActive == true,
+                incomingPayloadKey = payloadKey,
+            )
+            if (scheduleKind == ReassertScheduleKind.DUPLICATE_REPAIR) {
+                // A duplicate callback is still evidence of a stock DIM write. Repair it,
+                // but do not restart the full burst or postpone the steady watchdog.
+                val generation = reassertGeneration.get()
+                duplicateRepairJob?.cancel()
+                duplicateRepairJob = reassertScope.launch {
+                    DUPLICATE_REPAIR_DELAYS_MS.forEachIndexed { index, waitMs ->
+                        delay(waitMs)
+                        if (!isCurrentReassertion(generation)) return@launch
+                        val attempt = "duplicate-repair-${index + 1}"
+                        runCatching {
+                            sendToDim(
+                                mediaInteraction = mediaInteraction,
+                                playInfo = playInfo,
+                                formattedFreq = formattedFreq,
+                                stationName = stationName,
+                                radioSourceType = radioSourceType,
+                                displaySourceType = displaySourceType,
+                                artworkUri = artworkUri,
+                                artworkFile = artworkFile,
+                                artworkGrantReport = artworkGrantReport,
+                                attempt = attempt,
+                            )
+                        }.onFailure { recordReassertionFailure(it, attempt) }
+                    }
+                }
+                return
+            }
+
+            val generation = reassertGeneration.incrementAndGet()
+            reassertPayloadKey = payloadKey
+            reassertJob?.cancel()
+            duplicateRepairJob?.cancel()
+            duplicateRepairJob = null
+            reassertJob = reassertScope.launch {
+                var consecutiveFailures = 0
+                // Cumulative times after the initial send: 100, 250, 500, 1000, 1500 ms.
+                REASSERT_BURST_DELAYS_MS.forEachIndexed { index, waitMs ->
+                    delay(waitMs)
+                    if (!isCurrentReassertion(generation)) return@launch
+                    val attempt = "adaptive-burst-${index + 1}"
+                    val failure = runCatching {
+                        sendToDim(
+                            mediaInteraction = mediaInteraction,
+                            playInfo = playInfo,
+                            formattedFreq = formattedFreq,
+                            stationName = stationName,
+                            radioSourceType = radioSourceType,
+                            displaySourceType = displaySourceType,
+                            artworkUri = artworkUri,
+                            artworkFile = artworkFile,
+                            artworkGrantReport = artworkGrantReport,
+                            attempt = attempt,
+                        )
+                    }.exceptionOrNull()
+                    if (failure == null) {
+                        consecutiveFailures = 0
+                    } else {
+                        consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(30)
+                        recordReassertionFailure(failure, attempt)
+                    }
+                }
+
+                // Jitter avoids phase-locking with periodic stock producer refreshes.
+                var watchdogAttempt = 1
+                while (isCurrentReassertion(generation)) {
+                    val waitMs = if (consecutiveFailures == 0) {
+                        jitteredReassertWatchdogDelayMs(
+                            reassertWatchdogIntervalMs,
+                            Random.nextLong(
+                                -REASSERT_WATCHDOG_JITTER_MS,
+                                REASSERT_WATCHDOG_JITTER_MS + 1L,
+                            ),
+                        )
+                    } else {
+                        reassertRetryDelayMs(reassertWatchdogIntervalMs, consecutiveFailures)
+                    }
+                    delay(waitMs)
+                    if (!isCurrentReassertion(generation)) return@launch
+                    val attempt = "watchdog-${watchdogAttempt++}"
+                    val failure = runCatching {
+                        sendToDim(
+                            mediaInteraction = mediaInteraction,
+                            playInfo = playInfo,
+                            formattedFreq = formattedFreq,
+                            stationName = stationName,
+                            radioSourceType = radioSourceType,
+                            displaySourceType = displaySourceType,
+                            artworkUri = artworkUri,
+                            artworkFile = artworkFile,
+                            artworkGrantReport = artworkGrantReport,
+                            attempt = attempt,
+                        )
+                    }.exceptionOrNull()
+                    if (failure == null) {
+                        consecutiveFailures = 0
+                    } else {
+                        consecutiveFailures = (consecutiveFailures + 1).coerceAtMost(30)
+                        recordReassertionFailure(failure, attempt)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun isCurrentReassertion(generation: Int): Boolean =
+        radioActive && isClusterCoversEnabled && reassertGeneration.get() == generation
+
+    private fun recordReassertionFailure(error: Throwable, attempt: String) {
+        dimAvailable = false
+        dimInitializationError = error.diagnosticMessage()
+        lastUpdateError = error.diagnosticMessage()
+        Timber.e(error, "Cluster DIM %s failed; retrying with backoff", attempt)
+    }
+
+    private fun cancelReassertions() {
+        synchronized(reassertLock) {
+            reassertGeneration.incrementAndGet()
+            reassertJob?.cancel()
+            reassertJob = null
+            duplicateRepairJob?.cancel()
+            duplicateRepairJob = null
+            reassertPayloadKey = ""
+        }
+    }
+
+    private fun sendToDim(
+        mediaInteraction: IMediaInteraction,
+        playInfo: IMediaInteraction.IPlaybackInfo,
+        formattedFreq: String,
+        stationName: String,
+        radioSourceType: Int,
+        displaySourceType: Int,
+        artworkUri: Uri?,
+        artworkFile: File?,
+        artworkGrantReport: String,
+        attempt: String,
+    ) {
+        if (!isClusterCoversEnabled) return
+        // ONLINE's worker uses BitmapFactory.decodeFile(uri.path), not ContentResolver.
+        // Give it the complete Android NFS path; file:///radio_cover.jpg points at the
+        // Android root and can never resolve to /data/vendor/nfs/shared.
+        val directArtworkUri = artworkFile?.let(Uri::fromFile) ?: artworkUri
+        val directPayload = directArtworkUri?.let { uri ->
+            DirectDimMediaClient.Payload(
+                sourceType = displaySourceType,
+                uuid = playInfo.uuid,
+                title = playInfo.title,
+                album = playInfo.album,
+                artist = playInfo.artist,
+                artworkUri = uri,
+                duration = playInfo.duration,
+                playbackStatus = playInfo.playbackStatus,
+                radioFrequency = playInfo.radioFrequency,
+                radioMode = playInfo.radioMode,
+                radioStationName = playInfo.radioStationName,
+            )
+        }
+        val directDimResult = directPayload?.let(directDimMediaClient::sendOrQueue) ?: "not-used"
+        val qnxArtworkPath = artworkFile?.let(::qnxCoverWirePath).orEmpty()
+        val directDimSent = directDimResult.startsWith("sent-")
+        var sourceUpdateError: Throwable? = null
+        if (!directDimSent) {
+            // Source selection and playback are both public-facade fallbacks. Either call
+            // can race through the facade's async queue and replace a successful direct
+            // ONLINE packet before DIM's 1-second debounce expires.
+            sourceUpdateError = runCatching {
+                mediaInteraction.updateCurrentSourceType(displaySourceType)
+            }.exceptionOrNull()
+            if (sourceUpdateError != null) {
+                Timber.w(sourceUpdateError, "Cluster DIM source update failed; still sending playback info")
+            }
+            mediaInteraction.updatePlaybackInfo(playInfo)
+        }
+        dimAvailable = true
+        dimInitializationError = ""
+        lastArtworkFilePath = artworkFile?.absolutePath.orEmpty()
+        lastArtworkWirePath = directArtworkUri?.toString().orEmpty()
+        lastArtworkQnxPath = qnxArtworkPath
+        lastArtworkGrantReport = artworkGrantReport
+        sendCount.incrementAndGet()
+        lastUpdate =
+            "${System.currentTimeMillis()}: $formattedFreq / $stationName / " +
+                "audioSource=$radioSourceType / displaySource=$displaySourceType / $attempt"
+        lastUpdateError = sourceUpdateError?.let {
+            "source update warning: ${it.diagnosticMessage()}"
+        }.orEmpty()
+        Timber.i(
+            "Cluster DIM playback sent: freq=%s, name=%s, audioSource=%d, displaySource=%d, artwork=%s, direct=%s, attempt=%s",
+            formattedFreq,
+            stationName,
+            radioSourceType,
+            displaySourceType,
+            artworkUri,
+            directDimResult,
+            attempt,
+        )
+    }
+
+    private fun grantArtworkReadAccess(uri: Uri): String {
+        if (uri.scheme != "content") return "not-content-uri"
+
+        val granted = mutableListOf<String>()
+        val failed = mutableListOf<String>()
+        ARTWORK_URI_GRANT_TARGETS.forEach { packageName ->
+            runCatching {
+                context.grantUriPermission(
+                    packageName,
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }.onSuccess {
+                granted += packageName
+            }.onFailure { error ->
+                failed += "$packageName:${error.javaClass.simpleName}"
+                Timber.d(error, "Unable to grant cluster artwork URI to %s", packageName)
+            }
+        }
+        return buildString {
+            append("granted=")
+            append(if (granted.isEmpty()) "none" else granted.joinToString(","))
+            if (failed.isNotEmpty()) {
+                append("; failed=")
+                append(failed.joinToString(","))
+            }
+        }
+    }
+
+    private fun copyArtworkAtomically(source: File, sharedDir: File): File {
+        val digest = MessageDigest.getInstance("SHA-256")
+        source.inputStream().buffered().use { input ->
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        val suffix = digest.digest().take(8).joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val target = File(sharedDir, "radio_cover_$suffix.jpg")
+        if (target.isFile && target.length() == source.length()) {
+            target.setReadable(true, false)
+            return target
+        }
+
+        val temporary = File(sharedDir, ".radio_cover_$suffix.${android.os.Process.myPid()}.tmp")
+        try {
+            source.copyTo(temporary, overwrite = true)
+            temporary.setReadable(true, false)
+            runCatching {
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }.getOrElse {
+                Files.move(
+                    temporary.toPath(),
+                    target.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }
+            target.setReadable(true, false)
+            return target
+        } finally {
+            if (temporary.exists()) {
+                temporary.delete()
+            }
+        }
+    }
+
+    private fun Throwable.diagnosticMessage(): String {
+        val cause = generateSequence(this) { it.cause }.last()
+        return "${cause.javaClass.simpleName}: ${cause.message.orEmpty()}"
+    }
+}

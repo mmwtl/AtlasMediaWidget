@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="media_artwork" path="media_artwork/" />
+    <cache-path name="radio_station_covers" path="radio_station_covers/" />
+    <cache-path name="exported_samples" path="exported_samples/" />
+</paths>

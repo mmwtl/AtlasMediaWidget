@@ -1,0 +1,28 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace = 'com.geely'
+    compileSdk = 36
+    defaultConfig { minSdk = 26 }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions { jvmTarget = '17' }
+    lint {
+        abortOnError = false
+        // Decompiled vendor Binder stubs use the correct raw integer flag values,
+        // which lint cannot associate with the corresponding Android constants.
+        disable 'WrongConstant'
+    }
+}
+
+dependencies {
+    compileOnly project(':vendor-ecarx-stub')
+    implementation 'androidx.core:core-ktx:1.16.0'
+    testImplementation project(':vendor-ecarx-stub')
+    testImplementation 'junit:junit:4.13.2'
+}

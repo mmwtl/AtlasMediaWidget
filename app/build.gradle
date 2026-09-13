@@ -2,8 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
-def appVersionCode = 46
-def appVersionName = '2.2.1'
+def appVersionCode = 48
+def appVersionName = '3.0.1'
 def branchName = providers.exec {
     commandLine('git', 'branch', '--show-current')
 }.standardOutput.asText.get().trim()
@@ -21,27 +21,6 @@ def effectiveVersionName = branchName == 'main'
         : "${appVersionName}-${effectiveBranchSuffix(branchName)}"
 def secureSigningScript = providers.gradleProperty('secure.signing').orNull
 def secureSigningFile = secureSigningScript == null ? null : rootProject.file(secureSigningScript)
-def embeddedApiApk = providers.gradleProperty('embeddedApiApk')
-def embeddedApiAssets = layout.buildDirectory.dir('generated/embeddedApiAssets')
-
-def prepareEmbeddedApiApk = tasks.register('prepareEmbeddedApiApk') {
-    inputs.property('embeddedApiApk', embeddedApiApk.orElse(''))
-    outputs.dir(embeddedApiAssets)
-    if (embeddedApiApk.isPresent()) {
-        inputs.file(embeddedApiApk)
-    }
-    doLast {
-        delete(embeddedApiAssets)
-        if (!embeddedApiApk.isPresent()) {
-            throw new GradleException('Bundled build requires -PembeddedApiApk=/path/to/AtlasMediaApi.apk')
-        }
-        copy {
-            from(embeddedApiApk)
-            into(embeddedApiAssets)
-            rename { 'atlas-media-api.apk' }
-        }
-    }
-}
 
 base {
     archivesName.set("${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget")
@@ -58,15 +37,14 @@ android {
         versionCode = appVersionCode
         versionName = effectiveVersionName
         testInstrumentationRunner = 'android.test.InstrumentationTestRunner'
+        buildConfigField 'String', 'MEDIA_BRIDGE_PACKAGE', '"com.mmwtl.atlasmediaapi"'
     }
 
     flavorDimensions += 'distribution'
     productFlavors {
-        plain {
+        integrated {
             dimension 'distribution'
-        }
-        bundled {
-            dimension 'distribution'
+            buildConfigField 'String', 'MEDIA_BRIDGE_PACKAGE', '"com.mmwtl.atlasmediawidget"'
         }
     }
 
@@ -82,29 +60,47 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    sourceSets {
-        bundled.assets.srcDir(embeddedApiAssets)
+    buildFeatures {
+        buildConfig = true
+    }
+
+    testOptions {
+        unitTests.includeAndroidResources = true
     }
 }
 
-androidComponents {
-    beforeVariants(selector().withFlavor('distribution', 'bundled')) { variantBuilder ->
-        if (!embeddedApiApk.isPresent()) variantBuilder.enable = false
+android.applicationVariants.configureEach { variant ->
+    variant.outputs.configureEach { output ->
+        if (variant.flavorName == 'integrated') {
+            output.outputFileName = "${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget-${variant.buildType.name}.apk"
+        }
     }
 }
 
 dependencies {
+    integratedImplementation project(':media-runtime')
+    testImplementation project(':media-core')
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
+    testImplementation 'org.robolectric:robolectric:4.16'
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.addAll(['-Xlint:deprecation', '-Xlint:unchecked'])
 }
 
-tasks.configureEach { task ->
-    if (task.name == 'preBundledDebugBuild' || task.name == 'preBundledReleaseBuild') {
-        task.dependsOn(prepareEmbeddedApiApk)
+afterEvaluate {
+    tasks.named('assembleRelease').configure {
+        setDependsOn([tasks.named('assembleIntegratedRelease')])
+    }
+    tasks.named('assembleDebug').configure {
+        setDependsOn([tasks.named('assembleIntegratedDebug')])
+    }
+    tasks.register('testReleaseUnitTest') {
+        dependsOn(tasks.named('testIntegratedReleaseUnitTest'))
+    }
+    tasks.register('testDebugUnitTest') {
+        dependsOn(tasks.named('testIntegratedDebugUnitTest'))
     }
 }
 

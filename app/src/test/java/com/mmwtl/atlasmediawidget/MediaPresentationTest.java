@@ -26,4 +26,26 @@ public final class MediaPresentationTest {
         assertTrue(MediaPresentation.hasContent(MediaSource.Id.BT,
                 true, true, "Track", "", "", -1L));
     }
+
+    @Test public void onlineSourceDoesNotRequireOneOsBackendConnection() {
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.ONLINE, false, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.ONLINE, true, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.ONLINE, false, true));
+    }
+
+    @Test public void nativeSourcesRequireOneOsBackendConnection() {
+        assertFalse(MediaPresentation.isBackendAvailable(MediaSource.Id.RADIO, false, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.RADIO, true, false));
+        assertFalse(MediaPresentation.isBackendAvailable(MediaSource.Id.BT, false, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.BT, true, false));
+        assertFalse(MediaPresentation.isBackendAvailable(MediaSource.Id.USB, false, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.USB, true, false));
+    }
+
+    @Test public void activeMediaOnUnknownOrOtherSourceTreatsBackendAvailable() {
+        assertFalse(MediaPresentation.isBackendAvailable(MediaSource.Id.UNKNOWN, false, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.UNKNOWN, false, true));
+        assertFalse(MediaPresentation.isBackendAvailable(MediaSource.Id.OTHER, false, false));
+        assertTrue(MediaPresentation.isBackendAvailable(MediaSource.Id.OTHER, false, true));
+    }
 }

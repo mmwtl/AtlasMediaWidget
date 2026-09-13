@@ -6,32 +6,34 @@
 ## 1. Архитектура / Architecture
 
 ### [RU] Централизованное управление в AtlasMediaApi
-Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi` (`com.mmwtl.atlasmediaapi`).
+Каталоги радиостанций (встроенный каталог станций Пензы и пользовательский ZIP-импорт) управляются централизованно в сервисе `AtlasMediaApi`. В стандартном варианте `integrated` он входит прямо в состав виджета (модуль `:media-runtime`); автономный пакет `com.mmwtl.atlasmediaapi` (модуль `:api-app`) можно собрать отдельно.
 
 - `AtlasMediaApi` автоматически сопоставляет текущую частоту радиоприёмника с каталогом;
 - название станции передаётся в `snapshot.title`;
 - диапазон и частота (например, `FM 101.8`) передаются в `snapshot.artist`;
 - обложка станции предоставляется через `FileProvider` URI в `snapshot.artworkUri` с инкрементом `snapshot.artworkRevision`;
-- виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов.
+- виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов;
+- в `integrated` сборке управление каталогом (информация о станциях, сброс к встроенному, импорт и экспорт) доступно прямо из единого экрана настроек `MainActivity` в секции «Медиасервис».
 
 ### [EN] Centralized Management in AtlasMediaApi
-Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally within the `AtlasMediaApi` service (`com.mmwtl.atlasmediaapi`).
+Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service. In the standard `integrated` variant, it is compiled directly into the widget package (module `:media-runtime`); the standalone `com.mmwtl.atlasmediaapi` package (module `:api-app`) can also be built separately.
 
 - `AtlasMediaApi` automatically matches the current radio frequency against the active catalog;
 - The resolved station name is supplied in `snapshot.title`;
 - The band and frequency (e.g., `FM 101.8`) are supplied in `snapshot.artist`;
 - Station artwork is provided via a `FileProvider` URI in `snapshot.artworkUri` with an incrementing `snapshot.artworkRevision`;
-- `AtlasMediaWidget` renders the incoming metadata and decodes the artwork URI without storing redundant local assets.
+- `AtlasMediaWidget` renders the incoming metadata and decodes the artwork URI without storing redundant local assets;
+- In `integrated` builds, catalog management (active station counts, reset to builtin, import and export) is accessible directly from the unified `MainActivity` under the "Media Service" section.
 
 ---
 
-## 2. Структура ZIP-архива каталога / Catalog ZIP Structure
+## 2. Структура архива каталога / Catalog Archive Structure
 
 ### [RU]
-Импорт пользовательского каталога выполняется в `AtlasMediaApi DiagnosticActivity`. ZIP-архив должен иметь следующую структуру:
+Каталог радиостанций экспортируется и импортируется отдельно от настроек. Прежние ZIP-архивы остаются совместимыми: `stations.csv` находится в корне, обложки — в `covers/`. Импорт радио полностью заменяет текущие станции и обложки, без объединения наборов. Импорт настроек полностью заменяет переносимые параметры (отсутствующие параметры получают значения по умолчанию) и не меняет текущий каталог, в том числе при загрузке старой полной копии с секцией `radio/`. Структура каталога:
 
 ### [EN]
-Custom catalog import is performed in the `AtlasMediaApi DiagnosticActivity`. The ZIP archive must follow this structure:
+Radio catalogs are exported and imported separately from settings. Existing ZIP archives remain compatible: `stations.csv` at the root and artwork in `covers/`. Radio imports replace all current stations and covers. Settings imports replace portable preferences, defaulting omitted parameters, and preserve the current catalog, including imports of older full backups with a `radio/` section. Catalog structure:
 
 ```text
 my-radio.zip
@@ -77,9 +79,11 @@ frequency_khz,name,band,cover
 
 - **[RU] Форматы изображений:** WebP, PNG, JPEG размером от 32×32 до 4096×4096 пикселей.
   **[EN] Image formats:** WebP, PNG, JPEG with dimensions from 32×32 to 4096×4096 px.
-- **[RU] Имена файлов:** только латинские буквы, цифры, точки, дефисы и подчёркивания (`[A-Za-z0-9._-]`).
-  **[EN] Filenames:** alphanumeric, dots, hyphens, and underscores only (`[A-Za-z0-9._-]`).
+- **[RU] Имена файлов:** только латинские буквы, цифры, точки, дефисы и подчёркивания (`[A-Za-z0-9._-]`). Запрещены пути с обходом каталогов (`..`, абсолютные пути).
+  **[EN] Filenames:** alphanumeric, dots, hyphens, and underscores only (`[A-Za-z0-9._-]`). Path traversal patterns (`..`, absolute paths) are strictly rejected.
 - **[RU] Лимиты:** до 256 станций, до 300 файлов, суммарный размер распакованного архива — до 64 МБ.
   **[EN] Limits:** up to 256 stations, up to 300 files, uncompressed size up to 64 MB.
-- **[RU] Целостность:** при наличии дублирующихся частот или отсутствующих обложек импорт отклоняется целиком.
-  **[EN] Integrity:** duplicate frequencies or missing cover files will cause the entire import to be rejected.
+- **[RU] Целостность и валидация:** при наличии дублирующихся частот, несуществующих файлов обложек или повреждённых картинок импорт отклоняется целиком до внесения изменений.
+  **[EN] Integrity and validation:** duplicate frequencies, missing referenced covers, or unreadable image files cause the entire import to be rejected prior to applying changes.
+- **[RU] Атомарный своп и защита от сбоев питания:** при импорте каталог распаковывается во временную директорию `custom_radio_next`, валидируется, после чего текущий каталог переносится в `custom_radio_prev`, а `next` становится активным `custom_radio`. В случае аварийного завершения предыдущий каталог восстанавливается.
+  **[EN] Atomic swap and power failure protection:** during import, files are staged to `custom_radio_next` and validated before replacing active data. The existing catalog is backed up to `custom_radio_prev`, and the staged directory becomes active `custom_radio`. If a crash occurs, the previous catalog is restored.

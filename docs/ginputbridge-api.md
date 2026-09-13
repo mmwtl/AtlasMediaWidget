@@ -1,101 +1,65 @@
-# Текущий legacy-контракт GInputBridge
+# [RU] Устаревший контракт GInputBridge (Legacy Reference)
+# [EN] Deprecated GInputBridge Contract (Legacy Reference)
 
-Контракт проверен по текущему исходному коду соседнего проекта GInputBridge. Он остаётся полезным
-для обратной совместимости и диагностики, но недостаточен для полного интерактивного виджета.
-Целевой API описан в [full-media-bridge.md](full-media-bridge.md).
+> [!WARNING]
+> **[RU]** Данный документ сохранён исключительно в качестве архивного справочника ранних прототипов. В актуальной версии `AtlasMediaWidget` используется нативный контракт `AtlasMediaApi Media Bridge v1` ([full-media-bridge.md](full-media-bridge.md)).
+> 
+> **[EN]** This document is retained solely as an archival reference from early prototype stages. The current `AtlasMediaWidget` implementation exclusively uses the native `AtlasMediaApi Media Bridge v1` protocol ([full-media-bridge.md](full-media-bridge.md)).
 
-## Предварительные настройки GInputBridge
+---
 
-Должны быть включены:
+## 1. Обзор и ограничения / Overview & Limitations
 
-- notification access для `MediaNotificationListenerService`;
-- модуль `Медиа runtime`;
-- модуль `Runtime внешнего API`;
-- `Отправка данных медиасессии`;
-- `Широковещательные события`.
+### [RU]
+Ранее для чтения медиа-состояния использовались широковещательные интенты (Broadcast Intents) стороннего приложения GInputBridge (`com.salat.gbinder`). Этот подход обладал существенными ограничениями:
+- Отсутствие атомарности: метаданные, состояние воспроизведения и источник передавались разными асинхронными сообщениями;
+- Отсутствие обратной связи при отправке команд;
+- Невозможность гарантированной передачи прав на обложки между процессами;
+- Отсутствие поддержки списков радиостанций и прямого переключения станций;
+- Отсутствие схемы версионирования.
 
-Последний переключатель критичен: когда `fullBroadcast=false`, GInputBridge адресует исходящие
-media broadcasts пакету MacroDroid, и AtlasMediaWidget их не получит.
+### [EN]
+During early development, media state was received via Broadcast Intents dispatched by GInputBridge (`com.salat.gbinder`). This legacy mechanism had fundamental limitations:
+- Lack of atomicity: metadata, playback state, and active audio source arrived in separate unsynchronized broadcasts;
+- No command execution feedback;
+- Inability to grant reliable, safe cross-process read access to album artwork;
+- No support for preset/favorite radio lists or direct station tuning;
+- Lack of a structured protocol versioning schema.
 
-## События от GInputBridge
+---
+
+## 2. Формат широковещательных сообщений / Legacy Broadcast Events
 
 ### `com.salat.gbinder.PLAYBACK_STATE`
-
-| Extra | Тип | Значение |
-|---|---|---|
-| `isPlaying` | `String` | `"1"` — что-то играет, `"0"` — ничего не играет |
-
-Это coarse boolean, а не полный Android `PlaybackState`: нет buffering, position, speed, actions
-или error.
+- `isPlaying` (`String`): `"1"` — воспроизведение активно, `"0"` — воспроизведение остановлено.
 
 ### `com.salat.gbinder.PLAYBACK_METADATA`
-
-Все extras передаются как `String`:
-
-| Extra | Назначение |
-|---|---|
-| `id` | Media ID или вычисленный идентификатор title/artist |
-| `packageName` | Пакет выбранной медиасессии |
-| `appName` | Отображаемое имя приложения |
-| `title` | Название трека/передачи |
-| `artist` | Исполнитель |
-| `album` | Альбом |
-| `uri` | URI трека |
-| `coverUri` | URI обложки |
-
-GInputBridge вычисляет `duration`, но текущий broadcast его не передаёт. `coverUri` нельзя считать
-читаемым: право GInputBridge/владельца session на URI автоматически не означает право
-AtlasMediaWidget.
+- `id` (`String`): ID медиасессии или вычисленный хэш;
+- `packageName` (`String`): Имя пакета активного плеера;
+- `appName` (`String`): Название приложения;
+- `title` (`String`): Название трека;
+- `artist` (`String`): Исполнитель;
+- `album` (`String`): Альбом;
+- `uri` (`String`): URI трека;
+- `coverUri` (`String`): URI обложки.
 
 ### `com.salat.gbinder.AUDIO_SOURCE_CHANGED`
+- `source` (`String`): `USB`, `BT`, `RADIO`, `CPAA`, `ONLINE`, `OTHER`, `YUNTING`, `UNKNOWN`.
 
-| Extra | Тип | Возможные значения |
-|---|---|---|
-| `source` | `String` | `USB`, `BT`, `RADIO`, `CPAA`, `ONLINE`, `OTHER`, `YUNTING`, `UNKNOWN` |
+---
 
-## Запрос текущего состояния
+## 3. Запрос состояния / State Polling
 
-AtlasMediaWidget отправляет explicit broadcast:
-
+### [RU]
+Для опроса состояния виджет отправлял явный Intent:
 ```text
 action  = com.salat.gbinder.REQUEST_PLAYBACK_INFO
 package = com.salat.gbinder
 ```
 
-GInputBridge отвечает отдельными `PLAYBACK_STATE` и, если metadata уже известны,
-`PLAYBACK_METADATA`. Текущая реализация не отвечает `AUDIO_SOURCE_CHANGED`, поэтому новый процесс
-AtlasMediaWidget может не знать source до следующего реального переключения.
-
-Запрос надо делать после регистрации runtime receiver:
-
-- при старте процесса/сервиса;
-- после wake;
-- при возврате overlay на HOME;
-- после обнаруженного восстановления GInputBridge.
-
-Если ответ не пришёл за ограниченный timeout, UI показывает `GInputBridge недоступен`, а не старую
-карточку.
-
-## Пробелы текущего API
-
-- Нет version/schema number и атомарного snapshot.
-- Нет current source в ответе на `REQUEST_PLAYBACK_INFO`.
-- Нет duration, position, speed, Android playback state и supported actions.
-- Нет команды play/pause/next/previous для кнопок собственного виджета.
-- Нет гарантированно читаемого artwork payload/URI.
-- Исходящие broadcasts либо глобальны, либо адресованы MacroDroid; отдельного package-targeted ответа
-  AtlasMediaWidget нет.
-- `BackgroundTaskReceiver` экспортирован без permission, поэтому команды GInputBridge может
-  отправить любое установленное приложение. На закрытой ГУ риск ниже, но контракт всё равно слабый.
-
-## Почему не надо продолжать расширять broadcasts
-
-Добавление ещё одного `MEDIA_SNAPSHOT` broadcast решило бы только часть проблемы. Для полного UI
-нужны двусторонние команды, подтверждения, подписка и Binder-death/reconnect. Поэтому целевой
-транспорт — explicit bound service, а не глобальные broadcasts.
-
-Ветка GInputBridge `mediaapi` намеренно открывает v1 service без permission, package allowlist и
-проверки сертификата: на целевой изолированной ГУ устанавливаются только доверенные владельцем APK.
-Любое установленное приложение технически может читать snapshots/artwork и отправлять команды.
-`Message.sendingUid` используется только для выдачи URI grant пакету клиента. Это принятая модель
-развёртывания, а не свойство безопасности Android.
+### [EN]
+To poll state, the widget dispatched an explicit Intent:
+```text
+action  = com.salat.gbinder.REQUEST_PLAYBACK_INFO
+package = com.salat.gbinder
+```

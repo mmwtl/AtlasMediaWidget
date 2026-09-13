@@ -1,0 +1,74 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+def appVersionCode = 43
+def appVersionName = '1.1.0'
+def branchName = providers.exec {
+    commandLine('git', 'branch', '--show-current')
+}.standardOutput.asText.get().trim()
+def safeBranchName = { String value ->
+    def sanitized = value.replaceAll(/[^A-Za-z0-9._-]+/, '-')
+            .replaceAll(/^[.-]+|[.-]+$/, '')
+    sanitized.isEmpty() ? 'detached' : sanitized
+}
+def effectiveVersionName = branchName == 'main'
+        ? appVersionName
+        : "${appVersionName}-${safeBranchName(branchName)}"
+def secureSigningScript = providers.gradleProperty('secure.signing').orNull
+def secureSigningFile = secureSigningScript == null ? null : rootProject.file(secureSigningScript)
+
+base {
+    archivesName.set("${effectiveVersionName}[${appVersionCode}]AtlasMediaApi")
+}
+
+android {
+    namespace = 'com.mmwtl.atlasmediaapi.standalone'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = 'com.mmwtl.atlasmediaapi'
+        minSdk = 26
+        targetSdk = 35
+        versionCode = appVersionCode
+        versionName = effectiveVersionName
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+}
+
+dependencies {
+    implementation project(':media-runtime')
+    implementation project(':media-core')
+    implementation project(':vendor-oneos')
+    compileOnly project(':vendor-ecarx-stub')
+    implementation 'androidx.core:core-ktx:1.16.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+
+    testImplementation 'junit:junit:4.13.2'
+}
+
+if (secureSigningFile != null && secureSigningFile.isFile()) {
+    apply from: secureSigningFile
+}

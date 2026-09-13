@@ -30,4 +30,9 @@
     <string name="scale_hint">Меняет размер экрана настроек без изменения размера медиакарточки overlay.</string>
     <string name="scale">Масштаб</string>
     <string name="scale_content_description">Масштаб интерфейса приложения</string>
+    <string name="section_widget">Виджет</string>
+    <string name="section_media">Медиа</string>
+    <string name="section_system">Система</string>
+    <string name="section_backup">Резервная копия</string>
+    <string name="section_diagnostics">Диагностика</string>
 </resources>

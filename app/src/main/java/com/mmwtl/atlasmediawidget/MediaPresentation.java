@@ -11,6 +11,14 @@ final class MediaPresentation {
                 && bridgeConnected && backendConnected;
     }
 
+    static boolean isBackendAvailable(MediaSource.Id source, boolean backendConnected,
+            boolean hasMedia) {
+        if (backendConnected) return true;
+        if (source.displayId() == MediaSource.Id.ONLINE) return true;
+        return hasMedia && (source.displayId() == MediaSource.Id.UNKNOWN
+                || source.displayId() == MediaSource.Id.OTHER);
+    }
+
     static String title(MediaSource.Id source, String value) {
         if (!value.isBlank()) return value;
         return source.displayId() == MediaSource.Id.RADIO ? "Радио" : "";

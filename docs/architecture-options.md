@@ -1,96 +1,50 @@
-# Варианты архитектуры AtlasMediaWidget
+# [RU] Архитектурные варианты AtlasMediaWidget
+# [EN] Architecture Options for AtlasMediaWidget
 
-## Подтверждённые факты
+---
 
-- OEM-карточка — стандартный Android `AppWidget` из пакета `com.geely.mediawidget`.
-- Лаунчер сам закрепляет `SourceBigWidgetProvider` в своей конфигурации, выдаёт право на bind и
-  запрещает редактирование карточки.
-- OEM-карточка получает данные не через публичную `MediaSession`, а через OneOS/MediaCenter Binder.
-- GInputBridge на этой платформе уже сочетает два канала:
-  - публичные `MediaSessionManager`/`MediaController` для metadata и playback state;
-  - OneOS `MediaCenterManager` для текущего audio source и нативных команд.
-- В GInputBridge известны нативные session packages:
-  `com.android.bluetooth`, `com.geely.usbservice`, `com.geely.radio.service`.
+## 1. Подтверждённые факты / Confirmed Platform Facts
 
-## Варианты
+### [RU]
+- Штатная карточка на автомобилях Geely — стандартный Android `AppWidget` из пакета `com.geely.mediawidget`.
+- Лаунчер сам закрепляет `SourceBigWidgetProvider` в своей конфигурации, выдаёт право на bind и запрещает пользовательское редактирование карточки.
+- Штатная карточка получает данные не через публичную `MediaSession`, а через закрытый OneOS/MediaCenter Binder.
+- Для полноценной работы с медиа на платформе необходимо сочетание двух каналов:
+  - Публичный `MediaSessionManager` / `MediaController` для Android-плееров (Яндекс Музыка, Spotify и др.);
+  - Системный OneOS `MediaCenterManager` для нативных источников (Radio, Bluetooth, USB, CPAA/CarPlay).
 
-| Вариант | Что получаем | Главные минусы | Оценка |
+### [EN]
+- The stock media widget on Geely vehicles is a standard Android `AppWidget` from `com.geely.mediawidget`.
+- The OEM launcher pins `SourceBigWidgetProvider` statically in its config, binds to it, and prevents user widget replacement.
+- The stock widget fetches media data through private OneOS/MediaCenter Binder rather than standard Android `MediaSession`.
+- Full-featured media support on this head unit requires combining two communication channels:
+  - Public `MediaSessionManager` / `MediaController` for Android players (Yandex Music, Spotify, etc.);
+  - System OneOS `MediaCenterManager` for hardware sources (Radio, Bluetooth, USB, CPAA/CarPlay).
+
+---
+
+## 2. Сравнение архитектурных вариантов / Comparison of Architecture Options
+
+| Вариант / Option | Преимущества / Pros | Недостатки / Cons | Статус / Status |
 |---|---|---|---|
-| Overlay + полный Media Bridge GInputBridge | Единый source-aware backend, metadata, progress, artwork, sources и controls без второй notification/OneOS подписки | Требует установки совместимой ветки `mediaapi`; GInputBridge становится точкой отказа; API открыт любому установленному APK | Рекомендуемый вариант |
-| Overlay + legacy broadcasts GInputBridge | Быстрый read-only прототип с metadata, coarse state и current-source events | Нет атомарности, controls, position/actions и гарантированно читаемой обложки | Только совместимость/диагностика |
-| Overlay + собственный notification listener | Независимая UI-карточка, metadata и controls всех корректно опубликованных медиасессий | Нужны отдельный notification access и дублирующие подписки; без OneOS возможен неверный выбор среди нескольких сессий | Резервный вариант |
-| Overlay + прямой OneOS adapter | Максимальная близость к OEM: source, radio frequency, BT/USB data и нативные controls | Непубличный firmware-specific API; совместимость после обновлений не гарантирована; большой `com_geely` модуль GInputBridge содержит около 491 файлов | Делать только минимальный адаптер после прототипа |
-| Настоящий сторонний `AppWidgetProvider` | Нативный AppWidget lifecycle и отсутствие overlay-окна | Нет доказательств, что OEM launcher даст добавить/закрепить его; `RemoteViews` ограничивает UI; остаётся зависимость от host Binder | Эксперимент, не основной путь |
-| Root/Magisk-модификация launcher config | Карточка в штатном слоте | Риск boot loop/несовместимости, подписи и обновления прошивки, сложное восстановление | Не рекомендуется для первой версии |
-| Замена OEM APK тем же package/class | Теоретически полная подмена | Конфликт установленного пакета и signature mismatch; высокий риск сломать системный UI | Не делать |
+| **1. Overlay + встроенный рантайм (`integrated`)** | Единый all-in-one APK; медиабэкенд изолирован в фоновом процессе `:media`; сохраняется чистый Messenger-контракт; независимый перезапуск при сбоях | Увеличивает размер одного APK | **Основной стандартный вариант / Primary Standard** |
+| **2. Overlay + автономный сервис (`plain` + `:api-app`)** | Модульность; независимое обновление UI-оверлея и бэкенда; доступность бэкенда другим приложениям | Требует установки двух отдельных APK и настройки двух наборов разрешений | **Исторический вариант: plain удалён; :api-app доступен отдельно / Historical: plain removed; standalone API still builds** |
+| **3. Overlay + legacy broadcasts GInputBridge** | Простая миграция со старых прототипов | Нет атомарности, управления воспроизведением, перемотки и безопасной передачи обложек | **Устаревший / Deprecated Legacy** |
+| **4. Overlay + прямой notification listener в виджете** | Нет зависимости от отдельного сервиса | Необходимость дублирования логики сессий; без OneOS невозможно надежно определить активный аппаратный источник | **Не используется / Rejected** |
+| **5. Сторонний `AppWidgetProvider`** | Штатный жизненный цикл `AppWidget` без overlay-окна | OEM-лаунчер жестко фиксирует свой виджет и не позволяет добавлять сторонние провайдеры на главный экран | **Технически невозможно на штатном лаунчере / Not Supported by OEM** |
 
-## Что реально даёт MediaSession
+---
 
-При наличии включённого notification listener приложение вызывает
-`MediaSessionManager.getActiveSessions(listenerComponent)` и получает `MediaController` для каждой
-активной сессии. Через snapshot и callback доступны:
+## 3. Выбор целевой модели / Architectural Decisions
 
-- `MediaMetadata`: display title/title, subtitle/artist, album, duration, media ID, media URI,
-  album-art URI и иногда bitmap;
-- `PlaybackState`: playing/paused/stopped/buffering, position, update time, speed, error и actions;
-- owner package, session activity, playback route/volume и transport controls.
+### [RU]
+1. **Изоляция процесса `:media`**: В варианте `integrated` медиасервис вынесен в отдельный процесс `android:process=":media"`. Это предотвращает влияние возможных задержек в системных вызовах OneOS Binder на плавность отрисовки и анимации UI-оверлея.
+2. **Атомарный снимок (`MediaSnapshot`)**: Клиент никогда не собирает состояние по кусочкам из разрозненных callback-вызовов. Сервис публикует монолитный объект `MediaSnapshot` с монотонным счетчиком `generation`.
+3. **Локальная экстраполяция прогресса**: Клиент локально вычисляет текущую позицию воспроизведения на основе `position`, `speed` и `updateElapsedRealtime`, исключая высокочастотный IPC-трафик между процессами.
+4. **Управление обложками через `FileProvider`**: Обложки нормализуются до 512 px, сохраняются во внутреннем кэше и предоставляются клиенту через URI с временными правами доступа, которые автоматически отзываются при разрыве соединения.
 
-Ограничения данных принадлежат источнику. Плеер может не публиковать artist, duration или artwork;
-URI обложки может быть недоступен чужому UID; session может оставаться active после остановки.
-`MEDIA_CONTENT_CONTROL` имеет уровень `signature|privileged`, поэтому для обычной установки надо
-использовать именно явно разрешённый notification listener, а не пытаться выдать permission через
-обычный runtime prompt.
-
-AtlasMediaWidget не должен получать этот доступ напрямую: установленный GInputBridge уже выполняет
-роль брокера и содержит нативную маршрутизацию команд. Целевой контракт описан в
-[full-media-bridge.md](full-media-bridge.md), текущий broadcast API — в
-[ginputbridge-api.md](ginputbridge-api.md).
-
-## Выбор правильной сессии
-
-На ГУ недостаточно правила «первая сессия со state=PLAYING». Нужен детерминированный selector:
-
-При использовании полного Media Bridge выбор controller выполняется внутри GInputBridge.
-AtlasMediaWidget получает уже единый snapshot. Каждый снимок имеет монотонный generation ID;
-поздняя обложка или результат команды не должны перезаписывать более новое состояние.
-
-## Надёжность против штатного виджета
-
-### Где кастомный может быть лучше
-
-- собственный snapshot сразу после connect/wake/показа overlay;
-- повторная регистрация listeners с backoff;
-- отдельный worker для Binder, не блокирующий UI;
-- редкая reconcile-проверка во время видимости;
-- срок годности состояния вместо вечного показа устаревшей карточки;
-- отсутствие зависимости от `AppWidgetHost`/`RemoteViews` Binder для самой отрисовки.
-
-### Где он объективно хуже
-
-- обычное приложение не `persistent` и может быть остановлено OEM power manager;
-- overlay требует больше пользовательских разрешений и постоянное уведомление foreground service;
-- окно не является частью layout лаунчера и перекрывает свою прямоугольную область;
-- публичная MediaSession содержит только то, что публикует источник;
-- OneOS API непубличен и привязан к конкретной прошивке;
-- после OTA могут поменяться Binder contract, package names или правила запуска фона.
-- при выбранной архитектуре сбой или отключённый runtime GInputBridge становится отдельной точкой
-  отказа.
-
-Итог: по визуальной отзывчивости и восстановлению callback-цепочки кастомная реализация может быть
-лучше. По системной интеграции и гарантии выживания процесса штатная карточка сильнее. По полноте
-данных паритет достижим только гибридом MediaSession + OneOS current source, проверенным на реальной
-ГУ.
-
-## Минимальные проверки прототипа на ГУ
-
-1. Включить в GInputBridge Media runtime и убедиться, что его notification access активен.
-2. Проверить initial snapshot после bind и восстановление после смерти любого из двух процессов.
-3. Записать snapshots и command results для Radio, Bluetooth, USB, CPAA/CarPlay и
-   минимум двух сторонних плееров.
-4. Проверить GInputBridge-owned `content://` artwork URI и отзыв старых grants.
-5. Переключать источники при одновременно активных sessions и проверять source list/selection.
-6. Выполнить cold boot, sleep/wake, restart launcher, restart GInputBridge и restart только
-   AtlasMediaWidget.
-7. На каждом сценарии проверять, что карточка либо восстанавливается сама, либо показывает
-   `disconnected`, но не остаётся бесконечно в старом состоянии.
-8. Измерить CPU/RAM и частоту update вызовов; reconcile не должен превращаться в частый poll.
+### [EN]
+1. **Isolated `:media` Process**: In the `integrated` flavor, the media service runs in a dedicated `android:process=":media"`. This isolates any potential Binder latency or delays in OEM calls from affecting UI rendering smoothness.
+2. **Atomic `MediaSnapshot`**: Clients never assemble media state from disparate callbacks. The backend emits an atomic `MediaSnapshot` payload stamped with a monotonic `generation` counter.
+3. **Local Progress Extrapolation**: Clients extrapolate current playback position locally using `position`, `speed`, and `updateElapsedRealtime`, eliminating continuous 1 Hz IPC chatter over Binder.
+4. **`FileProvider` Artwork Pipeline**: Artwork is downscaled to 512 px, stored in private cache, and shared with clients via URIs accompanied by temporary read grants that are cleanly revoked upon client unregistration or crash.

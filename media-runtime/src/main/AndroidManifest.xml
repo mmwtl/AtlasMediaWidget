@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <queries>
+        <package android:name="com.geely.service.oneosapi" />
+        <package android:name="com.autolink.diminteraction" />
+        <package android:name="com.geely.dimservice" />
+        <package android:name="android.car.cluster" />
+        <package android:name="com.geely.usbservice" />
+        <package android:name="com.geely.radio.service" />
+        <package android:name="com.geely.mediacenterservice" />
+        <package android:name="com.geely.mediawidget" />
+        <package android:name="com.android.launcher3" />
+        <package android:name="com.android.systemui" />
+        <package android:name="com.tencent.wecarflow" />
+    </queries>
+
+    <application>
+        <activity
+            android:name=".diagnostics.DiagnosticActivity"
+            android:exported="false"
+            android:icon="@mipmap/ic_media_api_launcher"
+            android:roundIcon="@mipmap/ic_media_api_launcher_round"
+            android:label="@string/media_api_name"
+            android:taskAffinity="com.mmwtl.atlasmediaapi"
+            android:process=":media"
+            android:theme="@style/Theme.AtlasMediaApi" />
+
+        <activity-alias
+            android:name="com.mmwtl.atlasmediaapi.diagnostics.MediaApiLauncher"
+            android:exported="true"
+            android:icon="@mipmap/ic_media_api_launcher"
+            android:roundIcon="@mipmap/ic_media_api_launcher_round"
+            android:label="@string/media_api_name"
+            android:targetActivity="com.mmwtl.atlasmediaapi.diagnostics.DiagnosticActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <service
+            android:name=".media.bridge.MediaBridgeService"
+            android:exported="false"
+            android:process=":media">
+            <intent-filter>
+                <action android:name="com.mmwtl.atlasmediaapi.media.BIND" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".media.session.MediaNotificationListenerService"
+            android:exported="true"
+            android:process=":media"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>
