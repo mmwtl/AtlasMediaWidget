@@ -1,7 +1,9 @@
 package com.mmwtl.atlasmediaapi.settings
 
 import android.content.Context
+import android.content.ContextWrapper
 import android.os.Bundle
+import android.content.SharedPreferences
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
 import com.mmwtl.atlasmediaapi.media.cluster.ClusterMediaBridge
@@ -85,6 +87,7 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
             putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
+            putInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, 18)
         }
 
         val result = controller.updateSettings(initialRev, changes)
@@ -98,6 +101,7 @@ class MediaSettingsControllerTest {
         assertTrue(snap.autoSwitchToDefaultOnSourceLost)
         assertTrue(snap.switchToOnlineBeforeSessionPlay)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
+        assertEquals(18, snap.uiScaleTenths)
         assertTrue(settingsChangedTriggered)
     }
 
@@ -112,6 +116,92 @@ class MediaSettingsControllerTest {
         assertEquals(MediaBridgeContract.Status.CONFLICT, result.status)
         assertNull(result.snapshot)
         assertFalse(settingsChangedTriggered)
+    }
+
+    @Test
+    fun `successful settings update commits owners before publishing revision`() {
+        val events = mutableListOf<String>()
+        val recordingContext = RecordingContext(context, events)
+        val recordingController = MediaSettingsController(
+            context = recordingContext,
+            preferences = AtlasPreferences(recordingContext),
+            radioCatalogRepository = RadioCatalogRepository(recordingContext),
+            clusterMediaBridge = ClusterMediaBridge(recordingContext),
+        )
+        events.clear()
+
+        val result = recordingController.updateSettings(recordingController.getRevision(), Bundle().apply {
+            putString(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE, "ONLINE")
+            putInt(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_DELAY_SEC, 9)
+            putBoolean(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY, false)
+            putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
+            putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY, false)
+            putString(MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE, "com.example.player")
+            putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
+            putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, false)
+            putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, false)
+            putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2500L)
+        })
+        assertEquals(MediaBridgeContract.Status.OK, result.status)
+        assertEquals(
+            listOf("atlas_media_api_settings", "radio_catalog_prefs", "cluster_dim_prefs", "media_settings_meta"),
+            events,
+        )
+    }
+
+    @Test
+    fun `failed owner commit returns failure without publishing revision`() {
+        val events = mutableListOf<String>()
+        val failingContext = RecordingContext(context, events, failCommitFor = "atlas_media_api_settings")
+        var callbackCalled = false
+        val failingController = MediaSettingsController(
+            context = failingContext,
+            preferences = AtlasPreferences(failingContext),
+            radioCatalogRepository = RadioCatalogRepository(failingContext),
+            clusterMediaBridge = ClusterMediaBridge(failingContext),
+            onSettingsChanged = { callbackCalled = true },
+        )
+        events.clear()
+        val initialRevision = failingController.getRevision()
+
+        val result = failingController.updateSettings(initialRevision, Bundle().apply {
+            putString(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE, "ONLINE")
+        })
+
+        assertEquals(MediaBridgeContract.Status.FAILED, result.status)
+        assertNull(result.snapshot)
+        assertEquals(initialRevision, failingController.getRevision())
+        assertFalse(callbackCalled)
+        assertEquals(listOf("atlas_media_api_settings"), events)
+    }
+
+    @Test
+    fun `failed revision commit returns failure after draining owners`() {
+        val events = mutableListOf<String>()
+        val failingContext = RecordingContext(context, events, failCommitFor = "media_settings_meta")
+        var callbackCalled = false
+        val failingController = MediaSettingsController(
+            context = failingContext,
+            preferences = AtlasPreferences(failingContext),
+            radioCatalogRepository = RadioCatalogRepository(failingContext),
+            clusterMediaBridge = ClusterMediaBridge(failingContext),
+            onSettingsChanged = { callbackCalled = true },
+        )
+        events.clear()
+        val initialRevision = failingController.getRevision()
+
+        val result = failingController.updateSettings(initialRevision, Bundle().apply {
+            putString(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE, "ONLINE")
+        })
+
+        assertEquals(MediaBridgeContract.Status.FAILED, result.status)
+        assertNull(result.snapshot)
+        assertEquals(initialRevision, failingController.getRevision())
+        assertFalse(callbackCalled)
+        assertEquals(
+            listOf("atlas_media_api_settings", "radio_catalog_prefs", "cluster_dim_prefs", "media_settings_meta"),
+            events,
+        )
     }
 
     @Test
@@ -162,6 +252,7 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("defaultAudioSource"))
         assertTrue(json.has("radioWidgetBroadcastEnabled"))
         assertTrue(json.has("clusterCoversEnabled"))
+        assertFalse(json.has("uiScaleTenths"))
     }
 
     @Test
@@ -226,6 +317,23 @@ class MediaSettingsControllerTest {
     }
 
     @Test
+    fun `replaying committed import reports the actual catalog mode`() {
+        assertEquals(1, radioCatalogRepository.importCustomZip(ByteArrayInputStream(radioZip("90000,Active,FM,\n"))).getOrThrow())
+        val operation = UUID.randomUUID().toString()
+        val prepared = controller.prepareMediaImport(operation, ByteArrayInputStream(mediaArchive("")))
+        assertEquals(MediaBridgeContract.Status.OK, prepared.status)
+        assertEquals("builtin", prepared.catalogMode)
+        assertEquals(MediaBridgeContract.Status.OK, controller.commitMediaImport(operation, prepared.stagingToken).status)
+
+        // The legacy idempotency response must describe the real catalog. Audio source is
+        // unrelated and is deliberately empty here to catch the old fabricated value.
+        val replay = controller.prepareMediaImport(operation, ByteArrayInputStream(byteArrayOf()))
+        assertEquals(MediaBridgeContract.Status.OK, replay.status)
+        assertEquals("custom", replay.catalogMode)
+        assertEquals(1, replay.stationCount)
+    }
+
+    @Test
     fun `invalid legacy radio section is rejected without mutating active catalog`() {
         assertEquals(1, radioCatalogRepository.importCustomZip(ByteArrayInputStream(radioZip("90000,Active,FM,\n"))).getOrThrow())
         val operation = UUID.randomUUID().toString()
@@ -241,7 +349,7 @@ class MediaSettingsControllerTest {
     }
 
     @Test
-    fun `settings import resets omitted portable fields to defaults`() {
+    fun `settings import resets omitted portable fields but preserves widget scale`() {
         preferences.defaultAudioSource = "BT"
         preferences.defaultAudioSourceDelaySec = 12
         preferences.defaultAudioSourceAutoplayOnStartup = false
@@ -256,6 +364,9 @@ class MediaSettingsControllerTest {
 
         val operation = UUID.randomUUID().toString()
         val minimal = JSONObject().put("format", "atlas-media-settings").put("schemaVersion", 1)
+            // Legacy media archives may carry this derived Widget-owned field. It is validated
+            // for compatibility, but must never overwrite the local diagnostic scale.
+            .put("uiScaleTenths", 10)
         val archive = ByteArrayOutputStream()
         ZipOutputStream(archive).use { zip ->
             zip.putNextEntry(ZipEntry("manifest.json"))
@@ -280,7 +391,7 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
-        assertEquals(15, snapshot.uiScaleTenths)
+        assertEquals(19, snapshot.uiScaleTenths)
     }
 
     @Test
@@ -479,6 +590,54 @@ class MediaSettingsControllerTest {
             zip.closeEntry()
         }
         return output.toByteArray()
+    }
+
+    private class RecordingContext(
+        base: Context,
+        private val events: MutableList<String>,
+        private val failCommitFor: String? = null,
+    ) : ContextWrapper(base) {
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences {
+            val preferenceName = name.orEmpty()
+            return RecordingSharedPreferences(
+                delegate = super.getSharedPreferences(name, mode),
+                name = preferenceName,
+                events = events,
+                failCommit = preferenceName == failCommitFor,
+            )
+        }
+    }
+
+    private class RecordingSharedPreferences(
+        private val delegate: SharedPreferences,
+        private val name: String,
+        private val events: MutableList<String>,
+        private val failCommit: Boolean,
+    ) : SharedPreferences by delegate {
+        override fun edit(): SharedPreferences.Editor = RecordingEditor(
+            delegate = delegate.edit(),
+            name = name,
+            events = events,
+            failCommit = failCommit,
+        )
+    }
+
+    private class RecordingEditor(
+        private val delegate: SharedPreferences.Editor,
+        private val name: String,
+        private val events: MutableList<String>,
+        private val failCommit: Boolean,
+    ) : SharedPreferences.Editor by delegate {
+        override fun putLong(key: String?, value: Long): SharedPreferences.Editor {
+            delegate.putLong(key, value)
+            return this
+        }
+
+        override fun commit(): Boolean {
+            events += name
+            if (failCommit) return false
+            return delegate.commit()
+        }
     }
 
 }

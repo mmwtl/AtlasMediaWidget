@@ -51,6 +51,19 @@ public class MediaBridgeContractTest {
         assertEquals("defaultAudioSource", MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE);
     }
 
+    @Test public void radioTransferConstantsMatchRuntimeContract() {
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ClientMessage.EXPORT_RADIO_CATALOG,
+                MediaBridgeContract.EXPORT_RADIO_CATALOG);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ClientMessage.IMPORT_RADIO_CATALOG,
+                MediaBridgeContract.IMPORT_RADIO_CATALOG);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ServerMessage.RADIO_CATALOG_EXPORTED,
+                MediaBridgeContract.RADIO_CATALOG_EXPORTED);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ServerMessage.RADIO_CATALOG_IMPORTED,
+                MediaBridgeContract.RADIO_CATALOG_IMPORTED);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.FILE_DESCRIPTOR,
+                MediaBridgeContract.K_FILE_DESCRIPTOR);
+    }
+
     @Test public void mediaSettingsSnapshotRoundTrip() {
         MediaSettingsSnapshot original = new MediaSettingsSnapshot(
                 123L, "RADIO", 4, true, true, false, "com.test.player",

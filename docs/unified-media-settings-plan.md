@@ -430,24 +430,21 @@ picker, разрешения и process death. На реальном ГУ: ра�
 файлов между двумя процессами с сохранением прежних установок. UI можно сделать
 быстро, но он не завершает задачу без проверенного backup и восстановления после сбоя.
 
-## 12. Статус проверки и реализации / Verification & Implementation Status
+## 12. Статус реализации и границы проверки
 
-### [RU]
-План полностью реализован и верифицирован в рамках рабочей ветки `codex/unified-media-settings-plan`:
-1. **Контракт IPC**: в `MediaBridgeContract.kt` и `MediaBridgeContract.java` реализованы сообщения 6–13 и 105–112, коды статусов 9–11, ключи настроек и статусов импорта.
-2. **Runtime-контроллер и хранилище**: `RadioCatalogRepository.kt` получил защиту от path traversal, лимиты 64 МБ / 300 файлов, валидацию обложек и атомарный своп каталога; `MediaSettingsController.kt` управляет ревизиями, экспортом/импортом медиа-ZIP и валидацией диапазонов настроек.
-3. **IPC-сервис и клиент**: `MediaBridgeService.kt` фильтрует вызовы через `isSettingsAllowed()` и обеспечивает потоковую передачу через `ParcelFileDescriptor`; `MediaBridgeClient.java` реализует типизированные асинхронные методы вызова настроек и двухфазного импорта.
-4. **Резервное копирование и журнал**: `FullSettingsBackup.java` упаковывает и распаковывает единый ZIP (`manifest.json` с SHA-256, `widget.json`, `media.json`, `radio/`), поддерживает legacy JSON схемы 1–9; `ImportJournal.java` гарантирует восстановление или откат при сбое питания; `SettingsExportStore.java` сохраняет архивы в `MediaStore.Downloads`.
-5. **UI и манифесты**: в `AndroidManifest.xml` integrated-сборки отключен дублирующий лаунчер-ярлык `MediaApiLauncher`; `DiagnosticActivity.kt` ветвится по режиму `isIntegrated`; `MainActivity.java` предоставляет единый интерфейс из 5 логических секций.
-6. **Модульные тесты**: `MediaSettingsControllerTest` (8 тестов), `FullSettingsBackupTest` (5 тестов), `ImportJournalTest` (3 теста), `MediaBridgeContractTest` (Java и Kotlin), `ScaledContextHelperTest` успешно пройдены (100% pass rate).
-7. **Сборка артефактов**: проверена офлайн-сборка `./gradlew --offline clean check assembleRelease` и `:app:assemblePlainRelease`. Манифесты APK верифицированы: один лаунчер в integrated, процесс `:media`, authority FileProvider виджета, отсутствие `REQUEST_INSTALL_PACKAGES`.
+Этот файл сохраняет исходный план, а не подтверждает выполнение всех его пунктов.
+По уточнению пользователя импорт/экспорт настроек и радио разделены; flavor `plain`
+удалён. Настройки ZIP содержат `manifest.json`, `widget.json`, `media.json`, радио ZIP
+сохраняет прежний формат `stations.csv` + `covers/`. Настроечный commit не активирует
+каталог; старые полные копии читаются с сохранением текущего радио. Масштаб Widget —
+единственный переносимый масштаб; API получает производное значение по IPC.
 
-### [EN]
-The implementation plan is fully realized and verified on the `codex/unified-media-settings-plan` branch:
-1. **IPC Contract**: `MediaBridgeContract.kt` and `MediaBridgeContract.java` implement messages 6–13 and 105–112, status codes 9–11, setting keys, and import statuses.
-2. **Runtime Controller & Storage**: `RadioCatalogRepository.kt` enforces path traversal protection, 64 MB / 300 files limits, image dimension validation, and atomic directory swapping; `MediaSettingsController.kt` coordinates settings revisions, media ZIP export/import, and value range checks.
-3. **IPC Service & Client**: `MediaBridgeService.kt` restricts configuration via `isSettingsAllowed()` and streams archives through `ParcelFileDescriptor` pipes; `MediaBridgeClient.java` supplies typed asynchronous calls for settings and two-phase imports.
-4. **Backup & Crash Journal**: `FullSettingsBackup.java` packages and parses the unified ZIP (`manifest.json` with SHA-256, `widget.json`, `media.json`, `radio/`) and maintains legacy JSON 1–9 backward compatibility; `ImportJournal.java` protects against power failures during import; `SettingsExportStore.java` manages `MediaStore.Downloads`.
-5. **UI & Manifests**: In integrated `AndroidManifest.xml`, the secondary launcher alias `MediaApiLauncher` is removed; `DiagnosticActivity.kt` branches based on `isIntegrated`; `MainActivity.java` presents a unified 5-section UI.
-6. **Unit Test Suites**: `MediaSettingsControllerTest` (8 tests), `FullSettingsBackupTest` (5 tests), `ImportJournalTest` (3 tests), `MediaBridgeContractTest` (Java & Kotlin), `ScaledContextHelperTest` all pass (100% success rate).
-7. **Artifact Verification**: Verified via `./gradlew --offline clean check assembleRelease` and `:app:assemblePlainRelease`. APK manifests verified: single launcher in integrated, `:media` process isolation, widget FileProvider authority, zero `REQUEST_INSTALL_PACKAGES`.
+Текущий контракт: сообщения клиента 6–15, ответы 105–112 и 114–115. Клиент передаёт
+write-PFD для экспорта и read-PFD для импорта. Журналы и идемпотентное восстановление
+проверяются unit/Robolectric-тестами; это не гарантия восстановления при отключении
+питания и не проверка OEM Binder на реальном устройстве.
+
+Подробные подтверждения и ограничения:
+[review](unified-media-settings-review-2026-09-13.md),
+[audit](unified-media-settings-audit-2026-09-13.md),
+[актуальный IPC-контракт](full-media-bridge.md).

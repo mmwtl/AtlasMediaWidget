@@ -54,6 +54,7 @@ public final class MainActivity extends ScaledActivity {
     private static final int REQUEST_STORAGE_PERMISSION = 1001;
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
     private static final int REQUEST_IMPORT_RADIO_CATALOG = 4103;
+    private static final long SETTINGS_READINESS_TIMEOUT_MS = 20_000L;
     private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
     private Prefs prefs;
@@ -1128,11 +1129,20 @@ public final class MainActivity extends ScaledActivity {
     private void importRadioCatalog(File stagedFile) {
         ioExecutor.execute(() -> {
             try {
+                MediaBridgeClient bridge = mediaBridgeClient;
+                if (bridge == null) {
+                    throw new IOException("Медиасервис недоступен. Импорт не выполнен.");
+                }
+                MediaBridgeClient.SettingsReadiness readiness =
+                        bridge.awaitSettingsSupported(SETTINGS_READINESS_TIMEOUT_MS);
+                if (!readiness.supported) {
+                    throw new IOException("Нельзя импортировать каталог радио: " + readiness.message);
+                }
                 final CountDownLatch latch = new CountDownLatch(1);
                 final boolean[] success = new boolean[1];
                 final int[] stationCount = new int[1];
                 final String[] errorHolder = new String[1];
-                mediaBridgeClient.importRadioCatalog(stagedFile,
+                bridge.importRadioCatalog(stagedFile,
                         new MediaBridgeClient.RadioCatalogImportCallback() {
                             @Override public void onCatalogImported(int count) {
                                 stationCount[0] = count;
@@ -1266,19 +1276,28 @@ public final class MainActivity extends ScaledActivity {
             boolean commitRequested = false;
             String operationId = null;
             try {
-                if (preview.hasMedia && !mediaBridgeClient.isSettingsSupported()) {
-                    throw new IOException("Медиасервис недоступен. Импорт не выполнен.");
+                MediaBridgeClient bridge = mediaBridgeClient;
+                if (preview.hasMedia) {
+                    if (bridge == null) {
+                        throw new IOException("Медиасервис недоступен. Импорт не выполнен.");
+                    }
+                    MediaBridgeClient.SettingsReadiness readiness =
+                            bridge.awaitSettingsSupported(SETTINGS_READINESS_TIMEOUT_MS);
+                    if (!readiness.supported) {
+                        throw new IOException("Нельзя импортировать настройки медиа: "
+                                + readiness.message);
+                    }
                 }
                 operationId = ImportJournal.startImport(appContext, prefs, preview.hasWidget, preview.hasMedia);
                 journalStarted = true;
 
                 String stagingToken = null;
                 final String mediaOperationId = operationId;
-                if (preview.hasMedia && mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()) {
+                if (preview.hasMedia) {
                     final CountDownLatch prepLatch = new CountDownLatch(1);
                     final String[] tokenHolder = new String[1];
                     final String[] errHolder = new String[1];
-                    mediaBridgeClient.prepareMediaImport(mediaOperationId, preview.stagedFile, new MediaBridgeClient.PrepareImportCallback() {
+                    bridge.prepareMediaImport(mediaOperationId, preview.stagedFile, new MediaBridgeClient.PrepareImportCallback() {
                         @Override public void onImportPrepared(String token, String catalogMode, int stationCount, java.util.List<String> warnings) {
                             tokenHolder[0] = token;
                             prepLatch.countDown();
@@ -1310,7 +1329,7 @@ public final class MainActivity extends ScaledActivity {
                     final String finalStagingToken = stagingToken;
                     ImportJournal.markMediaCommitRequested(appContext);
                     commitRequested = true;
-                    mediaBridgeClient.commitMediaImport(mediaOperationId, finalStagingToken, new MediaBridgeClient.CommitImportCallback() {
+                    bridge.commitMediaImport(mediaOperationId, finalStagingToken, new MediaBridgeClient.CommitImportCallback() {
                         @Override public void onImportCommitted(MediaSettingsSnapshot snapshot) {
                             commitOk[0] = true;
                             commitLatch.countDown();
@@ -1347,11 +1366,13 @@ public final class MainActivity extends ScaledActivity {
                 showSettingsTransferError("Не удалось импортировать настройки", error);
             } finally {
                 main.post(() -> {
+                    if (isDestroyed()) return;
                     importInProgress = false;
                     checkPendingImportRecovery();
                     if (!recoveryInProgress && ImportJournal.checkPendingRecovery(this) == null) {
                         setSettingsTransferEnabled(true);
                         setRadioCatalogTransferEnabled(true);
+                        loadMediaSettings();
                     }
                 });
             }
@@ -1701,7 +1722,8 @@ public final class MainActivity extends ScaledActivity {
 
     private void loadMediaSettings() {
         if (mediaBridgeClient == null || !mediaBridgeClient.isSettingsSupported()
-                || mediaSettingsBusy || settingsTransferBusy || radioCatalogBusy) return;
+                || mediaSettingsBusy || settingsTransferBusy || radioCatalogBusy
+                || recoveryInProgress || importInProgress) return;
         mediaSettingsBusy = true;
         setMediaControlsEnabled(mediaSettingsGroup, false);
         setSettingsTransferEnabled(false);

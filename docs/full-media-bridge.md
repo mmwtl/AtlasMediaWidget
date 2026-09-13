@@ -60,14 +60,16 @@ Binding is established via explicit Intent (`bindService`):
 | `3` | `GET_SNAPSHOT` | Разовый запрос текущего снимка / One-shot request for current snapshot | `protocolVersion` (int), optional `requestId` (String), `replyTo` (Messenger) |
 | `4` | `COMMAND` | Отправка команды воспроизведения или источника / Dispatch playback or source command | `protocolVersion` (int), `requestId` (String), `command` (String), payload, `replyTo` (Messenger) |
 | `5` | `GET_RADIO_STATIONS` | Запрос сохранённых и избранных станций / Request saved and favorite radio stations | `protocolVersion` (int), optional `requestId` (String), `replyTo` (Messenger) |
-| `6` | `GET_SETTINGS` | Запрос текущих настроек медиасервиса / Request current media service settings | `protocolVersion` (int), optional `requestId` (String), `replyTo` (Messenger) |
-| `7` | `UPDATE_SETTINGS` | Обновление настроек медиасервиса / Update media service settings | `protocolVersion` (int), `expectedRevision` (long), `settings` (Bundle), optional `requestId` (String), `replyTo` (Messenger) |
-| `8` | `RESTORE_DEFAULT_CATALOG` | Сброс каталога радиостанций к встроенному / Reset radio catalog to builtin | `protocolVersion` (int), optional `requestId` (String), `replyTo` (Messenger) |
-| `9` | `EXPORT_MEDIA_BACKUP` | Экспорт настроек медиа и каталога радио через PFD pipe / Stream media backup ZIP via PFD | `protocolVersion` (int), optional `requestId` (String), `replyTo` (Messenger) |
-| `10` | `PREPARE_MEDIA_IMPORT` | Подготовка импорта медиаархива через PFD pipe / Stream and stage media import ZIP via PFD | `protocolVersion` (int), `pfd` (ParcelFileDescriptor), optional `requestId` (String), `replyTo` (Messenger) |
-| `11` | `COMMIT_MEDIA_IMPORT` | Атомарное подтверждение подготовленного импорта / Atomic commit of staged media import | `protocolVersion` (int), `importOperationId` (String), optional `requestId` (String), `replyTo` (Messenger) |
-| `12` | `ABORT_MEDIA_IMPORT` | Отмена и очистка подготовленного импорта / Abort and cleanup staged media import | `protocolVersion` (int), `importOperationId` (String), optional `requestId` (String), `replyTo` (Messenger) |
-| `13` | `GET_IMPORT_STATUS` | Проверка состояния незавершённого импорта / Query active import operation status | `protocolVersion` (int), optional `requestId` (String), `replyTo` (Messenger) |
+| `6` | `GET_SETTINGS` | Снимок медианастроек / Media settings snapshot | `protocolVersion`, `requestId`, `replyTo` |
+| `7` | `UPDATE_SETTINGS` | Обновить параметры / Update settings | `protocolVersion`, optional `expectedRevision`, поля настроек в плоском Bundle / flat settings fields, `requestId`, `replyTo` |
+| `8` | `EXPORT_MEDIA_BACKUP` | Экспорт настроек без радио / Export settings without radio | `protocolVersion`, `fileDescriptor` (write PFD), `requestId`, `replyTo` |
+| `9` | `PREPARE_MEDIA_IMPORT` | Проверить и подготовить настройки / Validate and stage settings | `protocolVersion`, `operationId` (UUID), `fileDescriptor` (read PFD), `requestId`, `replyTo` |
+| `10` | `COMMIT_MEDIA_IMPORT` | Применить подготовленные настройки / Apply staged settings | `protocolVersion`, `operationId`, `stagingToken`, `requestId`, `replyTo` |
+| `11` | `GET_IMPORT_STATUS` | Статус операции / Operation status | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
+| `12` | `ABORT_MEDIA_IMPORT` | Удалить подготовленный импорт / Discard staged import | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
+| `13` | `RESTORE_DEFAULT_CATALOG` | Восстановить встроенное радио / Restore builtin catalog | `protocolVersion`, `requestId`, `replyTo` |
+| `14` | `EXPORT_RADIO_CATALOG` | Экспорт текущих станций и обложек / Export active radio catalog | `protocolVersion`, `fileDescriptor` (write PFD), `requestId`, `replyTo` |
+| `15` | `IMPORT_RADIO_CATALOG` | Полная замена радио / Replace radio catalog | `protocolVersion`, `fileDescriptor` (read PFD), `requestId`, `replyTo` |
 
 ### Сервис → Клиент (Service → Client)
 
@@ -78,14 +80,16 @@ Binding is established via explicit Intent (`bindService`):
 | `102` | `COMMAND_RESULT` | Асинхронный результат выполнения команды / Command execution result | `protocolVersion`, `requestId`, `status`, `message`, `generation` |
 | `103` | `ERROR` | Ошибка протокола или неподдерживаемая версия / Protocol error or version mismatch | `protocolVersion`, `status`, `message`, optional `requestId` |
 | `104` | `RADIO_STATIONS` | Списки радиостанций с обложками / Station lists with artwork | `protocolVersion`, `generation`, `radioSavedStations`, `radioFavoriteStations` |
-| `105` | `SETTINGS` | Текущие настройки медиасервиса и ревизия / Current media settings snapshot and revision | `protocolVersion`, `status`, `settings` (Bundle), optional `requestId` |
-| `106` | `SETTINGS_UPDATED` | Подтверждение применения новых настроек / Settings update ACK with new revision | `protocolVersion`, `status`, `revision` (long), optional `requestId` |
-| `107` | `DEFAULT_CATALOG_RESTORED` | Подтверждение сброса каталога к встроенному / Default catalog restored ACK | `protocolVersion`, `status`, `revision` (long), optional `requestId` |
-| `108` | `MEDIA_BACKUP_EXPORTED` | PFD pipe для чтения экспортированного ZIP / Read-side PFD pipe for exported backup ZIP | `protocolVersion`, `status`, `pfd` (ParcelFileDescriptor), optional `requestId` |
-| `109` | `MEDIA_IMPORT_PREPARED` | Подтверждение валидации импорта и staging / Import staged and validated ACK | `protocolVersion`, `status`, `importOperationId`, `settings` (Bundle), `catalogPresent`, `stationCount`, optional `requestId` |
-| `110` | `MEDIA_IMPORT_COMMITTED` | Подтверждение атомарного применения импорта / Import atomic commit ACK | `protocolVersion`, `status`, `importOperationId`, `revision` (long), optional `requestId` |
-| `111` | `MEDIA_IMPORT_ABORTED` | Подтверждение отмены и очистки staging / Import abort ACK | `protocolVersion`, `status`, `importOperationId`, optional `requestId` |
-| `112` | `IMPORT_STATUS` | Статус активной операции импорта / Current import state | `protocolVersion`, `status`, `importOperationId`, `importState`, optional `requestId` |
+| `105` | `SETTINGS` | Снимок настроек / Settings snapshot | `protocolVersion`, `status`, `requestId`, плоские поля снимка / flat snapshot, `settingsRevision` |
+| `106` | `SETTINGS_UPDATED` | Настройки сохранены / Settings saved | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
+| `107` | `MEDIA_BACKUP_EXPORTED` | ZIP записан в дескриптор клиента / Client file written | `protocolVersion`, `status`, `requestId` |
+| `108` | `MEDIA_IMPORT_PREPARED` | Настройки проверены / Settings staged | `protocolVersion`, `status`, `requestId`, `operationId`, `stagingToken`, `catalogType`, `catalogStationCount`, `importPreview` (warnings) |
+| `109` | `MEDIA_IMPORT_COMMITTED` | Настройки применены / Settings applied | `protocolVersion`, `status`, `requestId`, `operationId`, flat snapshot with `settingsRevision` |
+| `110` | `MEDIA_IMPORT_STATUS` | Статус операции / Operation state | `protocolVersion`, `status`, `requestId`, `operationId`, `importStatus` |
+| `111` | `MEDIA_IMPORT_ABORTED` | Отмена обработана / Abort handled | `protocolVersion`, `status`, `requestId`, `operationId` |
+| `112` | `DEFAULT_CATALOG_RESTORED` | Встроенный каталог восстановлен / Builtin catalog restored | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
+| `114` | `RADIO_CATALOG_EXPORTED` | Радио ZIP записан / Radio ZIP written | `protocolVersion`, `status`, `requestId`, `catalogStationCount` |
+| `115` | `RADIO_CATALOG_IMPORTED` | Радиокаталог заменён / Radio catalog replaced | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `settingsRevision` |
 
 ---
 
@@ -174,31 +178,53 @@ if (duration > 0) estimatedPosition = Math.min(estimatedPosition, duration);
 
 ## 8. Настройки и резервное копирование по IPC / IPC Settings & Backup
 
-### [RU] Авторизация и безопасность
-- Встроенный вариант (`integrated`): сервис приватный (`exported="false"`), вызовы изменения настроек и бэкапа разрешены только из основного процесса того же приложения (`callingUid == myUid`).
-- Автономный вариант (`standalone`): вызовы настройки и импорта/экспорта требуют совпадения UID или привилегированных системных прав; неавторизованные запросы возвращают статус `UNAUTHORIZED(3)`.
+### [RU] Авторизация и передача файлов
 
-### [RU] Потоковая передача архивов через ParcelFileDescriptor
-- При `EXPORT_MEDIA_BACKUP` сервис создаёт конвейер `ParcelFileDescriptor.createPipe()`, возвращает клиенту дескриптор на чтение и в фоновом потоке записывает ZIP-архив с `media.json` и пользовательским каталогом `radio/`.
-- При `PREPARE_MEDIA_IMPORT` клиент передаёт открытый дескриптор на чтение архива. Сервис читает архив из дескриптора без загрузки всего файла в память устройства.
+В integrated сервис не экспортирован. Настройки и файловые операции допускают
+`message.sendingUid == Process.myUid()` либо пакет приложения среди пакетов UID.
+Та же проверка действует в standalone; пути через привилегированное разрешение нет.
+Открытый standalone протокол управления воспроизведением не даёт стороннему Widget
+доступа к настройкам standalone API.
 
-### [RU] Двухфазный защищённый протокол импорта
-1. **Подготовка (`PREPARE_MEDIA_IMPORT`)**: сервис читает архив, валидирует `manifest.json`, извлекает `media.json`, распаковывает каталог радио во временную staging-директорию `custom_radio_next` и валидирует все станции и обложки. Клиент получает статус, валидированные настройки и количество станций.
-2. **Фиксация (`COMMIT_MEDIA_IMPORT`)**: по переданному `importOperationId` сервис атомарно активирует каталог (`custom_radio_prev` -> `custom_radio`), сохраняет `media.json` в SharedPreferences с инкрементом ревизии и уведомляет клиента.
-3. **Отмена (`ABORT_MEDIA_IMPORT`)**: очищает staging-файлы без применения изменений.
-4. **Статус (`GET_IMPORT_STATUS`)**: позволяет UI или клиенту после пересоздания процесса определить состояние незавершённой операции (`NONE`, `PREPARED`, `COMMITTED`, `ABORTED`).
+Клиент открывает файл и передаёт `fileDescriptor`: write-PFD при экспорте,
+read-PFD при импорте. Сервис обрабатывает поток в IO и закрывает свой дескриптор;
+клиент закрывает свою копию после отправки. Ответ экспорта подтверждает запись,
+не возвращает pipe. Все ответы содержат `protocolVersion`.
 
-### [EN] Authorization & Security
-- Integrated mode (`integrated`): Service is non-exported (`exported="false"`), configuration and backup mutations are strictly restricted to the host application UID (`callingUid == myUid`).
-- Standalone mode (`standalone`): Configuration and backup calls require UID matching or privileged permissions; unauthorized callers receive `UNAUTHORIZED(3)`.
+### [RU] Раздельный перенос и восстановление
 
-### [EN] Streaming Archives via ParcelFileDescriptor Pipes
-- For `EXPORT_MEDIA_BACKUP`, the service creates a `ParcelFileDescriptor.createPipe()`, returns the read-side descriptor to the client, and streams the ZIP containing `media.json` and the custom `radio/` catalog on a background thread.
-- For `PREPARE_MEDIA_IMPORT`, the client passes an open read-side pipe descriptor. The service streams and processes the archive without loading the full payload into memory.
+- Настройки: ZIP `manifest.json` + `media.json`; Widget добавляет `widget.json`.
+  Радио экспортируется отдельно в прежнем ZIP `stations.csv` + `covers/`.
+- `PREPARE_MEDIA_IMPORT` проверяет архив и сохраняет его в
+  `staging_media_import_<operationId>` с AtomicFile-метаданными и токеном.
+  `catalogMode`/`radio/` читаются только для совместимости и проверки старых полных
+  копий; их наличие не меняет текущий каталог.
+- `COMMIT_MEDIA_IMPORT` полностью заменяет переносимые медиапараметры, сбрасывая
+  отсутствующие поля к стандартным значениям. Радио и производный масштаб API
+  не меняются. Масштаб Widget переносится только через `widget.json` и передаётся
+  API при регистрации.
+- `GET_IMPORT_STATUS`: `IDLE`, `PREPARED`, `COMMITTING`, `COMMITTED`, `FAILED`.
+  `COMMITTING` повторно завершает сохранённую операцию. Abort не откатывает начатый
+  commit. Widget хранит отдельный журнал для согласования своей части импорта.
+- `IMPORT_RADIO_CATALOG` валидирует отдельный архив до замены всего каталога.
+  Старые станции и обложки не объединяются с новыми; настройки сохраняются.
 
-### [EN] Two-Phase Crash-Safe Import Flow
-1. **Prepare (`PREPARE_MEDIA_IMPORT`)**: The service streams the archive, validates `manifest.json`, parses `media.json`, unpacks the radio catalog into `custom_radio_next`, and validates all station records and image files. Returns staging status, validated settings, and station counts.
-2. **Commit (`COMMIT_MEDIA_IMPORT`)**: Using the unique `importOperationId`, the service atomically activates the staged catalog (`custom_radio_prev` -> `custom_radio`), writes `media.json` to SharedPreferences with an incremented revision, and notifies the client.
-3. **Abort (`ABORT_MEDIA_IMPORT`)**: Cleans up staged files without mutating active settings.
-4. **Status Query (`GET_IMPORT_STATUS`)**: Allows the UI client to recover import state across process restarts (`NONE`, `PREPARED`, `COMMITTED`, `ABORTED`).
+Успешный update подтверждается после синхронного сохранения параметров и ревизии.
+Несколько SharedPreferences не являются общей дисковой транзакцией. Журнал импорта
+и повтор commit обеспечивают восстановление известных этапов, но не доказывают
+атомарность при физическом отключении питания.
 
+### [EN] Authorization, streams and recovery
+
+Settings/file operations require the host UID or host package in the sender UID's
+package list in both distributions; no privileged-permission bypass exists.
+The client supplies a write PFD for export or read PFD for import, and both sides
+close their own descriptor copies. Export replies acknowledge a completed write.
+Settings and radio use separate archives. Legacy full backups remain readable and
+validated, but their radio section is not applied by settings import. Settings
+replace portable fields and default missing fields; Widget owns the exported UI
+scale and derives the API scale during registration. Radio import replaces the
+entire station/artwork catalog after validation. Staged settings imports use UUIDs,
+tokens and persisted metadata; states are `IDLE`, `PREPARED`, `COMMITTING`,
+`COMMITTED`, `FAILED`. A successful settings update follows synchronous preference
+and revision writes; multiple preference files are not a single disk transaction.

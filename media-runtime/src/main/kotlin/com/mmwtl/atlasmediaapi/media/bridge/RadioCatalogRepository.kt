@@ -72,6 +72,9 @@ class RadioCatalogRepository(
     val catalogInfoFlow: StateFlow<RadioCatalogInfo> = _catalogInfoFlow.asStateFlow()
 
     init {
+        context.filesDir.listFiles()
+            ?.filter { it.isDirectory && it.name.startsWith("staging_radio_") }
+            ?.forEach { it.deleteRecursively() }
         reloadCatalog()
     }
 
@@ -282,6 +285,7 @@ class RadioCatalogRepository(
             var totalExtractedBytes = 0L
             var totalEntries = 0
             val stagingCanonical = tempStagingDir.canonicalPath
+            val extractedCanonicalPaths = HashSet<String>()
 
             ZipInputStream(BufferedInputStream(inputStream)).use { zis ->
                 var entry: ZipEntry? = zis.nextEntry
@@ -291,13 +295,24 @@ class RadioCatalogRepository(
                         throw IllegalStateException("Превышено максимальное количество файлов в архиве ($MAX_ZIP_ENTRIES)")
                     }
 
-                    val normalizedName = entry.name.replace('\\', '/').trimStart('/')
-                    val targetFile = File(tempStagingDir, normalizedName)
+                    val entryName = entry.name
+                    val pathSegments = entryName.split('/')
+                    if (entryName.contains('\\') || entryName.startsWith('/') ||
+                        entryName.matches(Regex("^[A-Za-z]:(/.*)?$")) ||
+                        pathSegments.any { it == "." || it == ".." }
+                    ) {
+                        throw SecurityException("Небезопасный путь в ZIP архиве: $entryName")
+                    }
+
+                    val targetFile = File(tempStagingDir, entryName)
                     val targetCanonical = targetFile.canonicalPath
                     val isSafe = targetCanonical == stagingCanonical ||
                             targetCanonical.startsWith(stagingCanonical + File.separator)
                     if (!isSafe) {
-                        throw SecurityException("Небезопасный путь в ZIP архиве: ${entry.name}")
+                        throw SecurityException("Небезопасный путь в ZIP архиве: $entryName")
+                    }
+                    if (!extractedCanonicalPaths.add(targetCanonical)) {
+                        throw IllegalArgumentException("Дублирующийся путь в ZIP архиве: $entryName")
                     }
 
                     if (entry.isDirectory) {
@@ -321,38 +336,12 @@ class RadioCatalogRepository(
                 }
             }
 
-            val manifestFile = File(tempStagingDir, MANIFEST_NAME)
-            if (!manifestFile.isFile) {
-                throw IllegalArgumentException("В корне архива отсутствует файл $MANIFEST_NAME")
-            }
+            val stationCount = validateDirectory(tempStagingDir).getOrThrow()
 
-            val parsedStations = InputStreamReader(FileInputStream(manifestFile), StandardCharsets.UTF_8).use {
-                RadioCatalogCsv.read(it)
-            }
-
-            if (parsedStations.isEmpty()) {
-                throw IllegalArgumentException("Каталог не содержит валидных радиостанций")
-            }
-
-            val coversDir = File(tempStagingDir, COVERS_DIR)
-            for (station in parsedStations) {
-                val coverName = station.coverFileName
-                if (coverName.isNotBlank()) {
-                    val coverFile = File(coversDir, coverName)
-                    val safeCoverPath = runCatching {
-                        val canonical = coverFile.canonicalPath
-                        canonical == coversDir.canonicalPath || canonical.startsWith(coversDir.canonicalPath + File.separator)
-                    }.getOrDefault(false)
-                    if (!safeCoverPath) {
-                        throw SecurityException("Небезопасный путь к обложке: $coverName")
-                    }
-                    validateCoverFile(coverFile, coverName)
-                }
-            }
-
+            customDirectoryNext.deleteRecursively()
             check(tempStagingDir.renameTo(customDirectoryNext)) { "Не удалось подготовить каталог для замены" }
             installValidatedCustomDirectory()
-            parsedStations.size
+            stationCount
         } finally {
             tempStagingDir.deleteRecursively()
         }

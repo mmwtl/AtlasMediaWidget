@@ -66,6 +66,26 @@ final class MediaBridgeClient {
         void onError(int status, String message);
     }
 
+    static final class SettingsReadiness {
+        final boolean supported;
+        final int status;
+        final String message;
+
+        private SettingsReadiness(boolean supported, int status, String message) {
+            this.supported = supported;
+            this.status = status;
+            this.message = message;
+        }
+
+        static SettingsReadiness ready() {
+            return new SettingsReadiness(true, MediaBridgeContract.STATUS_OK, "");
+        }
+
+        static SettingsReadiness failure(int status, String message) {
+            return new SettingsReadiness(false, status, message);
+        }
+    }
+
     interface RestoreCatalogCallback {
         void onCatalogRestored(MediaSettingsSnapshot snapshot);
         void onError(int status, String message);
@@ -77,10 +97,12 @@ final class MediaBridgeClient {
     private HandlerThread ipcThread;
     private final AtomicLong nextRequest = new AtomicLong();
     private final BridgeConnectionState connectionState = new BridgeConnectionState();
+    private final Object settingsReadinessMonitor = new Object();
     private final java.util.Map<String, Object> pendingCallbacks = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, Runnable> pendingTimeouts = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long REQUEST_TIMEOUT_MS = 15_000L;
     private volatile boolean settingsSupported;
+    private String settingsUnsupportedMessage;
     private Handler ipc;
     private Messenger incoming;
     private Messenger remote;
@@ -147,7 +169,12 @@ final class MediaBridgeClient {
     void start() {
         main.post(() -> {
             if (started) return;
-            started = true;
+            synchronized (settingsReadinessMonitor) {
+                started = true;
+                settingsSupported = false;
+                settingsUnsupportedMessage = null;
+                settingsReadinessMonitor.notifyAll();
+            }
             startedAt = SystemClock.elapsedRealtime();
             HandlerThread thread = new HandlerThread("atlas-media-bridge");
             ipcThread = thread;
@@ -162,14 +189,22 @@ final class MediaBridgeClient {
     void stop() {
         main.post(() -> {
             if (!started) {
-                settingsSupported = false;
+                synchronized (settingsReadinessMonitor) {
+                    settingsSupported = false;
+                    settingsUnsupportedMessage = "Atlas Media API остановлен";
+                    settingsReadinessMonitor.notifyAll();
+                }
                 failPendingCallbacks(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
                         "Atlas Media API остановлен");
                 return;
             }
-            started = false;
+            synchronized (settingsReadinessMonitor) {
+                started = false;
+                settingsSupported = false;
+                settingsUnsupportedMessage = "Atlas Media API остановлен";
+                settingsReadinessMonitor.notifyAll();
+            }
             removeConnectionCallbacks();
-            settingsSupported = false;
             failPendingCallbacks(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
                     "Atlas Media API остановлен");
             boolean hadBinding = connectionState.hasBinding();
@@ -299,6 +334,11 @@ final class MediaBridgeClient {
                 }
             }
             if (ipc != null) ipc.post(() -> remote = null);
+            synchronized (settingsReadinessMonitor) {
+                settingsSupported = false;
+                settingsUnsupportedMessage = null;
+                settingsReadinessMonitor.notifyAll();
+            }
             failPendingCallbacks(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
                     "Atlas Media API отключён");
             AppLog.info(detail + " at t+" + elapsedSince(startedAt) + " ms");
@@ -406,9 +446,16 @@ final class MediaBridgeClient {
                 case MediaBridgeContract.REGISTERED -> {
                     int status = data.getInt(MediaBridgeContract.K_STATUS, -1);
                     if (status == MediaBridgeContract.STATUS_OK) {
-                        settingsSupported = data.getInt(
-                                MediaBridgeContract.K_SETTINGS_PROTOCOL_VERSION, -1) == 1;
                         if (!connectionState.onRegistered()) return true;
+                        int settingsVersion = data.getInt(
+                                MediaBridgeContract.K_SETTINGS_PROTOCOL_VERSION, -1);
+                        synchronized (settingsReadinessMonitor) {
+                            settingsSupported = settingsVersion == 1;
+                            settingsUnsupportedMessage = settingsSupported ? null
+                                    : "Неподдерживаемая версия протокола настроек: "
+                                    + settingsVersion;
+                            settingsReadinessMonitor.notifyAll();
+                        }
                         main.post(() -> {
                             main.removeCallbacks(registerTimeout);
                             AppLog.info("Media Bridge registered after "
@@ -566,6 +613,42 @@ final class MediaBridgeClient {
 
     boolean isSettingsSupported() {
         return settingsSupported;
+    }
+
+    /**
+     * Waits for a registered settings-capable bridge. Callers must invoke this off the main
+     * thread because it may block until the bounded timeout expires.
+     */
+    SettingsReadiness awaitSettingsSupported(long timeoutMs) throws InterruptedException {
+        long deadline = System.nanoTime()
+                + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(Math.max(0L, timeoutMs));
+        synchronized (settingsReadinessMonitor) {
+            while (true) {
+                if (started && settingsSupported && connectionState.canSend()) {
+                    return SettingsReadiness.ready();
+                }
+                if (!started) {
+                    return SettingsReadiness.failure(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE,
+                            "Медиасервис остановлен");
+                }
+                if (connectionState.is(BridgeConnectionState.Phase.INCOMPATIBLE)) {
+                    return SettingsReadiness.failure(MediaBridgeContract.STATUS_UNSUPPORTED_VERSION,
+                            settingsUnsupportedMessage != null ? settingsUnsupportedMessage
+                                    : "Несовместимая версия Media Bridge");
+                }
+                if (settingsUnsupportedMessage != null && connectionState.canSend()) {
+                    return SettingsReadiness.failure(MediaBridgeContract.STATUS_UNSUPPORTED_VERSION,
+                            settingsUnsupportedMessage);
+                }
+                long remaining = java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                        deadline - System.nanoTime());
+                if (remaining <= 0L) {
+                    return SettingsReadiness.failure(MediaBridgeContract.STATUS_FAILED,
+                            "Таймаут ожидания подключения медиасервиса");
+                }
+                settingsReadinessMonitor.wait(remaining);
+            }
+        }
     }
 
     void getSettings(SettingsCallback callback) {
@@ -800,9 +883,13 @@ final class MediaBridgeClient {
 
     private void markIncompatible(String detail) {
         if (!started) return;
-        settingsSupported = false;
-        failPendingCallbacks(MediaBridgeContract.STATUS_UNSUPPORTED_VERSION, detail);
         connectionState.onIncompatible();
+        synchronized (settingsReadinessMonitor) {
+            settingsSupported = false;
+            settingsUnsupportedMessage = detail;
+            settingsReadinessMonitor.notifyAll();
+        }
+        failPendingCallbacks(MediaBridgeContract.STATUS_UNSUPPORTED_VERSION, detail);
         main.post(() -> {
             removeConnectionTimeouts();
             AppLog.info(detail + " at t+" + elapsedSince(startedAt) + " ms");

@@ -7,6 +7,7 @@ import android.util.AtomicFile
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
+import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogType
 import com.mmwtl.atlasmediaapi.media.cluster.ClusterMediaBridge
 import org.json.JSONArray
 import org.json.JSONObject
@@ -95,9 +96,12 @@ class MediaSettingsController(
 
     @Synchronized
     private fun nextRevision(): Long {
-        revision++
-        metaPrefs.edit().putLong(KEY_REVISION, revision).commit()
-        return revision
+        val nextRevision = revision + 1L
+        check(metaPrefs.edit().putLong(KEY_REVISION, nextRevision).commit()) {
+            "Не удалось сохранить ревизию настроек"
+        }
+        revision = nextRevision
+        return nextRevision
     }
 
     fun getSnapshot(): MediaSettingsSnapshot = synchronized(importLock) {
@@ -220,7 +224,19 @@ class MediaSettingsController(
             preferences.uiScaleTenths = update.getInt(MediaBridgeContract.Key.UI_SCALE_TENTHS)
         }
 
-        nextRevision()
+        try {
+            // Individual settings owners use apply(); drain all of their pending writes before
+            // publishing a revision that tells clients this update is durable.
+            drainPendingPreferenceWrites()
+            nextRevision()
+        } catch (error: Exception) {
+            Timber.e(error, "updateSettings could not durably publish the new revision")
+            return UpdateResult(
+                snapshot = null,
+                status = MediaBridgeContract.Status.FAILED,
+                errorMessage = error.message ?: "Не удалось сохранить настройки",
+            )
+        }
         onSettingsChanged?.invoke()
         return UpdateResult(
             snapshot = getSnapshot(),
@@ -258,7 +274,6 @@ class MediaSettingsController(
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
-            put("uiScaleTenths", snapshot.uiScaleTenths)
         }
         val mediaJsonBytes = mediaJsonObj.toString(2).toByteArray(StandardCharsets.UTF_8)
 
@@ -299,7 +314,7 @@ class MediaSettingsController(
             return PrepareImportResult(
                 status = MediaBridgeContract.Status.OK,
                 stagingToken = "already_committed",
-                catalogMode = if (preferences.defaultAudioSource.isNotBlank()) "custom" else "builtin",
+                catalogMode = currentCatalogMode(),
                 stationCount = radioCatalogRepository.getCatalogInfo().stationCount,
                 warnings = listOf("Операция уже была применена"),
             )
@@ -481,9 +496,7 @@ class MediaSettingsController(
             // from accepting the pre-import revision after a process death.
             nextRevision()
             // Drain the asynchronous preference writes before publishing the durable marker.
-            check(context.getSharedPreferences("atlas_media_api_settings", Context.MODE_PRIVATE).edit().commit())
-            check(context.getSharedPreferences("radio_catalog_prefs", Context.MODE_PRIVATE).edit().commit())
-            check(context.getSharedPreferences("cluster_dim_prefs", Context.MODE_PRIVATE).edit().commit())
+            drainPendingPreferenceWrites()
             check(metaPrefs.edit().putString(KEY_LAST_COMMITTED_OPERATION, operationId).commit()) {
                 "Не удалось сохранить маркер завершённого импорта"
             }
@@ -563,9 +576,26 @@ class MediaSettingsController(
                 mediaJson.getLong("clusterWatchdogIntervalMs")
             } else ClusterMediaBridge.DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS,
         )
-        preferences.uiScaleTenths = if (mediaJson.has("uiScaleTenths")) {
-            mediaJson.getInt("uiScaleTenths")
-        } else AtlasPreferences.DEFAULT_UI_SCALE_TENTHS
+    }
+
+    private fun currentCatalogMode(): String = when (radioCatalogRepository.getCatalogInfo().type) {
+        RadioCatalogType.BUILT_IN -> "builtin"
+        RadioCatalogType.CUSTOM -> "custom"
+    }
+
+    private fun drainPendingPreferenceWrites() {
+        check(context.getSharedPreferences("atlas_media_api_settings", Context.MODE_PRIVATE)
+            .edit().commit()) {
+            "Не удалось сохранить медиа-настройки"
+        }
+        check(context.getSharedPreferences(RadioCatalogRepository.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().commit()) {
+            "Не удалось сохранить настройки каталога радио"
+        }
+        check(context.getSharedPreferences(ClusterMediaBridge.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().commit()) {
+            "Не удалось сохранить настройки DIM"
+        }
     }
 
     private fun validateBundleTypes(update: Bundle): String? {

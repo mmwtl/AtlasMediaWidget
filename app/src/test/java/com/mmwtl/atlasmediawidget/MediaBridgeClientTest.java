@@ -15,6 +15,10 @@ import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -26,6 +30,83 @@ import org.robolectric.shadows.ShadowLooper;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 30)
 public final class MediaBridgeClientTest {
+    @Test
+    public void waitsForSettingsRegistrationWithoutBlockingMain() throws Exception {
+        MediaBridgeClient client = newClient();
+        setStarted(client, true);
+        connectionState(client).startBinding();
+        connectionState(client).onServiceConnected();
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<MediaBridgeClient.SettingsReadiness> result = executor.submit(
+                    () -> client.awaitSettingsSupported(2_000L));
+            Message registered = Message.obtain(null, MediaBridgeContract.REGISTERED);
+            Bundle data = new Bundle();
+            data.putInt(MediaBridgeContract.K_VERSION, MediaBridgeContract.VERSION);
+            data.putInt(MediaBridgeContract.K_STATUS, MediaBridgeContract.STATUS_OK);
+            data.putInt(MediaBridgeContract.K_SETTINGS_PROTOCOL_VERSION, 1);
+            registered.setData(data);
+            invokeIncoming(client, registered);
+
+            assertTrue(result.get(2, TimeUnit.SECONDS).supported);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void readinessTimesOutWithUsefulFailure() throws Exception {
+        MediaBridgeClient client = newClient();
+        setStarted(client, true);
+
+        MediaBridgeClient.SettingsReadiness result = client.awaitSettingsSupported(20L);
+
+        assertFalse(result.supported);
+        assertEquals(MediaBridgeContract.STATUS_FAILED, result.status);
+        assertTrue(result.message.contains("Таймаут"));
+    }
+
+    @Test
+    public void readinessIsCancelledWhenClientStops() throws Exception {
+        MediaBridgeClient client = newClient();
+        setStarted(client, true);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<MediaBridgeClient.SettingsReadiness> result = executor.submit(
+                    () -> client.awaitSettingsSupported(5_000L));
+            client.stop();
+            ShadowLooper.runUiThreadTasksIncludingDelayedTasks();
+
+            MediaBridgeClient.SettingsReadiness readiness = result.get(2, TimeUnit.SECONDS);
+            assertFalse(readiness.supported);
+            assertEquals(MediaBridgeContract.STATUS_BACKEND_UNAVAILABLE, readiness.status);
+            assertTrue(readiness.message.contains("остановлен"));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void unsupportedSettingsProtocolReturnsActionableFailure() throws Exception {
+        MediaBridgeClient client = newClient();
+        setStarted(client, true);
+        connectionState(client).startBinding();
+        connectionState(client).onServiceConnected();
+        Message registered = Message.obtain(null, MediaBridgeContract.REGISTERED);
+        Bundle data = new Bundle();
+        data.putInt(MediaBridgeContract.K_VERSION, MediaBridgeContract.VERSION);
+        data.putInt(MediaBridgeContract.K_STATUS, MediaBridgeContract.STATUS_OK);
+        data.putInt(MediaBridgeContract.K_SETTINGS_PROTOCOL_VERSION, 9);
+        registered.setData(data);
+        invokeIncoming(client, registered);
+
+        MediaBridgeClient.SettingsReadiness result = client.awaitSettingsSupported(100L);
+
+        assertFalse(result.supported);
+        assertEquals(MediaBridgeContract.STATUS_UNSUPPORTED_VERSION, result.status);
+        assertTrue(result.message.contains("версия протокола настроек"));
+    }
+
     @Test
     public void settingsRequestWhileStoppedFailsOnMainAndIsRemoved() {
         MediaBridgeClient client = newClient();
@@ -164,6 +245,27 @@ public final class MediaBridgeClientTest {
             @Override public void onRadioStationsError(int status, String message) {
             }
         });
+    }
+
+    private static BridgeConnectionState connectionState(MediaBridgeClient client)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Field field = MediaBridgeClient.class.getDeclaredField("connectionState");
+        field.setAccessible(true);
+        return (BridgeConnectionState) field.get(client);
+    }
+
+    private static void setStarted(MediaBridgeClient client, boolean value)
+            throws ReflectiveOperationException {
+        java.lang.reflect.Field field = MediaBridgeClient.class.getDeclaredField("started");
+        field.setAccessible(true);
+        field.setBoolean(client, value);
+    }
+
+    private static void invokeIncoming(MediaBridgeClient client, Message message)
+            throws ReflectiveOperationException {
+        Method incoming = MediaBridgeClient.class.getDeclaredMethod("handleIncoming", Message.class);
+        incoming.setAccessible(true);
+        incoming.invoke(client, message);
     }
 
     @SuppressWarnings("unchecked")
