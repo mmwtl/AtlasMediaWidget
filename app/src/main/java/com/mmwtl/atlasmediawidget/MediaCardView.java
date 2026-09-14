@@ -615,7 +615,8 @@ final class MediaCardView extends FrameLayout {
         boolean compact = style == CardStyle.COMPACT;
         boolean chooserVisible = sourceChooser.getVisibility() == VISIBLE
                 || favoritesChooser.getVisibility() == VISIBLE;
-        boolean showProgress = hasMedia && snapshot != null && snapshot.duration > 0L;
+        boolean radio = activeSource.displayId() == MediaSource.Id.RADIO;
+        boolean showProgress = !radio && hasMedia && snapshot != null && snapshot.duration > 0L;
         boolean showThumbnail = compact && hasMedia && hasArtwork;
         int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
         int controlsTop = Math.max(0, cardHeight - panelHeight);
@@ -647,7 +648,7 @@ final class MediaCardView extends FrameLayout {
             metadataParams.rightMargin = bx(appearance.contentInsetDp);
         }
         metadataParams.height = LayoutParams.WRAP_CONTENT;
-        int metadataBottom = showProgress
+        int metadataBottom = showProgress || radio
                 ? progressTop - d(appearance.metadataProgressGapDp) : controlsTop - d(4);
         metadataParams.gravity = Gravity.BOTTOM | Gravity.START;
         metadataParams.bottomMargin = Math.max(0, cardHeight - metadataBottom);
@@ -669,7 +670,7 @@ final class MediaCardView extends FrameLayout {
         dividerParams.topMargin = Math.max(0,
                 controlsTop - by((compact ? 22 : 8) + appearance.progressGapDp));
         divider.setLayoutParams(dividerParams);
-        divider.setVisibility(!chooserVisible && !showProgress ? VISIBLE : GONE);
+        divider.setVisibility(!chooserVisible && !showProgress && !radio ? VISIBLE : GONE);
 
         LayoutParams controlsParams = new LayoutParams(LayoutParams.MATCH_PARENT, panelHeight);
         controlsParams.gravity = Gravity.TOP;
