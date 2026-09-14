@@ -134,6 +134,7 @@ object MediaBridgeContract {
         const val SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switchToOnlineBeforeSessionPlay"
         const val RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled"
         const val CLUSTER_COVERS_ENABLED = "clusterCoversEnabled"
+        const val CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled"
         const val CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs"
         const val CATALOG_TYPE = "catalogType"
         const val CATALOG_STATION_COUNT = "catalogStationCount"

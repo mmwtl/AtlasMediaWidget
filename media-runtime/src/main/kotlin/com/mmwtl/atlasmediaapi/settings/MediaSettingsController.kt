@@ -117,6 +117,7 @@ class MediaSettingsController(
             switchToOnlineBeforeSessionPlay = preferences.switchToOnlineBeforeSessionPlay,
             radioWidgetBroadcastEnabled = radioCatalogRepository.isWidgetBroadcastEnabled,
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
+            clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
             clusterWatchdogIntervalMs = clusterMediaBridge.reassertWatchdogIntervalMs,
             catalogType = catalogInfo.type.name,
             catalogStationCount = catalogInfo.stationCount,
@@ -217,6 +218,9 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED)) {
             clusterMediaBridge.setClusterCoversEnabled(update.getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED))
         }
+        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED)) {
+            clusterMediaBridge.setClusterOnlineEnabled(update.getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED))
+        }
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS)) {
             clusterMediaBridge.setReassertWatchdogIntervalMs(update.getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS))
         }
@@ -273,6 +277,7 @@ class MediaSettingsController(
             put("switchToOnlineBeforeSessionPlay", snapshot.switchToOnlineBeforeSessionPlay)
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
+            put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
         }
         val mediaJsonBytes = mediaJsonObj.toString(2).toByteArray(StandardCharsets.UTF_8)
@@ -571,6 +576,9 @@ class MediaSettingsController(
         clusterMediaBridge.setClusterCoversEnabled(
             mediaJson.optBoolean("clusterCoversEnabled", true),
         )
+        clusterMediaBridge.setClusterOnlineEnabled(
+            mediaJson.optBoolean("clusterOnlineEnabled", false),
+        )
         clusterMediaBridge.setReassertWatchdogIntervalMs(
             if (mediaJson.has("clusterWatchdogIntervalMs")) {
                 mediaJson.getLong("clusterWatchdogIntervalMs")
@@ -609,6 +617,7 @@ class MediaSettingsController(
             MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS to java.lang.Long::class.java,
             MediaBridgeContract.Key.UI_SCALE_TENTHS to Integer::class.java,
         )
@@ -638,7 +647,7 @@ class MediaSettingsController(
         val booleanFields = listOf(
             "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
             "autoSwitchToDefaultAutoplayOnSourceLost", "switchToOnlineBeforeSessionPlay",
-            "radioWidgetBroadcastEnabled", "clusterCoversEnabled",
+            "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterOnlineEnabled",
         )
         stringFields.forEach { if (mediaJson.has(it) && mediaJson.opt(it) !is String) throw IllegalArgumentException("Недопустимый тип поля $it") }
         booleanFields.forEach { if (mediaJson.has(it) && mediaJson.opt(it) !is Boolean) throw IllegalArgumentException("Недопустимый тип поля $it") }

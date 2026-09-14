@@ -162,6 +162,7 @@ public final class FullSettingsBackupTest {
         mediaJson.put("schemaVersion", 1);
         mediaJson.put("defaultAudioSource", "USB");
         mediaJson.put("defaultAudioSourceDelaySec", 3);
+        mediaJson.put("clusterOnlineEnabled", true);
         byte[] mediaBytes = mediaJson.toString(2).getBytes(StandardCharsets.UTF_8);
 
         JSONObject manifest = new JSONObject();
@@ -203,6 +204,7 @@ public final class FullSettingsBackupTest {
         assertNotNull(preview.mediaData);
         assertEquals("USB", preview.mediaData.defaultAudioSource);
         assertEquals(3, preview.mediaData.defaultAudioSourceDelaySec);
+        assertTrue(preview.mediaData.clusterOnlineEnabled);
 
         // Cleanup staged dir
         FullSettingsBackup.deleteRecursively(preview.stagedDir);

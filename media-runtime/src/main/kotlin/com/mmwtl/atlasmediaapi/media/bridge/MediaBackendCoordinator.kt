@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -81,6 +82,7 @@ class MediaBackendCoordinator(
             onSettingsChanged = {
                 scope.launch {
                     stateHub.refreshRadioState()
+                    withContext(Dispatchers.IO) { publishOnlineToCluster(stateRepository.snapshot()) }
                     cancelDefaultSourceSwitch()
                 }
             },
@@ -90,6 +92,7 @@ class MediaBackendCoordinator(
 
     private val apiManager = OneOSApiManager.getInstance(context)
     private val clientCount = AtomicInteger(0)
+    private var onlineClusterJob: Job? = null
     private var graceJob: Job? = null
     private var reconnectJob: Job? = null
     private var defaultSourceJob: Job? = null
@@ -162,6 +165,11 @@ class MediaBackendCoordinator(
             demoBackend.start()
             return
         }
+        onlineClusterJob = scope.launch(Dispatchers.IO) {
+            stateRepository.snapshots.collect { snapshot ->
+                runCatching { publishOnlineToCluster(snapshot) }.onFailure { Timber.w(it, "Online DIM update failed") }
+            }
+        }
         stateHub.onBackendConnecting()
 
         apiManager.registerServiceConnectionListener(serviceConnectionListener)
@@ -174,6 +182,9 @@ class MediaBackendCoordinator(
     fun stopBackend() {
         if (!isBackendStarted) return
         isBackendStarted = false
+        onlineClusterJob?.cancel()
+        onlineClusterJob = null
+        clusterMediaBridge.setActiveSource(null)
         Timber.i("Stopping media backend coordinator")
         reconnectJob?.cancel()
         reconnectJob = null
@@ -193,6 +204,12 @@ class MediaBackendCoordinator(
         sessionObserver.stop()
         carPlayBridge.stop()
         apiManager.release()
+    }
+
+    private fun publishOnlineToCluster(snapshot: MediaSnapshot) {
+        val token = snapshot.artworkUri.substringAfterLast("/").substringBeforeLast(".")
+        val file = token.takeIf { it.isNotBlank() }?.let(artworkRepository::getCacheFile)
+        clusterMediaBridge.updateOnlinePlayback(snapshot, file)
     }
 
     private suspend fun handleConnectionChanged(connected: Boolean) {

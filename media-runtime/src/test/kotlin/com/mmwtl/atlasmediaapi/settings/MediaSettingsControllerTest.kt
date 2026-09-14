@@ -73,6 +73,7 @@ class MediaSettingsControllerTest {
         assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
+        assertFalse(snapshot.clusterOnlineEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
         assertEquals("BUILT_IN", snapshot.catalogType)
     }
@@ -86,6 +87,7 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY, false)
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
             putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
             putInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, 18)
         }
@@ -100,6 +102,7 @@ class MediaSettingsControllerTest {
         assertFalse(snap.defaultAudioSourceAutoplayOnStartup)
         assertTrue(snap.autoSwitchToDefaultOnSourceLost)
         assertTrue(snap.switchToOnlineBeforeSessionPlay)
+        assertTrue(snap.clusterOnlineEnabled)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
         assertEquals(18, snap.uiScaleTenths)
         assertTrue(settingsChangedTriggered)
@@ -252,6 +255,7 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("defaultAudioSource"))
         assertTrue(json.has("radioWidgetBroadcastEnabled"))
         assertTrue(json.has("clusterCoversEnabled"))
+        assertTrue(json.has("clusterOnlineEnabled"))
         assertFalse(json.has("uiScaleTenths"))
     }
 
@@ -359,6 +363,7 @@ class MediaSettingsControllerTest {
         preferences.switchToOnlineBeforeSessionPlay = true
         radioCatalogRepository.setWidgetBroadcastEnabled(false)
         clusterMediaBridge.setClusterCoversEnabled(false)
+        clusterMediaBridge.setClusterOnlineEnabled(true)
         clusterMediaBridge.setReassertWatchdogIntervalMs(4000L)
         preferences.uiScaleTenths = 19
 
@@ -390,6 +395,7 @@ class MediaSettingsControllerTest {
         assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
+        assertFalse(snapshot.clusterOnlineEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
         assertEquals(19, snapshot.uiScaleTenths)
     }
@@ -407,6 +413,7 @@ class MediaSettingsControllerTest {
             put("defaultAudioSourceDelaySec", 7)
             put("radioWidgetBroadcastEnabled", false)
             put("clusterCoversEnabled", true)
+            put("clusterOnlineEnabled", true)
             put("clusterWatchdogIntervalMs", 3000L)
             put("catalogMode", "builtin")
         }
@@ -437,6 +444,7 @@ class MediaSettingsControllerTest {
         assertEquals("USB", snap.defaultAudioSource)
         assertEquals(7, snap.defaultAudioSourceDelaySec)
         assertFalse(snap.radioWidgetBroadcastEnabled)
+        assertTrue(snap.clusterOnlineEnabled)
         assertEquals(3000L, snap.clusterWatchdogIntervalMs)
         assertTrue(snap.revision > initialRev)
     }

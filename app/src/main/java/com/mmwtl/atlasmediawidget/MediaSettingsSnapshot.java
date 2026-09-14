@@ -13,6 +13,7 @@ final class MediaSettingsSnapshot {
     final boolean switchToOnlineBeforeSessionPlay;
     final boolean radioWidgetBroadcastEnabled;
     final boolean clusterCoversEnabled;
+    final boolean clusterOnlineEnabled;
     final long clusterWatchdogIntervalMs;
     final String catalogType;
     final int catalogStationCount;
@@ -35,6 +36,31 @@ final class MediaSettingsSnapshot {
             int catalogStationCount,
             String catalogDescription,
             int uiScaleTenths) {
+        this(revision, defaultAudioSource, defaultAudioSourceDelaySec,
+                defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
+                autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
+                switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
+                clusterCoversEnabled, false, clusterWatchdogIntervalMs, catalogType,
+                catalogStationCount, catalogDescription, uiScaleTenths);
+    }
+
+    MediaSettingsSnapshot(
+            long revision,
+            String defaultAudioSource,
+            int defaultAudioSourceDelaySec,
+            boolean defaultAudioSourceAutoplayOnStartup,
+            boolean autoSwitchToDefaultOnSourceLost,
+            boolean autoSwitchToDefaultAutoplayOnSourceLost,
+            String defaultMediaPackage,
+            boolean switchToOnlineBeforeSessionPlay,
+            boolean radioWidgetBroadcastEnabled,
+            boolean clusterCoversEnabled,
+            boolean clusterOnlineEnabled,
+            long clusterWatchdogIntervalMs,
+            String catalogType,
+            int catalogStationCount,
+            String catalogDescription,
+            int uiScaleTenths) {
         this.revision = revision;
         this.defaultAudioSource = defaultAudioSource != null ? defaultAudioSource : "";
         this.defaultAudioSourceDelaySec = defaultAudioSourceDelaySec;
@@ -45,6 +71,7 @@ final class MediaSettingsSnapshot {
         this.switchToOnlineBeforeSessionPlay = switchToOnlineBeforeSessionPlay;
         this.radioWidgetBroadcastEnabled = radioWidgetBroadcastEnabled;
         this.clusterCoversEnabled = clusterCoversEnabled;
+        this.clusterOnlineEnabled = clusterOnlineEnabled;
         this.clusterWatchdogIntervalMs = clusterWatchdogIntervalMs;
         this.catalogType = catalogType != null && !catalogType.isEmpty() ? catalogType : "BUILT_IN";
         this.catalogStationCount = catalogStationCount;
@@ -67,6 +94,7 @@ final class MediaSettingsSnapshot {
                 bundle.getBoolean(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false),
                 bundle.getBoolean(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, true),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, true),
+                bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, false),
                 bundle.getLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),
                 bundle.getString(MediaBridgeContract.K_CATALOG_TYPE, "BUILT_IN"),
                 bundle.getInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, 0),
@@ -86,6 +114,7 @@ final class MediaSettingsSnapshot {
         bundle.putBoolean(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, switchToOnlineBeforeSessionPlay);
         bundle.putBoolean(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, clusterCoversEnabled);
+        bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled);
         bundle.putLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs);
         bundle.putString(MediaBridgeContract.K_CATALOG_TYPE, catalogType);
         bundle.putInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, catalogStationCount);

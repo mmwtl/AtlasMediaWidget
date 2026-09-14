@@ -16,6 +16,7 @@ data class MediaSettingsSnapshot(
     val switchToOnlineBeforeSessionPlay: Boolean = false,
     val radioWidgetBroadcastEnabled: Boolean = true,
     val clusterCoversEnabled: Boolean = true,
+    val clusterOnlineEnabled: Boolean = false,
     val clusterWatchdogIntervalMs: Long = 1250L,
     val catalogType: String = "BUILT_IN",
     val catalogStationCount: Int = 0,
@@ -34,6 +35,7 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
     putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, switchToOnlineBeforeSessionPlay)
     putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, clusterCoversEnabled)
+    putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled)
     putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs)
     putString(MediaBridgeContract.Key.CATALOG_TYPE, catalogType)
     putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, catalogStationCount)
@@ -52,6 +54,7 @@ fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnaps
     switchToOnlineBeforeSessionPlay = getBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false),
     radioWidgetBroadcastEnabled = getBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, true),
     clusterCoversEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, true),
+    clusterOnlineEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, false),
     clusterWatchdogIntervalMs = getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),
     catalogType = getString(MediaBridgeContract.Key.CATALOG_TYPE).orEmpty().ifBlank { "BUILT_IN" },
     catalogStationCount = getInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, 0),

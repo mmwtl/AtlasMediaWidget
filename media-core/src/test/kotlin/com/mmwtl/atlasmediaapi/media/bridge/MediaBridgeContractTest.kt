@@ -82,6 +82,7 @@ class MediaBridgeContractTest {
             switchToOnlineBeforeSessionPlay = true,
             radioWidgetBroadcastEnabled = false,
             clusterCoversEnabled = false,
+            clusterOnlineEnabled = true,
             clusterWatchdogIntervalMs = 2500L,
             catalogType = "CUSTOM",
             catalogStationCount = 10,

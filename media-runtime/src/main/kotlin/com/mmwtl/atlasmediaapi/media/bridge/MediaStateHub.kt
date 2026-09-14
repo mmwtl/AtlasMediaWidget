@@ -65,7 +65,7 @@ class MediaStateHub(
         availability: Map<BridgeAudioSource, Pair<Boolean, Boolean>>,
     ) {
         val selected = audioSource.toBridgeSource()
-        clusterMediaBridge?.setRadioActive(selected == BridgeAudioSource.RADIO)
+        clusterMediaBridge?.setActiveSource(selected)
         onlineSourcePolicy.onAudioSource(selected)
         val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
         repository.update { before ->
@@ -105,7 +105,7 @@ class MediaStateHub(
 
     fun onBackendDisconnected(message: String) {
         synchronized(mediaCallbackLock) {
-            clusterMediaBridge?.setRadioActive(false)
+            clusterMediaBridge?.setActiveSource(null)
             val before = repository.snapshot()
             val preserveAndroidOnline = before.audioSource == BridgeAudioSource.ONLINE.name &&
                 before.ownerPackage.isNotBlank() &&
@@ -156,7 +156,7 @@ class MediaStateHub(
         appSource: MediaCenterConstant.AppSource,
     ) {
         val selected = audioSource.toBridgeSource()
-        clusterMediaBridge?.setRadioActive(selected == BridgeAudioSource.RADIO)
+        clusterMediaBridge?.setActiveSource(selected)
         onlineSourcePolicy.onAudioSource(selected)
         val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
         repository.update { before ->

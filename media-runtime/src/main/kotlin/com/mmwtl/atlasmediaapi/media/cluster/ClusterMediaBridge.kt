@@ -4,6 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
+import android.media.session.PlaybackState
+import com.mmwtl.atlasmediaapi.media.bridge.MediaSnapshot
+import com.mmwtl.atlasmediaapi.media.bridge.BridgeAudioSource
 import com.ecarx.xui.adaptapi.diminteraction.DimInteraction
 import com.ecarx.xui.adaptapi.diminteraction.IMediaInteraction
 import kotlinx.coroutines.CoroutineScope
@@ -85,6 +88,7 @@ class ClusterMediaBridge(
 
     companion object {
         const val PREFS_NAME = "cluster_dim_prefs"
+        const val KEY_CLUSTER_ONLINE_ENABLED = "cluster_dim_online_enabled"
         const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
         private const val NFS_SHARED_DIR = "/data/vendor/nfs/shared"
@@ -195,6 +199,15 @@ class ClusterMediaBridge(
     var isClusterCoversEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_COVERS_ENABLED, true)
         private set
 
+    @Volatile
+    var isClusterOnlineEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_ONLINE_ENABLED, false)
+        private set
+
+    private var activeSource: BridgeAudioSource? = null
+    private var confirmedOnlineActive = false
+    private var currentRadioInfo: IMediaInteraction.IPlaybackInfo? = null
+    private var lastOnlinePayload: DirectDimMediaClient.Payload? = null
+
     val reassertWatchdogIntervalMs: Long
         get() = reassertWatchdogIntervalStore.value
 
@@ -230,7 +243,7 @@ class ClusterMediaBridge(
     private val directDimMediaClient = DirectDimMediaClient(context)
 
     init {
-        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled)
+        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || isClusterOnlineEnabled)
     }
 
     private val reassertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -253,11 +266,14 @@ class ClusterMediaBridge(
      * Controls the complete custom radio DIM producer. When disabled, no metadata or
      * artwork packets are emitted so the stock radio remains the only DIM owner.
      */
+    @Synchronized
     fun setClusterCoversEnabled(enabled: Boolean) {
         isClusterCoversEnabled = enabled
         prefs.edit().putBoolean(KEY_CLUSTER_COVERS_ENABLED, enabled).apply()
-        directDimMediaClient.setTransmissionEnabled(enabled)
+        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || isClusterOnlineEnabled)
         if (!enabled) {
+            if (radioActive) directDimMediaClient.clearPending()
+            currentRadioInfo = null
             cancelReassertions()
         }
     }
@@ -293,13 +309,22 @@ class ClusterMediaBridge(
         )
     }
 
-    fun setRadioActive(active: Boolean) {
+    @Synchronized
+    fun setActiveSource(source: BridgeAudioSource?) {
+        if (activeSource == source) return
+        activeSource = source
+        val active = source == BridgeAudioSource.RADIO
+        confirmedOnlineActive = source == BridgeAudioSource.ONLINE
+        lastOnlinePayload = null
+        currentRadioInfo = null
+        directDimMediaClient.clearPending()
         radioActive = active
         if (!active) {
             cancelReassertions()
         }
     }
 
+    @Synchronized
     fun updateRadioPlayback(
         frequencyKHz: Int,
         band: Int,
@@ -308,11 +333,9 @@ class ClusterMediaBridge(
         coverFile: File? = null,
         coverUri: Uri? = null,
     ) {
-        if (!isClusterCoversEnabled) {
-            cancelReassertions()
+        if (!isClusterCoversEnabled || !radioActive) {
             return
         }
-        radioActive = true
         val mediaInteraction = runCatching {
             dimInteraction?.mediaInteraction
         }.onFailure {
@@ -383,6 +406,7 @@ class ClusterMediaBridge(
                 clusterArtworkUri,
             )
 
+            currentRadioInfo = playInfo
             sendToDim(
                 mediaInteraction = mediaInteraction,
                 playInfo = playInfo,
@@ -419,6 +443,48 @@ class ClusterMediaBridge(
             lastUpdateError = it.diagnosticMessage()
             Timber.e(it, "Failed to update cluster DIM radio playback info")
         }
+    }
+
+    @Synchronized
+    fun setClusterOnlineEnabled(enabled: Boolean) {
+        isClusterOnlineEnabled = enabled
+        prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_ENABLED, enabled).apply()
+        lastOnlinePayload = null
+        if (!enabled && confirmedOnlineActive) directDimMediaClient.clearPending()
+        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || enabled)
+    }
+
+    /** Sends only resolved ONLINE snapshots; synthetic UNKNOWN/OTHER sessions are excluded. */
+    @Synchronized
+    fun updateOnlinePlayback(snapshot: MediaSnapshot, coverFile: File?) {
+        if (!isClusterOnlineEnabled || !confirmedOnlineActive || !snapshot.backendConnected ||
+            snapshot.audioSource != BridgeAudioSource.ONLINE.name || snapshot.ownerPackage.isBlank() ||
+            snapshot.mediaId.isBlank()
+        ) {
+            if (lastOnlinePayload != null) directDimMediaClient.clearPending()
+            lastOnlinePayload = null
+            return
+        }
+        val artworkFile = coverFile?.takeIf { it.isFile }?.let { source ->
+            val shared = File(NFS_SHARED_DIR)
+            if (shared.isDirectory && shared.canWrite()) copyArtworkAtomically(source, shared) else source
+        }
+        val payload = DirectDimMediaClient.Payload(
+            sourceType = IMediaInteraction.SOURCE_TYPE_ONLINE,
+            uuid = "atlas-online:${snapshot.ownerPackage}:${snapshot.mediaId}",
+            title = snapshot.title, album = snapshot.album, artist = snapshot.artist,
+            artworkUri = artworkFile?.let(Uri::fromFile),
+            duration = snapshot.duration.coerceAtLeast(0L),
+            playbackStatus = if (snapshot.playbackState == PlaybackState.STATE_PLAYING) {
+                IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING
+            } else IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED,
+            radioFrequency = "", radioMode = 0, radioStationName = "",
+        )
+        if (payload == lastOnlinePayload) return
+        val result = directDimMediaClient.sendOrQueue(payload)
+        if (!result.startsWith("send-failed")) lastOnlinePayload = payload
+        lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
+        lastUpdateError = directDimMediaClient.status().lastError
     }
 
     private fun scheduleReassertions(
@@ -565,6 +631,7 @@ class ClusterMediaBridge(
         }
     }
 
+    @Synchronized
     private fun sendToDim(
         mediaInteraction: IMediaInteraction,
         playInfo: IMediaInteraction.IPlaybackInfo,
@@ -577,7 +644,7 @@ class ClusterMediaBridge(
         artworkGrantReport: String,
         attempt: String,
     ) {
-        if (!isClusterCoversEnabled) return
+        if (!isClusterCoversEnabled || !radioActive || currentRadioInfo !== playInfo) return
         // ONLINE's worker uses BitmapFactory.decodeFile(uri.path), not ContentResolver.
         // Give it the complete Android NFS path; file:///radio_cover.jpg points at the
         // Android root and can never resolve to /data/vendor/nfs/shared.
