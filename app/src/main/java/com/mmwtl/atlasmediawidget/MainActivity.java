@@ -78,6 +78,7 @@ public final class MainActivity extends ScaledActivity {
     private Switch switchToOnlineSwitch;
     private Switch radioWidgetBroadcastSwitch;
     private Switch clusterCoversSwitch;
+    private Switch clusterOnlineSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
     private TextView radioCatalogInfoText;
@@ -1616,7 +1617,19 @@ public final class MainActivity extends ScaledActivity {
         s6.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterCoversSwitch, s6);
 
-        TextView clusterWatchdogTitle = text("Базовый интервал watchdog приборки", 14, Ui.SECONDARY, Typeface.BOLD);
+        clusterOnlineSwitch = new Switch(this);
+        clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название и обложка)");
+        clusterOnlineSwitch.setTextColor(Ui.PRIMARY);
+        clusterOnlineSwitch.setTextSize(15);
+        clusterOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, checked);
+        });
+        LinearLayout.LayoutParams s7 = fullWrap();
+        s7.topMargin = Ui.dp(this, 10);
+        mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
+
+        TextView clusterWatchdogTitle = text("Интервал повторной отправки радио на приборку", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
         cwtParams.topMargin = Ui.dp(this, 12);
         mediaSettingsGroup.addView(clusterWatchdogTitle, cwtParams);
@@ -1792,6 +1805,9 @@ public final class MainActivity extends ScaledActivity {
         }
         if (clusterCoversSwitch != null) {
             clusterCoversSwitch.setChecked(snapshot.clusterCoversEnabled);
+        }
+        if (clusterOnlineSwitch != null) {
+            clusterOnlineSwitch.setChecked(snapshot.clusterOnlineEnabled);
         }
         if (clusterWatchdogLabel != null) {
             clusterWatchdogLabel.setText(snapshot.clusterWatchdogIntervalMs + " мс");

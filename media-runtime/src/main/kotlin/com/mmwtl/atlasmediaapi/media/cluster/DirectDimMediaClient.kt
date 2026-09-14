@@ -29,7 +29,7 @@ internal class DirectDimMediaClient(context: Context) {
         val title: String,
         val album: String,
         val artist: String,
-        val artworkUri: Uri,
+        val artworkUri: Uri?,
         val duration: Long,
         val playbackStatus: Int,
         val radioFrequency: String,
@@ -132,6 +132,10 @@ internal class DirectDimMediaClient(context: Context) {
         lastError = lastError,
     )
 
+    @Synchronized
+    fun clearPending() { pendingPayload = null }
+
+    @Synchronized
     fun setTransmissionEnabled(enabled: Boolean) {
         transmissionEnabled = enabled
         if (!enabled) {
@@ -143,6 +147,7 @@ internal class DirectDimMediaClient(context: Context) {
     }
 
     /** Returns a short diagnostic result; a disconnected Binder queues the latest payload. */
+    @Synchronized
     fun sendOrQueue(payload: Payload): String {
         if (!transmissionEnabled) return "disabled"
         pendingPayload = payload
@@ -181,8 +186,9 @@ internal class DirectDimMediaClient(context: Context) {
         }
     }
 
+    @Synchronized
     private fun sendNow(target: IBinder, payload: Payload): String {
-        if (!transmissionEnabled) return "disabled"
+        if (!transmissionEnabled || pendingPayload != payload) return "cancelled"
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
         return try {
@@ -195,7 +201,8 @@ internal class DirectDimMediaClient(context: Context) {
                 "DIM Binder rejected transaction $TRANSACTION_SEND_MESSAGE"
             }
             reply.readException()
-            if (pendingPayload == payload) pendingPayload = null
+            // Retain the current packet for replay after Binder reconnection. Source
+            // changes and disabled transmission explicitly clear it.
             val currentSendCount = sendCount.incrementAndGet()
             lastError = ""
             lastResult = "sent-$currentSendCount"
@@ -226,7 +233,7 @@ internal class DirectDimMediaClient(context: Context) {
         parcel.writeString(payload.artist)
         // DIM V9.03 checks only nullness here before converting artworkUrl. Keep this
         // deliberately simple to rule out hidden interpretation of a URI-shaped string.
-        parcel.writeString(LEGACY_ARTWORK_GATE)
+        parcel.writeString(if (payload.artworkUri != null) LEGACY_ARTWORK_GATE else null)
         parcel.writeParcelable(payload.artworkUri, 0)
         parcel.writeString("") // next_artwork
         parcel.writeString("") // lyric_sentence
