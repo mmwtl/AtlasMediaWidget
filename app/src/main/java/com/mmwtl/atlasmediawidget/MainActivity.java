@@ -18,6 +18,8 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.InputType;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -109,6 +111,11 @@ public final class MainActivity extends ScaledActivity {
     private EditText positionY;
     private OverlayCorner displayedPositionCorner;
     private boolean refreshingGeometry;
+    private boolean geometryApplyPending;
+    private final Runnable applyGeometryDelayed = () -> {
+        geometryApplyPending = false;
+        applyGeometry();
+    };
     private TextView metadataProgressGapValue;
     private SeekBar metadataProgressGap;
     private TextView controlPanelHeightValue;
@@ -195,6 +202,14 @@ public final class MainActivity extends ScaledActivity {
         if (mediaBridgeClient != null) {
             mediaBridgeClient.start();
         }
+    }
+
+    @Override protected void onPause() {
+        if (geometryApplyPending) {
+            main.removeCallbacks(applyGeometryDelayed);
+            applyGeometryDelayed.run();
+        }
+        super.onPause();
     }
 
     @Override protected void onStop() {
@@ -448,9 +463,22 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams dragHandleHintParams = fullWrap();
         dragHandleHintParams.topMargin = Ui.dp(this, 5);
         serviceCard.addView(dragHandleHint, dragHandleHintParams);
-        Button applyGeometry = actionButton("Применить размер и положение");
-        applyGeometry.setOnClickListener(v -> applyGeometry());
-        serviceCard.addView(applyGeometry, buttonParams());
+        TextWatcher geometryWatcher = new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start,
+                    int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start,
+                    int before, int count) {}
+            @Override public void afterTextChanged(Editable value) {
+                if (refreshingGeometry || refreshingStyle) return;
+                main.removeCallbacks(applyGeometryDelayed);
+                geometryApplyPending = true;
+                main.postDelayed(applyGeometryDelayed, 400L);
+            }
+        };
+        widthSize.addTextChangedListener(geometryWatcher);
+        heightSize.addTextChangedListener(geometryWatcher);
+        positionX.addTextChangedListener(geometryWatcher);
+        positionY.addTextChangedListener(geometryWatcher);
 
         LinearLayout typographyCard = card();
         typographyCard.addView(text("Текст и отступы", 20, Ui.PRIMARY, Typeface.BOLD));
@@ -2355,6 +2383,7 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void reanchorPositionFields(OverlayCorner newCorner) {
+        if (newCorner == displayedPositionCorner) return;
         Rect bounds = availableBoundsForGeometry();
         int width = widthInput();
         int height = heightInput();
@@ -2369,8 +2398,13 @@ public final class MainActivity extends ScaledActivity {
                 bounds.left, bounds.top, bounds.right, bounds.bottom,
                 width, height, absolute.x(), absolute.y());
         displayedPositionCorner = newCorner;
+        refreshingGeometry = true;
         positionX.setText(Integer.toString(offsets.x()));
         positionY.setText(Integer.toString(offsets.y()));
+        refreshingGeometry = false;
+        main.removeCallbacks(applyGeometryDelayed);
+        geometryApplyPending = false;
+        applyGeometry();
     }
 
     private void applyGeometry() {
