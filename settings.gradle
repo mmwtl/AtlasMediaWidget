@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "AtlasMediaWidget"
-include ':app', ':api-app', ':media-core', ':vendor-oneos', ':vendor-ecarx-stub', ':media-runtime'
+include ':app', ':media-core', ':vendor-oneos', ':vendor-ecarx-stub', ':media-runtime'

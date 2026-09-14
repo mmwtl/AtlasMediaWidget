@@ -10,8 +10,7 @@ AtlasMediaWidget is intended to be an Android 11 media overlay for a portrait au
 unit. The first implementation should use a `TYPE_APPLICATION_OVERLAY` window, following the
 proven shell and lifecycle approach from AtlasAppWidget. The standard release build is the
 `integrated` Widget APK where the versioned AtlasMediaApi backend (`:media-runtime`) runs directly
-inside a private `:media` process. The autonomous `com.mmwtl.atlasmediaapi` package can still be
-built separately from `:api-app` when a standalone backend is needed.
+inside a private `:media` process. This integrated Widget APK is the only supported distribution.
 The planned package name is `com.mmwtl.atlasmediawidget`; do not change it without an explicit
 migration request.
 
@@ -24,7 +23,7 @@ provider has been demonstrated on the real head unit.
 - Keep confirmed device behavior, Android API facts, and implementation assumptions visibly
   separate in documentation and reviews.
 - The Media Bridge protocol v1 and runtime implementation are maintained directly in this repository
-  as modules `:media-core`, `:media-runtime`, `:vendor-oneos`, `:vendor-ecarx-stub`, and `:api-app`.
+  as modules `:media-core`, `:media-runtime`, `:vendor-oneos`, and `:vendor-ecarx-stub`.
 - Treat the decompiled OEM APKs as firmware-specific evidence, not as a stable public API.
 - Target the tested Android 11 head unit first. Do not generalize OEM Binder behavior to other
   firmware versions without a device test.
@@ -62,9 +61,8 @@ provider has been demonstrated on the real head unit.
 - Extrapolate a playing position locally from position, speed and `SystemClock.elapsedRealtime()`.
   Do not request one IPC update per second. A low-frequency reconciliation timer may run only while
   the overlay is visible or playback is expected, and must supplement rather than replace callbacks.
-- Send transport/source commands only through the explicit versioned bound service. The autonomous
-  v1 service is intentionally open on the isolated head unit; the integrated service is private to
-  the Widget package. Do not add client-side identity assumptions.
+- Send transport/source commands only through the explicit versioned bound service. The integrated
+  v1 service is private to the Widget package. Do not add client-side identity assumptions.
   The UI must respect the capability mask and treat `OK` as command delivery, pending until a newer
   snapshot confirms the resulting state.
 
@@ -84,7 +82,6 @@ provider has been demonstrated on the real head unit.
 - Preserve the archive base name `<effectiveVersionName>[<versionCode>]AtlasMediaWidget`; do not
   allow Gradle to fall back to module-derived `app-*.apk` names. The standard integrated release
   build omits the flavor suffix and outputs `<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`.
-  Standalone API APKs from `:api-app` follow `<effectiveVersionName>[<versionCode>]AtlasMediaApi-release.apk`.
 - The Widget application has only the `integrated` distribution flavor. Its standard release task
   `:app:assembleRelease` outputs the integrated Widget APK with the private `:media` process.
 - The `integrated` variant must include `media-runtime`, bind its non-exported Media Bridge service
@@ -99,14 +96,11 @@ Use the repository wrapper. Before handing off a completed application improveme
 sh gradlew --offline clean check assembleRelease
 ```
 
-This command builds the standard `release` for `:app` (integrated backend) and `release` for `:api-app`.
-Individual targets can be built separately:
-- Standard Widget (with integrated API): `sh gradlew assembleRelease` or `sh gradlew :app:assembleRelease`
-- Standalone Media API APK: `sh gradlew :api-app:assembleRelease`
+This command builds the integrated Widget APK. The only individual application target is
+`sh gradlew :app:assembleRelease` (equivalent to `sh gradlew assembleRelease`).
 
 Verify release outputs under `app/build/outputs/apk/integrated/release/`
-(`<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`) and
-`api-app/build/outputs/apk/release/`. Inspect package/version
+(`<effectiveVersionName>[<versionCode>]AtlasMediaWidget-release.apk`). Inspect package/version
 metadata and run `apksigner verify` when the artifacts are signed.
 For integrated builds, verify the local Media Bridge, notification listener, diagnostics activity,
 and FileProvider are present only in that flavor; verify that the bridge and diagnostics activity

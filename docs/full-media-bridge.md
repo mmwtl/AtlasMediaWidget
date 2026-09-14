@@ -31,7 +31,6 @@ The source of truth for the contract is maintained in `:media-core` ([`MediaBrid
 | Режим | Пакет (`Package`) | Компонент (`Component`) | Процесс | Экспортирован (`Exported`) | Authority FileProvider |
 |---|---|---|---|---|---|
 | **Встроенный (`integrated`)** | `com.mmwtl.atlasmediawidget` | `com.mmwtl.atlasmediawidget/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService` | `:media` | `false` (приватный) | `com.mmwtl.atlasmediawidget.fileprovider` |
-| **Автономный (`standalone`)** | `com.mmwtl.atlasmediaapi` | `com.mmwtl.atlasmediaapi/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService` | `:main` | `true` (открытый) | `com.mmwtl.atlasmediaapi.fileprovider` |
 
 - **Action**: `com.mmwtl.atlasmediaapi.media.BIND`
 - **Версия протокола**: `1` (`MIN_PROTOCOL_VERSION = 1`, `MAX_PROTOCOL_VERSION = 1`).
@@ -42,10 +41,13 @@ Binding is established via explicit Intent (`bindService`):
 | Mode | Package | Component | Process | Exported | FileProvider Authority |
 |---|---|---|---|---|---|
 | **Integrated (`integrated`)** | `com.mmwtl.atlasmediawidget` | `com.mmwtl.atlasmediawidget/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService` | `:media` | `false` (private) | `com.mmwtl.atlasmediawidget.fileprovider` |
-| **Standalone (`standalone`)** | `com.mmwtl.atlasmediaapi` | `com.mmwtl.atlasmediaapi/com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeService` | `:main` | `true` (open) | `com.mmwtl.atlasmediaapi.fileprovider` |
 
 - **Action**: `com.mmwtl.atlasmediaapi.media.BIND`
 - **Protocol Version**: `1` (`MIN_PROTOCOL_VERSION = 1`, `MAX_PROTOCOL_VERSION = 1`).
+
+> **Историческая справка / Historical:** до удаления standalone `:api-app` существовал отдельный
+> открытый endpoint `com.mmwtl.atlasmediaapi/.../MediaBridgeService` в процессе `:main`.
+> Он больше не собирается и не является поддерживаемой точкой подключения.
 
 ---
 
@@ -182,9 +184,6 @@ if (duration > 0) estimatedPosition = Math.min(estimatedPosition, duration);
 
 В integrated сервис не экспортирован. Настройки и файловые операции допускают
 `message.sendingUid == Process.myUid()` либо пакет приложения среди пакетов UID.
-Та же проверка действует в standalone; пути через привилегированное разрешение нет.
-Открытый standalone протокол управления воспроизведением не даёт стороннему Widget
-доступа к настройкам standalone API.
 
 Клиент открывает файл и передаёт `fileDescriptor`: write-PFD при экспорте,
 read-PFD при импорте. Сервис обрабатывает поток в IO и закрывает свой дескриптор;

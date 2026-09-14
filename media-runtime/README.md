@@ -8,11 +8,13 @@
 This module and the sibling `media-core`, `vendor-oneos`, and `vendor-ecarx-stub` modules were
 synchronized from `/Users/wital/dev/AtlasMediaApi` commit `4e9b640`.
 
-## Отличия integrated-варианта / Integrated variant differences
+## Интегрированный рантайм / Integrated runtime
 
-Вариант `integrated` намеренно отличается от автономного приложения в следующих аспектах:
+Этот репозиторий собирает рантайм только как часть интегрированного Widget APK.
+Автономный APK AtlasMediaApi больше не собирается и не распространяется.
 
-The integrated variant deliberately differs from the standalone application in these aspects:
+This repository builds the runtime only as part of the integrated Widget APK.
+The standalone AtlasMediaApi APK is no longer built or distributed.
 
 - `MediaRuntime` управляет одним ленивым координатором на процесс вместо требования `AtlasMediaApiApp`;  
   `MediaRuntime` owns one lazy coordinator per process instead of requiring `AtlasMediaApiApp`;
@@ -20,14 +22,10 @@ The integrated variant deliberately differs from the standalone application in t
   `:media` приложения-хоста;  
   `MediaBridgeService`, `MediaNotificationListenerService`, and `DiagnosticActivity` run in the
   host application's `:media` process;
-- Bridge и активность диагностики являются приватными компонентами приложения-хоста, а экспортируемый
-  launcher alias (`MediaApiLauncher`) предоставляет доступ к экрану диагностики как к отдельному
-  пункту списка приложений «Atlas Media API» со своей иконкой (`@mipmap/ic_media_api_launcher`) и
-  собственным `taskAffinity` (`com.mmwtl.atlasmediaapi`);  
-  The bridge and diagnostics activity are private components of the host application, while an
-  exported launcher alias (`MediaApiLauncher`) exposes diagnostics as the separate `Atlas Media API`
-  app-list entry with its own standalone launcher icon (`@mipmap/ic_media_api_launcher`) and dedicated
-  `taskAffinity` (`com.mmwtl.atlasmediaapi`);
+- Bridge и активность диагностики являются приватными компонентами приложения-хоста; диагностика
+  открывается из единого интерфейса Widget.
+  The bridge and diagnostics activity are private components of the host application; diagnostics
+  is opened from the unified Widget interface.
 - Пользовательские разрешения медиа декларируются хостовым flavor'ом `integrated` и управляются из
   главной активности Widget; экран диагностики только отображает их текущий статус.  
   User-grantable media permissions are declared by the `integrated` host flavor and managed from

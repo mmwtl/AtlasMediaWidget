@@ -187,18 +187,14 @@ The settings application includes a live preview and granular controls for card 
 Для сборки требуются JDK 17 и Android SDK 36. Сборка осуществляется с помощью Gradle Wrapper.
 
 ```sh
-# 1. Сборка стандартного релиза (виджет со встроенным API):
+# Сборка единственного поддерживаемого релиза (виджет со встроенным API):
 ./gradlew assembleRelease
 # или целевая задача только для виджета:
 ./gradlew :app:assembleRelease
-
-# 2. Сборка автономного медиасервиса (Atlas Media API APK, если требуется):
-./gradlew :api-app:assembleRelease
 ```
 
 Собранные файлы:
 - **Стандартный виджет (с встроенным API)**: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-release.apk`
-- **Автономный API**: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
 
 #### Запуск модульных тестов:
 ```sh
@@ -209,18 +205,14 @@ The settings application includes a live preview and granular controls for card 
 Requires JDK 17 and Android SDK 36. The build is managed via the repository Gradle Wrapper.
 
 ```sh
-# 1. Build standard release (widget with integrated API):
+# Build the only supported release (widget with integrated API):
 ./gradlew assembleRelease
 # or target only the widget:
 ./gradlew :app:assembleRelease
-
-# 2. Build standalone media backend APK (Atlas Media API, if needed):
-./gradlew :api-app:assembleRelease
 ```
 
 Generated artifacts:
 - **Standard widget (with integrated API)**: `app/build/outputs/apk/integrated/release/<versionName>[<versionCode>]AtlasMediaWidget-release.apk`
-- **Standalone API**: `api-app/build/outputs/apk/release/<versionName>[<versionCode>]AtlasMediaApi-release.apk`
 
 #### Running Unit Tests:
 ```sh
@@ -231,7 +223,6 @@ Generated artifacts:
 
 ## [RU] Документация / [EN] Documentation
 
-- [📖 Atlas Media API README](api-app/README.md) — руководство по медиасервису, архитектуре и модулям.
 - [🔌 Контракт Media Bridge v1](docs/full-media-bridge.md) — подробная спецификация wire-протокола IPC.
 - [📻 Каталог радиостанций](docs/radio-catalog.md) — форматы CSV/ZIP, интеграция обложек и прямой выбор станций.
 - [🏛 Архитектурные варианты](docs/architecture-options.md) — обоснование выбора архитектуры и процесса `:media`.

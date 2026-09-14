@@ -11,6 +11,10 @@ Date: 2026-09-13. Base branch: `codex/integrated-media-api`, commit `4af3cee`.
 Working branch: `codex/unified-media-settings-plan`.
 Status: **Implemented and verified**. All phases 1–7 (IPC contract, runtime controller, IPC service/client, two-phase backup and recovery journal, unified `MainActivity` UI, unit tests, and release builds) are fully complete.
 
+> **Historical note (2026-09-14):** The `plain` flavor and standalone `:api-app` APK have been
+> removed. References below to standalone/plain builds, migration, UI, backup, or verification
+> describe the earlier architecture and are retained as historical record.
+
 ## 1. Результат и границы
 
 Пользователь открывает Atlas Media Widget и в одном интерфейсе настраивает карточку,
