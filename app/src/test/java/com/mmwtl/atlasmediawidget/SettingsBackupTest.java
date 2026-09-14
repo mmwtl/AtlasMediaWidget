@@ -35,12 +35,29 @@ public final class SettingsBackupTest {
         assertEquals(CoverDimPreset.DEFAULT, restored.compact.appearance.coverDimPreset);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(9, root.getInt("schemaVersion"));
+        assertEquals(10, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
         assertFalse(settings.has("customRadioCatalog"));
         assertFalse(settings.has("showRadioCovers"));
+    }
+
+    @Test public void hideThresholdRoundTripAndLegacyDefault() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(data(15, CardStyle.COMPACT, null, null), "test"));
+        root.getJSONObject("settings").put("freeformHideThresholdPercent", 60);
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+        assertEquals(60, restored.freeformHideThresholdPercent);
+        assertEquals(60, SettingsBackup.decode(SettingsBackup.encode(restored, "test"))
+                .freeformHideThresholdPercent);
+        root.getJSONObject("settings").put("freeformHideThresholdPercent", 29);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").put("freeformHideThresholdPercent", 96);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("freeformHideThresholdPercent");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.put("schemaVersion", 9);
+        assertEquals(85, SettingsBackup.decode(root.toString()).freeformHideThresholdPercent);
     }
 
     @Test public void jsonRoundTripPreservesFavoriteGrid() throws Exception {
@@ -166,7 +183,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 10);
+        root.put("schemaVersion", 11);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));

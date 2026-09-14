@@ -10,6 +10,7 @@ final class Prefs {
     private static volatile boolean credentialMigrationAttempted;
     static final String KEY_SERVICE_ENABLED = "service_enabled";
     static final String KEY_AUTO_START = "auto_start";
+    static final String KEY_FREEFORM_HIDE_THRESHOLD_PERCENT = "freeform_hide_threshold_percent";
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_POSITION_CORNER = "position_corner";
@@ -114,6 +115,13 @@ final class Prefs {
 
     boolean getBoolean(String key, boolean fallback) {
         return preferences.getBoolean(key, fallback);
+    }
+
+    int freeformHideThresholdPercent() {
+        return clamp(getInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT,
+                WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT),
+                WindowVisibilityPolicy.MIN_HIDE_THRESHOLD_PERCENT,
+                WindowVisibilityPolicy.MAX_HIDE_THRESHOLD_PERCENT);
     }
 
     int getInt(String key, int fallback) {
@@ -359,6 +367,7 @@ final class Prefs {
                 .putInt(KEY_RADIO_FAVORITES_COLUMNS, data.favoriteColumns)
                 .putInt(KEY_RADIO_FAVORITES_ROWS, data.favoriteRows)
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
+                .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
                 .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);
         if (data.positionX == null) {

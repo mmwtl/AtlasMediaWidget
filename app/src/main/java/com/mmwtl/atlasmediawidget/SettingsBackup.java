@@ -16,11 +16,12 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 9;
+    private static final int SCHEMA_VERSION = 10;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
+        final int freeformHideThresholdPercent;
         final boolean autoStart;
         final boolean radioSavedNavigation;
         final boolean radioFavoritesNavigation;
@@ -85,6 +86,23 @@ final class SettingsBackup {
                 StyleData compact, StyleData square, Integer cardWidthPx, Integer cardHeightPx,
                 int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths,
+                CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner,
+                StyleData compact, StyleData square, Integer cardWidthPx, Integer cardHeightPx,
+                int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent) throws IOException {
+            this.freeformHideThresholdPercent = requireRange(
+                    "settings.freeformHideThresholdPercent", freeformHideThresholdPercent,
+                    WindowVisibilityPolicy.MIN_HIDE_THRESHOLD_PERCENT,
+                    WindowVisibilityPolicy.MAX_HIDE_THRESHOLD_PERCENT);
             this.autoStart = autoStart;
             this.radioSavedNavigation = radioSavedNavigation;
             this.radioFavoritesNavigation = radioFavoritesNavigation;
@@ -213,7 +231,8 @@ final class SettingsBackup {
                 captureStyle(prefs, CardStyle.SQUARE),
                 prefs.cardWidthPx(), prefs.cardHeightPx(),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
-                prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false));
+                prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
+                prefs.freeformHideThresholdPercent());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -256,6 +275,7 @@ final class SettingsBackup {
             root.put("schemaVersion", SCHEMA_VERSION);
             root.put("appVersion", appVersion == null ? "" : appVersion);
             JSONObject settings = new JSONObject();
+            settings.put("freeformHideThresholdPercent", data.freeformHideThresholdPercent);
             settings.put("autoStart", data.autoStart);
             settings.put("radioSavedNavigation", data.radioSavedNavigation);
             settings.put("radioFavoritesNavigation", data.radioFavoritesNavigation);
@@ -362,7 +382,10 @@ final class SettingsBackup {
                             "settings.favoriteRows")
                             : Prefs.DEFAULT_RADIO_FAVORITES_GRID_ROWS,
                     version >= 7 && requireBoolean(settings, "radioFavoritesNavigation",
-                            "settings.radioFavoritesNavigation"));
+                            "settings.radioFavoritesNavigation"),
+                    version >= 10 ? requireInt(settings, "freeformHideThresholdPercent",
+                            "settings.freeformHideThresholdPercent")
+                            : WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT);
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }

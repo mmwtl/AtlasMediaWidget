@@ -102,6 +102,7 @@ public final class MainActivity extends ScaledActivity {
     private RadioButton[] coverDimPresetButtons;
     private EditText widthSize;
     private EditText heightSize;
+    private SeekBar hideThreshold;
     private Spinner positionCornerSpinner;
     private EditText positionX;
     private EditText positionY;
@@ -768,6 +769,7 @@ public final class MainActivity extends ScaledActivity {
         // 3. Секция «Виджет»
         addSectionHeading(root, getString(R.string.section_widget), false);
         root.addView(serviceCard);
+        root.addView(createVisibilityCard());
         root.addView(typographyCard);
         root.addView(controlsCard);
         root.addView(behaviorCard);
@@ -794,6 +796,39 @@ public final class MainActivity extends ScaledActivity {
         params.topMargin = Ui.dp(this, first ? 20 : 14);
         params.bottomMargin = Ui.dp(this, 10);
         parent.addView(heading, params);
+    }
+
+    private LinearLayout createVisibilityCard() {
+        LinearLayout visibility = card();
+        visibility.addView(text("Видимость", 20, Ui.PRIMARY, Typeface.BOLD), fullWrap());
+        TextView hint = text("Карточка скрывается, если одно окно достигает порога одновременно "
+                + "по ширине и высоте или если все видимые окна приложений вместе покрывают "
+                + "этот процент экрана. Пересечения считаются один раз. GSplit и системные "
+                + "исключения скрывают карточку при любом размере.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        hint.setLineSpacing(0, 1.1f);
+        visibility.addView(hint, fullWrap());
+        TextView value = text("", 15, Ui.PRIMARY, Typeface.NORMAL);
+        visibility.addView(value, fullWrap());
+        SeekBar threshold = sizeSeekBar(WindowVisibilityPolicy.MIN_HIDE_THRESHOLD_PERCENT,
+                WindowVisibilityPolicy.MAX_HIDE_THRESHOLD_PERCENT);
+        hideThreshold = threshold;
+        threshold.setProgress(prefs.freeformHideThresholdPercent());
+        value.setText("Порог скрытия: " + threshold.getProgress() + " %");
+        threshold.setContentDescription("Порог скрытия");
+        threshold.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                value.setText("Порог скрытия: " + progress + " %");
+                if (fromUser) {
+                    prefs.putInt(Prefs.KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, progress);
+                    OverlayService.onAccessibilityWindowsChanged();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {}
+        });
+        visibility.addView(threshold, fullWrap());
+        return visibility;
     }
 
     private void addScaleSlider(LinearLayout parent) {
@@ -839,6 +874,7 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void refresh() {
+        if (hideThreshold != null) hideThreshold.setProgress(prefs.freeformHideThresholdPercent());
         boolean overlay = Settings.canDrawOverlays(this);
         boolean usage = ForegroundAppDetector.hasUsageAccess(this);
         boolean accessibility = AccessibilityWindowState.isEnabled(this);

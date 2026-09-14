@@ -26,6 +26,7 @@ final class ForegroundAppDetector {
     private final PowerManager powerManager;
     private final KeyguardManager keyguardManager;
     private final UserManager userManager;
+    private final Prefs prefs;
     private final Set<String> homePackages = new HashSet<>();
     private final Set<String> homeComponents = new HashSet<>();
     private final ForegroundEventTracker tracker = new ForegroundEventTracker();
@@ -38,6 +39,7 @@ final class ForegroundAppDetector {
         powerManager = context.getSystemService(PowerManager.class);
         keyguardManager = context.getSystemService(KeyguardManager.class);
         userManager = context.getSystemService(UserManager.class);
+        prefs = new Prefs(context);
     }
 
     static boolean hasUsageAccess(Context context) {
@@ -111,7 +113,8 @@ final class ForegroundAppDetector {
                 tracker.mostRecentVisibleActivity(),
                 windowState.eventPackage,
                 windowState.eventClass,
-                context.getPackageName()
+                context.getPackageName(),
+                prefs.freeformHideThresholdPercent()
         );
     }
 
@@ -199,13 +202,24 @@ final class ForegroundAppDetector {
         }
         for (ResolveInfo home : homes) {
             if (home.activityInfo != null) {
+                String packageName = home.activityInfo.packageName;
+                String className = home.activityInfo.name;
+                if (isExcludedHome(packageName, className)) {
+                    continue;
+                }
                 homePackages.add(home.activityInfo.packageName);
                 homeComponents.add(WindowVisibilityPolicy.componentKey(
-                        home.activityInfo.packageName,
-                        home.activityInfo.name
+                        packageName,
+                        className
                 ));
             }
         }
         lastHomeRefresh = System.currentTimeMillis();
+    }
+
+    private static boolean isExcludedHome(String packageName, String className) {
+        return HeadUnitWindowRules.forceHide(packageName, className)
+                || "com.android.settings".equals(packageName)
+                || (className != null && className.endsWith(".FallbackHome"));
     }
 }

@@ -2,12 +2,15 @@ package com.mmwtl.atlasmediawidget;
 
 import java.util.Set;
 
-/** Firmware-specific hide rules for windows that report incomplete activity state. */
+/** Narrow workarounds for known Atlas/OneOS windows that do not report normal activity state. */
 final class HeadUnitWindowRules {
     private static final Set<String> FORCE_HIDE_PACKAGES = Set.of(
             "com.salat.gsplit",
             "com.geely.hvac",
-            "com.geely.oneosphone"
+            "com.geely.oneosphone",
+            "com.android.settings",
+            "com.android.permissioncontroller",
+            "com.google.android.permissioncontroller"
     );
     private static final Set<String> FORCE_HIDE_CLASSES = Set.of(
             "com.salat.gbinder.features.launcher.LauncherEntryActivity"
