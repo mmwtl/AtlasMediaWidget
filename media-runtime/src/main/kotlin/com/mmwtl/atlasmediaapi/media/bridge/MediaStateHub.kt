@@ -104,39 +104,51 @@ class MediaStateHub(
     }
 
     fun onBackendDisconnected(message: String) {
-        clusterMediaBridge?.setRadioActive(false)
-        latestArtworkRequest.incrementAndGet()
-        onlineSourcePolicy.onSessionGone()
-        repository.update {
-            it.copy(
-                backendConnected = false,
-                backendErrorCode = MediaBridgeContract.BackendError.ONE_OS_DISCONNECTED,
-                backendErrorMessage = message,
-                sources = it.sources.map { source ->
-                    source.copy(connected = false, available = false, selected = false)
-                },
-                ownerPackage = "",
-                ownerApp = "",
-                mediaId = "",
-                title = "",
-                artist = "",
-                album = "",
-                duration = -1L,
-                position = -1L,
-                updateElapsedRealtime = 0L,
-                speed = 0f,
-                playbackState = PlaybackState.STATE_NONE,
-                playbackErrorCode = 0,
-                playbackErrorMessage = "",
-                playbackActions = 0L,
-                capabilities = MediaCapabilities.SET_SOURCE,
-                artworkUri = "",
-                artworkRevision = if (it.artworkUri.isNotBlank()) {
-                    it.artworkRevision + 1L
-                } else it.artworkRevision,
-            )
+        synchronized(mediaCallbackLock) {
+            clusterMediaBridge?.setRadioActive(false)
+            val before = repository.snapshot()
+            val preserveAndroidOnline = before.audioSource == BridgeAudioSource.ONLINE.name &&
+                before.ownerPackage.isNotBlank() &&
+                !onlineSourcePolicy.acceptOneOs(BridgeAudioSource.ONLINE, meaningful = true)
+            if (!preserveAndroidOnline) {
+                latestArtworkRequest.incrementAndGet()
+                onlineSourcePolicy.onSessionGone()
+            }
+            repository.update {
+                val base = if (preserveAndroidOnline) it else it.copy(
+                    ownerPackage = "",
+                    ownerApp = "",
+                    mediaId = "",
+                    title = "",
+                    artist = "",
+                    album = "",
+                    duration = -1L,
+                    position = -1L,
+                    updateElapsedRealtime = 0L,
+                    speed = 0f,
+                    playbackState = PlaybackState.STATE_NONE,
+                    playbackErrorCode = 0,
+                    playbackErrorMessage = "",
+                    playbackActions = 0L,
+                    capabilities = MediaCapabilities.SET_SOURCE,
+                    artworkUri = "",
+                    artworkRevision = if (it.artworkUri.isNotBlank()) it.artworkRevision + 1L else it.artworkRevision,
+                )
+                base.copy(
+                    backendConnected = false,
+                    backendErrorCode = MediaBridgeContract.BackendError.ONE_OS_DISCONNECTED,
+                    backendErrorMessage = message,
+                    sources = it.sources.map { source ->
+                        source.copy(
+                            connected = false,
+                            available = false,
+                            selected = preserveAndroidOnline && source.id == BridgeAudioSource.ONLINE.name,
+                        )
+                    },
+                )
+            }
+            if (!preserveAndroidOnline) cpaaArtworkFallback.onBridgeStateChanged()
         }
-        cpaaArtworkFallback.onBridgeStateChanged()
     }
 
     fun onSourceChanged(
@@ -272,7 +284,7 @@ class MediaStateHub(
 
         repository.update { before ->
             val sameMedia = before.mediaId == mediaId && before.ownerPackage == ownerPackage
-            val targetSource = if (before.audioSource == BridgeAudioSource.UNKNOWN.name
+            val targetSource = if (!bridgeState.backendConnected || before.audioSource == BridgeAudioSource.UNKNOWN.name
                 || before.audioSource == BridgeAudioSource.OTHER.name
             ) {
                 BridgeAudioSource.ONLINE.name
