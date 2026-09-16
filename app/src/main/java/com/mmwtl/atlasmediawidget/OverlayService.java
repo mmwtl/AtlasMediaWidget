@@ -511,7 +511,8 @@ public final class OverlayService extends Service
                 OverlayCorner corner = storedCorner();
                 OverlayGeometry.Offset offsets = OverlayGeometry.offsetsFor(corner,
                         bounds.left, bounds.top, bounds.right, bounds.bottom,
-                        card.cardWidth(), card.cardHeight(), cardParams.x, cardParams.y);
+                        card.cardWidth(), card.cardHeight(),
+                        cardParams.x + bounds.left, cardParams.y + bounds.top);
                 prefs.putPosition(corner, offsets.x(), offsets.y());
                 return true;
             }
@@ -838,10 +839,9 @@ public final class OverlayService extends Service
     private void clampPosition(WindowManager.LayoutParams params, MediaCardView target, Rect bounds) {
         OverlayGeometry.Position position = OverlayGeometry.positionFor(OverlayCorner.TOP_START,
                 bounds.left, bounds.top, bounds.right, bounds.bottom,
-                target.cardWidth(), target.cardHeight(), params.x - bounds.left,
-                params.y - bounds.top);
-        params.x = position.x();
-        params.y = position.y();
+                target.cardWidth(), target.cardHeight(), params.x, params.y);
+        params.x = position.x() - bounds.left;
+        params.y = position.y() - bounds.top;
     }
 
     private OverlayCorner storedCorner() {
@@ -851,19 +851,7 @@ public final class OverlayService extends Service
     }
 
     private void migrateLegacyPosition(Rect bounds, int cardWidth, int cardHeight) {
-        if (OverlayCorner.fromPreference(prefs.getString(Prefs.KEY_POSITION_CORNER, null)) != null) {
-            return;
-        }
-        int storedX = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
-        int storedY = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
-        int defaultX = bounds.left + Math.max(0, (bounds.width() - cardWidth) / 2);
-        int defaultY = bounds.top + Math.max(0, Math.round(bounds.height() * 0.62f));
-        int absoluteX = storedX == Prefs.POSITION_UNSET ? defaultX : storedX;
-        int absoluteY = storedY == Prefs.POSITION_UNSET ? defaultY : storedY;
-        OverlayGeometry.Offset offsets = OverlayGeometry.offsetsFor(OverlayCorner.TOP_START,
-                bounds.left, bounds.top, bounds.right, bounds.bottom,
-                cardWidth, cardHeight, absoluteX, absoluteY);
-        prefs.putPosition(OverlayCorner.TOP_START, offsets.x(), offsets.y());
+        OverlayPositionMigration.migrate(prefs, bounds, cardWidth, cardHeight);
     }
 
     private void applyStoredPosition(WindowManager.LayoutParams params, int cardWidth,
@@ -874,8 +862,8 @@ public final class OverlayService extends Service
         OverlayGeometry.Position position = OverlayGeometry.positionFor(corner,
                 bounds.left, bounds.top, bounds.right, bounds.bottom,
                 cardWidth, cardHeight, offsetX, offsetY);
-        params.x = position.x();
-        params.y = position.y();
+        params.x = position.x() - bounds.left;
+        params.y = position.y() - bounds.top;
     }
 
     private void createNotificationChannel() {

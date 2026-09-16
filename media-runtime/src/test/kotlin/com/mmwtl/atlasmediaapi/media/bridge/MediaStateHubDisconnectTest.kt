@@ -4,6 +4,8 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
+import com.geely.lib.oneosapi.mediacenter.bean.Frequency
+import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +20,42 @@ import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class MediaStateHubDisconnectTest {
+    @Test
+    fun `radio state received before source callback is restored after confirmation`() {
+        val fixture = fixture()
+        fixture.hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+
+        fixture.hub.onOneOsRadioState(frequency = null, playing = true)
+        fixture.hub.onSourceChanged(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO,
+            MediaCenterConstant.AppSource.UNKNOWN,
+        )
+
+        val snapshot = fixture.repository.snapshot()
+        assertEquals(BridgeAudioSource.RADIO.name, snapshot.audioSource)
+        assertEquals(PlaybackState.STATE_PLAYING, snapshot.playbackState)
+    }
+
+    @Test
+    fun `radio status without frequency preserves cached station`() {
+        val fixture = fixture()
+        fixture.hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+        fixture.hub.onOneOsRadioState(radioFrequency(), playing = true)
+        fixture.hub.onOneOsRadioState(frequency = null, playing = false)
+
+        val field = MediaStateHub::class.java.getDeclaredField("lastRadioFrequency")
+        field.isAccessible = true
+        assertEquals(100_100, (field.get(fixture.hub) as Frequency).frequency)
+    }
+
     @Test
     fun `OneOS disconnect preserves selected meaningful Android online session`() {
         val fixture = fixture()
@@ -109,6 +147,17 @@ class MediaStateHubDisconnectTest {
         )
         return Fixture(context, repository, hub)
     }
+
+    private fun radioFrequency(): Frequency = Frequency(
+        100_100,
+        1,
+        "",
+        "Radio 7",
+        "",
+        0,
+        80,
+        "",
+    )
 
     private data class SessionFixture(
         val session: MediaSession,

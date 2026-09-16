@@ -26,6 +26,7 @@ class MediaBackendCoordinator(
     companion object {
         const val GRACE_PERIOD_MS = 30_000L
         val RECONNECT_DELAYS_MS = listOf(2_000L, 5_000L, 10_000L, 30_000L)
+        val DEFAULT_SOURCE_RETRY_DELAYS_MS = listOf(1_000L, 2_000L, 4_000L, 8_000L)
     }
 
     val stateRepository: MediaStateRepository = MediaStateRepository()
@@ -275,19 +276,48 @@ class MediaBackendCoordinator(
                 delay(delayMs)
             }
             if (!isBackendStarted) return@launch
-            isApplyingDefaultSource = true
-            hasAppliedDefaultSource = true
-            try {
-                Timber.i("Applying default audio source switch to %s (autoplay=%b)", targetSource.name, autoplay)
-                commandMutex.withLock {
-                    commandHost.setSource(
-                        source = targetSource,
-                        appSource = null,
-                        autoplay = autoplay,
+            var attempt = 0
+            while (isBackendStarted && !hasAppliedDefaultSource) {
+                isApplyingDefaultSource = true
+                val applied = try {
+                    Timber.i(
+                        "Applying default audio source switch to %s (autoplay=%b, attempt=%d)",
+                        targetSource.name,
+                        autoplay,
+                        attempt + 1,
                     )
+                    commandMutex.withLock {
+                        commandHost.setSource(
+                            source = targetSource,
+                            appSource = null,
+                            autoplay = autoplay,
+                        )
+                    }
+                } finally {
+                    isApplyingDefaultSource = false
                 }
-            } finally {
-                isApplyingDefaultSource = false
+                if (applied) {
+                    hasAppliedDefaultSource = true
+                    Timber.i("Default audio source %s applied", targetSource.name)
+                    return@launch
+                }
+                val retryDelay = DEFAULT_SOURCE_RETRY_DELAYS_MS.getOrNull(attempt)
+                if (retryDelay == null) {
+                    Timber.w(
+                        "Default audio source %s was not applied after %d attempts",
+                        targetSource.name,
+                        attempt + 1,
+                    )
+                    return@launch
+                }
+                attempt++
+                if (!isBackendStarted || hasAppliedDefaultSource) return@launch
+                Timber.w(
+                    "Default audio source %s was not applied; retrying in %d ms",
+                    targetSource.name,
+                    retryDelay,
+                )
+                delay(retryDelay)
             }
         }
     }

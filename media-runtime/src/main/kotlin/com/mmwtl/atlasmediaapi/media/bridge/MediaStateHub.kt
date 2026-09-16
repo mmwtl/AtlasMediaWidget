@@ -41,6 +41,7 @@ class MediaStateHub(
     private var lastPlayingRealtimeMs: Long = 0L
     private var lastRadioFrequency: Frequency? = null
     private var lastRadioPlaying: Boolean = false
+    private var hasRadioState: Boolean = false
 
     private fun markPlayingIfActive(isPlaying: Boolean) {
         if (isPlaying) {
@@ -155,46 +156,53 @@ class MediaStateHub(
         audioSource: MediaCenterConstant.AudioSource,
         appSource: MediaCenterConstant.AppSource,
     ) {
-        val selected = audioSource.toBridgeSource()
-        clusterMediaBridge?.setActiveSource(selected)
-        onlineSourcePolicy.onAudioSource(selected)
-        val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
-        repository.update { before ->
-            val sourceChanged = before.audioSource != selected.name
-            val newArtworkUri = when {
-                cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
-                sourceChanged -> ""
-                else -> before.artworkUri
+        synchronized(mediaCallbackLock) {
+            val selected = audioSource.toBridgeSource()
+            clusterMediaBridge?.setActiveSource(selected)
+            onlineSourcePolicy.onAudioSource(selected)
+            val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
+            repository.update { before ->
+                val sourceChanged = before.audioSource != selected.name
+                val newArtworkUri = when {
+                    cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
+                    sourceChanged -> ""
+                    else -> before.artworkUri
+                }
+                before.copy(
+                    audioSource = selected.name,
+                    appSource = appSource.name,
+                    sources = before.sources.map { source ->
+                        source.copy(selected = source.id == selected.name)
+                    },
+                    ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
+                    ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
+                    mediaId = if (sourceChanged) "" else before.mediaId,
+                    title = if (sourceChanged) "" else before.title,
+                    artist = if (sourceChanged) "" else before.artist,
+                    album = if (sourceChanged) "" else before.album,
+                    duration = if (sourceChanged) -1L else before.duration,
+                    position = if (sourceChanged) -1L else before.position,
+                    updateElapsedRealtime = if (sourceChanged) 0L else before.updateElapsedRealtime,
+                    speed = if (sourceChanged) 0f else before.speed,
+                    playbackState = if (sourceChanged) PlaybackState.STATE_NONE else before.playbackState,
+                    playbackErrorCode = if (sourceChanged) 0 else before.playbackErrorCode,
+                    playbackErrorMessage = if (sourceChanged) "" else before.playbackErrorMessage,
+                    playbackActions = if (sourceChanged) 0L else before.playbackActions,
+                    capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
+                    artworkUri = newArtworkUri,
+                    artworkRevision = if (
+                        newArtworkUri != before.artworkUri && (sourceChanged || newArtworkUri.isNotBlank())
+                    ) {
+                        before.artworkRevision + 1L
+                    } else before.artworkRevision,
+                )
             }
-            before.copy(
-                audioSource = selected.name,
-                appSource = appSource.name,
-                sources = before.sources.map { source ->
-                    source.copy(selected = source.id == selected.name)
-                },
-                ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
-                ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
-                mediaId = if (sourceChanged) "" else before.mediaId,
-                title = if (sourceChanged) "" else before.title,
-                artist = if (sourceChanged) "" else before.artist,
-                album = if (sourceChanged) "" else before.album,
-                duration = if (sourceChanged) -1L else before.duration,
-                position = if (sourceChanged) -1L else before.position,
-                updateElapsedRealtime = if (sourceChanged) 0L else before.updateElapsedRealtime,
-                speed = if (sourceChanged) 0f else before.speed,
-                playbackState = if (sourceChanged) PlaybackState.STATE_NONE else before.playbackState,
-                playbackErrorCode = if (sourceChanged) 0 else before.playbackErrorCode,
-                playbackErrorMessage = if (sourceChanged) "" else before.playbackErrorMessage,
-                playbackActions = if (sourceChanged) 0L else before.playbackActions,
-                capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
-                artworkUri = newArtworkUri,
-                artworkRevision = if (newArtworkUri != before.artworkUri && (sourceChanged || newArtworkUri.isNotBlank())) {
-                    before.artworkRevision + 1L
-                } else before.artworkRevision,
-            )
+            cpaaArtworkFallback.onBridgeStateChanged()
+            if (repository.snapshot().artworkUri.isBlank()) latestArtworkRequest.incrementAndGet()
+            if (selected == BridgeAudioSource.RADIO && hasRadioState) {
+                onOneOsRadioStateLocked(lastRadioFrequency, lastRadioPlaying)
+            }
         }
-        cpaaArtworkFallback.onBridgeStateChanged()
-        if (repository.snapshot().artworkUri.isBlank()) latestArtworkRequest.incrementAndGet()
     }
 
     fun onSourceAvailability(
@@ -535,8 +543,18 @@ class MediaStateHub(
     }
 
     fun onOneOsRadioState(frequency: Frequency?, playing: Boolean) {
-        lastRadioFrequency = frequency
+        synchronized(mediaCallbackLock) {
+            onOneOsRadioStateLocked(frequency, playing)
+        }
+    }
+
+    private fun onOneOsRadioStateLocked(frequency: Frequency?, playing: Boolean) {
+        hasRadioState = true
+        if (frequency != null) lastRadioFrequency = frequency
         lastRadioPlaying = playing
+        if (repository.snapshot().audioSource != BridgeAudioSource.RADIO.name ||
+            !onlineSourcePolicy.acceptOneOs(BridgeAudioSource.RADIO)
+        ) return
         markPlayingIfActive(playing)
 
         val widgetBroadcastEnabled = radioCatalogRepository?.isWidgetBroadcastEnabled == true

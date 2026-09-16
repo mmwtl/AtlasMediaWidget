@@ -14,6 +14,8 @@ final class Prefs {
     static final String KEY_POSITION_X = "position_x";
     static final String KEY_POSITION_Y = "position_y";
     static final String KEY_POSITION_CORNER = "position_corner";
+    static final String KEY_POSITION_CONTRACT_VERSION = "position_contract_version";
+    static final int POSITION_CONTRACT_VERSION = 1;
     static final String KEY_CARD_STYLE = "card_style";
     static final String KEY_CARD_WIDTH_PX = "card_width_px";
     static final String KEY_CARD_HEIGHT_PX = "card_height_px";
@@ -145,6 +147,7 @@ final class Prefs {
                 .putString(KEY_POSITION_CORNER, corner.preferenceValue)
                 .putInt(KEY_POSITION_X, Math.max(0, offsetX))
                 .putInt(KEY_POSITION_Y, Math.max(0, offsetY))
+                .putInt(KEY_POSITION_CONTRACT_VERSION, POSITION_CONTRACT_VERSION)
                 .apply();
     }
 
@@ -371,14 +374,17 @@ final class Prefs {
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
                 .putInt(KEY_CARD_STYLE, data.selectedStyle.preferenceValue);
         if (data.positionX == null) {
-            editor.remove(KEY_POSITION_X).remove(KEY_POSITION_Y).remove(KEY_POSITION_CORNER);
+            editor.remove(KEY_POSITION_X).remove(KEY_POSITION_Y).remove(KEY_POSITION_CORNER)
+                    .putInt(KEY_POSITION_CONTRACT_VERSION, POSITION_CONTRACT_VERSION);
         } else {
             editor.putInt(KEY_POSITION_X, data.positionX)
                     .putInt(KEY_POSITION_Y, data.positionY);
             if (data.positionCorner == null) {
-                editor.remove(KEY_POSITION_CORNER);
+                editor.remove(KEY_POSITION_CORNER)
+                        .putInt(KEY_POSITION_CONTRACT_VERSION, 0);
             } else {
-                editor.putString(KEY_POSITION_CORNER, data.positionCorner.preferenceValue);
+                editor.putString(KEY_POSITION_CORNER, data.positionCorner.preferenceValue)
+                        .putInt(KEY_POSITION_CONTRACT_VERSION, POSITION_CONTRACT_VERSION);
             }
         }
         if (data.cardWidthPx == null) {

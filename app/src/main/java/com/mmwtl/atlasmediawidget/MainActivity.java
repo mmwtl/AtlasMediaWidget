@@ -2359,6 +2359,9 @@ public final class MainActivity extends ScaledActivity {
         int height = heightInput();
         OverlayCorner corner = OverlayCorner.fromPreference(
                 prefs.getString(Prefs.KEY_POSITION_CORNER, null));
+        if (corner != null) {
+            OverlayPositionMigration.migrate(prefs, bounds, width, height);
+        }
         int storedX = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
         int storedY = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
         if (corner == null) {

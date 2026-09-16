@@ -10,6 +10,10 @@ class MediaBackendCoordinatorTest {
     fun `constants and reconnect delays are defined properly`() {
         assertEquals(30_000L, MediaBackendCoordinator.GRACE_PERIOD_MS)
         assertEquals(listOf(2_000L, 5_000L, 10_000L, 30_000L), MediaBackendCoordinator.RECONNECT_DELAYS_MS)
+        assertEquals(
+            listOf(1_000L, 2_000L, 4_000L, 8_000L),
+            MediaBackendCoordinator.DEFAULT_SOURCE_RETRY_DELAYS_MS,
+        )
     }
 
     @Test
