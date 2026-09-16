@@ -119,6 +119,7 @@ class MediaSettingsController(
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
             clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
             clusterWatchdogIntervalMs = clusterMediaBridge.reassertWatchdogIntervalMs,
+            clusterReassertBurstIntervalMs = clusterMediaBridge.reassertBurstIntervalMs,
             catalogType = catalogInfo.type.name,
             catalogStationCount = catalogInfo.stationCount,
             catalogDescription = catalogInfo.description,
@@ -166,6 +167,16 @@ class MediaSettingsController(
                     snapshot = null,
                     status = MediaBridgeContract.Status.VALIDATION_ERROR,
                     errorMessage = "Интервал watchdog должен быть от 1000 до 5000 мс: $interval",
+                )
+            }
+        }
+        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS)) {
+            val interval = update.getLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS)
+            if (interval !in 50L..500L) {
+                return UpdateResult(
+                    snapshot = null,
+                    status = MediaBridgeContract.Status.VALIDATION_ERROR,
+                    errorMessage = "Интервал быстрых повторов должен быть от 50 до 500 мс: $interval",
                 )
             }
         }
@@ -224,6 +235,9 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS)) {
             clusterMediaBridge.setReassertWatchdogIntervalMs(update.getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS))
         }
+        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS)) {
+            clusterMediaBridge.setReassertBurstIntervalMs(update.getLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS))
+        }
         if (update.containsKey(MediaBridgeContract.Key.UI_SCALE_TENTHS)) {
             preferences.uiScaleTenths = update.getInt(MediaBridgeContract.Key.UI_SCALE_TENTHS)
         }
@@ -279,6 +293,7 @@ class MediaSettingsController(
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
+            put("clusterReassertBurstIntervalMs", snapshot.clusterReassertBurstIntervalMs)
         }
         val mediaJsonBytes = mediaJsonObj.toString(2).toByteArray(StandardCharsets.UTF_8)
 
@@ -584,6 +599,11 @@ class MediaSettingsController(
                 mediaJson.getLong("clusterWatchdogIntervalMs")
             } else ClusterMediaBridge.DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS,
         )
+        clusterMediaBridge.setReassertBurstIntervalMs(
+            if (mediaJson.has("clusterReassertBurstIntervalMs")) {
+                mediaJson.getLong("clusterReassertBurstIntervalMs")
+            } else ClusterMediaBridge.DEFAULT_REASSERT_BURST_INTERVAL_MS,
+        )
     }
 
     private fun currentCatalogMode(): String = when (radioCatalogRepository.getCatalogInfo().type) {
@@ -619,6 +639,7 @@ class MediaSettingsController(
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS to java.lang.Long::class.java,
+            MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS to java.lang.Long::class.java,
             MediaBridgeContract.Key.UI_SCALE_TENTHS to Integer::class.java,
         )
         expected.forEach { (key, type) ->
@@ -661,6 +682,10 @@ class MediaSettingsController(
         if (mediaJson.has("clusterWatchdogIntervalMs")) {
             val value = jsonLong(mediaJson, "clusterWatchdogIntervalMs")
             if (value !in 1000L..5000L) throw IllegalArgumentException("Интервал watchdog должен быть от 1000 до 5000 мс: $value")
+        }
+        if (mediaJson.has("clusterReassertBurstIntervalMs")) {
+            val value = jsonLong(mediaJson, "clusterReassertBurstIntervalMs")
+            if (value !in 50L..500L) throw IllegalArgumentException("Интервал быстрых повторов должен быть от 50 до 500 мс: $value")
         }
         if (mediaJson.has("uiScaleTenths")) {
             val value = jsonInt(mediaJson, "uiScaleTenths")

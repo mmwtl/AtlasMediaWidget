@@ -15,6 +15,7 @@ final class MediaSettingsSnapshot {
     final boolean clusterCoversEnabled;
     final boolean clusterOnlineEnabled;
     final long clusterWatchdogIntervalMs;
+    final long clusterReassertBurstIntervalMs;
     final String catalogType;
     final int catalogStationCount;
     final String catalogDescription;
@@ -40,7 +41,7 @@ final class MediaSettingsSnapshot {
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
                 switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
-                clusterCoversEnabled, false, clusterWatchdogIntervalMs, catalogType,
+                clusterCoversEnabled, false, clusterWatchdogIntervalMs, 100L, catalogType,
                 catalogStationCount, catalogDescription, uiScaleTenths);
     }
 
@@ -61,6 +62,32 @@ final class MediaSettingsSnapshot {
             int catalogStationCount,
             String catalogDescription,
             int uiScaleTenths) {
+        this(revision, defaultAudioSource, defaultAudioSourceDelaySec,
+                defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
+                autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
+                switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
+                clusterCoversEnabled, clusterOnlineEnabled, clusterWatchdogIntervalMs, 100L,
+                catalogType, catalogStationCount, catalogDescription, uiScaleTenths);
+    }
+
+    MediaSettingsSnapshot(
+            long revision,
+            String defaultAudioSource,
+            int defaultAudioSourceDelaySec,
+            boolean defaultAudioSourceAutoplayOnStartup,
+            boolean autoSwitchToDefaultOnSourceLost,
+            boolean autoSwitchToDefaultAutoplayOnSourceLost,
+            String defaultMediaPackage,
+            boolean switchToOnlineBeforeSessionPlay,
+            boolean radioWidgetBroadcastEnabled,
+            boolean clusterCoversEnabled,
+            boolean clusterOnlineEnabled,
+            long clusterWatchdogIntervalMs,
+            long clusterReassertBurstIntervalMs,
+            String catalogType,
+            int catalogStationCount,
+            String catalogDescription,
+            int uiScaleTenths) {
         this.revision = revision;
         this.defaultAudioSource = defaultAudioSource != null ? defaultAudioSource : "";
         this.defaultAudioSourceDelaySec = defaultAudioSourceDelaySec;
@@ -73,6 +100,7 @@ final class MediaSettingsSnapshot {
         this.clusterCoversEnabled = clusterCoversEnabled;
         this.clusterOnlineEnabled = clusterOnlineEnabled;
         this.clusterWatchdogIntervalMs = clusterWatchdogIntervalMs;
+        this.clusterReassertBurstIntervalMs = clusterReassertBurstIntervalMs;
         this.catalogType = catalogType != null && !catalogType.isEmpty() ? catalogType : "BUILT_IN";
         this.catalogStationCount = catalogStationCount;
         this.catalogDescription = catalogDescription != null ? catalogDescription : "";
@@ -96,6 +124,7 @@ final class MediaSettingsSnapshot {
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, true),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, false),
                 bundle.getLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),
+                bundle.getLong(MediaBridgeContract.K_CLUSTER_REASSERT_BURST_INTERVAL_MS, 100L),
                 bundle.getString(MediaBridgeContract.K_CATALOG_TYPE, "BUILT_IN"),
                 bundle.getInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, 0),
                 bundle.getString(MediaBridgeContract.K_CATALOG_DESCRIPTION, ""),
@@ -116,6 +145,7 @@ final class MediaSettingsSnapshot {
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, clusterCoversEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled);
         bundle.putLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs);
+        bundle.putLong(MediaBridgeContract.K_CLUSTER_REASSERT_BURST_INTERVAL_MS, clusterReassertBurstIntervalMs);
         bundle.putString(MediaBridgeContract.K_CATALOG_TYPE, catalogType);
         bundle.putInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, catalogStationCount);
         bundle.putString(MediaBridgeContract.K_CATALOG_DESCRIPTION, catalogDescription);

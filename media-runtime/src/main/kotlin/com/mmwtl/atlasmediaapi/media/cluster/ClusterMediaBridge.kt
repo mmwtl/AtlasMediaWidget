@@ -63,6 +63,38 @@ internal class ReassertWatchdogIntervalStore(
     }
 }
 
+internal class ReassertBurstIntervalStore(
+    private val prefs: SharedPreferences,
+) {
+    private val hasStoredValue = prefs.contains(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS)
+    private val storedValue = prefs.getLong(
+        ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS,
+        ClusterMediaBridge.DEFAULT_REASSERT_BURST_INTERVAL_MS,
+    )
+
+    @Volatile
+    var value: Long = ClusterMediaBridge.normalizeReassertBurstInterval(storedValue)
+        private set
+
+    init {
+        if (!hasStoredValue || storedValue != value) {
+            prefs.edit()
+                .putLong(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS, value)
+                .apply()
+        }
+    }
+
+    fun set(intervalMs: Long): Long {
+        val normalized = ClusterMediaBridge.normalizeReassertBurstInterval(intervalMs)
+        if (normalized == value) return normalized
+        value = normalized
+        prefs.edit()
+            .putLong(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS, normalized)
+            .apply()
+        return normalized
+    }
+}
+
 /**
  * Manages playback metadata and artwork broadcast to the vehicle digital instrument cluster (DIM/QNX)
  * via the ECarX DimInteraction hardware abstraction layer.
@@ -91,6 +123,7 @@ class ClusterMediaBridge(
         const val KEY_CLUSTER_ONLINE_ENABLED = "cluster_dim_online_enabled"
         const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
+        const val KEY_REASSERT_BURST_INTERVAL_MS = "reassert_burst_interval_ms"
         private const val NFS_SHARED_DIR = "/data/vendor/nfs/shared"
 
         /**
@@ -99,8 +132,9 @@ class ClusterMediaBridge(
          * repair burst; duplicate callbacks get only a short repair and cannot extend
          * the aggressive window indefinitely.
          */
-        internal val REASSERT_BURST_DELAYS_MS = listOf(100L, 150L, 250L, 500L, 500L)
-        internal val DUPLICATE_REPAIR_DELAYS_MS = listOf(100L, 150L)
+        const val MIN_REASSERT_BURST_INTERVAL_MS = 50L
+        const val MAX_REASSERT_BURST_INTERVAL_MS = 500L
+        const val DEFAULT_REASSERT_BURST_INTERVAL_MS = 100L
         const val MIN_REASSERT_WATCHDOG_INTERVAL_MS = 1_000L
         const val MAX_REASSERT_WATCHDOG_INTERVAL_MS = 5_000L
         const val RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS = 1_250L
@@ -113,6 +147,20 @@ class ClusterMediaBridge(
                 MIN_REASSERT_WATCHDOG_INTERVAL_MS,
                 MAX_REASSERT_WATCHDOG_INTERVAL_MS,
             )
+
+        internal fun normalizeReassertBurstInterval(intervalMs: Long): Long =
+            intervalMs.coerceIn(
+                MIN_REASSERT_BURST_INTERVAL_MS,
+                MAX_REASSERT_BURST_INTERVAL_MS,
+            )
+
+        internal fun reassertBurstDelaysMs(intervalMs: Long): List<Long> {
+            val base = normalizeReassertBurstInterval(intervalMs)
+            return listOf(base, base * 3L / 2L, base * 5L / 2L, base * 5L, base * 5L)
+        }
+
+        internal fun duplicateRepairDelaysMs(intervalMs: Long): List<Long> =
+            reassertBurstDelaysMs(intervalMs).take(2)
 
         internal fun jitteredReassertWatchdogDelayMs(
             intervalMs: Long,
@@ -194,6 +242,7 @@ class ClusterMediaBridge(
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val reassertWatchdogIntervalStore = ReassertWatchdogIntervalStore(prefs)
+    private val reassertBurstIntervalStore = ReassertBurstIntervalStore(prefs)
 
     @Volatile
     var isClusterCoversEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_COVERS_ENABLED, true)
@@ -210,6 +259,9 @@ class ClusterMediaBridge(
 
     val reassertWatchdogIntervalMs: Long
         get() = reassertWatchdogIntervalStore.value
+
+    val reassertBurstIntervalMs: Long
+        get() = reassertBurstIntervalStore.value
 
     @Volatile
     private var lastUpdate = "none"
@@ -284,6 +336,11 @@ class ClusterMediaBridge(
      */
     fun setReassertWatchdogIntervalMs(intervalMs: Long) {
         reassertWatchdogIntervalStore.set(intervalMs)
+    }
+
+    /** Changes the base interval used by the bounded startup and duplicate-repair bursts. */
+    fun setReassertBurstIntervalMs(intervalMs: Long) {
+        reassertBurstIntervalStore.set(intervalMs)
     }
 
     fun isDimAvailable(): Boolean {
@@ -511,7 +568,7 @@ class ClusterMediaBridge(
                 val generation = reassertGeneration.get()
                 duplicateRepairJob?.cancel()
                 duplicateRepairJob = reassertScope.launch {
-                    DUPLICATE_REPAIR_DELAYS_MS.forEachIndexed { index, waitMs ->
+                    duplicateRepairDelaysMs(reassertBurstIntervalMs).forEachIndexed { index, waitMs ->
                         delay(waitMs)
                         if (!isCurrentReassertion(generation)) return@launch
                         val attempt = "duplicate-repair-${index + 1}"
@@ -541,8 +598,7 @@ class ClusterMediaBridge(
             duplicateRepairJob = null
             reassertJob = reassertScope.launch {
                 var consecutiveFailures = 0
-                // Cumulative times after the initial send: 100, 250, 500, 1000, 1500 ms.
-                REASSERT_BURST_DELAYS_MS.forEachIndexed { index, waitMs ->
+                reassertBurstDelaysMs(reassertBurstIntervalMs).forEachIndexed { index, waitMs ->
                     delay(waitMs)
                     if (!isCurrentReassertion(generation)) return@launch
                     val attempt = "adaptive-burst-${index + 1}"

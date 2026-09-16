@@ -237,6 +237,7 @@ final class FullSettingsBackup {
                         mediaJson.optBoolean("clusterCoversEnabled", true),
                         mediaJson.optBoolean("clusterOnlineEnabled", false),
                         mediaJson.optLong("clusterWatchdogIntervalMs", 1250L),
+                        mediaJson.optLong("clusterReassertBurstIntervalMs", 100L),
                         catalogMode.toUpperCase(),
                         0,
                         "",

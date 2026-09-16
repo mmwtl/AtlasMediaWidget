@@ -18,6 +18,7 @@ data class MediaSettingsSnapshot(
     val clusterCoversEnabled: Boolean = true,
     val clusterOnlineEnabled: Boolean = false,
     val clusterWatchdogIntervalMs: Long = 1250L,
+    val clusterReassertBurstIntervalMs: Long = 100L,
     val catalogType: String = "BUILT_IN",
     val catalogStationCount: Int = 0,
     val catalogDescription: String = "",
@@ -37,6 +38,7 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
     putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, clusterCoversEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled)
     putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs)
+    putLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, clusterReassertBurstIntervalMs)
     putString(MediaBridgeContract.Key.CATALOG_TYPE, catalogType)
     putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, catalogStationCount)
     putString(MediaBridgeContract.Key.CATALOG_DESCRIPTION, catalogDescription)
@@ -56,6 +58,7 @@ fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnaps
     clusterCoversEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, true),
     clusterOnlineEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, false),
     clusterWatchdogIntervalMs = getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),
+    clusterReassertBurstIntervalMs = getLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, 100L),
     catalogType = getString(MediaBridgeContract.Key.CATALOG_TYPE).orEmpty().ifBlank { "BUILT_IN" },
     catalogStationCount = getInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, 0),
     catalogDescription = getString(MediaBridgeContract.Key.CATALOG_DESCRIPTION).orEmpty(),

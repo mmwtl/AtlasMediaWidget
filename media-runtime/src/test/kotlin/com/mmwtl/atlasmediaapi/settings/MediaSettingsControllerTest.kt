@@ -75,6 +75,7 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
+        assertEquals(100L, snapshot.clusterReassertBurstIntervalMs)
         assertEquals("BUILT_IN", snapshot.catalogType)
     }
 
@@ -89,6 +90,7 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
+            putLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, 200L)
             putInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, 18)
         }
 
@@ -104,6 +106,7 @@ class MediaSettingsControllerTest {
         assertTrue(snap.switchToOnlineBeforeSessionPlay)
         assertTrue(snap.clusterOnlineEnabled)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
+        assertEquals(200L, snap.clusterReassertBurstIntervalMs)
         assertEquals(18, snap.uiScaleTenths)
         assertTrue(settingsChangedTriggered)
     }
@@ -144,6 +147,7 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, false)
             putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, false)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2500L)
+            putLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, 150L)
         })
         assertEquals(MediaBridgeContract.Status.OK, result.status)
         assertEquals("com.example.player", result.snapshot?.defaultMediaPackage)
@@ -209,7 +213,7 @@ class MediaSettingsControllerTest {
     }
 
     @Test
-    fun `updateSettings validates source delay and watchdog range bounds`() {
+    fun `updateSettings validates source delay and cluster interval bounds`() {
         val badSource = Bundle().apply {
             putString(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE, "INVALID_SOURCE")
         }
@@ -227,6 +231,12 @@ class MediaSettingsControllerTest {
         }
         val res3 = controller.updateSettings(null, badWatchdog)
         assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, res3.status)
+
+        val badBurst = Bundle().apply {
+            putLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, 1_000L)
+        }
+        val res4 = controller.updateSettings(null, badBurst)
+        assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, res4.status)
     }
 
     @Test
@@ -257,6 +267,7 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("radioWidgetBroadcastEnabled"))
         assertTrue(json.has("clusterCoversEnabled"))
         assertTrue(json.has("clusterOnlineEnabled"))
+        assertTrue(json.has("clusterReassertBurstIntervalMs"))
         assertFalse(json.has("uiScaleTenths"))
     }
 
@@ -366,6 +377,7 @@ class MediaSettingsControllerTest {
         clusterMediaBridge.setClusterCoversEnabled(false)
         clusterMediaBridge.setClusterOnlineEnabled(true)
         clusterMediaBridge.setReassertWatchdogIntervalMs(4000L)
+        clusterMediaBridge.setReassertBurstIntervalMs(300L)
         preferences.uiScaleTenths = 19
 
         val operation = UUID.randomUUID().toString()
@@ -398,6 +410,7 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
+        assertEquals(100L, snapshot.clusterReassertBurstIntervalMs)
         assertEquals(19, snapshot.uiScaleTenths)
     }
 
@@ -416,6 +429,7 @@ class MediaSettingsControllerTest {
             put("clusterCoversEnabled", true)
             put("clusterOnlineEnabled", true)
             put("clusterWatchdogIntervalMs", 3000L)
+            put("clusterReassertBurstIntervalMs", 250L)
             put("catalogMode", "builtin")
         }
 
@@ -447,6 +461,7 @@ class MediaSettingsControllerTest {
         assertFalse(snap.radioWidgetBroadcastEnabled)
         assertTrue(snap.clusterOnlineEnabled)
         assertEquals(3000L, snap.clusterWatchdogIntervalMs)
+        assertEquals(250L, snap.clusterReassertBurstIntervalMs)
         assertTrue(snap.revision > initialRev)
     }
 

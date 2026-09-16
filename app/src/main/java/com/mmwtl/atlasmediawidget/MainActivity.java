@@ -96,6 +96,8 @@ public final class MainActivity extends ScaledActivity {
     private Switch clusterOnlineSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
+    private TextView clusterReassertBurstLabel;
+    private SeekBar clusterReassertBurstSeekBar;
     private TextView radioCatalogInfoText;
     private Button restoreDefaultRadioCatalogButton;
     private TextView mediaStatusText;
@@ -1748,7 +1750,7 @@ public final class MainActivity extends ScaledActivity {
         s7.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
 
-        TextView clusterWatchdogTitle = text("Интервал повторной отправки радио на приборку", 14, Ui.SECONDARY, Typeface.BOLD);
+        TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
         cwtParams.topMargin = Ui.dp(this, 12);
         mediaSettingsGroup.addView(clusterWatchdogTitle, cwtParams);
@@ -1772,6 +1774,31 @@ public final class MainActivity extends ScaledActivity {
             }
         });
         mediaSettingsGroup.addView(clusterWatchdogSeekBar, fullWrap());
+
+        TextView clusterReassertBurstTitle = text("Базовый интервал быстрых повторов", 14, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams crbtParams = fullWrap();
+        crbtParams.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(clusterReassertBurstTitle, crbtParams);
+
+        clusterReassertBurstLabel = text("100 мс", 16, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams crblParams = fullWrap();
+        crblParams.topMargin = Ui.dp(this, 4);
+        mediaSettingsGroup.addView(clusterReassertBurstLabel, crblParams);
+
+        clusterReassertBurstSeekBar = sizeSeekBar(5, 50); // 50..500 ms
+        clusterReassertBurstSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    long ms = progress * 10L;
+                    clusterReassertBurstLabel.setText(ms + " мс");
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                commitReassertBurstInterval(bar.getProgress() * 10L);
+            }
+        });
+        mediaSettingsGroup.addView(clusterReassertBurstSeekBar, fullWrap());
 
         TextView radioCatalogSectionTitle = text("Каталог радио", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams rcsParams = fullWrap();
@@ -1941,6 +1968,16 @@ public final class MainActivity extends ScaledActivity {
             clusterWatchdogSeekBar.setEnabled(snapshot.clusterCoversEnabled);
             clusterWatchdogSeekBar.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
             clusterWatchdogSeekBar.setProgress((int) (snapshot.clusterWatchdogIntervalMs / 10L));
+        }
+        if (clusterReassertBurstLabel != null) {
+            clusterReassertBurstLabel.setText(snapshot.clusterReassertBurstIntervalMs + " мс");
+            clusterReassertBurstLabel.setEnabled(snapshot.clusterCoversEnabled);
+            clusterReassertBurstLabel.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
+        }
+        if (clusterReassertBurstSeekBar != null) {
+            clusterReassertBurstSeekBar.setEnabled(snapshot.clusterCoversEnabled);
+            clusterReassertBurstSeekBar.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
+            clusterReassertBurstSeekBar.setProgress((int) (snapshot.clusterReassertBurstIntervalMs / 10L));
         }
         if (radioCatalogInfoText != null) {
             radioCatalogInfoText.setText("Тип каталога: " + snapshot.catalogType
@@ -2177,6 +2214,10 @@ public final class MainActivity extends ScaledActivity {
 
     private void commitWatchdog(long ms) {
         sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, ms);
+    }
+
+    private void commitReassertBurstInterval(long ms) {
+        sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_REASSERT_BURST_INTERVAL_MS, ms);
     }
 
     private void setMediaControlsEnabled(View view, boolean enabled) {

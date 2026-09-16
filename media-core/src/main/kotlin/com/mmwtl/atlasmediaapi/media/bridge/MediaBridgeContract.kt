@@ -136,6 +136,7 @@ object MediaBridgeContract {
         const val CLUSTER_COVERS_ENABLED = "clusterCoversEnabled"
         const val CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled"
         const val CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs"
+        const val CLUSTER_REASSERT_BURST_INTERVAL_MS = "clusterReassertBurstIntervalMs"
         const val CATALOG_TYPE = "catalogType"
         const val CATALOG_STATION_COUNT = "catalogStationCount"
         const val CATALOG_DESCRIPTION = "catalogDescription"

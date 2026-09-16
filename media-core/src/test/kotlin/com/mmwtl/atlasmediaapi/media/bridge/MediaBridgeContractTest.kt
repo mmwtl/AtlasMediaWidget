@@ -84,6 +84,7 @@ class MediaBridgeContractTest {
             clusterCoversEnabled = false,
             clusterOnlineEnabled = true,
             clusterWatchdogIntervalMs = 2500L,
+            clusterReassertBurstIntervalMs = 200L,
             catalogType = "CUSTOM",
             catalogStationCount = 10,
             catalogDescription = "Custom Catalog",

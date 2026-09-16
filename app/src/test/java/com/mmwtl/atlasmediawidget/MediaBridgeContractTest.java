@@ -67,7 +67,7 @@ public class MediaBridgeContractTest {
     @Test public void mediaSettingsSnapshotRoundTrip() {
         MediaSettingsSnapshot original = new MediaSettingsSnapshot(
                 123L, "RADIO", 4, true, true, false, "com.test.player",
-                true, false, true, true, 2000L, "CUSTOM", 15, "Test Catalog", 18);
+                true, false, true, true, 2000L, 200L, "CUSTOM", 15, "Test Catalog", 18);
         MediaSettingsSnapshot restored = MediaSettingsSnapshot.fromBundle(original.toBundle());
         assertEquals(original.revision, restored.revision);
         assertEquals(original.defaultAudioSource, restored.defaultAudioSource);
@@ -81,6 +81,7 @@ public class MediaBridgeContractTest {
         assertEquals(original.clusterCoversEnabled, restored.clusterCoversEnabled);
         assertEquals(original.clusterOnlineEnabled, restored.clusterOnlineEnabled);
         assertEquals(original.clusterWatchdogIntervalMs, restored.clusterWatchdogIntervalMs);
+        assertEquals(original.clusterReassertBurstIntervalMs, restored.clusterReassertBurstIntervalMs);
         assertEquals(original.catalogType, restored.catalogType);
         assertEquals(original.catalogStationCount, restored.catalogStationCount);
         assertEquals(original.catalogDescription, restored.catalogDescription);

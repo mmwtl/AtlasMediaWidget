@@ -139,6 +139,7 @@ final class MediaBridgeContract {
     static final String K_CLUSTER_COVERS_ENABLED = "clusterCoversEnabled";
     static final String K_CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled";
     static final String K_CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs";
+    static final String K_CLUSTER_REASSERT_BURST_INTERVAL_MS = "clusterReassertBurstIntervalMs";
     static final String K_CATALOG_TYPE = "catalogType";
     static final String K_CATALOG_STATION_COUNT = "catalogStationCount";
     static final String K_CATALOG_DESCRIPTION = "catalogDescription";
