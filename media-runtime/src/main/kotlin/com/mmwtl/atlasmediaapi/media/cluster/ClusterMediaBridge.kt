@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediaapi.media.cluster
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.SystemClock
 import android.net.Uri
 import android.media.session.PlaybackState
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSnapshot
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import timber.log.Timber
 import java.io.File
 import java.nio.file.Files
@@ -23,6 +25,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
+import kotlin.math.roundToLong
 
 internal enum class ReassertScheduleKind {
     FULL,
@@ -121,6 +124,7 @@ class ClusterMediaBridge(
     companion object {
         const val PREFS_NAME = "cluster_dim_prefs"
         const val KEY_CLUSTER_ONLINE_ENABLED = "cluster_dim_online_enabled"
+        const val KEY_CLUSTER_ONLINE_PROGRESS_ENABLED = "cluster_dim_online_progress_enabled"
         const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
         const val KEY_REASSERT_BURST_INTERVAL_MS = "reassert_burst_interval_ms"
@@ -135,6 +139,7 @@ class ClusterMediaBridge(
         const val MIN_REASSERT_BURST_INTERVAL_MS = 50L
         const val MAX_REASSERT_BURST_INTERVAL_MS = 500L
         const val DEFAULT_REASSERT_BURST_INTERVAL_MS = 100L
+        const val ONLINE_PROGRESS_INTERVAL_MS = 500L
         const val MIN_REASSERT_WATCHDOG_INTERVAL_MS = 1_000L
         const val MAX_REASSERT_WATCHDOG_INTERVAL_MS = 5_000L
         const val RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS = 1_250L
@@ -161,6 +166,23 @@ class ClusterMediaBridge(
 
         internal fun duplicateRepairDelaysMs(intervalMs: Long): List<Long> =
             reassertBurstDelaysMs(intervalMs).take(2)
+
+        internal fun extrapolateOnlineProgress(
+            positionMs: Long,
+            durationMs: Long,
+            speed: Float,
+            updateElapsedRealtime: Long,
+            nowElapsedRealtime: Long,
+        ): Long? {
+            if (positionMs < 0L) return null
+            val elapsedMs = if (updateElapsedRealtime > 0L) {
+                (nowElapsedRealtime - updateElapsedRealtime).coerceAtLeast(0L)
+            } else 0L
+            val progressed = positionMs + (elapsedMs * speed.coerceAtLeast(0f)).roundToLong()
+            return progressed.coerceAtLeast(0L).let { value ->
+                if (durationMs > 0L) value.coerceAtMost(durationMs) else value
+            }
+        }
 
         internal fun jitteredReassertWatchdogDelayMs(
             intervalMs: Long,
@@ -252,10 +274,25 @@ class ClusterMediaBridge(
     var isClusterOnlineEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_ONLINE_ENABLED, false)
         private set
 
+    @Volatile
+    var isClusterOnlineProgressEnabled: Boolean =
+        prefs.getBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, false)
+        private set
+
     private var activeSource: BridgeAudioSource? = null
     private var confirmedOnlineActive = false
     private var currentRadioInfo: IMediaInteraction.IPlaybackInfo? = null
     private var lastOnlinePayload: DirectDimMediaClient.Payload? = null
+
+    private data class OnlineProgressState(
+        val positionMs: Long,
+        val durationMs: Long,
+        val speed: Float,
+        val updateElapsedRealtime: Long,
+    )
+
+    @Volatile
+    private var onlineProgressState: OnlineProgressState? = null
 
     val reassertWatchdogIntervalMs: Long
         get() = reassertWatchdogIntervalStore.value
@@ -299,6 +336,8 @@ class ClusterMediaBridge(
     }
 
     private val reassertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val onlineProgressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var onlineProgressJob: Job? = null
     private val reassertLock = Any()
     private var reassertJob: Job? = null
     private var duplicateRepairJob: Job? = null
@@ -373,6 +412,8 @@ class ClusterMediaBridge(
         val active = source == BridgeAudioSource.RADIO
         confirmedOnlineActive = source == BridgeAudioSource.ONLINE
         lastOnlinePayload = null
+        onlineProgressState = null
+        if (!confirmedOnlineActive) stopOnlineProgress()
         currentRadioInfo = null
         directDimMediaClient.clearPending()
         radioActive = active
@@ -507,8 +548,20 @@ class ClusterMediaBridge(
         isClusterOnlineEnabled = enabled
         prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_ENABLED, enabled).apply()
         lastOnlinePayload = null
-        if (!enabled && confirmedOnlineActive) directDimMediaClient.clearPending()
+        if (!enabled) {
+            onlineProgressState = null
+            stopOnlineProgress()
+            if (confirmedOnlineActive) directDimMediaClient.clearPending()
+        }
         directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || enabled)
+        if (enabled) ensureOnlineProgress()
+    }
+
+    @Synchronized
+    fun setClusterOnlineProgressEnabled(enabled: Boolean) {
+        isClusterOnlineProgressEnabled = enabled
+        prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, enabled).apply()
+        if (enabled) ensureOnlineProgress() else stopOnlineProgress()
     }
 
     /** Sends only resolved ONLINE snapshots; synthetic UNKNOWN/OTHER sessions are excluded. */
@@ -520,8 +573,17 @@ class ClusterMediaBridge(
         ) {
             if (lastOnlinePayload != null) directDimMediaClient.clearPending()
             lastOnlinePayload = null
+            onlineProgressState = null
+            stopOnlineProgress()
             return
         }
+        onlineProgressState = OnlineProgressState(
+            positionMs = snapshot.position,
+            durationMs = snapshot.duration,
+            speed = snapshot.speed,
+            updateElapsedRealtime = snapshot.updateElapsedRealtime,
+        )
+        ensureOnlineProgress()
         val artworkFile = coverFile?.takeIf { it.isFile }?.let { source ->
             val shared = File(NFS_SHARED_DIR)
             if (shared.isDirectory && shared.canWrite()) copyArtworkAtomically(source, shared) else source
@@ -542,6 +604,36 @@ class ClusterMediaBridge(
         if (!result.startsWith("send-failed")) lastOnlinePayload = payload
         lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
         lastUpdateError = directDimMediaClient.status().lastError
+    }
+
+    @Synchronized
+    private fun ensureOnlineProgress() {
+        if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
+            onlineProgressState == null || onlineProgressJob?.isActive == true
+        ) return
+        onlineProgressJob = onlineProgressScope.launch {
+            while (isActive) {
+                val state = onlineProgressState ?: break
+                val progress = extrapolateOnlineProgress(
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    speed = state.speed,
+                    updateElapsedRealtime = state.updateElapsedRealtime,
+                    nowElapsedRealtime = SystemClock.elapsedRealtime(),
+                )
+                if (progress != null) {
+                    runCatching { dimInteraction?.mediaInteraction?.updateCurrentProgress(progress) }
+                        .onFailure { Timber.w(it, "Online DIM progress update failed") }
+                }
+                delay(ONLINE_PROGRESS_INTERVAL_MS)
+            }
+        }
+    }
+
+    @Synchronized
+    private fun stopOnlineProgress() {
+        onlineProgressJob?.cancel()
+        onlineProgressJob = null
     }
 
     private fun scheduleReassertions(

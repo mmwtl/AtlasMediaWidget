@@ -139,6 +139,34 @@ class ClusterMediaBridgeTest {
     }
 
     @Test
+    fun `online progress is extrapolated without rebuilding the media card`() {
+        assertEquals(
+            12_500L,
+            ClusterMediaBridge.extrapolateOnlineProgress(
+                positionMs = 10_000L,
+                durationMs = 60_000L,
+                speed = 1f,
+                updateElapsedRealtime = 1_000L,
+                nowElapsedRealtime = 3_500L,
+            ),
+        )
+        assertEquals(
+            60_000L,
+            ClusterMediaBridge.extrapolateOnlineProgress(
+                positionMs = 59_900L,
+                durationMs = 60_000L,
+                speed = 1f,
+                updateElapsedRealtime = 1_000L,
+                nowElapsedRealtime = 2_000L,
+            ),
+        )
+        assertEquals(
+            null,
+            ClusterMediaBridge.extrapolateOnlineProgress(-1L, 60_000L, 1f, 1_000L, 2_000L),
+        )
+    }
+
+    @Test
     fun `cluster overwrite watchdog interval is constrained to safe range`() {
         assertEquals(1_000L, ClusterMediaBridge.normalizeReassertWatchdogInterval(0L))
         assertEquals(1_000L, ClusterMediaBridge.normalizeReassertWatchdogInterval(250L))

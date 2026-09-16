@@ -83,6 +83,7 @@ class MediaBridgeContractTest {
             radioWidgetBroadcastEnabled = false,
             clusterCoversEnabled = false,
             clusterOnlineEnabled = true,
+            clusterOnlineProgressEnabled = true,
             clusterWatchdogIntervalMs = 2500L,
             clusterReassertBurstIntervalMs = 200L,
             catalogType = "CUSTOM",

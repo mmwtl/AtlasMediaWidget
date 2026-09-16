@@ -94,6 +94,7 @@ public final class MainActivity extends ScaledActivity {
     private Switch radioWidgetBroadcastSwitch;
     private Switch clusterCoversSwitch;
     private Switch clusterOnlineSwitch;
+    private Switch clusterOnlineProgressSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
     private TextView clusterReassertBurstLabel;
@@ -1750,6 +1751,18 @@ public final class MainActivity extends ScaledActivity {
         s7.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
 
+        clusterOnlineProgressSwitch = new Switch(this);
+        clusterOnlineProgressSwitch.setText("Отправлять прогресс онлайн на приборку (каждые 500 мс)");
+        clusterOnlineProgressSwitch.setTextColor(Ui.PRIMARY);
+        clusterOnlineProgressSwitch.setTextSize(15);
+        clusterOnlineProgressSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, checked);
+        });
+        LinearLayout.LayoutParams s8 = fullWrap();
+        s8.topMargin = Ui.dp(this, 10);
+        mediaSettingsGroup.addView(clusterOnlineProgressSwitch, s8);
+
         TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
         cwtParams.topMargin = Ui.dp(this, 12);
@@ -1956,6 +1969,11 @@ public final class MainActivity extends ScaledActivity {
         }
         if (clusterOnlineSwitch != null) {
             clusterOnlineSwitch.setChecked(snapshot.clusterOnlineEnabled);
+        }
+        if (clusterOnlineProgressSwitch != null) {
+            clusterOnlineProgressSwitch.setChecked(snapshot.clusterOnlineProgressEnabled);
+            clusterOnlineProgressSwitch.setEnabled(snapshot.clusterOnlineEnabled);
+            clusterOnlineProgressSwitch.setAlpha(snapshot.clusterOnlineEnabled ? 1f : 0.45f);
         }
         if (clusterWatchdogLabel != null) {
             clusterWatchdogLabel.setText(snapshot.clusterWatchdogIntervalMs + " мс");
