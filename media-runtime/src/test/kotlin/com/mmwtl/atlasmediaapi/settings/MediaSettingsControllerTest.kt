@@ -146,6 +146,7 @@ class MediaSettingsControllerTest {
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2500L)
         })
         assertEquals(MediaBridgeContract.Status.OK, result.status)
+        assertEquals("com.example.player", result.snapshot?.defaultMediaPackage)
         assertEquals(
             listOf("atlas_media_api_settings", "radio_catalog_prefs", "cluster_dim_prefs", "media_settings_meta"),
             events,

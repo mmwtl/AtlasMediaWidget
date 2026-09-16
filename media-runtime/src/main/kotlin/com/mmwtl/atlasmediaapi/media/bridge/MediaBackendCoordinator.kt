@@ -178,6 +178,9 @@ class MediaBackendCoordinator(
 
         sessionObserver.start()
         carPlayBridge.start()
+        if (preferences.defaultAudioSource == BridgeAudioSource.ONLINE.name) {
+            scheduleDefaultSourceSwitch()
+        }
     }
 
     fun stopBackend() {
@@ -228,7 +231,7 @@ class MediaBackendCoordinator(
                     withContext(Dispatchers.Main) {
                         if (connectionGeneration == currentGen && isBackendStarted) {
                             oneOsAdapter.attach(center)
-                            if (!hasAppliedDefaultSource) {
+                            if (!hasAppliedDefaultSource && defaultSourceJob?.isActive != true) {
                                 scheduleDefaultSourceSwitch()
                             }
                         }
@@ -241,8 +244,10 @@ class MediaBackendCoordinator(
             }
         } else {
             Timber.w("OneOS disconnected")
-            defaultSourceJob?.cancel()
-            defaultSourceJob = null
+            if (preferences.defaultAudioSource != BridgeAudioSource.ONLINE.name) {
+                defaultSourceJob?.cancel()
+                defaultSourceJob = null
+            }
             oneOsAdapter.detach(notify = true)
             if (clientCount.get() > 0 && isBackendStarted) {
                 scheduleReconnect()
@@ -287,9 +292,8 @@ class MediaBackendCoordinator(
                         attempt + 1,
                     )
                     commandMutex.withLock {
-                        commandHost.setSource(
+                        commandHost.setDefaultSource(
                             source = targetSource,
-                            appSource = null,
                             autoplay = autoplay,
                         )
                     }
