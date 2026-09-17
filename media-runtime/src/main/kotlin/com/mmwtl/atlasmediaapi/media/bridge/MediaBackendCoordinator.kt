@@ -263,15 +263,24 @@ class MediaBackendCoordinator(
         defaultSourceJob = null
 
         val targetSourceStr = preferences.defaultAudioSource
-        if (targetSourceStr.isBlank()) return
-        val targetSource = runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
-        if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER) return
-
-        val delayMs = preferences.defaultAudioSourceDelaySec * 1000L
         val autoplay = preferences.defaultAudioSourceAutoplayOnStartup
+        val targetSource = if (targetSourceStr.isBlank()) {
+            null
+        } else {
+            runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
+        }
+        if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER) return
+        if (targetSource == null && !autoplay) return
+
+        val delayMs = if (targetSource != null) {
+            preferences.defaultAudioSourceDelaySec * 1000L
+        } else {
+            0L
+        }
+        val targetDescription = targetSource?.name ?: "current source"
         Timber.i(
-            "Scheduling default audio source switch to %s in %d ms (autoplay=%b)",
-            targetSource.name,
+            "Scheduling startup media action for %s in %d ms (autoplay=%b)",
+            targetDescription,
             delayMs,
             autoplay,
         )
@@ -286,30 +295,34 @@ class MediaBackendCoordinator(
                 isApplyingDefaultSource = true
                 val applied = try {
                     Timber.i(
-                        "Applying default audio source switch to %s (autoplay=%b, attempt=%d)",
-                        targetSource.name,
+                        "Applying startup media action for %s (autoplay=%b, attempt=%d)",
+                        targetDescription,
                         autoplay,
                         attempt + 1,
                     )
                     commandMutex.withLock {
-                        commandHost.setDefaultSource(
-                            source = targetSource,
-                            autoplay = autoplay,
-                        )
+                        if (targetSource != null) {
+                            commandHost.setDefaultSource(
+                                source = targetSource,
+                                autoplay = autoplay,
+                            )
+                        } else {
+                            commandHost.autoplayCurrentSource()
+                        }
                     }
                 } finally {
                     isApplyingDefaultSource = false
                 }
                 if (applied) {
                     hasAppliedDefaultSource = true
-                    Timber.i("Default audio source %s applied", targetSource.name)
+                    Timber.i("Startup media action for %s applied", targetDescription)
                     return@launch
                 }
                 val retryDelay = DEFAULT_SOURCE_RETRY_DELAYS_MS.getOrNull(attempt)
                 if (retryDelay == null) {
                     Timber.w(
-                        "Default audio source %s was not applied after %d attempts",
-                        targetSource.name,
+                        "Startup media action for %s was not applied after %d attempts",
+                        targetDescription,
                         attempt + 1,
                     )
                     return@launch
@@ -317,8 +330,8 @@ class MediaBackendCoordinator(
                 attempt++
                 if (!isBackendStarted || hasAppliedDefaultSource) return@launch
                 Timber.w(
-                    "Default audio source %s was not applied; retrying in %d ms",
-                    targetSource.name,
+                    "Startup media action for %s was not applied; retrying in %d ms",
+                    targetDescription,
                     retryDelay,
                 )
                 delay(retryDelay)

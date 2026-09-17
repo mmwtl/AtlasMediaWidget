@@ -181,6 +181,32 @@ class AndroidMediaCommandHost(
             launchConfiguredOnlinePackage = true,
         )
 
+    suspend fun autoplayCurrentSource(): Boolean {
+        val request = MediaCommandRequest(
+            requestId = "startup-autoplay",
+            command = MediaCommand.PLAY,
+        )
+        executeNative(request)?.let { nativeResult ->
+            if (nativeResult.status == MediaBridgeContract.Status.OK) return true
+            if (nativeResult.status != MediaBridgeContract.Status.NOT_SUPPORTED) return false
+        }
+
+        val session = preferredSession()
+        if (session != null) {
+            return session.play().also { played ->
+                if (played) setCurrentMediaPackage(session.packageName)
+            }
+        }
+
+        val defaultPackage = defaultMediaPackage()
+        if (defaultPackage.isBlank()) return false
+        return launchPackageAndMaybePlay(
+            packageName = defaultPackage,
+            autoplay = true,
+            returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+        )
+    }
+
     private suspend fun launchPackageAndMaybePlay(
         packageName: String,
         autoplay: Boolean,
@@ -326,7 +352,7 @@ class AndroidMediaCommandHost(
                 return launchPackageAndMaybePlay(
                     packageName = configuredOnlinePackage,
                     autoplay = autoplay,
-                    returnHomeAfterLaunch = true,
+                    returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
                 )
             }
             if (!autoplay) return true
@@ -339,7 +365,11 @@ class AndroidMediaCommandHost(
                 }
             }
             return if (configuredOnlinePackage != null) {
-                startDefaultAndPlay(configuredOnlinePackage)
+                launchPackageAndMaybePlay(
+                    packageName = configuredOnlinePackage,
+                    autoplay = true,
+                    returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+                )
             } else {
                 true
             }
@@ -378,7 +408,7 @@ class AndroidMediaCommandHost(
                 return@runCatching launchPackageAndMaybePlay(
                     packageName = configuredOnlinePackage,
                     autoplay = autoplay,
-                    returnHomeAfterLaunch = true,
+                    returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
                 )
             } else if (autoplay) {
                 delay(500L)
@@ -411,7 +441,12 @@ class AndroidMediaCommandHost(
                         } else {
                             val defaultPkg = defaultMediaPackage()
                             if (defaultPkg.isNotBlank()) {
-                                startDefaultAndPlay(defaultPkg)
+                                launchPackageAndMaybePlay(
+                                    packageName = defaultPkg,
+                                    autoplay = true,
+                                    returnHomeAfterLaunch =
+                                        preferences.minimizeOnlinePlayerAfterAutostart,
+                                )
                             }
                         }
                     }
@@ -443,13 +478,20 @@ class AndroidMediaCommandHost(
     }
 
     internal fun preferredOnlineSession(): MediaSessionCommandTarget? {
+        val controllers = sessionObserver.getActiveControllers()
         val rememberedPackage = lastOnlineMediaPackageRef.get()
         if (rememberedPackage.isNotBlank()) {
-            sessionObserver.getActiveControllers()
+            controllers
                 .firstOrNull { it.packageName == rememberedPackage }
                 ?.let { return AndroidMediaSessionTarget(it) }
         }
-        return preferredSession()
+        val configuredPackage = defaultMediaPackage()
+        if (configuredPackage.isNotBlank()) {
+            controllers
+                .firstOrNull { it.packageName == configuredPackage }
+                ?.let { return AndroidMediaSessionTarget(it) }
+        }
+        return null
     }
 
     private fun rememberOnlineMediaPackage(packageName: String) {

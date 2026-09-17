@@ -70,12 +70,12 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.defaultAudioSourceAutoplayOnStartup)
         assertFalse(snapshot.autoSwitchToDefaultOnSourceLost)
         assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
+        assertFalse(snapshot.minimizeOnlinePlayerAfterAutostart)
         assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
         assertFalse(snapshot.clusterOnlineProgressEnabled)
-        assertFalse(snapshot.clusterOnlineFacadeProgressEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
         assertEquals(100L, snapshot.clusterReassertBurstIntervalMs)
         assertEquals("BUILT_IN", snapshot.catalogType)
@@ -89,10 +89,10 @@ class MediaSettingsControllerTest {
             putInt(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_DELAY_SEC, 5)
             putBoolean(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY, false)
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
+            putBoolean(MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART, true)
             putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
-            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
             putLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, 200L)
             putInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, 18)
@@ -107,10 +107,10 @@ class MediaSettingsControllerTest {
         assertEquals(5, snap.defaultAudioSourceDelaySec)
         assertFalse(snap.defaultAudioSourceAutoplayOnStartup)
         assertTrue(snap.autoSwitchToDefaultOnSourceLost)
+        assertTrue(snap.minimizeOnlinePlayerAfterAutostart)
         assertTrue(snap.switchToOnlineBeforeSessionPlay)
         assertTrue(snap.clusterOnlineEnabled)
         assertTrue(snap.clusterOnlineProgressEnabled)
-        assertFalse(snap.clusterOnlineFacadeProgressEnabled)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
         assertEquals(200L, snap.clusterReassertBurstIntervalMs)
         assertEquals(18, snap.uiScaleTenths)
@@ -118,31 +118,16 @@ class MediaSettingsControllerTest {
     }
 
     @Test
-    fun `online progress transports are mutually exclusive`() {
-        val direct = controller.updateSettings(controller.getRevision(), Bundle().apply {
+    fun `online progress has one facade-backed setting`() {
+        val enabled = controller.updateSettings(controller.getRevision(), Bundle().apply {
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
         }).snapshot!!
-        assertTrue(direct.clusterOnlineProgressEnabled)
-        assertFalse(direct.clusterOnlineFacadeProgressEnabled)
+        assertTrue(enabled.clusterOnlineProgressEnabled)
 
-        val facade = controller.updateSettings(controller.getRevision(), Bundle().apply {
-            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, true)
+        val disabled = controller.updateSettings(controller.getRevision(), Bundle().apply {
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, false)
         }).snapshot!!
-        assertFalse(facade.clusterOnlineProgressEnabled)
-        assertTrue(facade.clusterOnlineFacadeProgressEnabled)
-
-        val directAgain = controller.updateSettings(controller.getRevision(), Bundle().apply {
-            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
-        }).snapshot!!
-        assertTrue(directAgain.clusterOnlineProgressEnabled)
-        assertFalse(directAgain.clusterOnlineFacadeProgressEnabled)
-
-        val normalized = controller.updateSettings(controller.getRevision(), Bundle().apply {
-            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
-            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, true)
-        }).snapshot!!
-        assertFalse(normalized.clusterOnlineProgressEnabled)
-        assertTrue(normalized.clusterOnlineFacadeProgressEnabled)
+        assertFalse(disabled.clusterOnlineProgressEnabled)
     }
 
     @Test
@@ -302,7 +287,8 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("clusterCoversEnabled"))
         assertTrue(json.has("clusterOnlineEnabled"))
         assertTrue(json.has("clusterOnlineProgressEnabled"))
-        assertTrue(json.has("clusterOnlineFacadeProgressEnabled"))
+        assertFalse(json.has("clusterOnlineFacadeProgressEnabled"))
+        assertTrue(json.has("minimizeOnlinePlayerAfterAutostart"))
         assertTrue(json.has("clusterReassertBurstIntervalMs"))
         assertFalse(json.has("uiScaleTenths"))
     }
@@ -408,12 +394,12 @@ class MediaSettingsControllerTest {
         preferences.autoSwitchToDefaultOnSourceLost = true
         preferences.autoSwitchToDefaultAutoplayOnSourceLost = false
         preferences.defaultMediaPackage = "com.example.player"
+        preferences.minimizeOnlinePlayerAfterAutostart = true
         preferences.switchToOnlineBeforeSessionPlay = true
         radioCatalogRepository.setWidgetBroadcastEnabled(false)
         clusterMediaBridge.setClusterCoversEnabled(false)
         clusterMediaBridge.setClusterOnlineEnabled(true)
         clusterMediaBridge.setClusterOnlineProgressEnabled(true)
-        clusterMediaBridge.setClusterOnlineFacadeProgressEnabled(true)
         clusterMediaBridge.setReassertWatchdogIntervalMs(4000L)
         clusterMediaBridge.setReassertBurstIntervalMs(300L)
         preferences.uiScaleTenths = 19
@@ -443,12 +429,12 @@ class MediaSettingsControllerTest {
         assertFalse(snapshot.autoSwitchToDefaultOnSourceLost)
         assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
         assertEquals("", snapshot.defaultMediaPackage)
+        assertFalse(snapshot.minimizeOnlinePlayerAfterAutostart)
         assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
         assertFalse(snapshot.clusterOnlineProgressEnabled)
-        assertFalse(snapshot.clusterOnlineFacadeProgressEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
         assertEquals(100L, snapshot.clusterReassertBurstIntervalMs)
         assertEquals(19, snapshot.uiScaleTenths)
@@ -465,9 +451,11 @@ class MediaSettingsControllerTest {
             put("schemaVersion", 1)
             put("defaultAudioSource", "USB")
             put("defaultAudioSourceDelaySec", 7)
+            put("minimizeOnlinePlayerAfterAutostart", true)
             put("radioWidgetBroadcastEnabled", false)
             put("clusterCoversEnabled", true)
             put("clusterOnlineEnabled", true)
+            put("clusterOnlineFacadeProgressEnabled", true)
             put("clusterWatchdogIntervalMs", 3000L)
             put("clusterReassertBurstIntervalMs", 250L)
             put("catalogMode", "builtin")
@@ -498,8 +486,10 @@ class MediaSettingsControllerTest {
         val snap = commitResult.snapshot!!
         assertEquals("USB", snap.defaultAudioSource)
         assertEquals(7, snap.defaultAudioSourceDelaySec)
+        assertTrue(snap.minimizeOnlinePlayerAfterAutostart)
         assertFalse(snap.radioWidgetBroadcastEnabled)
         assertTrue(snap.clusterOnlineEnabled)
+        assertTrue(snap.clusterOnlineProgressEnabled)
         assertEquals(3000L, snap.clusterWatchdogIntervalMs)
         assertEquals(250L, snap.clusterReassertBurstIntervalMs)
         assertTrue(snap.revision > initialRev)

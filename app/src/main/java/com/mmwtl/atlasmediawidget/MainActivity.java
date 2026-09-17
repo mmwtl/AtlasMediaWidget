@@ -87,6 +87,7 @@ public final class MainActivity extends ScaledActivity {
     private Spinner onlinePlayerSpinner;
     private ArrayAdapter<OnlinePlayerOption> onlinePlayerAdapter;
     private boolean refreshingOnlinePlayer;
+    private Switch minimizeOnlinePlayerSwitch;
     private Switch startupAutoplaySwitch;
     private Switch sourceLostSwitch;
     private Switch sourceLostAutoplaySwitch;
@@ -95,7 +96,6 @@ public final class MainActivity extends ScaledActivity {
     private Switch clusterCoversSwitch;
     private Switch clusterOnlineSwitch;
     private Switch clusterOnlineProgressSwitch;
-    private Switch clusterOnlineFacadeProgressSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
     private TextView clusterReassertBurstLabel;
@@ -1597,7 +1597,7 @@ public final class MainActivity extends ScaledActivity {
         r2Params.topMargin = Ui.dp(this, 6);
         row2.setLayoutParams(r2Params);
 
-        onlinePlayerTitle = text("Приложение Online при старте", 15,
+        onlinePlayerTitle = text("Онлайн медиаплеер по умолчанию", 15,
                 Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams onlineTitleParams = fullWrap();
         onlineTitleParams.topMargin = Ui.dp(this, 14);
@@ -1618,13 +1618,10 @@ public final class MainActivity extends ScaledActivity {
             }
         };
         onlinePlayerSpinner.setAdapter(onlinePlayerAdapter);
-        onlinePlayerTitle.setVisibility(View.GONE);
-        onlinePlayerSpinner.setVisibility(View.GONE);
         onlinePlayerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view,
                     int position, long id) {
                 if (refreshingOnlinePlayer || currentMediaSettings == null
-                        || !"ONLINE".equals(currentMediaSettings.defaultAudioSource)
                         || position < 0 || position >= onlinePlayerAdapter.getCount()) return;
                 String packageName = onlinePlayerAdapter.getItem(position).packageName;
                 if (!packageName.equals(currentMediaSettings.defaultMediaPackage)) {
@@ -1638,6 +1635,20 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams onlineSpinnerParams = fullWrap();
         onlineSpinnerParams.topMargin = Ui.dp(this, 4);
         mediaSettingsGroup.addView(onlinePlayerSpinner, onlineSpinnerParams);
+
+        minimizeOnlinePlayerSwitch = new Switch(this);
+        minimizeOnlinePlayerSwitch.setText("Сворачивать онлайн-плеер после автозапуска");
+        minimizeOnlinePlayerSwitch.setTextColor(Ui.PRIMARY);
+        minimizeOnlinePlayerSwitch.setTextSize(15);
+        minimizeOnlinePlayerSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(
+                    MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
+                    checked);
+        });
+        LinearLayout.LayoutParams minimizeParams = fullWrap();
+        minimizeParams.topMargin = Ui.dp(this, 10);
+        mediaSettingsGroup.addView(minimizeOnlinePlayerSwitch, minimizeParams);
 
         TextView delayTitle = text("Задержка переключения на старте", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams dtParams = fullWrap();
@@ -1753,36 +1764,16 @@ public final class MainActivity extends ScaledActivity {
         mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
 
         clusterOnlineProgressSwitch = new Switch(this);
-        clusterOnlineProgressSwitch.setText("Прогресс онлайн: прямой DIM-пакет (каждые 2 с)");
+        clusterOnlineProgressSwitch.setText("Трансляция прогресса онлайн на приборку (каждую 1 с)");
         clusterOnlineProgressSwitch.setTextColor(Ui.PRIMARY);
         clusterOnlineProgressSwitch.setTextSize(15);
         clusterOnlineProgressSwitch.setOnCheckedChangeListener((btn, checked) -> {
             if (!btn.isPressed()) return;
-            if (checked && clusterOnlineFacadeProgressSwitch != null) {
-                clusterOnlineFacadeProgressSwitch.setChecked(false);
-            }
             sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, checked);
         });
         LinearLayout.LayoutParams s8 = fullWrap();
         s8.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterOnlineProgressSwitch, s8);
-
-        clusterOnlineFacadeProgressSwitch = new Switch(this);
-        clusterOnlineFacadeProgressSwitch.setText("Прогресс онлайн: режим GMediaHUD (каждую 1 с)");
-        clusterOnlineFacadeProgressSwitch.setTextColor(Ui.PRIMARY);
-        clusterOnlineFacadeProgressSwitch.setTextSize(15);
-        clusterOnlineFacadeProgressSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            if (checked && clusterOnlineProgressSwitch != null) {
-                clusterOnlineProgressSwitch.setChecked(false);
-            }
-            sendMediaSettingChange(
-                    MediaBridgeContract.K_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
-                    checked);
-        });
-        LinearLayout.LayoutParams s9 = fullWrap();
-        s9.topMargin = Ui.dp(this, 10);
-        mediaSettingsGroup.addView(clusterOnlineFacadeProgressSwitch, s9);
 
         TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
@@ -1965,8 +1956,8 @@ public final class MainActivity extends ScaledActivity {
         }
         if (startupAutoplaySwitch != null) {
             startupAutoplaySwitch.setChecked(snapshot.defaultAudioSourceAutoplayOnStartup);
-            startupAutoplaySwitch.setEnabled(hasSource);
-            startupAutoplaySwitch.setAlpha(hasSource ? 1f : 0.45f);
+            startupAutoplaySwitch.setEnabled(true);
+            startupAutoplaySwitch.setAlpha(1f);
         }
         if (sourceLostSwitch != null) {
             sourceLostSwitch.setChecked(snapshot.autoSwitchToDefaultOnSourceLost);
@@ -1995,11 +1986,6 @@ public final class MainActivity extends ScaledActivity {
             clusterOnlineProgressSwitch.setChecked(snapshot.clusterOnlineProgressEnabled);
             clusterOnlineProgressSwitch.setEnabled(snapshot.clusterOnlineEnabled);
             clusterOnlineProgressSwitch.setAlpha(snapshot.clusterOnlineEnabled ? 1f : 0.45f);
-        }
-        if (clusterOnlineFacadeProgressSwitch != null) {
-            clusterOnlineFacadeProgressSwitch.setChecked(snapshot.clusterOnlineFacadeProgressEnabled);
-            clusterOnlineFacadeProgressSwitch.setEnabled(snapshot.clusterOnlineEnabled);
-            clusterOnlineFacadeProgressSwitch.setAlpha(snapshot.clusterOnlineEnabled ? 1f : 0.45f);
         }
         if (clusterWatchdogLabel != null) {
             clusterWatchdogLabel.setText(snapshot.clusterWatchdogIntervalMs + " мс");
@@ -2037,18 +2023,25 @@ public final class MainActivity extends ScaledActivity {
     private void updateOnlinePlayerUi(MediaSettingsSnapshot snapshot) {
         if (onlinePlayerTitle == null || onlinePlayerSpinner == null
                 || onlinePlayerAdapter == null) return;
-        boolean isOnline = "ONLINE".equals(snapshot.defaultAudioSource);
-        onlinePlayerTitle.setVisibility(isOnline ? View.VISIBLE : View.GONE);
-        onlinePlayerSpinner.setVisibility(isOnline ? View.VISIBLE : View.GONE);
-        onlinePlayerTitle.setEnabled(isOnline);
-        onlinePlayerSpinner.setEnabled(isOnline);
-        onlinePlayerTitle.setAlpha(isOnline ? 1f : 0.45f);
-        onlinePlayerSpinner.setAlpha(isOnline ? 1f : 0.45f);
+        onlinePlayerTitle.setVisibility(View.VISIBLE);
+        onlinePlayerSpinner.setVisibility(View.VISIBLE);
+        onlinePlayerTitle.setEnabled(true);
+        onlinePlayerSpinner.setEnabled(true);
+        onlinePlayerTitle.setAlpha(1f);
+        onlinePlayerSpinner.setAlpha(1f);
 
         refreshingOnlinePlayer = true;
         onlinePlayerSpinner.setSelection(
                 findOnlinePlayerOption(snapshot.defaultMediaPackage), false);
         refreshingOnlinePlayer = false;
+
+        if (minimizeOnlinePlayerSwitch != null) {
+            boolean hasDefaultOnlinePlayer = snapshot.defaultMediaPackage != null
+                    && !snapshot.defaultMediaPackage.isEmpty();
+            minimizeOnlinePlayerSwitch.setChecked(snapshot.minimizeOnlinePlayerAfterAutostart);
+            minimizeOnlinePlayerSwitch.setEnabled(hasDefaultOnlinePlayer);
+            minimizeOnlinePlayerSwitch.setAlpha(hasDefaultOnlinePlayer ? 1f : 0.45f);
+        }
     }
 
     private int findOnlinePlayerOption(String packageName) {

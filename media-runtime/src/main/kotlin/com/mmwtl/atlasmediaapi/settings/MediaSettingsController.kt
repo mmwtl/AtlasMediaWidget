@@ -114,13 +114,12 @@ class MediaSettingsController(
             autoSwitchToDefaultOnSourceLost = preferences.autoSwitchToDefaultOnSourceLost,
             autoSwitchToDefaultAutoplayOnSourceLost = preferences.autoSwitchToDefaultAutoplayOnSourceLost,
             defaultMediaPackage = preferences.defaultMediaPackage,
+            minimizeOnlinePlayerAfterAutostart = preferences.minimizeOnlinePlayerAfterAutostart,
             switchToOnlineBeforeSessionPlay = preferences.switchToOnlineBeforeSessionPlay,
             radioWidgetBroadcastEnabled = radioCatalogRepository.isWidgetBroadcastEnabled,
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
             clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
             clusterOnlineProgressEnabled = clusterMediaBridge.isClusterOnlineProgressEnabled,
-            clusterOnlineFacadeProgressEnabled =
-                clusterMediaBridge.isClusterOnlineFacadeProgressEnabled,
             clusterWatchdogIntervalMs = clusterMediaBridge.reassertWatchdogIntervalMs,
             clusterReassertBurstIntervalMs = clusterMediaBridge.reassertBurstIntervalMs,
             catalogType = catalogInfo.type.name,
@@ -223,6 +222,11 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE)) {
             preferences.defaultMediaPackage = update.getString(MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE).orEmpty()
         }
+        if (update.containsKey(MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART)) {
+            preferences.minimizeOnlinePlayerAfterAutostart = update.getBoolean(
+                MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
+            )
+        }
         if (update.containsKey(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY)) {
             preferences.switchToOnlineBeforeSessionPlay = update.getBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY)
         }
@@ -238,11 +242,6 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED)) {
             clusterMediaBridge.setClusterOnlineProgressEnabled(
                 update.getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED),
-            )
-        }
-        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED)) {
-            clusterMediaBridge.setClusterOnlineFacadeProgressEnabled(
-                update.getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED),
             )
         }
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS)) {
@@ -301,15 +300,12 @@ class MediaSettingsController(
             put("autoSwitchToDefaultOnSourceLost", snapshot.autoSwitchToDefaultOnSourceLost)
             put("autoSwitchToDefaultAutoplayOnSourceLost", snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
             put("defaultMediaPackage", snapshot.defaultMediaPackage)
+            put("minimizeOnlinePlayerAfterAutostart", snapshot.minimizeOnlinePlayerAfterAutostart)
             put("switchToOnlineBeforeSessionPlay", snapshot.switchToOnlineBeforeSessionPlay)
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
             put("clusterOnlineProgressEnabled", snapshot.clusterOnlineProgressEnabled)
-            put(
-                "clusterOnlineFacadeProgressEnabled",
-                snapshot.clusterOnlineFacadeProgressEnabled,
-            )
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
             put("clusterReassertBurstIntervalMs", snapshot.clusterReassertBurstIntervalMs)
         }
@@ -599,6 +595,10 @@ class MediaSettingsController(
             true,
         )
         preferences.defaultMediaPackage = mediaJson.optString("defaultMediaPackage", "")
+        preferences.minimizeOnlinePlayerAfterAutostart = mediaJson.optBoolean(
+            "minimizeOnlinePlayerAfterAutostart",
+            false,
+        )
         preferences.switchToOnlineBeforeSessionPlay = mediaJson.optBoolean(
             "switchToOnlineBeforeSessionPlay",
             false,
@@ -613,10 +613,8 @@ class MediaSettingsController(
             mediaJson.optBoolean("clusterOnlineEnabled", false),
         )
         clusterMediaBridge.setClusterOnlineProgressEnabled(
-            mediaJson.optBoolean("clusterOnlineProgressEnabled", false),
-        )
-        clusterMediaBridge.setClusterOnlineFacadeProgressEnabled(
-            mediaJson.optBoolean("clusterOnlineFacadeProgressEnabled", false),
+            mediaJson.optBoolean("clusterOnlineProgressEnabled", false) ||
+                mediaJson.optBoolean("clusterOnlineFacadeProgressEnabled", false),
         )
         clusterMediaBridge.setReassertWatchdogIntervalMs(
             if (mediaJson.has("clusterWatchdogIntervalMs")) {
@@ -658,12 +656,12 @@ class MediaSettingsController(
             MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE to String::class.java,
+            MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED to java.lang.Boolean::class.java,
-            MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS to java.lang.Long::class.java,
             MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS to java.lang.Long::class.java,
             MediaBridgeContract.Key.UI_SCALE_TENTHS to Integer::class.java,
@@ -694,6 +692,7 @@ class MediaSettingsController(
         val booleanFields = listOf(
             "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
             "autoSwitchToDefaultAutoplayOnSourceLost", "switchToOnlineBeforeSessionPlay",
+            "minimizeOnlinePlayerAfterAutostart",
             "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterOnlineEnabled",
             "clusterOnlineProgressEnabled",
             "clusterOnlineFacadeProgressEnabled",

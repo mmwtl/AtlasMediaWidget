@@ -67,7 +67,7 @@ public class MediaBridgeContractTest {
     @Test public void mediaSettingsSnapshotRoundTrip() {
         MediaSettingsSnapshot original = new MediaSettingsSnapshot(
                 123L, "RADIO", 4, true, true, false, "com.test.player",
-                true, false, true, true, true, false, 2000L, 200L,
+                true, true, false, true, true, true, 2000L, 200L,
                 "CUSTOM", 15, "Test Catalog", 18);
         MediaSettingsSnapshot restored = MediaSettingsSnapshot.fromBundle(original.toBundle());
         assertEquals(original.revision, restored.revision);
@@ -77,13 +77,13 @@ public class MediaBridgeContractTest {
         assertEquals(original.autoSwitchToDefaultOnSourceLost, restored.autoSwitchToDefaultOnSourceLost);
         assertEquals(original.autoSwitchToDefaultAutoplayOnSourceLost, restored.autoSwitchToDefaultAutoplayOnSourceLost);
         assertEquals(original.defaultMediaPackage, restored.defaultMediaPackage);
+        assertEquals(original.minimizeOnlinePlayerAfterAutostart,
+                restored.minimizeOnlinePlayerAfterAutostart);
         assertEquals(original.switchToOnlineBeforeSessionPlay, restored.switchToOnlineBeforeSessionPlay);
         assertEquals(original.radioWidgetBroadcastEnabled, restored.radioWidgetBroadcastEnabled);
         assertEquals(original.clusterCoversEnabled, restored.clusterCoversEnabled);
         assertEquals(original.clusterOnlineEnabled, restored.clusterOnlineEnabled);
         assertEquals(original.clusterOnlineProgressEnabled, restored.clusterOnlineProgressEnabled);
-        assertEquals(original.clusterOnlineFacadeProgressEnabled,
-                restored.clusterOnlineFacadeProgressEnabled);
         assertEquals(original.clusterWatchdogIntervalMs, restored.clusterWatchdogIntervalMs);
         assertEquals(original.clusterReassertBurstIntervalMs, restored.clusterReassertBurstIntervalMs);
         assertEquals(original.catalogType, restored.catalogType);

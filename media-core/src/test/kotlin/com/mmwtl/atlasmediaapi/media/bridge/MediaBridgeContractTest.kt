@@ -68,8 +68,8 @@ class MediaBridgeContractTest {
         assertEquals("settingsRevision", MediaBridgeContract.Key.SETTINGS_REVISION)
         assertEquals("defaultAudioSource", MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE)
         assertEquals(
-            "clusterOnlineFacadeProgressEnabled",
-            MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
+            "minimizeOnlinePlayerAfterAutostart",
+            MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
         )
     }
 
@@ -83,12 +83,12 @@ class MediaBridgeContractTest {
             autoSwitchToDefaultOnSourceLost = true,
             autoSwitchToDefaultAutoplayOnSourceLost = false,
             defaultMediaPackage = "ru.yandex.music",
+            minimizeOnlinePlayerAfterAutostart = true,
             switchToOnlineBeforeSessionPlay = true,
             radioWidgetBroadcastEnabled = false,
             clusterCoversEnabled = false,
             clusterOnlineEnabled = true,
             clusterOnlineProgressEnabled = true,
-            clusterOnlineFacadeProgressEnabled = false,
             clusterWatchdogIntervalMs = 2500L,
             clusterReassertBurstIntervalMs = 200L,
             catalogType = "CUSTOM",

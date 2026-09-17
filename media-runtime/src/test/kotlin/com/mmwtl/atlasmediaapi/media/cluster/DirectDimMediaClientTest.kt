@@ -7,7 +7,6 @@ import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Binder
 import android.os.Parcel
-import android.os.SystemClock
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.BridgeAudioSource
 import org.robolectric.RuntimeEnvironment
@@ -34,6 +33,25 @@ class DirectDimMediaClientTest {
     private fun payload(artwork: Uri? = null) = DirectDimMediaClient.Payload(
         6, "online-track", "Title", "Album", "Artist", artwork, 120000L, 1, "", 0, "",
     )
+
+    @Test
+    fun `legacy facade progress preference migrates to the single progress setting`() {
+        val context = RecordingContext()
+        val preferences = context.getSharedPreferences(
+            ClusterMediaBridge.PREFS_NAME,
+            Context.MODE_PRIVATE,
+        )
+        preferences.edit()
+            .clear()
+            .putBoolean("cluster_dim_online_facade_progress_enabled", true)
+            .commit()
+
+        val bridge = ClusterMediaBridge(context)
+
+        assertTrue(bridge.isClusterOnlineProgressEnabled)
+        assertTrue(preferences.getBoolean(ClusterMediaBridge.KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, false))
+        assertFalse(preferences.contains("cluster_dim_online_facade_progress_enabled"))
+    }
 
     @Test
     fun `online packet without cover preserves text and has no legacy artwork gate`() {
@@ -140,69 +158,6 @@ class DirectDimMediaClientTest {
         context.connection.onServiceDisconnected(context.intent.component!!)
         context.connection.onServiceConnected(context.intent.component!!, binder)
         assertTrue(replayed.await(2, java.util.concurrent.TimeUnit.SECONDS))
-    }
-
-    @Test
-    fun `online progress resends the direct packet without clearing metadata`() {
-        val context = RecordingContext()
-        context.getSharedPreferences(ClusterMediaBridge.PREFS_NAME, Context.MODE_PRIVATE)
-            .edit().clear().commit()
-        val bridge = ClusterMediaBridge(context)
-        val packets = java.util.Collections.synchronizedList(
-            mutableListOf<Pair<String, Long>>(),
-        )
-        val received = java.util.concurrent.CountDownLatch(2)
-        context.connection.onServiceConnected(context.intent.component!!, object : Binder() {
-            override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
-                data.enforceInterface("com.autolink.adapterbinder.IDimMediaInteractioncService")
-                assertEquals(1, code)
-                assertEquals(1, data.readInt())
-                data.readInt() // source_type
-                data.readString() // uuid
-                data.readInt() // mute_state
-                val title = data.readString().orEmpty()
-                data.readString() // album
-                data.readString() // artist
-                data.readString() // legacy artwork gate
-                data.readParcelable<Uri>(Uri::class.java.classLoader)
-                repeat(4) { data.readString() }
-                data.readLong() // duration
-                val progress = data.readLong()
-                packets += title to progress
-                received.countDown()
-                reply!!.writeNoException()
-                return true
-            }
-        })
-        bridge.setActiveSource(BridgeAudioSource.ONLINE)
-        bridge.setClusterOnlineEnabled(true)
-        bridge.setClusterOnlineProgressEnabled(true)
-        val snapshot = MediaSnapshot(
-            backendConnected = true,
-            audioSource = BridgeAudioSource.ONLINE.name,
-            ownerPackage = "player",
-            mediaId = "track",
-            title = "Title",
-            duration = 120_000L,
-            position = 1_000L,
-            updateElapsedRealtime = SystemClock.elapsedRealtime(),
-            speed = 1f,
-            playbackState = 3,
-        )
-        bridge.updateOnlinePlayback(snapshot, null)
-        bridge.updateOnlinePlayback(snapshot.copy(position = 2_000L), null)
-
-        assertTrue(
-            received.await(
-                ClusterMediaBridge.ONLINE_PROGRESS_INITIAL_DELAY_MS + 1_000L,
-                java.util.concurrent.TimeUnit.MILLISECONDS,
-            ),
-        )
-        bridge.setActiveSource(BridgeAudioSource.RADIO)
-        assertTrue(packets.size >= 2)
-        assertTrue(packets.all { it.first == "Title" })
-        assertTrue(packets.first().second >= 1_000L)
-        assertTrue(packets.last().second > packets.first().second)
     }
 
 }

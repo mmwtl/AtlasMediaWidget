@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -47,6 +48,7 @@ class AndroidMediaCommandHostTest {
         val launched = mutableListOf<String>()
         val fixture = fixture(
             configuredPackage = "com.example.player",
+            minimizeAfterAutostart = true,
             launchPackage = {
                 launched += it
                 true
@@ -58,6 +60,17 @@ class AndroidMediaCommandHostTest {
         val homeIntent = shadowOf(fixture.context).nextStartedActivity
         assertEquals(Intent.ACTION_MAIN, homeIntent.action)
         assertTrue(homeIntent.categories.contains(Intent.CATEGORY_HOME))
+    }
+
+    @Test
+    fun `configured online player stays foreground when auto minimize is disabled`() = runBlocking {
+        val fixture = fixture(
+            configuredPackage = "com.example.player",
+            launchPackage = { true },
+        )
+
+        assertTrue(fixture.host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = false))
+        assertNull(shadowOf(fixture.context).nextStartedActivity)
     }
 
     @Test
@@ -117,7 +130,8 @@ class AndroidMediaCommandHostTest {
             autoplayMediaKeyConfirmDelayMs = 10L,
         )
 
-        assertTrue(host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = true))
+        assertTrue(host.setSource(BridgeAudioSource.ONLINE, appSource = null, autoplay = true))
+        assertNull(shadowOf(context).nextStartedActivity)
         session.release()
     }
 
@@ -185,6 +199,59 @@ class AndroidMediaCommandHostTest {
         newerSession.release()
     }
 
+    @Test
+    fun `online does not reuse an unrelated session when no online session was remembered`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+        val unrelatedSession = MediaSession(context, "unrelated-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 200L))
+        }
+        activeControllers(observer) += controller(context, unrelatedSession, "com.example.unrelated")
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply {
+                defaultMediaPackage = "com.example.default"
+            },
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+        )
+
+        assertNull(host.preferredOnlineSession())
+        unrelatedSession.release()
+    }
+
+    @Test
+    fun `startup autoplay without a selected source plays the current session`() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+        val session = MediaSession(context, "current-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 100L))
+        }
+        activeControllers(observer) += controller(context, session, "com.example.current")
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context),
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+        )
+
+        assertTrue(host.autoplayCurrentSource())
+        assertEquals("com.example.current", host.currentMediaPackage())
+        session.release()
+    }
+
     private data class Fixture(
         val context: android.app.Application,
         val repository: MediaStateRepository,
@@ -193,6 +260,7 @@ class AndroidMediaCommandHostTest {
 
     private fun fixture(
         configuredPackage: String = "",
+        minimizeAfterAutostart: Boolean = false,
         launchPackage: ((String) -> Boolean)? = null,
         sessionWaitTimeoutMs: Long = AndroidMediaCommandHost.SESSION_WAIT_TIMEOUT_MS,
         sessionPollDelaysMs: List<Long> = AndroidMediaCommandHost.SESSION_POLL_DELAYS_MS,
@@ -205,6 +273,7 @@ class AndroidMediaCommandHostTest {
         val observer = MediaSessionObserver(context, hub)
         val preferences = AtlasPreferences(context).apply {
             defaultMediaPackage = configuredPackage
+            minimizeOnlinePlayerAfterAutostart = minimizeAfterAutostart
         }
         return Fixture(
             context = context,
