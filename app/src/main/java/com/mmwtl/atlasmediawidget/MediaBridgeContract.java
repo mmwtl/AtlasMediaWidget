@@ -138,6 +138,7 @@ final class MediaBridgeContract {
     static final String K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switchToOnlineBeforeSessionPlay";
     static final String K_RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled";
     static final String K_CLUSTER_COVERS_ENABLED = "clusterCoversEnabled";
+    static final String K_CLUSTER_RADIO_FACADE_ENABLED = "clusterRadioFacadeEnabled";
     static final String K_CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled";
     static final String K_CLUSTER_ONLINE_PROGRESS_ENABLED = "clusterOnlineProgressEnabled";
     static final String K_CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs";

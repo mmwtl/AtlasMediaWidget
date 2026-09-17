@@ -128,6 +128,7 @@ class ClusterMediaBridge(
         private const val KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED =
             "cluster_dim_online_facade_progress_enabled"
         const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
+        const val KEY_CLUSTER_RADIO_FACADE_ENABLED = "cluster_dim_radio_facade_enabled"
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
         const val KEY_REASSERT_BURST_INTERVAL_MS = "reassert_burst_interval_ms"
         private const val NFS_SHARED_DIR = "/data/vendor/nfs/shared"
@@ -277,6 +278,11 @@ class ClusterMediaBridge(
         private set
 
     @Volatile
+    var isClusterRadioFacadeEnabled: Boolean =
+        prefs.getBoolean(KEY_CLUSTER_RADIO_FACADE_ENABLED, false)
+        private set
+
+    @Volatile
     var isClusterOnlineEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_ONLINE_ENABLED, false)
         private set
 
@@ -382,6 +388,16 @@ class ClusterMediaBridge(
             currentRadioInfo = null
             cancelReassertions()
         }
+    }
+
+    @Synchronized
+    fun setClusterRadioFacadeEnabled(enabled: Boolean) {
+        if (isClusterRadioFacadeEnabled == enabled) return
+        isClusterRadioFacadeEnabled = enabled
+        prefs.edit().putBoolean(KEY_CLUSTER_RADIO_FACADE_ENABLED, enabled).apply()
+        if (radioActive) directDimMediaClient.clearPending()
+        currentRadioInfo = null
+        cancelReassertions()
     }
 
     /**
@@ -914,14 +930,17 @@ class ClusterMediaBridge(
                 radioStationName = playInfo.radioStationName,
             )
         }
-        val directDimResult = directPayload?.let(directDimMediaClient::sendOrQueue) ?: "not-used"
+        val directDimResult = if (isClusterRadioFacadeEnabled) {
+            "facade-forced"
+        } else {
+            directPayload?.let(directDimMediaClient::sendOrQueue) ?: "not-used"
+        }
         val qnxArtworkPath = artworkFile?.let(::qnxCoverWirePath).orEmpty()
         val directDimSent = directDimResult.startsWith("sent-")
         var sourceUpdateError: Throwable? = null
-        if (!directDimSent) {
-            // Source selection and playback are both public-facade fallbacks. Either call
-            // can race through the facade's async queue and replace a successful direct
-            // ONLINE packet before DIM's 1-second debounce expires.
+        if (isClusterRadioFacadeEnabled || !directDimSent) {
+            // Forced facade mode repeats both calls during repair bursts and watchdog ticks
+            // so a later stock-radio publication can be overwritten by the same full card.
             sourceUpdateError = runCatching {
                 mediaInteraction.updateCurrentSourceType(displaySourceType)
             }.exceptionOrNull()

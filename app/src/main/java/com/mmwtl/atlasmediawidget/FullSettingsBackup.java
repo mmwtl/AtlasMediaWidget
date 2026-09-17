@@ -236,6 +236,7 @@ final class FullSettingsBackup {
                         mediaJson.optBoolean("switchToOnlineBeforeSessionPlay", false),
                         mediaJson.optBoolean("radioWidgetBroadcastEnabled", true),
                         mediaJson.optBoolean("clusterCoversEnabled", true),
+                        mediaJson.optBoolean("clusterRadioFacadeEnabled", false),
                         mediaJson.optBoolean("clusterOnlineEnabled", false),
                         mediaJson.optBoolean("clusterOnlineProgressEnabled", false)
                                 || mediaJson.optBoolean("clusterOnlineFacadeProgressEnabled", false),

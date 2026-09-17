@@ -17,6 +17,7 @@ data class MediaSettingsSnapshot(
     val switchToOnlineBeforeSessionPlay: Boolean = false,
     val radioWidgetBroadcastEnabled: Boolean = true,
     val clusterCoversEnabled: Boolean = true,
+    val clusterRadioFacadeEnabled: Boolean = false,
     val clusterOnlineEnabled: Boolean = false,
     val clusterOnlineProgressEnabled: Boolean = false,
     val clusterWatchdogIntervalMs: Long = 1250L,
@@ -42,6 +43,7 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
     putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, switchToOnlineBeforeSessionPlay)
     putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, clusterCoversEnabled)
+    putBoolean(MediaBridgeContract.Key.CLUSTER_RADIO_FACADE_ENABLED, clusterRadioFacadeEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, clusterOnlineProgressEnabled)
     putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs)
@@ -67,6 +69,10 @@ fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnaps
     switchToOnlineBeforeSessionPlay = getBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false),
     radioWidgetBroadcastEnabled = getBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, true),
     clusterCoversEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, true),
+    clusterRadioFacadeEnabled = getBoolean(
+        MediaBridgeContract.Key.CLUSTER_RADIO_FACADE_ENABLED,
+        false,
+    ),
     clusterOnlineEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, false),
     clusterOnlineProgressEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, false),
     clusterWatchdogIntervalMs = getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),

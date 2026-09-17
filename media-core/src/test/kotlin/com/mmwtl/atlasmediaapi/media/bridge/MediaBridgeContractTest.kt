@@ -87,6 +87,7 @@ class MediaBridgeContractTest {
             switchToOnlineBeforeSessionPlay = true,
             radioWidgetBroadcastEnabled = false,
             clusterCoversEnabled = false,
+            clusterRadioFacadeEnabled = true,
             clusterOnlineEnabled = true,
             clusterOnlineProgressEnabled = true,
             clusterWatchdogIntervalMs = 2500L,

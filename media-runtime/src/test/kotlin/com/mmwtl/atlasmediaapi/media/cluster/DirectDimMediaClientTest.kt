@@ -54,6 +54,24 @@ class DirectDimMediaClientTest {
     }
 
     @Test
+    fun `radio facade setting defaults off and persists`() {
+        val context = RecordingContext()
+        val preferences = context.getSharedPreferences(
+            ClusterMediaBridge.PREFS_NAME,
+            Context.MODE_PRIVATE,
+        )
+        preferences.edit().clear().commit()
+
+        val bridge = ClusterMediaBridge(context)
+        assertFalse(bridge.isClusterRadioFacadeEnabled)
+
+        bridge.setClusterRadioFacadeEnabled(true)
+
+        assertTrue(preferences.getBoolean(ClusterMediaBridge.KEY_CLUSTER_RADIO_FACADE_ENABLED, false))
+        assertTrue(ClusterMediaBridge(context).isClusterRadioFacadeEnabled)
+    }
+
+    @Test
     fun `online packet without cover preserves text and has no legacy artwork gate`() {
         val context = RecordingContext()
         val client = DirectDimMediaClient(context)

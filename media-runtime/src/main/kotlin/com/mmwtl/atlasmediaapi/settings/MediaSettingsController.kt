@@ -118,6 +118,7 @@ class MediaSettingsController(
             switchToOnlineBeforeSessionPlay = preferences.switchToOnlineBeforeSessionPlay,
             radioWidgetBroadcastEnabled = radioCatalogRepository.isWidgetBroadcastEnabled,
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
+            clusterRadioFacadeEnabled = clusterMediaBridge.isClusterRadioFacadeEnabled,
             clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
             clusterOnlineProgressEnabled = clusterMediaBridge.isClusterOnlineProgressEnabled,
             clusterWatchdogIntervalMs = clusterMediaBridge.reassertWatchdogIntervalMs,
@@ -236,6 +237,11 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED)) {
             clusterMediaBridge.setClusterCoversEnabled(update.getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED))
         }
+        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_RADIO_FACADE_ENABLED)) {
+            clusterMediaBridge.setClusterRadioFacadeEnabled(
+                update.getBoolean(MediaBridgeContract.Key.CLUSTER_RADIO_FACADE_ENABLED),
+            )
+        }
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED)) {
             clusterMediaBridge.setClusterOnlineEnabled(update.getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED))
         }
@@ -304,6 +310,7 @@ class MediaSettingsController(
             put("switchToOnlineBeforeSessionPlay", snapshot.switchToOnlineBeforeSessionPlay)
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
+            put("clusterRadioFacadeEnabled", snapshot.clusterRadioFacadeEnabled)
             put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
             put("clusterOnlineProgressEnabled", snapshot.clusterOnlineProgressEnabled)
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
@@ -609,6 +616,9 @@ class MediaSettingsController(
         clusterMediaBridge.setClusterCoversEnabled(
             mediaJson.optBoolean("clusterCoversEnabled", true),
         )
+        clusterMediaBridge.setClusterRadioFacadeEnabled(
+            mediaJson.optBoolean("clusterRadioFacadeEnabled", false),
+        )
         clusterMediaBridge.setClusterOnlineEnabled(
             mediaJson.optBoolean("clusterOnlineEnabled", false),
         )
@@ -660,6 +670,7 @@ class MediaSettingsController(
             MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.CLUSTER_RADIO_FACADE_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS to java.lang.Long::class.java,
@@ -693,7 +704,8 @@ class MediaSettingsController(
             "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
             "autoSwitchToDefaultAutoplayOnSourceLost", "switchToOnlineBeforeSessionPlay",
             "minimizeOnlinePlayerAfterAutostart",
-            "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterOnlineEnabled",
+            "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterRadioFacadeEnabled",
+            "clusterOnlineEnabled",
             "clusterOnlineProgressEnabled",
             "clusterOnlineFacadeProgressEnabled",
         )
