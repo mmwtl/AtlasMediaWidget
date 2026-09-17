@@ -125,6 +125,8 @@ class ClusterMediaBridge(
         const val PREFS_NAME = "cluster_dim_prefs"
         const val KEY_CLUSTER_ONLINE_ENABLED = "cluster_dim_online_enabled"
         const val KEY_CLUSTER_ONLINE_PROGRESS_ENABLED = "cluster_dim_online_progress_enabled"
+        const val KEY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED =
+            "cluster_dim_online_facade_progress_enabled"
         const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
         const val KEY_REASSERT_BURST_INTERVAL_MS = "reassert_burst_interval_ms"
@@ -139,8 +141,9 @@ class ClusterMediaBridge(
         const val MIN_REASSERT_BURST_INTERVAL_MS = 50L
         const val MAX_REASSERT_BURST_INTERVAL_MS = 500L
         const val DEFAULT_REASSERT_BURST_INTERVAL_MS = 100L
-        const val ONLINE_PROGRESS_INTERVAL_MS = 500L
-        const val ONLINE_PROGRESS_INITIAL_DELAY_MS = 1_250L
+        const val ONLINE_PROGRESS_INTERVAL_MS = 2_000L
+        const val ONLINE_FACADE_PROGRESS_INTERVAL_MS = 1_000L
+        const val ONLINE_PROGRESS_INITIAL_DELAY_MS = ONLINE_PROGRESS_INTERVAL_MS
         const val MIN_REASSERT_WATCHDOG_INTERVAL_MS = 1_000L
         const val MAX_REASSERT_WATCHDOG_INTERVAL_MS = 5_000L
         const val RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS = 1_250L
@@ -284,6 +287,12 @@ class ClusterMediaBridge(
         prefs.getBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, false)
         private set
 
+    @Volatile
+    var isClusterOnlineFacadeProgressEnabled: Boolean =
+        prefs.getBoolean(KEY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false) &&
+            !isClusterOnlineProgressEnabled
+        private set
+
     private var activeSource: BridgeAudioSource? = null
     private var confirmedOnlineActive = false
     private var currentRadioInfo: IMediaInteraction.IPlaybackInfo? = null
@@ -339,6 +348,11 @@ class ClusterMediaBridge(
     private val directDimMediaClient = DirectDimMediaClient(context)
 
     init {
+        if (prefs.getBoolean(KEY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false) &&
+            isClusterOnlineProgressEnabled
+        ) {
+            prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false).apply()
+        }
         directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || isClusterOnlineEnabled)
     }
 
@@ -568,8 +582,36 @@ class ClusterMediaBridge(
 
     @Synchronized
     fun setClusterOnlineProgressEnabled(enabled: Boolean) {
+        stopOnlineProgress()
         isClusterOnlineProgressEnabled = enabled
-        prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, enabled).apply()
+        if (enabled) isClusterOnlineFacadeProgressEnabled = false
+        prefs.edit()
+            .putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, isClusterOnlineProgressEnabled)
+            .putBoolean(
+                KEY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
+                isClusterOnlineFacadeProgressEnabled,
+            )
+            .apply()
+        directDimMediaClient.clearPending()
+        lastOnlinePayload = null
+        lastOnlineProgress = -1L
+        if (enabled) ensureOnlineProgress() else stopOnlineProgress()
+    }
+
+    @Synchronized
+    fun setClusterOnlineFacadeProgressEnabled(enabled: Boolean) {
+        stopOnlineProgress()
+        isClusterOnlineFacadeProgressEnabled = enabled
+        if (enabled) isClusterOnlineProgressEnabled = false
+        prefs.edit()
+            .putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, isClusterOnlineProgressEnabled)
+            .putBoolean(
+                KEY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
+                isClusterOnlineFacadeProgressEnabled,
+            )
+            .apply()
+        directDimMediaClient.clearPending()
+        lastOnlinePayload = null
         lastOnlineProgress = -1L
         if (enabled) ensureOnlineProgress() else stopOnlineProgress()
     }
@@ -609,7 +651,7 @@ class ClusterMediaBridge(
                 IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING
             } else IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED,
             radioFrequency = "", radioMode = 0, radioStationName = "",
-            currentProgress = if (isClusterOnlineProgressEnabled) {
+            currentProgress = if (isAnyOnlineProgressEnabled()) {
                 extrapolateOnlineProgress(
                     positionMs = snapshot.position,
                     durationMs = snapshot.duration,
@@ -621,25 +663,33 @@ class ClusterMediaBridge(
         )
         if (lastOnlinePayload?.let(::onlinePayloadDedupKey) != onlinePayloadDedupKey(payload)) {
             stopOnlineProgress()
-            val result = directDimMediaClient.sendOrQueue(payload)
+            val result = if (isClusterOnlineFacadeProgressEnabled) {
+                sendOnlineFacadePayload(payload)
+            } else {
+                directDimMediaClient.sendOrQueue(payload)
+            }
             if (!result.startsWith("send-failed")) {
                 lastOnlinePayload = payload
                 lastOnlineProgress = payload.currentProgress
             }
             lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
-            lastUpdateError = directDimMediaClient.status().lastError
+            if (!isClusterOnlineFacadeProgressEnabled) {
+                lastUpdateError = directDimMediaClient.status().lastError
+            } else if (!result.startsWith("send-failed")) {
+                lastUpdateError = ""
+            }
         }
         if (onlineProgressState?.playing == true) ensureOnlineProgress() else stopOnlineProgress()
     }
 
     @Synchronized
     private fun ensureOnlineProgress() {
-        if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
+        if (!isClusterOnlineEnabled || !isAnyOnlineProgressEnabled() || !confirmedOnlineActive ||
             onlineProgressState?.playing != true || lastOnlinePayload == null ||
             onlineProgressJob?.isActive == true
         ) return
         onlineProgressJob = onlineProgressScope.launch {
-            delay(ONLINE_PROGRESS_INITIAL_DELAY_MS)
+            delay(onlineProgressIntervalMs())
             while (isActive) {
                 val state = onlineProgressState ?: break
                 if (!state.playing) break
@@ -653,35 +703,87 @@ class ClusterMediaBridge(
                 if (progress != null) {
                     sendOnlineProgress(progress)
                 }
-                delay(ONLINE_PROGRESS_INTERVAL_MS)
+                delay(onlineProgressIntervalMs())
             }
         }
     }
 
     @Synchronized
     private fun sendOnlineProgress(progress: Long) {
-        if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
+        if (!isClusterOnlineEnabled || !isAnyOnlineProgressEnabled() || !confirmedOnlineActive ||
             onlineProgressState?.playing != true || lastOnlinePayload == null || lastOnlineProgress == progress
         ) return
 
-        val mediaInteraction = runCatching {
-            dimInteraction?.mediaInteraction
-        }.onFailure {
-            lastUpdateError = it.diagnosticMessage()
-            Timber.e(it, "Failed to initialize cluster DIM media interaction for online progress")
-        }.getOrNull() ?: return
+        if (isClusterOnlineFacadeProgressEnabled) {
+            val result = runCatching {
+                dimInteraction?.mediaInteraction?.updateCurrentProgress(progress)
+                    ?: error("DIM mediaInteraction is unavailable")
+                "facade-progress"
+            }.getOrElse { error ->
+                lastUpdateError = error.diagnosticMessage()
+                Timber.e(error, "Failed to update facade DIM online progress")
+                "send-failed:$lastUpdateError"
+            }
+            if (!result.startsWith("send-failed")) {
+                lastOnlineProgress = progress
+                lastUpdateError = ""
+            }
+            lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress / $result"
+            return
+        }
 
-        runCatching {
-            mediaInteraction.updateCurrentProgress(progress)
-        }.onSuccess {
+        val payload = lastOnlinePayload?.copy(currentProgress = progress) ?: return
+        val result = directDimMediaClient.sendOrQueue(payload)
+        if (!result.startsWith("send-failed")) {
+            lastOnlinePayload = payload
             lastOnlineProgress = progress
-            lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress"
-            lastUpdateError = ""
-        }.onFailure {
-            lastUpdateError = it.diagnosticMessage()
-            Timber.e(it, "Failed to update cluster DIM online progress")
+        }
+        lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress / $result"
+        lastUpdateError = directDimMediaClient.status().lastError
+        if (result.startsWith("send-failed")) {
+            Timber.w("Failed to send direct DIM online progress: %s", lastUpdateError)
         }
     }
+
+    private fun sendOnlineFacadePayload(payload: DirectDimMediaClient.Payload): String = runCatching {
+        val mediaInteraction = dimInteraction?.mediaInteraction
+            ?: error("DIM mediaInteraction is unavailable")
+        mediaInteraction.updatePlaybackInfo(
+            ClusterRadioPlaybackInfo(
+                payload.uuid,
+                payload.sourceType,
+                payload.radioFrequency,
+                payload.radioStationName,
+                payload.title,
+                payload.artist,
+                payload.album,
+                payload.duration,
+                payload.playbackStatus,
+                payload.radioMode,
+                payload.artworkUri,
+            ),
+        )
+        mediaInteraction.updateCurrentProgress(payload.currentProgress)
+        dimAvailable = true
+        dimInitializationError = ""
+        "facade-sent"
+    }.getOrElse { error ->
+        dimAvailable = false
+        dimInitializationError = error.diagnosticMessage()
+        lastUpdateError = error.diagnosticMessage()
+        Timber.e(error, "Failed to send facade DIM online playback")
+        "send-failed:$lastUpdateError"
+    }
+
+    private fun isAnyOnlineProgressEnabled(): Boolean =
+        isClusterOnlineProgressEnabled || isClusterOnlineFacadeProgressEnabled
+
+    private fun onlineProgressIntervalMs(): Long =
+        if (isClusterOnlineFacadeProgressEnabled) {
+            ONLINE_FACADE_PROGRESS_INTERVAL_MS
+        } else {
+            ONLINE_PROGRESS_INTERVAL_MS
+        }
 
     @Synchronized
     private fun stopOnlineProgress() {

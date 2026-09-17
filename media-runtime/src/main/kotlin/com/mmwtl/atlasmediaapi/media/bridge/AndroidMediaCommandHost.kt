@@ -28,12 +28,16 @@ class AndroidMediaCommandHost(
     private val stateHub: MediaStateHub? = null,
     internal val sessionWaitTimeoutMs: Long = SESSION_WAIT_TIMEOUT_MS,
     internal val sessionPollDelaysMs: List<Long> = SESSION_POLL_DELAYS_MS,
+    internal val autoplayConfirmDelaysMs: List<Long> = AUTOPLAY_CONFIRM_DELAYS_MS,
+    internal val autoplayMediaKeyConfirmDelayMs: Long = AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
     private val launchPackage: ((String) -> Boolean)? = null,
 ) : MediaCommandHost {
     companion object {
         private const val MAX_RADIO_STATIONS_PER_LIST = 256
         const val SESSION_WAIT_TIMEOUT_MS = 10_000L
         val SESSION_POLL_DELAYS_MS = listOf(100L, 200L, 400L, 800L, 1_000L)
+        val AUTOPLAY_CONFIRM_DELAYS_MS = listOf(300L, 700L, 1_200L)
+        const val AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS = 1_000L
     }
 
     private val currentMediaPackageRef = AtomicReference("")
@@ -196,11 +200,7 @@ class AndroidMediaCommandHost(
 
         val sessionFound = awaitSession(packageName)
         val result = if (sessionFound != null) {
-            runCatching {
-                sessionFound.transportControls.play()
-                true
-            }.onFailure { Timber.w(it, "Could not start configured media package $packageName") }
-                .getOrDefault(false)
+            playAndConfirm(packageName, sessionFound)
         } else {
             Timber.w("Configured media package %s did not publish a MediaSession", packageName)
             false
@@ -208,6 +208,55 @@ class AndroidMediaCommandHost(
         if (returnHomeAfterLaunch) returnHomeScreen()
         return result
     }
+
+    private suspend fun playAndConfirm(
+        packageName: String,
+        initialController: MediaController,
+    ): Boolean {
+        var controller = initialController
+        if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            setCurrentMediaPackage(packageName)
+            return true
+        }
+
+        autoplayConfirmDelaysMs.forEachIndexed { attempt, confirmDelayMs ->
+            runCatching { controller.transportControls.play() }
+                .onFailure {
+                    Timber.w(it, "Could not request playback from $packageName (attempt ${attempt + 1})")
+                }
+            delay(confirmDelayMs.coerceAtLeast(1L))
+            controller = configuredController(packageName) ?: controller
+            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                setCurrentMediaPackage(packageName)
+                return true
+            }
+        }
+
+        runCatching {
+            val eventTime = android.os.SystemClock.uptimeMillis()
+            val downSent = controller.dispatchMediaButtonEvent(
+                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY, 0),
+            )
+            val upSent = controller.dispatchMediaButtonEvent(
+                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY, 0),
+            )
+            downSent || upSent
+        }.onFailure {
+            Timber.w(it, "Could not send MEDIA_PLAY to configured media package $packageName")
+        }
+        delay(autoplayMediaKeyConfirmDelayMs.coerceAtLeast(1L))
+        controller = configuredController(packageName) ?: controller
+        if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            setCurrentMediaPackage(packageName)
+            return true
+        }
+
+        Timber.w("Configured media package %s stayed paused after autoplay requests", packageName)
+        return false
+    }
+
+    private fun configuredController(packageName: String): MediaController? =
+        sessionObserver.getActiveControllers().firstOrNull { it.packageName == packageName }
 
     private fun launchConfiguredPackage(packageName: String): Boolean {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)

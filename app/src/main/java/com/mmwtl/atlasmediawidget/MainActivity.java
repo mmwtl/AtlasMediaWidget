@@ -95,6 +95,7 @@ public final class MainActivity extends ScaledActivity {
     private Switch clusterCoversSwitch;
     private Switch clusterOnlineSwitch;
     private Switch clusterOnlineProgressSwitch;
+    private Switch clusterOnlineFacadeProgressSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
     private TextView clusterReassertBurstLabel;
@@ -1752,16 +1753,36 @@ public final class MainActivity extends ScaledActivity {
         mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
 
         clusterOnlineProgressSwitch = new Switch(this);
-        clusterOnlineProgressSwitch.setText("Отправлять прогресс онлайн на приборку (каждые 500 мс)");
+        clusterOnlineProgressSwitch.setText("Прогресс онлайн: прямой DIM-пакет (каждые 2 с)");
         clusterOnlineProgressSwitch.setTextColor(Ui.PRIMARY);
         clusterOnlineProgressSwitch.setTextSize(15);
         clusterOnlineProgressSwitch.setOnCheckedChangeListener((btn, checked) -> {
             if (!btn.isPressed()) return;
+            if (checked && clusterOnlineFacadeProgressSwitch != null) {
+                clusterOnlineFacadeProgressSwitch.setChecked(false);
+            }
             sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, checked);
         });
         LinearLayout.LayoutParams s8 = fullWrap();
         s8.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterOnlineProgressSwitch, s8);
+
+        clusterOnlineFacadeProgressSwitch = new Switch(this);
+        clusterOnlineFacadeProgressSwitch.setText("Прогресс онлайн: режим GMediaHUD (каждую 1 с)");
+        clusterOnlineFacadeProgressSwitch.setTextColor(Ui.PRIMARY);
+        clusterOnlineFacadeProgressSwitch.setTextSize(15);
+        clusterOnlineFacadeProgressSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            if (checked && clusterOnlineProgressSwitch != null) {
+                clusterOnlineProgressSwitch.setChecked(false);
+            }
+            sendMediaSettingChange(
+                    MediaBridgeContract.K_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
+                    checked);
+        });
+        LinearLayout.LayoutParams s9 = fullWrap();
+        s9.topMargin = Ui.dp(this, 10);
+        mediaSettingsGroup.addView(clusterOnlineFacadeProgressSwitch, s9);
 
         TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
@@ -1974,6 +1995,11 @@ public final class MainActivity extends ScaledActivity {
             clusterOnlineProgressSwitch.setChecked(snapshot.clusterOnlineProgressEnabled);
             clusterOnlineProgressSwitch.setEnabled(snapshot.clusterOnlineEnabled);
             clusterOnlineProgressSwitch.setAlpha(snapshot.clusterOnlineEnabled ? 1f : 0.45f);
+        }
+        if (clusterOnlineFacadeProgressSwitch != null) {
+            clusterOnlineFacadeProgressSwitch.setChecked(snapshot.clusterOnlineFacadeProgressEnabled);
+            clusterOnlineFacadeProgressSwitch.setEnabled(snapshot.clusterOnlineEnabled);
+            clusterOnlineFacadeProgressSwitch.setAlpha(snapshot.clusterOnlineEnabled ? 1f : 0.45f);
         }
         if (clusterWatchdogLabel != null) {
             clusterWatchdogLabel.setText(snapshot.clusterWatchdogIntervalMs + " мс");

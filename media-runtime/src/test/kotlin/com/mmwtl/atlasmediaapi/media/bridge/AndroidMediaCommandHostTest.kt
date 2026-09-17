@@ -73,7 +73,7 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
-    fun `autoplay waits for configured player session`() = runBlocking {
+    fun `autoplay waits for configured player session and playing state`() = runBlocking {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
         val hub = hub(context, repository)
@@ -102,14 +102,51 @@ class AndroidMediaCommandHostTest {
                 Thread {
                     Thread.sleep(30L)
                     controllers += controller
+                    Thread.sleep(30L)
+                    shadowOf(controller).setPlaybackState(
+                        PlaybackState.Builder()
+                            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+                            .build(),
+                    )
                 }.start()
                 true
             },
             sessionWaitTimeoutMs = 500L,
             sessionPollDelaysMs = listOf(5L, 10L, 20L),
+            autoplayConfirmDelaysMs = listOf(10L, 30L),
+            autoplayMediaKeyConfirmDelayMs = 10L,
         )
 
         assertTrue(host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = true))
+        session.release()
+    }
+
+    @Test
+    fun `autoplay fails when configured session stays paused`() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+        val session = MediaSession(context, "paused-online-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 100L))
+        }
+        activeControllers(observer) += controller(context, session, "com.example.paused")
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply {
+                defaultMediaPackage = "com.example.paused"
+            },
+            hub = hub,
+            launchPackage = { true },
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+            autoplayConfirmDelaysMs = listOf(1L, 1L),
+            autoplayMediaKeyConfirmDelayMs = 1L,
+        )
+
+        assertFalse(host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = true))
         session.release()
     }
 
@@ -159,6 +196,8 @@ class AndroidMediaCommandHostTest {
         launchPackage: ((String) -> Boolean)? = null,
         sessionWaitTimeoutMs: Long = AndroidMediaCommandHost.SESSION_WAIT_TIMEOUT_MS,
         sessionPollDelaysMs: List<Long> = AndroidMediaCommandHost.SESSION_POLL_DELAYS_MS,
+        autoplayConfirmDelaysMs: List<Long> = AndroidMediaCommandHost.AUTOPLAY_CONFIRM_DELAYS_MS,
+        autoplayMediaKeyConfirmDelayMs: Long = AndroidMediaCommandHost.AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
     ): Fixture {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
@@ -178,6 +217,8 @@ class AndroidMediaCommandHostTest {
                 launchPackage = launchPackage,
                 sessionWaitTimeoutMs = sessionWaitTimeoutMs,
                 sessionPollDelaysMs = sessionPollDelaysMs,
+                autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
+                autoplayMediaKeyConfirmDelayMs = autoplayMediaKeyConfirmDelayMs,
             ),
         )
     }
@@ -202,6 +243,8 @@ class AndroidMediaCommandHostTest {
         launchPackage: ((String) -> Boolean)?,
         sessionWaitTimeoutMs: Long,
         sessionPollDelaysMs: List<Long>,
+        autoplayConfirmDelaysMs: List<Long> = AndroidMediaCommandHost.AUTOPLAY_CONFIRM_DELAYS_MS,
+        autoplayMediaKeyConfirmDelayMs: Long = AndroidMediaCommandHost.AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
     ): AndroidMediaCommandHost = AndroidMediaCommandHost(
         context = context,
         apiManager = OneOSApiManager.getInstance(context),
@@ -212,6 +255,8 @@ class AndroidMediaCommandHostTest {
         launchPackage = launchPackage,
         sessionWaitTimeoutMs = sessionWaitTimeoutMs,
         sessionPollDelaysMs = sessionPollDelaysMs,
+        autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
+        autoplayMediaKeyConfirmDelayMs = autoplayMediaKeyConfirmDelayMs,
     )
 
     private fun pausedState(lastUpdateTime: Long): PlaybackState = PlaybackState.Builder()

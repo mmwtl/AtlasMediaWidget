@@ -75,6 +75,7 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
         assertFalse(snapshot.clusterOnlineProgressEnabled)
+        assertFalse(snapshot.clusterOnlineFacadeProgressEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
         assertEquals(100L, snapshot.clusterReassertBurstIntervalMs)
         assertEquals("BUILT_IN", snapshot.catalogType)
@@ -91,6 +92,7 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
             putLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS, 200L)
             putInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, 18)
@@ -108,10 +110,39 @@ class MediaSettingsControllerTest {
         assertTrue(snap.switchToOnlineBeforeSessionPlay)
         assertTrue(snap.clusterOnlineEnabled)
         assertTrue(snap.clusterOnlineProgressEnabled)
+        assertFalse(snap.clusterOnlineFacadeProgressEnabled)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
         assertEquals(200L, snap.clusterReassertBurstIntervalMs)
         assertEquals(18, snap.uiScaleTenths)
         assertTrue(settingsChangedTriggered)
+    }
+
+    @Test
+    fun `online progress transports are mutually exclusive`() {
+        val direct = controller.updateSettings(controller.getRevision(), Bundle().apply {
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
+        }).snapshot!!
+        assertTrue(direct.clusterOnlineProgressEnabled)
+        assertFalse(direct.clusterOnlineFacadeProgressEnabled)
+
+        val facade = controller.updateSettings(controller.getRevision(), Bundle().apply {
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, true)
+        }).snapshot!!
+        assertFalse(facade.clusterOnlineProgressEnabled)
+        assertTrue(facade.clusterOnlineFacadeProgressEnabled)
+
+        val directAgain = controller.updateSettings(controller.getRevision(), Bundle().apply {
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
+        }).snapshot!!
+        assertTrue(directAgain.clusterOnlineProgressEnabled)
+        assertFalse(directAgain.clusterOnlineFacadeProgressEnabled)
+
+        val normalized = controller.updateSettings(controller.getRevision(), Bundle().apply {
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, true)
+        }).snapshot!!
+        assertFalse(normalized.clusterOnlineProgressEnabled)
+        assertTrue(normalized.clusterOnlineFacadeProgressEnabled)
     }
 
     @Test
@@ -271,6 +302,7 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("clusterCoversEnabled"))
         assertTrue(json.has("clusterOnlineEnabled"))
         assertTrue(json.has("clusterOnlineProgressEnabled"))
+        assertTrue(json.has("clusterOnlineFacadeProgressEnabled"))
         assertTrue(json.has("clusterReassertBurstIntervalMs"))
         assertFalse(json.has("uiScaleTenths"))
     }
@@ -381,6 +413,7 @@ class MediaSettingsControllerTest {
         clusterMediaBridge.setClusterCoversEnabled(false)
         clusterMediaBridge.setClusterOnlineEnabled(true)
         clusterMediaBridge.setClusterOnlineProgressEnabled(true)
+        clusterMediaBridge.setClusterOnlineFacadeProgressEnabled(true)
         clusterMediaBridge.setReassertWatchdogIntervalMs(4000L)
         clusterMediaBridge.setReassertBurstIntervalMs(300L)
         preferences.uiScaleTenths = 19
@@ -415,6 +448,7 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
         assertFalse(snapshot.clusterOnlineProgressEnabled)
+        assertFalse(snapshot.clusterOnlineFacadeProgressEnabled)
         assertEquals(1250L, snapshot.clusterWatchdogIntervalMs)
         assertEquals(100L, snapshot.clusterReassertBurstIntervalMs)
         assertEquals(19, snapshot.uiScaleTenths)

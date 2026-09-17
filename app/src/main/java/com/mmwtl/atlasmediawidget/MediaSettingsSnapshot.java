@@ -15,6 +15,7 @@ final class MediaSettingsSnapshot {
     final boolean clusterCoversEnabled;
     final boolean clusterOnlineEnabled;
     final boolean clusterOnlineProgressEnabled;
+    final boolean clusterOnlineFacadeProgressEnabled;
     final long clusterWatchdogIntervalMs;
     final long clusterReassertBurstIntervalMs;
     final String catalogType;
@@ -42,7 +43,7 @@ final class MediaSettingsSnapshot {
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
                 switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
-                clusterCoversEnabled, false, false, clusterWatchdogIntervalMs, 100L, catalogType,
+                clusterCoversEnabled, false, false, false, clusterWatchdogIntervalMs, 100L, catalogType,
                 catalogStationCount, catalogDescription, uiScaleTenths);
     }
 
@@ -67,7 +68,7 @@ final class MediaSettingsSnapshot {
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
                 switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
-                clusterCoversEnabled, clusterOnlineEnabled, false, clusterWatchdogIntervalMs, 100L,
+                clusterCoversEnabled, clusterOnlineEnabled, false, false, clusterWatchdogIntervalMs, 100L,
                 catalogType, catalogStationCount, catalogDescription, uiScaleTenths);
     }
 
@@ -84,6 +85,7 @@ final class MediaSettingsSnapshot {
             boolean clusterCoversEnabled,
             boolean clusterOnlineEnabled,
             boolean clusterOnlineProgressEnabled,
+            boolean clusterOnlineFacadeProgressEnabled,
             long clusterWatchdogIntervalMs,
             long clusterReassertBurstIntervalMs,
             String catalogType,
@@ -102,6 +104,7 @@ final class MediaSettingsSnapshot {
         this.clusterCoversEnabled = clusterCoversEnabled;
         this.clusterOnlineEnabled = clusterOnlineEnabled;
         this.clusterOnlineProgressEnabled = clusterOnlineProgressEnabled;
+        this.clusterOnlineFacadeProgressEnabled = clusterOnlineFacadeProgressEnabled;
         this.clusterWatchdogIntervalMs = clusterWatchdogIntervalMs;
         this.clusterReassertBurstIntervalMs = clusterReassertBurstIntervalMs;
         this.catalogType = catalogType != null && !catalogType.isEmpty() ? catalogType : "BUILT_IN";
@@ -127,6 +130,7 @@ final class MediaSettingsSnapshot {
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, true),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, false),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, false),
+                bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false),
                 bundle.getLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),
                 bundle.getLong(MediaBridgeContract.K_CLUSTER_REASSERT_BURST_INTERVAL_MS, 100L),
                 bundle.getString(MediaBridgeContract.K_CATALOG_TYPE, "BUILT_IN"),
@@ -149,6 +153,8 @@ final class MediaSettingsSnapshot {
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, clusterCoversEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, clusterOnlineProgressEnabled);
+        bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
+                clusterOnlineFacadeProgressEnabled);
         bundle.putLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs);
         bundle.putLong(MediaBridgeContract.K_CLUSTER_REASSERT_BURST_INTERVAL_MS, clusterReassertBurstIntervalMs);
         bundle.putString(MediaBridgeContract.K_CATALOG_TYPE, catalogType);

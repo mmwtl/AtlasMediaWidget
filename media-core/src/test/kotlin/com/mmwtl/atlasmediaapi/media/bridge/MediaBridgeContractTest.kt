@@ -67,6 +67,10 @@ class MediaBridgeContractTest {
         assertEquals("uiScaleTenths", MediaBridgeContract.Key.UI_SCALE_TENTHS)
         assertEquals("settingsRevision", MediaBridgeContract.Key.SETTINGS_REVISION)
         assertEquals("defaultAudioSource", MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE)
+        assertEquals(
+            "clusterOnlineFacadeProgressEnabled",
+            MediaBridgeContract.Key.CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED,
+        )
     }
 
     @Test
@@ -84,6 +88,7 @@ class MediaBridgeContractTest {
             clusterCoversEnabled = false,
             clusterOnlineEnabled = true,
             clusterOnlineProgressEnabled = true,
+            clusterOnlineFacadeProgressEnabled = false,
             clusterWatchdogIntervalMs = 2500L,
             clusterReassertBurstIntervalMs = 200L,
             catalogType = "CUSTOM",
