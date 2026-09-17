@@ -288,6 +288,7 @@ class ClusterMediaBridge(
     private var confirmedOnlineActive = false
     private var currentRadioInfo: IMediaInteraction.IPlaybackInfo? = null
     private var lastOnlinePayload: DirectDimMediaClient.Payload? = null
+    private var lastOnlineProgress = -1L
 
     private data class OnlineProgressState(
         val positionMs: Long,
@@ -418,6 +419,7 @@ class ClusterMediaBridge(
         val active = source == BridgeAudioSource.RADIO
         confirmedOnlineActive = source == BridgeAudioSource.ONLINE
         lastOnlinePayload = null
+        lastOnlineProgress = -1L
         onlineProgressState = null
         if (!confirmedOnlineActive) stopOnlineProgress()
         currentRadioInfo = null
@@ -555,6 +557,7 @@ class ClusterMediaBridge(
         prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_ENABLED, enabled).apply()
         lastOnlinePayload = null
         if (!enabled) {
+            lastOnlineProgress = -1L
             onlineProgressState = null
             stopOnlineProgress()
             if (confirmedOnlineActive) directDimMediaClient.clearPending()
@@ -567,6 +570,7 @@ class ClusterMediaBridge(
     fun setClusterOnlineProgressEnabled(enabled: Boolean) {
         isClusterOnlineProgressEnabled = enabled
         prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, enabled).apply()
+        lastOnlineProgress = -1L
         if (enabled) ensureOnlineProgress() else stopOnlineProgress()
     }
 
@@ -579,6 +583,7 @@ class ClusterMediaBridge(
         ) {
             if (lastOnlinePayload != null) directDimMediaClient.clearPending()
             lastOnlinePayload = null
+            lastOnlineProgress = -1L
             onlineProgressState = null
             stopOnlineProgress()
             return
@@ -617,7 +622,10 @@ class ClusterMediaBridge(
         if (lastOnlinePayload?.let(::onlinePayloadDedupKey) != onlinePayloadDedupKey(payload)) {
             stopOnlineProgress()
             val result = directDimMediaClient.sendOrQueue(payload)
-            if (!result.startsWith("send-failed")) lastOnlinePayload = payload
+            if (!result.startsWith("send-failed")) {
+                lastOnlinePayload = payload
+                lastOnlineProgress = payload.currentProgress
+            }
             lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
             lastUpdateError = directDimMediaClient.status().lastError
         }
@@ -652,18 +660,27 @@ class ClusterMediaBridge(
 
     @Synchronized
     private fun sendOnlineProgress(progress: Long) {
-        val currentPayload = lastOnlinePayload ?: return
         if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
-            onlineProgressState?.playing != true || currentPayload.currentProgress == progress
+            onlineProgressState?.playing != true || lastOnlinePayload == null || lastOnlineProgress == progress
         ) return
 
-        // The metadata packet uses the firmware's direct DIM producer. Sending progress through
-        // the public facade creates a competing producer and can replace the complete ONLINE card.
-        val payload = currentPayload.copy(currentProgress = progress)
-        val result = directDimMediaClient.sendOrQueue(payload)
-        if (!result.startsWith("send-failed")) lastOnlinePayload = payload
-        lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress / $result"
-        lastUpdateError = directDimMediaClient.status().lastError
+        val mediaInteraction = runCatching {
+            dimInteraction?.mediaInteraction
+        }.onFailure {
+            lastUpdateError = it.diagnosticMessage()
+            Timber.e(it, "Failed to initialize cluster DIM media interaction for online progress")
+        }.getOrNull() ?: return
+
+        runCatching {
+            mediaInteraction.updateCurrentProgress(progress)
+        }.onSuccess {
+            lastOnlineProgress = progress
+            lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress"
+            lastUpdateError = ""
+        }.onFailure {
+            lastUpdateError = it.diagnosticMessage()
+            Timber.e(it, "Failed to update cluster DIM online progress")
+        }
     }
 
     @Synchronized

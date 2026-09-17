@@ -143,7 +143,7 @@ class DirectDimMediaClientTest {
     }
 
     @Test
-    fun `online progress keeps metadata on the direct DIM producer`() {
+    fun `online progress waits for initial card without resending metadata`() {
         val context = RecordingContext()
         context.getSharedPreferences(ClusterMediaBridge.PREFS_NAME, Context.MODE_PRIVATE)
             .edit().clear().commit()
@@ -151,7 +151,7 @@ class DirectDimMediaClientTest {
         val packets = java.util.Collections.synchronizedList(
             mutableListOf<Pair<String, Long>>(),
         )
-        val received = java.util.concurrent.CountDownLatch(2)
+        val received = java.util.concurrent.CountDownLatch(1)
         context.connection.onServiceConnected(context.intent.component!!, object : Binder() {
             override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
                 data.enforceInterface("com.autolink.adapterbinder.IDimMediaInteractioncService")
@@ -192,12 +192,12 @@ class DirectDimMediaClientTest {
         bridge.updateOnlinePlayback(snapshot, null)
         bridge.updateOnlinePlayback(snapshot.copy(position = 2_000L), null)
 
-        assertFalse(received.await(750, java.util.concurrent.TimeUnit.MILLISECONDS))
-        assertTrue(received.await(2, java.util.concurrent.TimeUnit.SECONDS))
+        assertTrue(received.await(1, java.util.concurrent.TimeUnit.SECONDS))
+        Thread.sleep(ClusterMediaBridge.ONLINE_PROGRESS_INITIAL_DELAY_MS + 250L)
         bridge.setActiveSource(BridgeAudioSource.RADIO)
-        assertTrue(packets.size >= 2)
-        assertTrue(packets.all { it.first == "Title" })
-        assertTrue(packets.last().second >= packets.first().second)
+        assertEquals(1, packets.size)
+        assertEquals("Title", packets.single().first)
+        assertTrue(packets.single().second >= 1_000L)
     }
 
 }
