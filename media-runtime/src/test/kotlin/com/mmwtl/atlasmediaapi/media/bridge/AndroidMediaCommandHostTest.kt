@@ -113,6 +113,41 @@ class AndroidMediaCommandHostTest {
         session.release()
     }
 
+    @Test
+    fun `returning to online prefers remembered session instead of newer session`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+        val controllers = activeControllers(observer)
+        val rememberedSession = MediaSession(context, "remembered-online-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 100L))
+        }
+        val newerSession = MediaSession(context, "newer-online-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 200L))
+        }
+        controllers += controller(context, newerSession, "com.example.newer")
+        controllers += controller(context, rememberedSession, "com.example.remembered")
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context),
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+        )
+        assertEquals("com.example.newer", host.preferredSession()?.packageName)
+
+        host.setCurrentMediaPackage("com.example.remembered")
+
+        assertEquals("com.example.remembered", host.preferredOnlineSession()?.packageName)
+        rememberedSession.release()
+        newerSession.release()
+    }
+
     private data class Fixture(
         val context: android.app.Application,
         val repository: MediaStateRepository,
@@ -178,6 +213,20 @@ class AndroidMediaCommandHostTest {
         sessionWaitTimeoutMs = sessionWaitTimeoutMs,
         sessionPollDelaysMs = sessionPollDelaysMs,
     )
+
+    private fun pausedState(lastUpdateTime: Long): PlaybackState = PlaybackState.Builder()
+        .setState(PlaybackState.STATE_PAUSED, 0L, 0f, lastUpdateTime)
+        .setActions(PlaybackState.ACTION_PLAY)
+        .build()
+
+    private fun controller(
+        context: Context,
+        session: MediaSession,
+        packageName: String,
+    ): MediaController = MediaController(context, session.sessionToken).also { controller ->
+        shadowOf(controller).setPackageName(packageName)
+        shadowOf(controller).setPlaybackState(session.controller.playbackState)
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun activeControllers(

@@ -37,6 +37,7 @@ class AndroidMediaCommandHost(
     }
 
     private val currentMediaPackageRef = AtomicReference("")
+    private val lastOnlineMediaPackageRef = AtomicReference("")
 
     private fun mediaCenter(): MediaCenterManager? =
         apiManager.getMediaCenterManager()?.takeIf { it.isAlive }
@@ -128,6 +129,10 @@ class AndroidMediaCommandHost(
 
     override fun setCurrentMediaPackage(packageName: String) {
         currentMediaPackageRef.set(packageName)
+        val currentSource = runCatching { mediaCenter()?.currentAudioSource }.getOrNull()
+        if (currentSource == null || currentSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
+            rememberOnlineMediaPackage(packageName)
+        }
     }
 
     override fun beforeSessionPlay() {
@@ -278,8 +283,12 @@ class AndroidMediaCommandHost(
             if (!autoplay) return true
 
             delay(500L)
-            val session = preferredSession()
-            if (session != null) return session.play()
+            val session = preferredOnlineSession()
+            if (session != null) {
+                return session.play().also { played ->
+                    if (played) setCurrentMediaPackage(session.packageName)
+                }
+            }
             return if (configuredOnlinePackage != null) {
                 startDefaultAndPlay(configuredOnlinePackage)
             } else {
@@ -291,6 +300,7 @@ class AndroidMediaCommandHost(
             ?: MediaCenterConstant.AppSource.UNKNOWN
 
         return runCatching {
+            rememberOnlineSessionBeforeLeaving(center, oneOsSource)
             pauseCurrentPlayback(center)
 
             if (oneOsSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE &&
@@ -346,9 +356,9 @@ class AndroidMediaCommandHost(
                         launchCarPlayActivity()
                     }
                     MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE -> {
-                        val session = preferredSession()
+                        val session = preferredOnlineSession()
                         if (session != null) {
-                            session.play()
+                            if (session.play()) setCurrentMediaPackage(session.packageName)
                         } else {
                             val defaultPkg = defaultMediaPackage()
                             if (defaultPkg.isNotBlank()) {
@@ -361,6 +371,40 @@ class AndroidMediaCommandHost(
             }
             true
         }.onFailure(Timber::e).getOrDefault(false)
+    }
+
+    private fun rememberOnlineSessionBeforeLeaving(
+        center: MediaCenterManager,
+        targetSource: MediaCenterConstant.AudioSource,
+    ) {
+        if (targetSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) return
+        val currentSource = runCatching { center.currentAudioSource }.getOrNull()
+        if (currentSource != MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) return
+
+        val controllers = sessionObserver.getActiveControllers()
+        val currentPackage = currentMediaPackage()
+        val onlineController = controllers.firstOrNull {
+            it.playbackState?.state == PlaybackState.STATE_PLAYING
+        } ?: controllers.firstOrNull {
+            currentPackage.isNotBlank() && it.packageName == currentPackage
+        } ?: controllers.maxByOrNull {
+            it.playbackState?.lastPositionUpdateTime ?: 0L
+        }
+        rememberOnlineMediaPackage(onlineController?.packageName.orEmpty())
+    }
+
+    internal fun preferredOnlineSession(): MediaSessionCommandTarget? {
+        val rememberedPackage = lastOnlineMediaPackageRef.get()
+        if (rememberedPackage.isNotBlank()) {
+            sessionObserver.getActiveControllers()
+                .firstOrNull { it.packageName == rememberedPackage }
+                ?.let { return AndroidMediaSessionTarget(it) }
+        }
+        return preferredSession()
+    }
+
+    private fun rememberOnlineMediaPackage(packageName: String) {
+        if (packageName.isNotBlank()) lastOnlineMediaPackageRef.set(packageName)
     }
 
     override suspend fun tuneRadio(target: RadioStationTarget, autoplay: Boolean): Boolean {
