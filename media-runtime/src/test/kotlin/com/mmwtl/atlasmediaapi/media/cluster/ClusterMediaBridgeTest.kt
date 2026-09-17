@@ -167,6 +167,33 @@ class ClusterMediaBridgeTest {
     }
 
     @Test
+    fun `online payload deduplication ignores only progress`() {
+        val payload = DirectDimMediaClient.Payload(
+            sourceType = IMediaInteraction.SOURCE_TYPE_ONLINE,
+            uuid = "online-track",
+            title = "Title",
+            album = "Album",
+            artist = "Artist",
+            artworkUri = null,
+            duration = 60_000L,
+            playbackStatus = IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING,
+            radioFrequency = "",
+            radioMode = 0,
+            radioStationName = "",
+            currentProgress = 12_500L,
+        )
+
+        assertEquals(
+            ClusterMediaBridge.onlinePayloadDedupKey(payload),
+            ClusterMediaBridge.onlinePayloadDedupKey(payload.copy(currentProgress = 13_000L)),
+        )
+        assertFalse(
+            ClusterMediaBridge.onlinePayloadDedupKey(payload) ==
+                ClusterMediaBridge.onlinePayloadDedupKey(payload.copy(title = "Other")),
+        )
+    }
+
+    @Test
     fun `cluster overwrite watchdog interval is constrained to safe range`() {
         assertEquals(1_000L, ClusterMediaBridge.normalizeReassertWatchdogInterval(0L))
         assertEquals(1_000L, ClusterMediaBridge.normalizeReassertWatchdogInterval(250L))

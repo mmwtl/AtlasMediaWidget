@@ -140,6 +140,7 @@ class ClusterMediaBridge(
         const val MAX_REASSERT_BURST_INTERVAL_MS = 500L
         const val DEFAULT_REASSERT_BURST_INTERVAL_MS = 100L
         const val ONLINE_PROGRESS_INTERVAL_MS = 500L
+        const val ONLINE_PROGRESS_INITIAL_DELAY_MS = 1_250L
         const val MIN_REASSERT_WATCHDOG_INTERVAL_MS = 1_000L
         const val MAX_REASSERT_WATCHDOG_INTERVAL_MS = 5_000L
         const val RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS = 1_250L
@@ -183,6 +184,10 @@ class ClusterMediaBridge(
                 if (durationMs > 0L) value.coerceAtMost(durationMs) else value
             }
         }
+
+        internal fun onlinePayloadDedupKey(
+            payload: DirectDimMediaClient.Payload,
+        ): DirectDimMediaClient.Payload = payload.copy(currentProgress = 0L)
 
         internal fun jitteredReassertWatchdogDelayMs(
             intervalMs: Long,
@@ -289,6 +294,7 @@ class ClusterMediaBridge(
         val durationMs: Long,
         val speed: Float,
         val updateElapsedRealtime: Long,
+        val playing: Boolean,
     )
 
     @Volatile
@@ -582,8 +588,8 @@ class ClusterMediaBridge(
             durationMs = snapshot.duration,
             speed = snapshot.speed,
             updateElapsedRealtime = snapshot.updateElapsedRealtime,
+            playing = snapshot.playbackState == PlaybackState.STATE_PLAYING,
         )
-        ensureOnlineProgress()
         val artworkFile = coverFile?.takeIf { it.isFile }?.let { source ->
             val shared = File(NFS_SHARED_DIR)
             if (shared.isDirectory && shared.canWrite()) copyArtworkAtomically(source, shared) else source
@@ -598,22 +604,37 @@ class ClusterMediaBridge(
                 IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING
             } else IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED,
             radioFrequency = "", radioMode = 0, radioStationName = "",
+            currentProgress = if (isClusterOnlineProgressEnabled) {
+                extrapolateOnlineProgress(
+                    positionMs = snapshot.position,
+                    durationMs = snapshot.duration,
+                    speed = snapshot.speed,
+                    updateElapsedRealtime = snapshot.updateElapsedRealtime,
+                    nowElapsedRealtime = SystemClock.elapsedRealtime(),
+                ) ?: 0L
+            } else 0L,
         )
-        if (payload == lastOnlinePayload) return
-        val result = directDimMediaClient.sendOrQueue(payload)
-        if (!result.startsWith("send-failed")) lastOnlinePayload = payload
-        lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
-        lastUpdateError = directDimMediaClient.status().lastError
+        if (lastOnlinePayload?.let(::onlinePayloadDedupKey) != onlinePayloadDedupKey(payload)) {
+            stopOnlineProgress()
+            val result = directDimMediaClient.sendOrQueue(payload)
+            if (!result.startsWith("send-failed")) lastOnlinePayload = payload
+            lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
+            lastUpdateError = directDimMediaClient.status().lastError
+        }
+        if (onlineProgressState?.playing == true) ensureOnlineProgress() else stopOnlineProgress()
     }
 
     @Synchronized
     private fun ensureOnlineProgress() {
         if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
-            onlineProgressState == null || onlineProgressJob?.isActive == true
+            onlineProgressState?.playing != true || lastOnlinePayload == null ||
+            onlineProgressJob?.isActive == true
         ) return
         onlineProgressJob = onlineProgressScope.launch {
+            delay(ONLINE_PROGRESS_INITIAL_DELAY_MS)
             while (isActive) {
                 val state = onlineProgressState ?: break
+                if (!state.playing) break
                 val progress = extrapolateOnlineProgress(
                     positionMs = state.positionMs,
                     durationMs = state.durationMs,
@@ -622,12 +643,27 @@ class ClusterMediaBridge(
                     nowElapsedRealtime = SystemClock.elapsedRealtime(),
                 )
                 if (progress != null) {
-                    runCatching { dimInteraction?.mediaInteraction?.updateCurrentProgress(progress) }
-                        .onFailure { Timber.w(it, "Online DIM progress update failed") }
+                    sendOnlineProgress(progress)
                 }
                 delay(ONLINE_PROGRESS_INTERVAL_MS)
             }
         }
+    }
+
+    @Synchronized
+    private fun sendOnlineProgress(progress: Long) {
+        val currentPayload = lastOnlinePayload ?: return
+        if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
+            onlineProgressState?.playing != true || currentPayload.currentProgress == progress
+        ) return
+
+        // The metadata packet uses the firmware's direct DIM producer. Sending progress through
+        // the public facade creates a competing producer and can replace the complete ONLINE card.
+        val payload = currentPayload.copy(currentProgress = progress)
+        val result = directDimMediaClient.sendOrQueue(payload)
+        if (!result.startsWith("send-failed")) lastOnlinePayload = payload
+        lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress / $result"
+        lastUpdateError = directDimMediaClient.status().lastError
     }
 
     @Synchronized

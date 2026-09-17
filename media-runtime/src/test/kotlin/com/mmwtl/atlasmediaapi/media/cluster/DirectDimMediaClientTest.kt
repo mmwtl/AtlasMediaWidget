@@ -7,6 +7,7 @@ import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Binder
 import android.os.Parcel
+import android.os.SystemClock
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.BridgeAudioSource
 import org.robolectric.RuntimeEnvironment
@@ -139,6 +140,64 @@ class DirectDimMediaClientTest {
         context.connection.onServiceDisconnected(context.intent.component!!)
         context.connection.onServiceConnected(context.intent.component!!, binder)
         assertTrue(replayed.await(2, java.util.concurrent.TimeUnit.SECONDS))
+    }
+
+    @Test
+    fun `online progress keeps metadata on the direct DIM producer`() {
+        val context = RecordingContext()
+        context.getSharedPreferences(ClusterMediaBridge.PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val bridge = ClusterMediaBridge(context)
+        val packets = java.util.Collections.synchronizedList(
+            mutableListOf<Pair<String, Long>>(),
+        )
+        val received = java.util.concurrent.CountDownLatch(2)
+        context.connection.onServiceConnected(context.intent.component!!, object : Binder() {
+            override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+                data.enforceInterface("com.autolink.adapterbinder.IDimMediaInteractioncService")
+                assertEquals(1, code)
+                assertEquals(1, data.readInt())
+                data.readInt() // source_type
+                data.readString() // uuid
+                data.readInt() // mute_state
+                val title = data.readString().orEmpty()
+                data.readString() // album
+                data.readString() // artist
+                data.readString() // legacy artwork gate
+                data.readParcelable<Uri>(Uri::class.java.classLoader)
+                repeat(4) { data.readString() }
+                data.readLong() // duration
+                val progress = data.readLong()
+                packets += title to progress
+                received.countDown()
+                reply!!.writeNoException()
+                return true
+            }
+        })
+        bridge.setActiveSource(BridgeAudioSource.ONLINE)
+        bridge.setClusterOnlineEnabled(true)
+        bridge.setClusterOnlineProgressEnabled(true)
+        val snapshot = MediaSnapshot(
+            backendConnected = true,
+            audioSource = BridgeAudioSource.ONLINE.name,
+            ownerPackage = "player",
+            mediaId = "track",
+            title = "Title",
+            duration = 120_000L,
+            position = 1_000L,
+            updateElapsedRealtime = SystemClock.elapsedRealtime(),
+            speed = 1f,
+            playbackState = 3,
+        )
+        bridge.updateOnlinePlayback(snapshot, null)
+        bridge.updateOnlinePlayback(snapshot.copy(position = 2_000L), null)
+
+        assertFalse(received.await(750, java.util.concurrent.TimeUnit.MILLISECONDS))
+        assertTrue(received.await(2, java.util.concurrent.TimeUnit.SECONDS))
+        bridge.setActiveSource(BridgeAudioSource.RADIO)
+        assertTrue(packets.size >= 2)
+        assertTrue(packets.all { it.first == "Title" })
+        assertTrue(packets.last().second >= packets.first().second)
     }
 
 }
