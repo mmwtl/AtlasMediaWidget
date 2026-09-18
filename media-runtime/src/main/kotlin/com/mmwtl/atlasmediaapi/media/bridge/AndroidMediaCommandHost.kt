@@ -197,14 +197,7 @@ class AndroidMediaCommandHost(
                 if (played) setCurrentMediaPackage(session.packageName)
             }
         }
-
-        val defaultPackage = defaultMediaPackage()
-        if (defaultPackage.isBlank()) return false
-        return launchPackageAndMaybePlay(
-            packageName = defaultPackage,
-            autoplay = true,
-            returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
-        )
+        return false
     }
 
     private suspend fun launchPackageAndMaybePlay(

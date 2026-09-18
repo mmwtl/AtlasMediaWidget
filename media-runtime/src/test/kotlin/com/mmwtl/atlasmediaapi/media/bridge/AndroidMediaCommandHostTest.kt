@@ -252,6 +252,22 @@ class AndroidMediaCommandHostTest {
         session.release()
     }
 
+    @Test
+    fun `startup autoplay without a selected source does not launch default online player`() =
+        runBlocking {
+            val launched = mutableListOf<String>()
+            val fixture = fixture(
+                configuredPackage = "com.example.default",
+                launchPackage = {
+                    launched += it
+                    true
+                },
+            )
+
+            assertFalse(fixture.host.autoplayCurrentSource())
+            assertTrue(launched.isEmpty())
+        }
+
     private data class Fixture(
         val context: android.app.Application,
         val repository: MediaStateRepository,
