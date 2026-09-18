@@ -38,6 +38,14 @@ class MediaStateHub(
     private val cpaaArtworkFallback = CpaaArtworkFallback(repository, artworkRepository)
     private val usbArtworkResolver = UsbArtworkResolver(context)
     private val mediaCallbackLock = Any()
+    private data class PendingSourceTransition(
+        val generation: Long,
+        val target: BridgeAudioSource,
+    )
+
+    private var nextSourceTransitionGeneration = 0L
+    private var pendingSourceTransition: PendingSourceTransition? = null
+    private val reportedLostSources = mutableSetOf<BridgeAudioSource>()
     private var lastPlayingRealtimeMs: Long = 0L
     private var lastRadioFrequency: Frequency? = null
     private var lastRadioPlaying: Boolean = false
@@ -66,6 +74,7 @@ class MediaStateHub(
         availability: Map<BridgeAudioSource, Pair<Boolean, Boolean>>,
     ) {
         val selected = audioSource.toBridgeSource()
+        synchronized(mediaCallbackLock) { reportedLostSources.remove(selected) }
         clusterMediaBridge?.setActiveSource(selected)
         onlineSourcePolicy.onAudioSource(selected)
         val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
@@ -158,6 +167,10 @@ class MediaStateHub(
     ) {
         synchronized(mediaCallbackLock) {
             val selected = audioSource.toBridgeSource()
+            val pending = pendingSourceTransition
+            if (pending != null && pending.target != selected) return
+            if (pending?.target == selected) pendingSourceTransition = null
+            reportedLostSources.remove(selected)
             clusterMediaBridge?.setActiveSource(selected)
             onlineSourcePolicy.onAudioSource(selected)
             val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
@@ -205,6 +218,22 @@ class MediaStateHub(
         }
     }
 
+    internal fun beginSourceTransition(target: BridgeAudioSource): Long =
+        synchronized(mediaCallbackLock) {
+            nextSourceTransitionGeneration++
+            val generation = nextSourceTransitionGeneration
+            pendingSourceTransition = PendingSourceTransition(generation, target)
+            generation
+        }
+
+    internal fun cancelSourceTransition(generation: Long) {
+        synchronized(mediaCallbackLock) {
+            if (pendingSourceTransition?.generation == generation) {
+                pendingSourceTransition = null
+            }
+        }
+    }
+
     fun onSourceAvailability(
         source: MediaCenterConstant.AudioSource,
         connected: Boolean,
@@ -218,6 +247,10 @@ class MediaStateHub(
         val wasPlaying = (snapshot.playbackState == PlaybackState.STATE_PLAYING) || wasRecentlyPlaying
         val lost = wasActive && (!connected || !available)
 
+        if (connected && available) {
+            synchronized(mediaCallbackLock) { reportedLostSources.remove(bridgeSource) }
+        }
+
         repository.update {
             it.copy(
                 sources = it.sources.map { item ->
@@ -228,7 +261,7 @@ class MediaStateHub(
             )
         }
 
-        if (lost) {
+        if (lost && synchronized(mediaCallbackLock) { reportedLostSources.add(bridgeSource) }) {
             onActiveSourceLost(bridgeSource, wasPlaying)
         }
     }
@@ -261,7 +294,10 @@ class MediaStateHub(
             if (wasActiveOnline) {
                 clearPlayback()
                 if (hadOwner) {
-                    onActiveSourceLost(BridgeAudioSource.ONLINE, wasPlaying)
+                    val shouldReportLoss = reportedLostSources.add(BridgeAudioSource.ONLINE)
+                    if (shouldReportLoss) {
+                        onActiveSourceLost(BridgeAudioSource.ONLINE, wasPlaying)
+                    }
                 }
             }
             return fallback

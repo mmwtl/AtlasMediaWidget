@@ -97,6 +97,7 @@ class MediaBackendCoordinator(
     private var graceJob: Job? = null
     private var reconnectJob: Job? = null
     private var defaultSourceJob: Job? = null
+    private var activeSourceLossJob: Job? = null
     private var hasAppliedDefaultSource = false
     private var isBackendStarted = false
     private var activeBackendIsDemo = false
@@ -194,6 +195,8 @@ class MediaBackendCoordinator(
         reconnectJob = null
         defaultSourceJob?.cancel()
         defaultSourceJob = null
+        activeSourceLossJob?.cancel()
+        activeSourceLossJob = null
         hasAppliedDefaultSource = false
 
         val wasDemoBackend = activeBackendIsDemo
@@ -355,6 +358,10 @@ class MediaBackendCoordinator(
         if (targetSourceStr.isBlank()) return
         val targetSource = runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
         if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER || targetSource == lostSource) return
+        if (activeSourceLossJob?.isActive == true) {
+            Timber.i("Ignoring duplicate loss of %s while default source switch is active", lostSource.name)
+            return
+        }
 
         val autoplay = preferences.autoSwitchToDefaultAutoplayOnSourceLost && wasPlaying
         Timber.i(
@@ -364,7 +371,7 @@ class MediaBackendCoordinator(
             targetSource.name,
             autoplay,
         )
-        scope.launch {
+        activeSourceLossJob = scope.launch {
             isApplyingDefaultSource = true
             try {
                 commandMutex.withLock {

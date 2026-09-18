@@ -132,6 +132,16 @@ class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
         source: MediaCenterConstant.AudioSource,
         appSource: MediaCenterConstant.AppSource,
     ) {
+        val currentManager = manager ?: return
+        val currentSource = runCatching { currentManager.currentAudioSource }.getOrNull()
+        if (!isCurrentSourceCallback(source, currentSource)) {
+            Timber.d(
+                "Ignoring stale OneOS source callback: callback=%s current=%s",
+                source,
+                currentSource,
+            )
+            return
+        }
         hub.onSourceChanged(source, appSource)
         refreshCurrentMedia()
     }
@@ -287,3 +297,10 @@ class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
         ) = Unit
     }
 }
+
+internal fun isCurrentSourceCallback(
+    callbackSource: MediaCenterConstant.AudioSource,
+    currentSource: MediaCenterConstant.AudioSource?,
+): Boolean = currentSource == null ||
+    currentSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN ||
+    callbackSource == currentSource
