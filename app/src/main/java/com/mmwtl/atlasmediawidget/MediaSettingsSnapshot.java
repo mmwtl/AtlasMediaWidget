@@ -14,7 +14,6 @@ final class MediaSettingsSnapshot {
     final boolean switchToOnlineBeforeSessionPlay;
     final boolean radioWidgetBroadcastEnabled;
     final boolean clusterCoversEnabled;
-    final boolean clusterRadioFacadeEnabled;
     final boolean clusterOnlineEnabled;
     final boolean clusterOnlineProgressEnabled;
     final long clusterWatchdogIntervalMs;
@@ -44,7 +43,7 @@ final class MediaSettingsSnapshot {
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
                 false, switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
-                clusterCoversEnabled, false, false, false, clusterWatchdogIntervalMs, 100L, catalogType,
+                clusterCoversEnabled, false, false, clusterWatchdogIntervalMs, 100L, catalogType,
                 catalogStationCount, catalogDescription, uiScaleTenths);
     }
 
@@ -69,7 +68,7 @@ final class MediaSettingsSnapshot {
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
                 false, switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
-                clusterCoversEnabled, false, clusterOnlineEnabled, false, clusterWatchdogIntervalMs, 100L,
+                clusterCoversEnabled, clusterOnlineEnabled, false, clusterWatchdogIntervalMs, 100L,
                 catalogType, catalogStationCount, catalogDescription, uiScaleTenths);
     }
 
@@ -85,7 +84,6 @@ final class MediaSettingsSnapshot {
             boolean switchToOnlineBeforeSessionPlay,
             boolean radioWidgetBroadcastEnabled,
             boolean clusterCoversEnabled,
-            boolean clusterRadioFacadeEnabled,
             boolean clusterOnlineEnabled,
             boolean clusterOnlineProgressEnabled,
             long clusterWatchdogIntervalMs,
@@ -105,7 +103,6 @@ final class MediaSettingsSnapshot {
         this.switchToOnlineBeforeSessionPlay = switchToOnlineBeforeSessionPlay;
         this.radioWidgetBroadcastEnabled = radioWidgetBroadcastEnabled;
         this.clusterCoversEnabled = clusterCoversEnabled;
-        this.clusterRadioFacadeEnabled = clusterRadioFacadeEnabled;
         this.clusterOnlineEnabled = clusterOnlineEnabled;
         this.clusterOnlineProgressEnabled = clusterOnlineProgressEnabled;
         this.clusterWatchdogIntervalMs = clusterWatchdogIntervalMs;
@@ -132,7 +129,6 @@ final class MediaSettingsSnapshot {
                 bundle.getBoolean(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false),
                 bundle.getBoolean(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, true),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, true),
-                bundle.getBoolean(MediaBridgeContract.K_CLUSTER_RADIO_FACADE_ENABLED, false),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, false),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, false),
                 bundle.getLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, 1250L),
@@ -157,8 +153,6 @@ final class MediaSettingsSnapshot {
         bundle.putBoolean(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, switchToOnlineBeforeSessionPlay);
         bundle.putBoolean(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, clusterCoversEnabled);
-        bundle.putBoolean(MediaBridgeContract.K_CLUSTER_RADIO_FACADE_ENABLED,
-                clusterRadioFacadeEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, clusterOnlineProgressEnabled);
         bundle.putLong(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, clusterWatchdogIntervalMs);

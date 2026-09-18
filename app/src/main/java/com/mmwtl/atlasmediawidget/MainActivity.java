@@ -94,7 +94,6 @@ public final class MainActivity extends ScaledActivity {
     private Switch switchToOnlineSwitch;
     private Switch radioWidgetBroadcastSwitch;
     private Switch clusterCoversSwitch;
-    private Switch clusterRadioFacadeSwitch;
     private Switch clusterOnlineSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
@@ -1751,20 +1750,6 @@ public final class MainActivity extends ScaledActivity {
         s6.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterCoversSwitch, s6);
 
-        clusterRadioFacadeSwitch = new Switch(this);
-        clusterRadioFacadeSwitch.setText("Экспериментально: радио на приборку через facade");
-        clusterRadioFacadeSwitch.setTextColor(Ui.PRIMARY);
-        clusterRadioFacadeSwitch.setTextSize(15);
-        clusterRadioFacadeSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(
-                    MediaBridgeContract.K_CLUSTER_RADIO_FACADE_ENABLED,
-                    checked);
-        });
-        LinearLayout.LayoutParams radioFacadeParams = fullWrap();
-        radioFacadeParams.topMargin = Ui.dp(this, 10);
-        mediaSettingsGroup.addView(clusterRadioFacadeSwitch, radioFacadeParams);
-
         clusterOnlineSwitch = new Switch(this);
         clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название, обложка и прогресс)");
         clusterOnlineSwitch.setTextColor(Ui.PRIMARY);
@@ -1980,11 +1965,6 @@ public final class MainActivity extends ScaledActivity {
         }
         if (clusterCoversSwitch != null) {
             clusterCoversSwitch.setChecked(snapshot.clusterCoversEnabled);
-        }
-        if (clusterRadioFacadeSwitch != null) {
-            clusterRadioFacadeSwitch.setChecked(snapshot.clusterRadioFacadeEnabled);
-            clusterRadioFacadeSwitch.setEnabled(snapshot.clusterCoversEnabled);
-            clusterRadioFacadeSwitch.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
         }
         if (clusterOnlineSwitch != null) {
             clusterOnlineSwitch.setChecked(snapshot.clusterOnlineEnabled);

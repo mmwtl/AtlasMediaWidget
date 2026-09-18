@@ -1125,10 +1125,6 @@ class DiagnosticActivity : Activity() {
             appendLine("clusterDimArtworkQnxPath: ${clusterStatus.artworkQnxPath.ifBlank { "none" }}")
             appendLine("clusterDimArtworkUriGrants: ${clusterStatus.artworkGrantReport.ifBlank { "none" }}")
             appendLine("clusterDimSendCount: ${clusterStatus.sendCount}")
-            appendLine("clusterDirectDimBound: ${clusterStatus.directDimBound}")
-            appendLine("clusterDirectDimSendCount: ${clusterStatus.directDimSendCount}")
-            appendLine("clusterDirectDimLastResult: ${clusterStatus.directDimLastResult}")
-            appendLine("clusterDirectDimLastError: ${clusterStatus.directDimLastError.ifBlank { "none" }}")
             appendLine("description: ${catalogInfo.description}")
             appendLine()
 
