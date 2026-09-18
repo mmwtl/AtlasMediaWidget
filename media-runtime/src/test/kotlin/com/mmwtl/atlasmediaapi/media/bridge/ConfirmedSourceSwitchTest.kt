@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class ConfirmedSourceSwitchTest {
@@ -115,6 +116,38 @@ class ConfirmedSourceSwitchTest {
             ),
         )
         assertEquals(2, playCalls)
+    }
+
+    @Test
+    fun `fallback play command is used only after primary command fails to reach playing`() = runBlocking {
+        val current = AtomicReference(BridgeAudioSource.BT)
+        val playing = AtomicBoolean(false)
+        val switch = switch(
+            current = current,
+            autoplayConfirmDelaysMs = listOf(1L, 1L),
+        )
+        var primaryCalls = 0
+        var fallbackCalls = 0
+
+        assertTrue(
+            switch.playAndConfirmWithFallback(
+                target = BridgeAudioSource.BT,
+                sendPlay = {
+                    primaryCalls++
+                    true
+                },
+                fallbackSendPlay = {
+                    fallbackCalls++
+                    playing.set(true)
+                    true
+                },
+                isPlaying = { playing.get() },
+            ),
+        )
+
+        assertEquals(2, primaryCalls)
+        assertEquals(1, fallbackCalls)
+        assertEquals(BridgeAudioSource.BT, current.get())
     }
 
     @Test

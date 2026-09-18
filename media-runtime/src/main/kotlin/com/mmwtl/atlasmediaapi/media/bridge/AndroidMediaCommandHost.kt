@@ -454,9 +454,10 @@ class AndroidMediaCommandHost(
                 )
             }
 
-            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT -> sourceSwitch.playAndConfirm(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT -> sourceSwitch.playAndConfirmWithFallback(
                 target = targetSource,
                 sendPlay = { playBluetooth(center) },
+                fallbackSendPlay = { playBluetoothMediaSession(center) },
                 isPlaying = {
                     center.musicAdapterManager.currentPlayState ==
                         MediaCenterConstant.PlayState.MUSIC_STATE_PLAY
@@ -601,12 +602,14 @@ class AndroidMediaCommandHost(
             return false
         }
         val adapterResult = runCatching { center.musicAdapterManager.play() }.getOrDefault(0)
-        if (adapterResult == 1) return true
+        return adapterResult == 1
+    }
+
+    private fun playBluetoothMediaSession(center: MediaCenterManager): Boolean {
         if (runCatching { center.currentAudioSource }
                 .getOrNull() != MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT
-        ) {
-            return false
-        }
+        ) return false
+
         val btController = sessionObserver.getActiveControllers().firstOrNull { controller ->
             val pkg = controller.packageName?.lowercase(java.util.Locale.ROOT).orEmpty()
             pkg.contains("bluetooth") || pkg.contains("a2dp") || pkg.contains("btservice")

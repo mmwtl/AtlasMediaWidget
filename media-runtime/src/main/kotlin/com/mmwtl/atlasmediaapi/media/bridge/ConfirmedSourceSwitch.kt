@@ -54,4 +54,12 @@ internal class ConfirmedSourceSwitch(
         }
         return false
     }
+
+    suspend fun playAndConfirmWithFallback(
+        target: BridgeAudioSource,
+        sendPlay: suspend () -> Boolean,
+        fallbackSendPlay: suspend () -> Boolean,
+        isPlaying: () -> Boolean,
+    ): Boolean = playAndConfirm(target, sendPlay, isPlaying) ||
+        playAndConfirm(target, fallbackSendPlay, isPlaying)
 }
