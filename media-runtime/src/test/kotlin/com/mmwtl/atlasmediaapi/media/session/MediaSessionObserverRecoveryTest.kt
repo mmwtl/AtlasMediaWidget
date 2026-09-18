@@ -7,7 +7,9 @@ import android.media.session.MediaSessionManager
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Handler
+import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import com.mmwtl.atlasmediaapi.media.bridge.ArtworkRepository
+import com.mmwtl.atlasmediaapi.media.bridge.BridgeAudioSource
 import com.mmwtl.atlasmediaapi.media.bridge.MediaStateHub
 import com.mmwtl.atlasmediaapi.media.bridge.MediaStateRepository
 import kotlinx.coroutines.CoroutineScope
@@ -93,11 +95,73 @@ class MediaSessionObserverRecoveryTest {
         session.release()
     }
 
+    @Test
+    fun `native bluetooth session does not replace lost online session`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val losses = mutableListOf<BridgeAudioSource>()
+        val hub = MediaStateHub(
+            context = context,
+            repository = repository,
+            artworkRepository = ArtworkRepository(
+                context,
+                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            ),
+            onActiveSourceLost = { source, _ -> losses += source },
+        )
+        hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+        val observer = MediaSessionObserver(context, hub)
+        val onlineSession = createController(context, "com.example.online", "Online title")
+        val bluetoothSession = createController(context, "com.android.bluetooth", "BT title")
+
+        ShadowMediaSessionManager.setControllers(listOf(onlineSession.controller, bluetoothSession.controller))
+        observer.start()
+        notifyNotificationListener(observer, true)
+        waitFor { repository.snapshot().ownerPackage == "com.example.online" }
+
+        ShadowMediaSessionManager.setControllers(listOf(bluetoothSession.controller))
+        ShadowMediaSessionManager.dispatchControllers()
+        waitFor { losses == listOf(BridgeAudioSource.ONLINE) }
+
+        assertEquals(listOf(BridgeAudioSource.ONLINE), losses)
+        observer.stop()
+        onlineSession.session.release()
+        bluetoothSession.session.release()
+    }
+
     private fun waitFor(condition: () -> Boolean) {
         repeat(20) {
             if (condition()) return
             Thread.sleep(25)
         }
+    }
+
+    private data class TestController(
+        val session: MediaSession,
+        val controller: MediaController,
+    )
+
+    private fun createController(
+        context: android.content.Context,
+        packageName: String,
+        title: String,
+    ): TestController {
+        val session = MediaSession(context, "observer-test-$packageName")
+        val metadata = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, title)
+            .build()
+        val playback = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+            .build()
+        val controller = MediaController(context, session.sessionToken)
+        shadowOf(controller).setPackageName(packageName)
+        shadowOf(controller).setMetadata(metadata)
+        shadowOf(controller).setPlaybackState(playback)
+        return TestController(session, controller)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -124,6 +188,12 @@ class MediaSessionObserverRecoveryTest {
 
             fun setControllers(value: List<MediaController>) {
                 controllers = value
+            }
+
+            fun dispatchControllers() {
+                listeners.toList().forEach { listener ->
+                    listener.onActiveSessionsChanged(controllers)
+                }
             }
         }
 

@@ -216,8 +216,17 @@ class MediaSessionObserver(
         isStarted && generation == expectedGeneration
 
     private fun pickActive(controllers: List<MediaController>): MediaController? {
-        if (controllers.isEmpty()) return null
-        return controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            ?: controllers.maxByOrNull { it.playbackState?.lastPositionUpdateTime ?: 0L }
+        val candidates = controllers.filterNot(::isNativeBluetoothController)
+        if (candidates.isEmpty()) return null
+        return candidates.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            ?: candidates.maxByOrNull { it.playbackState?.lastPositionUpdateTime ?: 0L }
+    }
+
+    private fun isNativeBluetoothController(controller: MediaController): Boolean {
+        val packageName = controller.packageName?.lowercase(java.util.Locale.ROOT).orEmpty()
+        return packageName == "com.android.bluetooth" ||
+            packageName.contains("bluetooth") ||
+            packageName.contains("a2dp") ||
+            packageName.contains("btservice")
     }
 }
