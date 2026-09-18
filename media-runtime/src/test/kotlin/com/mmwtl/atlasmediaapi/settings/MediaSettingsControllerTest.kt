@@ -121,15 +121,22 @@ class MediaSettingsControllerTest {
     }
 
     @Test
-    fun `online progress has one facade-backed setting`() {
+    fun `online cluster transmission always includes facade progress`() {
         val enabled = controller.updateSettings(controller.getRevision(), Bundle().apply {
-            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
         }).snapshot!!
+        assertTrue(enabled.clusterOnlineEnabled)
         assertTrue(enabled.clusterOnlineProgressEnabled)
 
-        val disabled = controller.updateSettings(controller.getRevision(), Bundle().apply {
+        val legacyProgressUpdate = controller.updateSettings(controller.getRevision(), Bundle().apply {
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, false)
         }).snapshot!!
+        assertTrue(legacyProgressUpdate.clusterOnlineProgressEnabled)
+
+        val disabled = controller.updateSettings(controller.getRevision(), Bundle().apply {
+            putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, false)
+        }).snapshot!!
+        assertFalse(disabled.clusterOnlineEnabled)
         assertFalse(disabled.clusterOnlineProgressEnabled)
     }
 
@@ -404,7 +411,6 @@ class MediaSettingsControllerTest {
         clusterMediaBridge.setClusterCoversEnabled(false)
         clusterMediaBridge.setClusterRadioFacadeEnabled(true)
         clusterMediaBridge.setClusterOnlineEnabled(true)
-        clusterMediaBridge.setClusterOnlineProgressEnabled(true)
         clusterMediaBridge.setReassertWatchdogIntervalMs(4000L)
         clusterMediaBridge.setReassertBurstIntervalMs(300L)
         preferences.uiScaleTenths = 19

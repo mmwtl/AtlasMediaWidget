@@ -245,6 +245,9 @@ class ClusterMediaBridge(
         internal fun qnxCoverUriString(sharedFile: File): String =
             "file://${qnxCoverWirePath(sharedFile)}"
 
+        internal fun radioFacadeArtworkUri(sharedFile: File?, fallbackUri: Uri?): Uri? =
+            sharedFile?.let(Uri::fromFile) ?: fallbackUri
+
         private const val DIM_TRANSPORT_MARKER = "atlas_dim=online-qnx-owned-v9"
 
         /**
@@ -286,11 +289,9 @@ class ClusterMediaBridge(
     var isClusterOnlineEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_ONLINE_ENABLED, false)
         private set
 
-    @Volatile
-    var isClusterOnlineProgressEnabled: Boolean =
-        prefs.getBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, false) ||
-            prefs.getBoolean(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED, false)
-        private set
+    // Kept in the settings snapshot for compatibility; progress now follows ONLINE transmission.
+    val isClusterOnlineProgressEnabled: Boolean
+        get() = isClusterOnlineEnabled
 
     private var activeSource: BridgeAudioSource? = null
     private var confirmedOnlineActive = false
@@ -347,9 +348,12 @@ class ClusterMediaBridge(
     private val directDimMediaClient = DirectDimMediaClient(context)
 
     init {
-        if (prefs.contains(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED)) {
+        if (
+            prefs.contains(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED) ||
+            prefs.contains(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED)
+        ) {
             prefs.edit()
-                .putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, isClusterOnlineProgressEnabled)
+                .remove(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED)
                 .remove(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED)
                 .apply()
         }
@@ -517,6 +521,11 @@ class ClusterMediaBridge(
 
             val radioSourceType = if (isAm) IMediaInteraction.SOURCE_TYPE_AM else IMediaInteraction.SOURCE_TYPE_FM
             val displaySourceType = displaySourceType(radioSourceType, clusterArtworkUri != null)
+            val playbackArtworkUri = if (isClusterRadioFacadeEnabled) {
+                radioFacadeArtworkUri(clusterArtworkFile, clusterArtworkUri)
+            } else {
+                clusterArtworkUri
+            }
 
             val playInfo = ClusterRadioPlaybackInfo(
                 "atlas-radio:$band:$frequencyKHz",
@@ -533,7 +542,7 @@ class ClusterMediaBridge(
                     IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED
                 },
                 IMediaInteraction.IPlaybackInfo.RADIO_MODE_PLAYING,
-                clusterArtworkUri,
+                playbackArtworkUri,
             )
 
             currentRadioInfo = playInfo
@@ -590,20 +599,6 @@ class ClusterMediaBridge(
         if (enabled) ensureOnlineProgress()
     }
 
-    @Synchronized
-    fun setClusterOnlineProgressEnabled(enabled: Boolean) {
-        stopOnlineProgress()
-        isClusterOnlineProgressEnabled = enabled
-        prefs.edit()
-            .putBoolean(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, enabled)
-            .remove(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED)
-            .apply()
-        directDimMediaClient.clearPending()
-        lastOnlinePayload = null
-        lastOnlineProgress = -1L
-        if (enabled) ensureOnlineProgress() else stopOnlineProgress()
-    }
-
     /** Sends only resolved ONLINE snapshots; synthetic UNKNOWN/OTHER sessions are excluded. */
     @Synchronized
     fun updateOnlinePlayback(snapshot: MediaSnapshot, coverFile: File?) {
@@ -639,31 +634,23 @@ class ClusterMediaBridge(
                 IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING
             } else IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED,
             radioFrequency = "", radioMode = 0, radioStationName = "",
-            currentProgress = if (isClusterOnlineProgressEnabled) {
-                extrapolateOnlineProgress(
-                    positionMs = snapshot.position,
-                    durationMs = snapshot.duration,
-                    speed = snapshot.speed,
-                    updateElapsedRealtime = snapshot.updateElapsedRealtime,
-                    nowElapsedRealtime = SystemClock.elapsedRealtime(),
-                ) ?: 0L
-            } else 0L,
+            currentProgress = extrapolateOnlineProgress(
+                positionMs = snapshot.position,
+                durationMs = snapshot.duration,
+                speed = snapshot.speed,
+                updateElapsedRealtime = snapshot.updateElapsedRealtime,
+                nowElapsedRealtime = SystemClock.elapsedRealtime(),
+            ) ?: 0L,
         )
         if (lastOnlinePayload?.let(::onlinePayloadDedupKey) != onlinePayloadDedupKey(payload)) {
             stopOnlineProgress()
-            val result = if (isClusterOnlineProgressEnabled) {
-                sendOnlineFacadePayload(payload)
-            } else {
-                directDimMediaClient.sendOrQueue(payload)
-            }
+            val result = sendOnlineFacadePayload(payload)
             if (!result.startsWith("send-failed")) {
                 lastOnlinePayload = payload
                 lastOnlineProgress = payload.currentProgress
             }
             lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
-            if (!isClusterOnlineProgressEnabled) {
-                lastUpdateError = directDimMediaClient.status().lastError
-            } else if (!result.startsWith("send-failed")) {
+            if (!result.startsWith("send-failed")) {
                 lastUpdateError = ""
             }
         }
@@ -672,7 +659,7 @@ class ClusterMediaBridge(
 
     @Synchronized
     private fun ensureOnlineProgress() {
-        if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
+        if (!isClusterOnlineEnabled || !confirmedOnlineActive ||
             onlineProgressState?.playing != true || lastOnlinePayload == null ||
             onlineProgressJob?.isActive == true
         ) return
@@ -698,7 +685,7 @@ class ClusterMediaBridge(
 
     @Synchronized
     private fun sendOnlineProgress(progress: Long) {
-        if (!isClusterOnlineEnabled || !isClusterOnlineProgressEnabled || !confirmedOnlineActive ||
+        if (!isClusterOnlineEnabled || !confirmedOnlineActive ||
             onlineProgressState?.playing != true || lastOnlinePayload == null || lastOnlineProgress == progress
         ) return
 

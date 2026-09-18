@@ -35,7 +35,7 @@ class DirectDimMediaClientTest {
     )
 
     @Test
-    fun `legacy facade progress preference migrates to the single progress setting`() {
+    fun `legacy progress preferences are removed and online controls progress`() {
         val context = RecordingContext()
         val preferences = context.getSharedPreferences(
             ClusterMediaBridge.PREFS_NAME,
@@ -43,14 +43,18 @@ class DirectDimMediaClientTest {
         )
         preferences.edit()
             .clear()
+            .putBoolean(ClusterMediaBridge.KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, true)
             .putBoolean("cluster_dim_online_facade_progress_enabled", true)
             .commit()
 
         val bridge = ClusterMediaBridge(context)
 
-        assertTrue(bridge.isClusterOnlineProgressEnabled)
-        assertTrue(preferences.getBoolean(ClusterMediaBridge.KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, false))
+        assertFalse(bridge.isClusterOnlineProgressEnabled)
+        assertFalse(preferences.contains(ClusterMediaBridge.KEY_CLUSTER_ONLINE_PROGRESS_ENABLED))
         assertFalse(preferences.contains("cluster_dim_online_facade_progress_enabled"))
+
+        bridge.setClusterOnlineEnabled(true)
+        assertTrue(bridge.isClusterOnlineProgressEnabled)
     }
 
     @Test
@@ -69,6 +73,18 @@ class DirectDimMediaClientTest {
 
         assertTrue(preferences.getBoolean(ClusterMediaBridge.KEY_CLUSTER_RADIO_FACADE_ENABLED, false))
         assertTrue(ClusterMediaBridge(context).isClusterRadioFacadeEnabled)
+    }
+
+    @Test
+    fun `radio facade prefers the shared file URI for artwork`() {
+        val sharedFile = java.io.File("/data/vendor/nfs/shared/radio_cover_abc.jpg")
+        val contentUri = Uri.parse("content://atlas/cover.jpg")
+
+        assertEquals(
+            Uri.fromFile(sharedFile),
+            ClusterMediaBridge.radioFacadeArtworkUri(sharedFile, contentUri),
+        )
+        assertEquals(contentUri, ClusterMediaBridge.radioFacadeArtworkUri(null, contentUri))
     }
 
     @Test
@@ -121,7 +137,7 @@ class DirectDimMediaClientTest {
         assertEquals(0, calls)
     }
     @Test
-    fun `online opt in is independent of radio and stops on source change`() {
+    fun `online opt in uses facade independently of direct radio transport`() {
         val context = RecordingContext()
         context.getSharedPreferences(ClusterMediaBridge.PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
         val bridge = ClusterMediaBridge(context)
@@ -141,22 +157,24 @@ class DirectDimMediaClientTest {
         bridge.updateOnlinePlayback(snapshot, null)
         assertEquals(0, calls)
         bridge.setClusterOnlineEnabled(true)
+        assertTrue(bridge.isClusterOnlineProgressEnabled)
         bridge.setClusterCoversEnabled(false)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(1, calls)
+        assertEquals(0, calls)
         bridge.updateOnlinePlayback(snapshot.copy(position = 1000L), null)
-        assertEquals(1, calls)
+        assertEquals(0, calls)
         bridge.setActiveSource(BridgeAudioSource.RADIO)
         bridge.updateOnlinePlayback(snapshot.copy(title = "Stale"), null)
-        assertEquals(1, calls)
+        assertEquals(0, calls)
         bridge.setActiveSource(BridgeAudioSource.ONLINE)
         bridge.setClusterOnlineEnabled(false)
+        assertFalse(bridge.isClusterOnlineProgressEnabled)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(1, calls)
+        assertEquals(0, calls)
         bridge.setClusterOnlineEnabled(true)
         bridge.setActiveSource(BridgeAudioSource.UNKNOWN)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(1, calls)
+        assertEquals(0, calls)
     }
 
     @Test

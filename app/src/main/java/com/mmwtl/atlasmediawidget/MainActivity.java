@@ -96,7 +96,6 @@ public final class MainActivity extends ScaledActivity {
     private Switch clusterCoversSwitch;
     private Switch clusterRadioFacadeSwitch;
     private Switch clusterOnlineSwitch;
-    private Switch clusterOnlineProgressSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
     private TextView clusterReassertBurstLabel;
@@ -1767,7 +1766,7 @@ public final class MainActivity extends ScaledActivity {
         mediaSettingsGroup.addView(clusterRadioFacadeSwitch, radioFacadeParams);
 
         clusterOnlineSwitch = new Switch(this);
-        clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название и обложка)");
+        clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название, обложка и прогресс)");
         clusterOnlineSwitch.setTextColor(Ui.PRIMARY);
         clusterOnlineSwitch.setTextSize(15);
         clusterOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
@@ -1777,18 +1776,6 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams s7 = fullWrap();
         s7.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
-
-        clusterOnlineProgressSwitch = new Switch(this);
-        clusterOnlineProgressSwitch.setText("Трансляция прогресса онлайн на приборку (каждую 1 с)");
-        clusterOnlineProgressSwitch.setTextColor(Ui.PRIMARY);
-        clusterOnlineProgressSwitch.setTextSize(15);
-        clusterOnlineProgressSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_ONLINE_PROGRESS_ENABLED, checked);
-        });
-        LinearLayout.LayoutParams s8 = fullWrap();
-        s8.topMargin = Ui.dp(this, 10);
-        mediaSettingsGroup.addView(clusterOnlineProgressSwitch, s8);
 
         TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
@@ -2001,11 +1988,6 @@ public final class MainActivity extends ScaledActivity {
         }
         if (clusterOnlineSwitch != null) {
             clusterOnlineSwitch.setChecked(snapshot.clusterOnlineEnabled);
-        }
-        if (clusterOnlineProgressSwitch != null) {
-            clusterOnlineProgressSwitch.setChecked(snapshot.clusterOnlineProgressEnabled);
-            clusterOnlineProgressSwitch.setEnabled(snapshot.clusterOnlineEnabled);
-            clusterOnlineProgressSwitch.setAlpha(snapshot.clusterOnlineEnabled ? 1f : 0.45f);
         }
         if (clusterWatchdogLabel != null) {
             clusterWatchdogLabel.setText(snapshot.clusterWatchdogIntervalMs + " мс");

@@ -245,11 +245,6 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED)) {
             clusterMediaBridge.setClusterOnlineEnabled(update.getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED))
         }
-        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED)) {
-            clusterMediaBridge.setClusterOnlineProgressEnabled(
-                update.getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED),
-            )
-        }
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS)) {
             clusterMediaBridge.setReassertWatchdogIntervalMs(update.getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS))
         }
@@ -621,10 +616,6 @@ class MediaSettingsController(
         )
         clusterMediaBridge.setClusterOnlineEnabled(
             mediaJson.optBoolean("clusterOnlineEnabled", false),
-        )
-        clusterMediaBridge.setClusterOnlineProgressEnabled(
-            mediaJson.optBoolean("clusterOnlineProgressEnabled", false) ||
-                mediaJson.optBoolean("clusterOnlineFacadeProgressEnabled", false),
         )
         clusterMediaBridge.setReassertWatchdogIntervalMs(
             if (mediaJson.has("clusterWatchdogIntervalMs")) {
