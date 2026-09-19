@@ -32,7 +32,6 @@ class MediaCommandRouterTest {
         var currentPackage = ""
         var defaultPackage = ""
         var beforePlayCalls = 0
-        var beforePlayResult = true
         var startDefaultCalls = 0
         var fallbackCalls = mutableListOf<Pair<String, MediaCommand>>()
         var sourceResult = true
@@ -55,9 +54,8 @@ class MediaCommandRouterTest {
             currentPackage = packageName
         }
 
-        override suspend fun beforeSessionPlay(): Boolean {
+        override fun beforeSessionPlay() {
             beforePlayCalls++
-            return beforePlayResult
         }
 
         override suspend fun sendFallback(packageName: String, command: MediaCommand): Boolean {
@@ -197,20 +195,6 @@ class MediaCommandRouterTest {
         assertTrue(result.succeeded)
         assertEquals(1, host.beforePlayCalls)
         assertEquals(listOf("play"), session.calls)
-    }
-
-    @Test
-    fun `play is not sent when source preparation is not confirmed`() = runBlocking {
-        val session = FakeSession("player")
-        val host = FakeHost().apply {
-            preferred = session
-            beforePlayResult = false
-        }
-
-        val result = MediaCommandRouter(host).execute(request(MediaCommand.PLAY))
-
-        assertEquals(MediaBridgeContract.Status.FAILED, result.status)
-        assertTrue(session.calls.isEmpty())
     }
 
     @Test

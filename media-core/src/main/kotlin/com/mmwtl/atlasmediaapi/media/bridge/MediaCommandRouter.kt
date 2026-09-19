@@ -30,7 +30,7 @@ interface MediaCommandHost {
     fun currentMediaPackage(): String
     fun defaultMediaPackage(): String
     fun setCurrentMediaPackage(packageName: String)
-    suspend fun beforeSessionPlay(): Boolean
+    fun beforeSessionPlay()
     suspend fun sendFallback(packageName: String, command: MediaCommand): Boolean
     suspend fun startDefaultAndPlay(packageName: String): Boolean
     suspend fun setSource(
@@ -96,17 +96,13 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
                 request.command == MediaCommand.TOGGLE) &&
             fallbackPackage == host.defaultMediaPackage()
         ) {
-            if (!host.beforeSessionPlay()) {
-                return result(MediaBridgeContract.Status.FAILED, "source preparation failed")
-            }
+            host.beforeSessionPlay()
             host.startDefaultAndPlay(fallbackPackage)
         } else if (request.command == MediaCommand.SEEK_TO) {
             false
         } else {
             if (request.command == MediaCommand.PLAY || request.command == MediaCommand.TOGGLE) {
-                if (!host.beforeSessionPlay()) {
-                    return result(MediaBridgeContract.Status.FAILED, "source preparation failed")
-                }
+                host.beforeSessionPlay()
             }
             host.sendFallback(fallbackPackage, request.command)
         }
@@ -162,7 +158,7 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
     private fun MediaSessionCommandTarget.supports(capability: Long): Boolean =
         capabilities and capability != 0L
 
-    private suspend fun executeOnSession(
+    private fun executeOnSession(
         target: MediaSessionCommandTarget,
         request: MediaCommandRequest,
         prepareSource: Boolean = true,
@@ -174,18 +170,14 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
 
         val succeeded = when (request.command) {
             MediaCommand.PLAY -> {
-                if (prepareSource && !host.beforeSessionPlay()) {
-                    return result(MediaBridgeContract.Status.FAILED, "source preparation failed")
-                }
+                if (prepareSource) host.beforeSessionPlay()
                 target.play()
             }
 
             MediaCommand.PAUSE -> target.pause()
             MediaCommand.TOGGLE -> {
                 if (prepareSource && target.playbackState != SessionPlaybackState.PLAYING) {
-                    if (!host.beforeSessionPlay()) {
-                        return result(MediaBridgeContract.Status.FAILED, "source preparation failed")
-                    }
+                    host.beforeSessionPlay()
                 }
                 target.toggle()
             }
