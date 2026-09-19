@@ -62,4 +62,22 @@ internal class ConfirmedSourceSwitch(
         isPlaying: () -> Boolean,
     ): Boolean = playAndConfirm(target, sendPlay, isPlaying) ||
         playAndConfirm(target, fallbackSendPlay, isPlaying)
+
+    suspend fun playAndConfirmWithFallbackAfterUpdate(
+        target: BridgeAudioSource,
+        sendPlay: suspend () -> Boolean,
+        fallbackSendPlay: suspend () -> Boolean,
+        playbackGeneration: () -> Long,
+        isPlaying: () -> Boolean,
+    ): Boolean {
+        val generationBeforePlay = playbackGeneration()
+        return playAndConfirmWithFallback(
+            target = target,
+            sendPlay = sendPlay,
+            fallbackSendPlay = fallbackSendPlay,
+            isPlaying = {
+                playbackGeneration() > generationBeforePlay && isPlaying()
+            },
+        )
+    }
 }

@@ -99,7 +99,7 @@ class MediaSessionObserverRecoveryTest {
     fun `native bluetooth session does not replace lost online session`() {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
-        val losses = mutableListOf<BridgeAudioSource>()
+        val losses = java.util.concurrent.CopyOnWriteArrayList<BridgeAudioSource>()
         val hub = MediaStateHub(
             context = context,
             repository = repository,
@@ -128,6 +128,79 @@ class MediaSessionObserverRecoveryTest {
         waitFor { losses == listOf(BridgeAudioSource.ONLINE) }
 
         assertEquals(listOf(BridgeAudioSource.ONLINE), losses)
+        observer.stop()
+        onlineSession.session.release()
+        bluetoothSession.session.release()
+    }
+
+    @Test
+    fun `confirmed online source refreshes an existing session without another session callback`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = MediaStateHub(
+            context = context,
+            repository = repository,
+            artworkRepository = ArtworkRepository(
+                context,
+                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            ),
+        )
+        hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+        val observer = MediaSessionObserver(context, hub)
+        val onlineSession = createController(context, "com.example.online", "Online title")
+        ShadowMediaSessionManager.setControllers(listOf(onlineSession.controller))
+        observer.start()
+        notifyNotificationListener(observer, true)
+        waitFor { observer.getActiveControllers().size == 1 }
+        assertEquals("", repository.snapshot().title)
+
+        hub.onSourceChanged(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            MediaCenterConstant.AppSource.UNKNOWN,
+        )
+        observer.refreshActiveController()
+
+        assertEquals("Online title", repository.snapshot().title)
+        assertEquals("com.example.online", repository.snapshot().ownerPackage)
+        observer.stop()
+        onlineSession.session.release()
+    }
+
+    @Test
+    fun `online metadata refresh does not report loss when only native bluetooth session exists`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val losses = java.util.concurrent.CopyOnWriteArrayList<BridgeAudioSource>()
+        val hub = MediaStateHub(
+            context = context,
+            repository = repository,
+            artworkRepository = ArtworkRepository(
+                context,
+                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            ),
+            onActiveSourceLost = { source, _ -> losses += source },
+        )
+        hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+        val observer = MediaSessionObserver(context, hub)
+        val onlineSession = createController(context, "com.example.online", "Online title")
+        val bluetoothSession = createController(context, "com.android.bluetooth", "BT title")
+        ShadowMediaSessionManager.setControllers(listOf(onlineSession.controller))
+        observer.start()
+        notifyNotificationListener(observer, true)
+        waitFor { repository.snapshot().ownerPackage == "com.example.online" }
+
+        replaceActiveControllers(observer, listOf(bluetoothSession.controller))
+        observer.refreshActiveController()
+
+        assertTrue(losses.isEmpty())
         observer.stop()
         onlineSession.session.release()
         bluetoothSession.session.release()
@@ -169,6 +242,18 @@ class MediaSessionObserverRecoveryTest {
         val field = MediaSessionObserver::class.java.getDeclaredField("notificationConnectionListener")
         field.isAccessible = true
         (field.get(observer) as (Boolean) -> Unit)(connected)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun replaceActiveControllers(
+        observer: MediaSessionObserver,
+        controllers: List<MediaController>,
+    ) {
+        val field = MediaSessionObserver::class.java.getDeclaredField("activeControllers")
+        field.isAccessible = true
+        val activeControllers = field.get(observer) as java.util.concurrent.CopyOnWriteArrayList<MediaController>
+        activeControllers.clear()
+        activeControllers.addAll(controllers)
     }
 
     @Implements(MediaSessionManager::class)

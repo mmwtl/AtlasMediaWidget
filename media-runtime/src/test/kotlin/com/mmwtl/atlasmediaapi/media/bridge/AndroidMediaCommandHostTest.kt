@@ -2,6 +2,7 @@ package com.mmwtl.atlasmediaapi.media.bridge
 
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
@@ -41,6 +42,45 @@ class AndroidMediaCommandHostTest {
 
         assertTrue(fixture.host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = false))
         assertEquals(BridgeAudioSource.ONLINE.name, fixture.repository.snapshot().audioSource)
+    }
+
+    @Test
+    fun `confirmed online source republishes metadata from an existing playing session`() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+        val playingState = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+            .build()
+        val metadata = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, "Existing online track")
+            .build()
+        val session = MediaSession(context, "existing-online-session").apply {
+            isActive = true
+            setMetadata(metadata)
+            setPlaybackState(playingState)
+        }
+        val controller = controller(context, session, "com.example.existing")
+        shadowOf(controller).setMetadata(metadata)
+        shadowOf(controller).setPlaybackState(playingState)
+        activeControllers(observer) += controller
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply {
+                defaultMediaPackage = "com.example.existing"
+            },
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+        )
+
+        assertTrue(host.setSource(BridgeAudioSource.ONLINE, appSource = null, autoplay = true))
+        assertEquals("Existing online track", repository.snapshot().title)
+        assertEquals("com.example.existing", repository.snapshot().ownerPackage)
+        session.release()
     }
 
     @Test

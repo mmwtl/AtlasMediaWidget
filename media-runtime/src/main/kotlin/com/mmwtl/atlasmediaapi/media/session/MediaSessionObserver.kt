@@ -81,6 +81,13 @@ class MediaSessionObserver(
 
     fun getActiveControllers(): List<MediaController> = activeControllers.toList()
 
+    fun refreshActiveController() {
+        synchronized(this) {
+            if (!isStarted) return
+            pickActive(activeControllers.toList())?.let(hub::onMediaController)
+        }
+    }
+
     private fun registerOrRefreshLocked(expectedGeneration: Long) {
         if (!isGenerationActiveLocked(expectedGeneration)) return
         val handler = cbHandler ?: return

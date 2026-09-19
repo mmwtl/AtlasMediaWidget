@@ -33,6 +33,7 @@ class AndroidMediaCommandHost(
     internal val autoplayConfirmDelaysMs: List<Long> = AUTOPLAY_CONFIRM_DELAYS_MS,
     internal val autoplayMediaKeyConfirmDelayMs: Long = AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
     private val launchPackage: ((String) -> Boolean)? = null,
+    private val oneOsPlayStateGeneration: (MediaCenterConstant.AudioSource) -> Long = { 0L },
 ) : MediaCommandHost {
     companion object {
         private const val MAX_RADIO_STATIONS_PER_LIST = 256
@@ -42,6 +43,7 @@ class AndroidMediaCommandHost(
         val SOURCE_POLL_DELAYS_MS = listOf(100L, 200L, 400L, 800L, 1_000L)
         val AUTOPLAY_CONFIRM_DELAYS_MS = listOf(300L, 700L, 1_200L)
         const val AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS = 1_000L
+        val SOURCE_STATE_REFRESH_DELAYS_MS = listOf(0L, 200L, 500L, 1_000L)
     }
 
     private val currentMediaPackageRef = AtomicReference("")
@@ -239,6 +241,7 @@ class AndroidMediaCommandHost(
         var controller = initialController
         if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
             setCurrentMediaPackage(packageName)
+            stateHub?.onMediaController(controller)
             return true
         }
 
@@ -251,6 +254,7 @@ class AndroidMediaCommandHost(
             controller = configuredController(packageName) ?: controller
             if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
                 setCurrentMediaPackage(packageName)
+                stateHub?.onMediaController(controller)
                 return true
             }
         }
@@ -271,6 +275,7 @@ class AndroidMediaCommandHost(
         controller = configuredController(packageName) ?: controller
         if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
             setCurrentMediaPackage(packageName)
+            stateHub?.onMediaController(controller)
             return true
         }
 
@@ -415,8 +420,8 @@ class AndroidMediaCommandHost(
             } else {
                 null
             }
-            if (configuredOnlinePackage != null) {
-                return@runCatching launchPackageAndMaybePlay(
+            val operationSucceeded = if (configuredOnlinePackage != null) {
+                launchPackageAndMaybePlay(
                     packageName = configuredOnlinePackage,
                     autoplay = autoplay,
                     returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
@@ -426,6 +431,8 @@ class AndroidMediaCommandHost(
             } else {
                 autoplayConfirmedSource(center, sourceSwitch, oneOsSource)
             }
+            refreshConfirmedSourceState(center, oneOsSource)
+            operationSucceeded
         }.onFailure(Timber::e).getOrDefault(false)
             .also { succeeded ->
                 if (!succeeded && transitionGeneration != null) {
@@ -454,10 +461,11 @@ class AndroidMediaCommandHost(
                 )
             }
 
-            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT -> sourceSwitch.playAndConfirmWithFallback(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT -> sourceSwitch.playAndConfirmWithFallbackAfterUpdate(
                 target = targetSource,
                 sendPlay = { playBluetooth(center) },
                 fallbackSendPlay = { playBluetoothMediaSession(center) },
+                playbackGeneration = { oneOsPlayStateGeneration(target) },
                 isPlaying = {
                     center.musicAdapterManager.currentPlayState ==
                         MediaCenterConstant.PlayState.MUSIC_STATE_PLAY
@@ -614,13 +622,46 @@ class AndroidMediaCommandHost(
             val pkg = controller.packageName?.lowercase(java.util.Locale.ROOT).orEmpty()
             pkg.contains("bluetooth") || pkg.contains("a2dp") || pkg.contains("btservice")
         }
-        if (btController != null && btController.playbackState?.state != PlaybackState.STATE_PLAYING) {
+        if (btController != null) {
             return runCatching {
                 btController.transportControls.play()
                 true
             }.onFailure(Timber::e).getOrDefault(false)
         }
         return false
+    }
+
+    private suspend fun refreshConfirmedSourceState(
+        center: MediaCenterManager,
+        target: MediaCenterConstant.AudioSource,
+    ) {
+        if (target == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
+            val packageName = preferredOnlineSession()?.packageName ?: return
+            configuredController(packageName)?.let { stateHub?.onMediaController(it) }
+            return
+        }
+        if (target !in setOf(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_YUNTING,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA,
+            )
+        ) return
+
+        SOURCE_STATE_REFRESH_DELAYS_MS.forEach { refreshDelayMs ->
+            if (refreshDelayMs > 0L) delay(refreshDelayMs)
+            if (runCatching { center.currentAudioSource }.getOrNull() != target) return
+            val adapter = center.musicAdapterManager
+            val data = runCatching { adapter.currentMediaData }.getOrNull()
+            if (data != null) stateHub?.onOneOsMediaData(target, data)
+            runCatching { adapter.currentPlayState }.getOrNull()?.let {
+                stateHub?.onOneOsPlayState(target, it)
+            }
+            val meaningful = data != null && (
+                !data.id.isNullOrBlank() || !data.name.isNullOrBlank() || !data.artist.isNullOrBlank()
+            )
+            if (meaningful) return
+        }
     }
 
     private fun playMusicAdapter(

@@ -12,12 +12,18 @@ import com.geely.lib.oneosapi.mediacenter.listener.DeviceStateListener
 import com.geely.lib.oneosapi.mediacenter.listener.IRadioStateListener
 import com.geely.lib.oneosapi.mediacenter.listener.MusicStateListener
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
-class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
+class OneOsMediaBridgeAdapter(
+    private val hub: MediaStateHub,
+    private val onOnlineSourceConfirmed: () -> Unit = {},
+) {
     @Volatile
     private var manager: MediaCenterManager? = null
     private var radioStateListener: IRadioStateListener? = null
     private val deviceListeners = mutableMapOf<MediaCenterConstant.AudioSource, DeviceStateListener>()
+    private val playStateGenerations = ConcurrentHashMap<MediaCenterConstant.AudioSource, AtomicLong>()
 
     private val musicStateListener = object : MusicStateListener {
         override fun onMediaDataChanged(
@@ -34,7 +40,13 @@ class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
         override fun onPlayStateChanged(
             source: MediaCenterConstant.AudioSource,
             state: MediaCenterConstant.PlayState,
-        ) = hub.onOneOsPlayState(source, state)
+        ) {
+            if (state == MediaCenterConstant.PlayState.MUSIC_STATE_PLAY) {
+                playStateGenerations.computeIfAbsent(source) { AtomicLong() }.incrementAndGet()
+            }
+            hub.onOneOsPlayState(source, state)
+            refreshCurrentMedia(expectedSource = source, includePlayState = false)
+        }
 
         override fun onPlayListChanged(
             source: MediaCenterConstant.AudioSource,
@@ -97,6 +109,9 @@ class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
         val currentApp = runCatching { mediaCenterManager.currentAppSource }
             .getOrDefault(MediaCenterConstant.AppSource.UNKNOWN)
         hub.onBackendConnected(currentSource, currentApp, queryAvailability(mediaCenterManager))
+        if (currentSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
+            onOnlineSourceConfirmed()
+        }
         refreshCurrentMedia()
     }
 
@@ -143,13 +158,23 @@ class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
             return
         }
         hub.onSourceChanged(source, appSource)
+        if (source == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
+            onOnlineSourceConfirmed()
+        }
         refreshCurrentMedia()
     }
 
-    private fun refreshCurrentMedia() {
+    internal fun playStateGeneration(source: MediaCenterConstant.AudioSource): Long =
+        playStateGenerations[source]?.get() ?: 0L
+
+    private fun refreshCurrentMedia(
+        expectedSource: MediaCenterConstant.AudioSource? = null,
+        includePlayState: Boolean = true,
+    ) {
         val currentManager = manager ?: return
         runCatching {
             val source = currentManager.currentAudioSource
+            if (expectedSource != null && source != expectedSource) return@runCatching
             if (source == MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO) {
                 val radio = currentManager.radioManager
                 val frequency = radio.getCurrentFrequency(radio.band)
@@ -162,7 +187,9 @@ class OneOsMediaBridgeAdapter(private val hub: MediaStateHub) {
             }
             val adapter = currentManager.musicAdapterManager
             hub.onOneOsMediaData(source, adapter.currentMediaData)
-            adapter.currentPlayState?.let { hub.onOneOsPlayState(source, it) }
+            if (includePlayState) {
+                adapter.currentPlayState?.let { hub.onOneOsPlayState(source, it) }
+            }
             val data = adapter.currentMediaData
             hub.onOneOsProgress(source, adapter.currentPosition, data?.duration ?: -1L)
         }.onFailure(Timber::e)

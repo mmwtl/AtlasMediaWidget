@@ -151,6 +151,57 @@ class ConfirmedSourceSwitchTest {
     }
 
     @Test
+    fun `second autoplay cycle does not accept playing state left by the first cycle`() = runBlocking {
+        val current = AtomicReference(BridgeAudioSource.BT)
+        val switch = switch(
+            current = current,
+            autoplayConfirmDelaysMs = listOf(1L, 1L),
+        )
+        var playbackGeneration = 7L
+        var primaryCalls = 0
+        var fallbackCalls = 0
+
+        assertTrue(
+            switch.playAndConfirmWithFallbackAfterUpdate(
+                target = BridgeAudioSource.BT,
+                sendPlay = {
+                    primaryCalls++
+                    playbackGeneration++
+                    true
+                },
+                fallbackSendPlay = {
+                    fallbackCalls++
+                    true
+                },
+                playbackGeneration = { playbackGeneration },
+                isPlaying = { true },
+            ),
+        )
+        assertEquals(1, primaryCalls)
+        assertEquals(0, fallbackCalls)
+
+        assertTrue(
+            switch.playAndConfirmWithFallbackAfterUpdate(
+                target = BridgeAudioSource.BT,
+                sendPlay = {
+                    primaryCalls++
+                    true
+                },
+                fallbackSendPlay = {
+                    fallbackCalls++
+                    playbackGeneration++
+                    true
+                },
+                playbackGeneration = { playbackGeneration },
+                isPlaying = { true },
+            ),
+        )
+
+        assertEquals(3, primaryCalls)
+        assertEquals(1, fallbackCalls)
+    }
+
+    @Test
     fun `source confirmation succeeds without autoplay command`() = runBlocking {
         val current = AtomicReference(BridgeAudioSource.BT)
         val switch = switch(current)

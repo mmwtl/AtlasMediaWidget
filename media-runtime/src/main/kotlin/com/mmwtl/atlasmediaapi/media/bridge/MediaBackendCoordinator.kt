@@ -44,8 +44,11 @@ class MediaBackendCoordinator(
         carPlayArtworkProvider = { if (::carPlayBridge.isInitialized) carPlayBridge.getCachedArtwork() else null },
         onActiveSourceLost = ::handleActiveSourceLost,
     )
-    val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(stateHub)
     val sessionObserver: MediaSessionObserver = MediaSessionObserver(context, stateHub)
+    val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(
+        hub = stateHub,
+        onOnlineSourceConfirmed = sessionObserver::refreshActiveController,
+    )
 
     init {
         carPlayBridge = com.mmwtl.atlasmediaapi.media.carplay.CarPlayNativeBridge(
@@ -66,6 +69,7 @@ class MediaBackendCoordinator(
         carPlayBridge = carPlayBridge,
         onUserAction = ::cancelDefaultSourceSwitch,
         stateHub = stateHub,
+        oneOsPlayStateGeneration = oneOsAdapter::playStateGeneration,
     )
     val commandRouter: MediaCommandRouter = MediaCommandRouter(commandHost)
     val demoBackend: DemoMediaBackend = DemoMediaBackend(
