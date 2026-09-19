@@ -145,11 +145,45 @@ class AndroidMediaCommandHost(
         }
     }
 
-    override fun beforeSessionPlay() {
-        if (preferences.switchToOnlineBeforeSessionPlay) {
-            runCatching {
-                mediaCenter()?.requestAudioSource(MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE)
-            }.onFailure(Timber::e)
+    override suspend fun beforeSessionPlay(): Boolean {
+        if (!preferences.switchToOnlineBeforeSessionPlay) return true
+
+        val center = mediaCenter() ?: return false
+        val target = BridgeAudioSource.ONLINE
+        val sourceSwitch = ConfirmedSourceSwitch(
+            currentSource = {
+                runCatching { center.currentAudioSource.toBridgeSource() }.getOrNull()
+            },
+            sourceWaitTimeoutMs = sourceWaitTimeoutMs,
+            sourcePollDelaysMs = sourcePollDelaysMs,
+            autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
+        )
+        val alreadyOnline = runCatching {
+            center.currentAudioSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE
+        }.getOrDefault(false)
+        val transitionGeneration = if (alreadyOnline) {
+            null
+        } else {
+            stateHub?.beginSourceTransition(target)
+        }
+
+        return runCatching {
+            val confirmed = alreadyOnline || sourceSwitch.requestAndConfirm(
+                target = target,
+                requestTarget = {
+                    center.requestAudioSource(MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE)
+                },
+            )
+            if (!confirmed) return@runCatching false
+            stateHub?.onSourceChanged(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+                MediaCenterConstant.AppSource.UNKNOWN,
+            )
+            true
+        }.onFailure(Timber::e).getOrDefault(false).also { succeeded ->
+            if (!succeeded && transitionGeneration != null) {
+                stateHub?.cancelSourceTransition(transitionGeneration)
+            }
         }
     }
 
