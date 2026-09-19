@@ -1,5 +1,7 @@
 package com.mmwtl.atlasmediaapi.media.bridge
 
+import android.media.MediaMetadata
+import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import kotlinx.coroutines.CoroutineScope
@@ -38,6 +40,45 @@ class MediaStateHubTransitionTest {
             MediaCenterConstant.AppSource.UNKNOWN,
         )
         assertEquals(BridgeAudioSource.USB.name, fixture.repository.snapshot().audioSource)
+    }
+
+    @Test
+    fun `active online session does not replace state during bluetooth transition`() {
+        val fixture = fixture()
+        fixture.repository.update {
+            it.copy(
+                backendConnected = true,
+                audioSource = BridgeAudioSource.UNKNOWN.name,
+            )
+        }
+        val session = MediaSession(RuntimeEnvironment.getApplication(), "online-during-bt-transition").apply {
+            setMetadata(
+                MediaMetadata.Builder()
+                    .putString(MediaMetadata.METADATA_KEY_TITLE, "Online title")
+                    .build(),
+            )
+            setPlaybackState(
+                PlaybackState.Builder()
+                    .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+                    .build(),
+            )
+        }
+
+        fixture.hub.beginSourceTransition(BridgeAudioSource.BT)
+        fixture.hub.onMediaController(session.controller)
+
+        assertEquals(BridgeAudioSource.UNKNOWN.name, fixture.repository.snapshot().audioSource)
+        assertEquals("", fixture.repository.snapshot().title)
+
+        fixture.hub.onSourceChanged(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            MediaCenterConstant.AppSource.UNKNOWN,
+        )
+        fixture.hub.onMediaController(session.controller)
+
+        assertEquals(BridgeAudioSource.BT.name, fixture.repository.snapshot().audioSource)
+        assertEquals("", fixture.repository.snapshot().title)
+        session.release()
     }
 
     @Test

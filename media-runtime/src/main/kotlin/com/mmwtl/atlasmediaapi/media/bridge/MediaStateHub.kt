@@ -302,6 +302,9 @@ class MediaStateHub(
             }
             return fallback
         }
+        if (pendingSourceTransition?.target?.let { it != BridgeAudioSource.ONLINE } == true) {
+            return null
+        }
         val bridgeState = repository.snapshot()
         if (bridgeState.backendConnected && bridgeState.audioSource !in setOf(
                 BridgeAudioSource.ONLINE.name,
