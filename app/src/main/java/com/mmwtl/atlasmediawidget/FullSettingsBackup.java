@@ -233,7 +233,6 @@ final class FullSettingsBackup {
                         mediaJson.optBoolean("autoSwitchToDefaultAutoplayOnSourceLost", true),
                         mediaJson.optString("defaultMediaPackage", ""),
                         mediaJson.optBoolean("minimizeOnlinePlayerAfterAutostart", false),
-                        mediaJson.optBoolean("switchToOnlineBeforeSessionPlay", false),
                         mediaJson.optBoolean("radioWidgetBroadcastEnabled", true),
                         mediaJson.optBoolean("clusterCoversEnabled", true),
                         mediaJson.optBoolean("clusterOnlineEnabled", false),

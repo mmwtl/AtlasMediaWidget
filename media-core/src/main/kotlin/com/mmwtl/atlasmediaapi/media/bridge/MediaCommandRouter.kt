@@ -30,7 +30,6 @@ interface MediaCommandHost {
     fun currentMediaPackage(): String
     fun defaultMediaPackage(): String
     fun setCurrentMediaPackage(packageName: String)
-    fun beforeSessionPlay()
     suspend fun sendFallback(packageName: String, command: MediaCommand): Boolean
     suspend fun startDefaultAndPlay(packageName: String): Boolean
     suspend fun setSource(
@@ -68,7 +67,7 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
         if (host.blocksMediaCommands()) {
             val ownedSession = host.ownedSession()
             return if (ownedSession != null) {
-                executeOnSession(ownedSession, request, prepareSource = false)
+                executeOnSession(ownedSession, request)
             } else {
                 result(MediaBridgeContract.Status.NOT_SUPPORTED, "source owns media keys")
             }
@@ -96,14 +95,10 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
                 request.command == MediaCommand.TOGGLE) &&
             fallbackPackage == host.defaultMediaPackage()
         ) {
-            host.beforeSessionPlay()
             host.startDefaultAndPlay(fallbackPackage)
         } else if (request.command == MediaCommand.SEEK_TO) {
             false
         } else {
-            if (request.command == MediaCommand.PLAY || request.command == MediaCommand.TOGGLE) {
-                host.beforeSessionPlay()
-            }
             host.sendFallback(fallbackPackage, request.command)
         }
         if (sent) host.setCurrentMediaPackage(fallbackPackage)
@@ -161,7 +156,6 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
     private fun executeOnSession(
         target: MediaSessionCommandTarget,
         request: MediaCommandRequest,
-        prepareSource: Boolean = true,
     ): MediaCommandResult {
         val requiredCapability = requiredCapability(request.command)
         if (target.capabilities and requiredCapability == 0L) {
@@ -169,18 +163,10 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
         }
 
         val succeeded = when (request.command) {
-            MediaCommand.PLAY -> {
-                if (prepareSource) host.beforeSessionPlay()
-                target.play()
-            }
+            MediaCommand.PLAY -> target.play()
 
             MediaCommand.PAUSE -> target.pause()
-            MediaCommand.TOGGLE -> {
-                if (prepareSource && target.playbackState != SessionPlaybackState.PLAYING) {
-                    host.beforeSessionPlay()
-                }
-                target.toggle()
-            }
+            MediaCommand.TOGGLE -> target.toggle()
 
             MediaCommand.NEXT -> target.next()
             MediaCommand.PREVIOUS -> target.previous()

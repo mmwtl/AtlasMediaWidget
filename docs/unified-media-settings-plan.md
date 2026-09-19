@@ -77,7 +77,7 @@ API уже интегрирован в стандартный APK. Остави�
 | Источник по умолчанию | `defaultAudioSource`: пусто / RADIO / BT / USB / ONLINE / CPAA | «Медиа → Источники»; включить |
 | Старт | `defaultAudioSourceDelaySec` 0–30, `defaultAudioSourceAutoplayOnStartup` | Там же; включить |
 | Потеря источника | `autoSwitchToDefaultOnSourceLost`, `autoSwitchToDefaultAutoplayOnSourceLost` | Там же; включить |
-| Online-проигрыватель | `defaultMediaPackage`, `switchToOnlineBeforeSessionPlay` | «Медиа → Online»; включить, эти поля используются в `AndroidMediaCommandHost`, хотя текущий экран не даёт полноценно их настроить |
+| Online-проигрыватель | `defaultMediaPackage` | «Медиа → Online» |
 | Радио | `radio_covers_enabled` / `isWidgetBroadcastEnabled` | «Медиа → Радио»; включить; подпись должна описывать фактический эффект настройки, а не только обложки |
 | Приборная панель | `cluster_dim_covers_enabled`, default true | «Медиа → Радио → Приборная панель»; включить, управляет трансляцией названия и обложки |
 | Восстановление данных приборки | `adaptive_watchdog_base_interval_ms`, 1000–5000 мс, default 1250 мс | Там же, расширенный параметр; включить, сохранить единицы миллисекунд и ограничения |

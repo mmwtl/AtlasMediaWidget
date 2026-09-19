@@ -31,7 +31,6 @@ class MediaCommandRouterTest {
         var visiblePackage = ""
         var currentPackage = ""
         var defaultPackage = ""
-        var beforePlayCalls = 0
         var startDefaultCalls = 0
         var fallbackCalls = mutableListOf<Pair<String, MediaCommand>>()
         var sourceResult = true
@@ -52,10 +51,6 @@ class MediaCommandRouterTest {
         override fun defaultMediaPackage(): String = defaultPackage
         override fun setCurrentMediaPackage(packageName: String) {
             currentPackage = packageName
-        }
-
-        override fun beforeSessionPlay() {
-            beforePlayCalls++
         }
 
         override suspend fun sendFallback(packageName: String, command: MediaCommand): Boolean {
@@ -182,7 +177,6 @@ class MediaCommandRouterTest {
         assertTrue(result.succeeded)
         assertEquals(listOf("pause"), session.calls)
         assertEquals("player", host.currentPackage)
-        assertEquals(0, host.beforePlayCalls)
     }
 
     @Test
@@ -193,7 +187,6 @@ class MediaCommandRouterTest {
         val result = MediaCommandRouter(host).execute(request(MediaCommand.PLAY))
 
         assertTrue(result.succeeded)
-        assertEquals(1, host.beforePlayCalls)
         assertEquals(listOf("play"), session.calls)
     }
 
@@ -244,7 +237,6 @@ class MediaCommandRouterTest {
         assertTrue(result.succeeded)
         assertEquals(listOf("next"), carPlay.calls)
         assertTrue(host.fallbackCalls.isEmpty())
-        assertEquals(0, host.beforePlayCalls)
     }
 
     @Test
