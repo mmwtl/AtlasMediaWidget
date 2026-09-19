@@ -121,10 +121,76 @@ class ClusterMediaBridgeTest {
     fun `cluster overwrite watchdog starts after the event driven repair burst`() {
         assertEquals(
             listOf(100L, 150L, 250L, 500L, 500L),
-            ClusterMediaBridge.REASSERT_BURST_DELAYS_MS,
+            ClusterMediaBridge.reassertBurstDelaysMs(100L),
         )
-        assertEquals(listOf(100L, 150L), ClusterMediaBridge.DUPLICATE_REPAIR_DELAYS_MS)
+        assertEquals(listOf(100L, 150L), ClusterMediaBridge.duplicateRepairDelaysMs(100L))
         assertEquals(1_250L, ClusterMediaBridge.DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS)
+    }
+
+    @Test
+    fun `cluster repair burst scales independently from watchdog`() {
+        assertEquals(50L, ClusterMediaBridge.normalizeReassertBurstInterval(0L))
+        assertEquals(500L, ClusterMediaBridge.normalizeReassertBurstInterval(5_000L))
+        assertEquals(
+            listOf(200L, 300L, 500L, 1_000L, 1_000L),
+            ClusterMediaBridge.reassertBurstDelaysMs(200L),
+        )
+        assertEquals(listOf(200L, 300L), ClusterMediaBridge.duplicateRepairDelaysMs(200L))
+    }
+
+    @Test
+    fun `online progress is extrapolated without rebuilding the media card`() {
+        assertEquals(
+            12_500L,
+            ClusterMediaBridge.extrapolateOnlineProgress(
+                positionMs = 10_000L,
+                durationMs = 60_000L,
+                speed = 1f,
+                updateElapsedRealtime = 1_000L,
+                nowElapsedRealtime = 3_500L,
+            ),
+        )
+        assertEquals(
+            60_000L,
+            ClusterMediaBridge.extrapolateOnlineProgress(
+                positionMs = 59_900L,
+                durationMs = 60_000L,
+                speed = 1f,
+                updateElapsedRealtime = 1_000L,
+                nowElapsedRealtime = 2_000L,
+            ),
+        )
+        assertEquals(
+            null,
+            ClusterMediaBridge.extrapolateOnlineProgress(-1L, 60_000L, 1f, 1_000L, 2_000L),
+        )
+    }
+
+    @Test
+    fun `online payload deduplication ignores only progress`() {
+        val payload = DirectDimMediaClient.Payload(
+            sourceType = IMediaInteraction.SOURCE_TYPE_ONLINE,
+            uuid = "online-track",
+            title = "Title",
+            album = "Album",
+            artist = "Artist",
+            artworkUri = null,
+            duration = 60_000L,
+            playbackStatus = IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING,
+            radioFrequency = "",
+            radioMode = 0,
+            radioStationName = "",
+            currentProgress = 12_500L,
+        )
+
+        assertEquals(
+            ClusterMediaBridge.onlinePayloadDedupKey(payload),
+            ClusterMediaBridge.onlinePayloadDedupKey(payload.copy(currentProgress = 13_000L)),
+        )
+        assertFalse(
+            ClusterMediaBridge.onlinePayloadDedupKey(payload) ==
+                ClusterMediaBridge.onlinePayloadDedupKey(payload.copy(title = "Other")),
+        )
     }
 
     @Test
@@ -229,6 +295,25 @@ class ClusterMediaBridgeTest {
         assertEquals(
             4_000L,
             fakePrefs.getLong(ClusterMediaBridge.KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS, -1L),
+        )
+    }
+
+    @Test
+    fun `burst interval store persists normalized updates`() {
+        val store = ReassertBurstIntervalStore(fakePrefs)
+
+        assertEquals(50L, store.set(10L))
+        assertEquals(50L, store.value)
+        assertEquals(
+            50L,
+            fakePrefs.getLong(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS, -1L),
+        )
+
+        assertEquals(250L, store.set(250L))
+        assertEquals(250L, store.value)
+        assertEquals(
+            250L,
+            fakePrefs.getLong(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS, -1L),
         )
     }
 

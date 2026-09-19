@@ -38,9 +38,18 @@ class MediaStateHub(
     private val cpaaArtworkFallback = CpaaArtworkFallback(repository, artworkRepository)
     private val usbArtworkResolver = UsbArtworkResolver(context)
     private val mediaCallbackLock = Any()
+    private data class PendingSourceTransition(
+        val generation: Long,
+        val target: BridgeAudioSource,
+    )
+
+    private var nextSourceTransitionGeneration = 0L
+    private var pendingSourceTransition: PendingSourceTransition? = null
+    private val reportedLostSources = mutableSetOf<BridgeAudioSource>()
     private var lastPlayingRealtimeMs: Long = 0L
     private var lastRadioFrequency: Frequency? = null
     private var lastRadioPlaying: Boolean = false
+    private var hasRadioState: Boolean = false
 
     private fun markPlayingIfActive(isPlaying: Boolean) {
         if (isPlaying) {
@@ -65,6 +74,7 @@ class MediaStateHub(
         availability: Map<BridgeAudioSource, Pair<Boolean, Boolean>>,
     ) {
         val selected = audioSource.toBridgeSource()
+        synchronized(mediaCallbackLock) { reportedLostSources.remove(selected) }
         clusterMediaBridge?.setActiveSource(selected)
         onlineSourcePolicy.onAudioSource(selected)
         val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
@@ -155,46 +165,73 @@ class MediaStateHub(
         audioSource: MediaCenterConstant.AudioSource,
         appSource: MediaCenterConstant.AppSource,
     ) {
-        val selected = audioSource.toBridgeSource()
-        clusterMediaBridge?.setActiveSource(selected)
-        onlineSourcePolicy.onAudioSource(selected)
-        val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
-        repository.update { before ->
-            val sourceChanged = before.audioSource != selected.name
-            val newArtworkUri = when {
-                cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
-                sourceChanged -> ""
-                else -> before.artworkUri
+        synchronized(mediaCallbackLock) {
+            val selected = audioSource.toBridgeSource()
+            val pending = pendingSourceTransition
+            if (pending != null && pending.target != selected) return
+            if (pending?.target == selected) pendingSourceTransition = null
+            reportedLostSources.remove(selected)
+            clusterMediaBridge?.setActiveSource(selected)
+            onlineSourcePolicy.onAudioSource(selected)
+            val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
+            repository.update { before ->
+                val sourceChanged = before.audioSource != selected.name
+                val newArtworkUri = when {
+                    cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
+                    sourceChanged -> ""
+                    else -> before.artworkUri
+                }
+                before.copy(
+                    audioSource = selected.name,
+                    appSource = appSource.name,
+                    sources = before.sources.map { source ->
+                        source.copy(selected = source.id == selected.name)
+                    },
+                    ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
+                    ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
+                    mediaId = if (sourceChanged) "" else before.mediaId,
+                    title = if (sourceChanged) "" else before.title,
+                    artist = if (sourceChanged) "" else before.artist,
+                    album = if (sourceChanged) "" else before.album,
+                    duration = if (sourceChanged) -1L else before.duration,
+                    position = if (sourceChanged) -1L else before.position,
+                    updateElapsedRealtime = if (sourceChanged) 0L else before.updateElapsedRealtime,
+                    speed = if (sourceChanged) 0f else before.speed,
+                    playbackState = if (sourceChanged) PlaybackState.STATE_NONE else before.playbackState,
+                    playbackErrorCode = if (sourceChanged) 0 else before.playbackErrorCode,
+                    playbackErrorMessage = if (sourceChanged) "" else before.playbackErrorMessage,
+                    playbackActions = if (sourceChanged) 0L else before.playbackActions,
+                    capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
+                    artworkUri = newArtworkUri,
+                    artworkRevision = if (
+                        newArtworkUri != before.artworkUri && (sourceChanged || newArtworkUri.isNotBlank())
+                    ) {
+                        before.artworkRevision + 1L
+                    } else before.artworkRevision,
+                )
             }
-            before.copy(
-                audioSource = selected.name,
-                appSource = appSource.name,
-                sources = before.sources.map { source ->
-                    source.copy(selected = source.id == selected.name)
-                },
-                ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
-                ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
-                mediaId = if (sourceChanged) "" else before.mediaId,
-                title = if (sourceChanged) "" else before.title,
-                artist = if (sourceChanged) "" else before.artist,
-                album = if (sourceChanged) "" else before.album,
-                duration = if (sourceChanged) -1L else before.duration,
-                position = if (sourceChanged) -1L else before.position,
-                updateElapsedRealtime = if (sourceChanged) 0L else before.updateElapsedRealtime,
-                speed = if (sourceChanged) 0f else before.speed,
-                playbackState = if (sourceChanged) PlaybackState.STATE_NONE else before.playbackState,
-                playbackErrorCode = if (sourceChanged) 0 else before.playbackErrorCode,
-                playbackErrorMessage = if (sourceChanged) "" else before.playbackErrorMessage,
-                playbackActions = if (sourceChanged) 0L else before.playbackActions,
-                capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
-                artworkUri = newArtworkUri,
-                artworkRevision = if (newArtworkUri != before.artworkUri && (sourceChanged || newArtworkUri.isNotBlank())) {
-                    before.artworkRevision + 1L
-                } else before.artworkRevision,
-            )
+            cpaaArtworkFallback.onBridgeStateChanged()
+            if (repository.snapshot().artworkUri.isBlank()) latestArtworkRequest.incrementAndGet()
+            if (selected == BridgeAudioSource.RADIO && hasRadioState) {
+                onOneOsRadioStateLocked(lastRadioFrequency, lastRadioPlaying)
+            }
         }
-        cpaaArtworkFallback.onBridgeStateChanged()
-        if (repository.snapshot().artworkUri.isBlank()) latestArtworkRequest.incrementAndGet()
+    }
+
+    internal fun beginSourceTransition(target: BridgeAudioSource): Long =
+        synchronized(mediaCallbackLock) {
+            nextSourceTransitionGeneration++
+            val generation = nextSourceTransitionGeneration
+            pendingSourceTransition = PendingSourceTransition(generation, target)
+            generation
+        }
+
+    internal fun cancelSourceTransition(generation: Long) {
+        synchronized(mediaCallbackLock) {
+            if (pendingSourceTransition?.generation == generation) {
+                pendingSourceTransition = null
+            }
+        }
     }
 
     fun onSourceAvailability(
@@ -210,6 +247,10 @@ class MediaStateHub(
         val wasPlaying = (snapshot.playbackState == PlaybackState.STATE_PLAYING) || wasRecentlyPlaying
         val lost = wasActive && (!connected || !available)
 
+        if (connected && available) {
+            synchronized(mediaCallbackLock) { reportedLostSources.remove(bridgeSource) }
+        }
+
         repository.update {
             it.copy(
                 sources = it.sources.map { item ->
@@ -220,7 +261,7 @@ class MediaStateHub(
             )
         }
 
-        if (lost) {
+        if (lost && synchronized(mediaCallbackLock) { reportedLostSources.add(bridgeSource) }) {
             onActiveSourceLost(bridgeSource, wasPlaying)
         }
     }
@@ -253,10 +294,16 @@ class MediaStateHub(
             if (wasActiveOnline) {
                 clearPlayback()
                 if (hadOwner) {
-                    onActiveSourceLost(BridgeAudioSource.ONLINE, wasPlaying)
+                    val shouldReportLoss = reportedLostSources.add(BridgeAudioSource.ONLINE)
+                    if (shouldReportLoss) {
+                        onActiveSourceLost(BridgeAudioSource.ONLINE, wasPlaying)
+                    }
                 }
             }
             return fallback
+        }
+        if (pendingSourceTransition?.target?.let { it != BridgeAudioSource.ONLINE } == true) {
+            return null
         }
         val bridgeState = repository.snapshot()
         if (bridgeState.backendConnected && bridgeState.audioSource !in setOf(
@@ -535,8 +582,18 @@ class MediaStateHub(
     }
 
     fun onOneOsRadioState(frequency: Frequency?, playing: Boolean) {
-        lastRadioFrequency = frequency
+        synchronized(mediaCallbackLock) {
+            onOneOsRadioStateLocked(frequency, playing)
+        }
+    }
+
+    private fun onOneOsRadioStateLocked(frequency: Frequency?, playing: Boolean) {
+        hasRadioState = true
+        if (frequency != null) lastRadioFrequency = frequency
         lastRadioPlaying = playing
+        if (repository.snapshot().audioSource != BridgeAudioSource.RADIO.name ||
+            !onlineSourcePolicy.acceptOneOs(BridgeAudioSource.RADIO)
+        ) return
         markPlayingIfActive(playing)
 
         val widgetBroadcastEnabled = radioCatalogRepository?.isWidgetBroadcastEnabled == true

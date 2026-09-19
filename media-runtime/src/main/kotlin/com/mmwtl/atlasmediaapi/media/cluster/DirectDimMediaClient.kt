@@ -35,6 +35,7 @@ internal class DirectDimMediaClient(context: Context) {
         val radioFrequency: String,
         val radioMode: Int,
         val radioStationName: String,
+        val currentProgress: Long = 0L,
     )
 
     data class Status(
@@ -240,7 +241,7 @@ internal class DirectDimMediaClient(context: Context) {
         parcel.writeString("") // lyric_content
         parcel.writeString("") // lyric_url
         parcel.writeLong(payload.duration)
-        parcel.writeLong(0L) // current_progress
+        parcel.writeLong(payload.currentProgress)
         parcel.writeInt(0) // favorite_state
         parcel.writeInt(0) // loop_mode
         parcel.writeString("") // media_path

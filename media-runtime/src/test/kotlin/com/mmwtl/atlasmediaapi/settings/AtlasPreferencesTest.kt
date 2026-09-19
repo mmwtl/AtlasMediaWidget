@@ -95,6 +95,7 @@ class AtlasPreferencesTest {
     @Test
     fun `default values are correct`() {
         assertEquals("", preferences.defaultMediaPackage)
+        assertFalse(preferences.minimizeOnlinePlayerAfterAutostart)
         assertFalse(preferences.switchToOnlineBeforeSessionPlay)
         assertFalse(preferences.diagnosticLoggingEnabled)
         assertEquals("", preferences.defaultAudioSource)
@@ -133,6 +134,9 @@ class AtlasPreferencesTest {
     fun `autoplay and auto switch flags persistence`() {
         preferences.defaultAudioSourceAutoplayOnStartup = false
         assertFalse(preferences.defaultAudioSourceAutoplayOnStartup)
+
+        preferences.minimizeOnlinePlayerAfterAutostart = true
+        assertTrue(preferences.minimizeOnlinePlayerAfterAutostart)
 
         preferences.autoSwitchToDefaultOnSourceLost = true
         assertTrue(preferences.autoSwitchToDefaultOnSourceLost)

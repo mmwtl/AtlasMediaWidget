@@ -26,12 +26,28 @@ class AndroidMediaCommandHost(
     private val carPlayBridge: CarPlayNativeBridge? = null,
     private val onUserAction: (() -> Unit)? = null,
     private val stateHub: MediaStateHub? = null,
+    internal val sessionWaitTimeoutMs: Long = SESSION_WAIT_TIMEOUT_MS,
+    internal val sessionPollDelaysMs: List<Long> = SESSION_POLL_DELAYS_MS,
+    internal val sourceWaitTimeoutMs: Long = SOURCE_WAIT_TIMEOUT_MS,
+    internal val sourcePollDelaysMs: List<Long> = SOURCE_POLL_DELAYS_MS,
+    internal val autoplayConfirmDelaysMs: List<Long> = AUTOPLAY_CONFIRM_DELAYS_MS,
+    internal val autoplayMediaKeyConfirmDelayMs: Long = AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
+    private val launchPackage: ((String) -> Boolean)? = null,
+    private val oneOsPlayStateGeneration: (MediaCenterConstant.AudioSource) -> Long = { 0L },
 ) : MediaCommandHost {
     companion object {
         private const val MAX_RADIO_STATIONS_PER_LIST = 256
+        const val SESSION_WAIT_TIMEOUT_MS = 10_000L
+        val SESSION_POLL_DELAYS_MS = listOf(100L, 200L, 400L, 800L, 1_000L)
+        const val SOURCE_WAIT_TIMEOUT_MS = 5_000L
+        val SOURCE_POLL_DELAYS_MS = listOf(100L, 200L, 400L, 800L, 1_000L)
+        val AUTOPLAY_CONFIRM_DELAYS_MS = listOf(300L, 700L, 1_200L)
+        const val AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS = 1_000L
+        val SOURCE_STATE_REFRESH_DELAYS_MS = listOf(0L, 200L, 500L, 1_000L)
     }
 
     private val currentMediaPackageRef = AtomicReference("")
+    private val lastOnlineMediaPackageRef = AtomicReference("")
 
     private fun mediaCenter(): MediaCenterManager? =
         apiManager.getMediaCenterManager()?.takeIf { it.isAlive }
@@ -123,6 +139,10 @@ class AndroidMediaCommandHost(
 
     override fun setCurrentMediaPackage(packageName: String) {
         currentMediaPackageRef.set(packageName)
+        val currentSource = runCatching { mediaCenter()?.currentAudioSource }.getOrNull()
+        if (currentSource == null || currentSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
+            rememberOnlineMediaPackage(packageName)
+        }
     }
 
     override fun beforeSessionPlay() {
@@ -152,102 +172,382 @@ class AndroidMediaCommandHost(
         return false
     }
 
-    override suspend fun startDefaultAndPlay(packageName: String): Boolean {
-        onUserAction?.invoke()
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return false
-        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(launchIntent) }.onFailure { return false }
+    override suspend fun startDefaultAndPlay(packageName: String): Boolean =
+        launchPackageAndMaybePlay(
+            packageName = packageName,
+            autoplay = true,
+            returnHomeAfterLaunch = false,
+        )
 
-        // Wait up to 3 seconds for session to appear
-        val sessionFound = withTimeoutOrNull(3000L) {
-            while (true) {
-                val controller = sessionObserver.getActiveControllers().firstOrNull { it.packageName == packageName }
-                if (controller != null) {
-                    return@withTimeoutOrNull controller
+    suspend fun setDefaultSource(source: BridgeAudioSource, autoplay: Boolean): Boolean =
+        setSourceInternal(
+            source = source,
+            appSource = null,
+            autoplay = autoplay,
+            launchConfiguredOnlinePackage = true,
+        )
+
+    suspend fun autoplayCurrentSource(): Boolean {
+        val request = MediaCommandRequest(
+            requestId = "startup-autoplay",
+            command = MediaCommand.PLAY,
+        )
+        executeNative(request)?.let { nativeResult ->
+            if (nativeResult.status == MediaBridgeContract.Status.OK) return true
+            if (nativeResult.status != MediaBridgeContract.Status.NOT_SUPPORTED) return false
+        }
+
+        val session = preferredSession()
+        if (session != null) {
+            return session.play().also { played ->
+                if (played) setCurrentMediaPackage(session.packageName)
+            }
+        }
+        return false
+    }
+
+    private suspend fun launchPackageAndMaybePlay(
+        packageName: String,
+        autoplay: Boolean,
+        returnHomeAfterLaunch: Boolean,
+    ): Boolean {
+        onUserAction?.invoke()
+        val launched = launchPackage?.let { callback ->
+            runCatching { callback(packageName) }
+                .onFailure { Timber.w(it, "Could not launch configured media package $packageName") }
+                .getOrDefault(false)
+        } ?: launchConfiguredPackage(packageName)
+        if (!launched) return false
+        if (!autoplay) {
+            if (returnHomeAfterLaunch) returnHomeScreen()
+            return true
+        }
+
+        val sessionFound = awaitSession(packageName)
+        val result = if (sessionFound != null) {
+            playAndConfirm(packageName, sessionFound)
+        } else {
+            Timber.w("Configured media package %s did not publish a MediaSession", packageName)
+            false
+        }
+        if (returnHomeAfterLaunch) returnHomeScreen()
+        return result
+    }
+
+    private suspend fun playAndConfirm(
+        packageName: String,
+        initialController: MediaController,
+    ): Boolean {
+        var controller = initialController
+        if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            setCurrentMediaPackage(packageName)
+            stateHub?.onMediaController(controller)
+            return true
+        }
+
+        autoplayConfirmDelaysMs.forEachIndexed { attempt, confirmDelayMs ->
+            runCatching { controller.transportControls.play() }
+                .onFailure {
+                    Timber.w(it, "Could not request playback from $packageName (attempt ${attempt + 1})")
                 }
-                delay(100L)
+            delay(confirmDelayMs.coerceAtLeast(1L))
+            controller = configuredController(packageName) ?: controller
+            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                setCurrentMediaPackage(packageName)
+                stateHub?.onMediaController(controller)
+                return true
+            }
+        }
+
+        runCatching {
+            val eventTime = android.os.SystemClock.uptimeMillis()
+            val downSent = controller.dispatchMediaButtonEvent(
+                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY, 0),
+            )
+            val upSent = controller.dispatchMediaButtonEvent(
+                KeyEvent(eventTime, eventTime, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY, 0),
+            )
+            downSent || upSent
+        }.onFailure {
+            Timber.w(it, "Could not send MEDIA_PLAY to configured media package $packageName")
+        }
+        delay(autoplayMediaKeyConfirmDelayMs.coerceAtLeast(1L))
+        controller = configuredController(packageName) ?: controller
+        if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+            setCurrentMediaPackage(packageName)
+            stateHub?.onMediaController(controller)
+            return true
+        }
+
+        Timber.w("Configured media package %s stayed paused after autoplay requests", packageName)
+        return false
+    }
+
+    private fun configuredController(packageName: String): MediaController? =
+        sessionObserver.getActiveControllers().firstOrNull { it.packageName == packageName }
+
+    private fun launchConfiguredPackage(packageName: String): Boolean {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            ?: run {
+                Timber.w("No launch intent for configured media package %s", packageName)
+                return false
+            }
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+        return runCatching { context.startActivity(launchIntent) }
+            .onFailure { Timber.w(it, "Could not launch configured media package $packageName") }
+            .isSuccess
+    }
+
+    private suspend fun awaitSession(packageName: String): MediaController? =
+        withTimeoutOrNull(sessionWaitTimeoutMs.coerceAtLeast(1L)) {
+            var poll = 0
+            while (true) {
+                sessionObserver.getActiveControllers()
+                    .firstOrNull { it.packageName == packageName }
+                    ?.let { return@withTimeoutOrNull it }
+                val delayMs = sessionPollDelaysMs
+                    .getOrElse(poll) { sessionPollDelaysMs.lastOrNull() ?: 1_000L }
+                    .coerceAtLeast(1L)
+                delay(delayMs)
+                poll++
             }
             null
         }
 
-        return if (sessionFound != null) {
-            runCatching {
-                sessionFound.transportControls.play()
-                true
-            }.getOrDefault(false)
-        } else {
-            true
+    private fun returnHomeScreen() {
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        runCatching { context.startActivity(homeIntent) }
+            .onFailure { Timber.w(it, "Could not return to HOME after starting media package") }
     }
 
     override suspend fun setSource(
         source: BridgeAudioSource,
         appSource: String?,
         autoplay: Boolean,
+    ): Boolean = setSourceInternal(
+        source = source,
+        appSource = appSource,
+        autoplay = autoplay,
+        launchConfiguredOnlinePackage = false,
+    )
+
+    private suspend fun setSourceInternal(
+        source: BridgeAudioSource,
+        appSource: String?,
+        autoplay: Boolean,
+        launchConfiguredOnlinePackage: Boolean,
     ): Boolean {
         onUserAction?.invoke()
-        val center = mediaCenter() ?: return false
+        val center = mediaCenter()
+        if (center == null) {
+            if (source != BridgeAudioSource.ONLINE) return false
+            Timber.i("OneOS MediaCenter unavailable; applying Android ONLINE source path")
+            stateHub?.onSourceChanged(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+                MediaCenterConstant.AppSource.UNKNOWN,
+            )
+            val configuredOnlinePackage = defaultMediaPackage().takeIf(String::isNotBlank)
+            if (launchConfiguredOnlinePackage && configuredOnlinePackage != null) {
+                return launchPackageAndMaybePlay(
+                    packageName = configuredOnlinePackage,
+                    autoplay = autoplay,
+                    returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+                )
+            }
+            if (!autoplay) return true
+
+            val sessionPackage = preferredOnlineSession()?.packageName
+            val controller = sessionPackage?.let(::configuredController)
+            if (controller != null) {
+                return playAndConfirm(controller.packageName, controller)
+            }
+            return if (configuredOnlinePackage != null) {
+                launchPackageAndMaybePlay(
+                    packageName = configuredOnlinePackage,
+                    autoplay = true,
+                    returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+                )
+            } else {
+                true
+            }
+        }
         val oneOsSource = source.toOneOsSource()
         val oneOsApp = appSource?.let { runCatching { MediaCenterConstant.AppSource.valueOf(it) }.getOrNull() }
             ?: MediaCenterConstant.AppSource.UNKNOWN
+        val sourceSwitch = ConfirmedSourceSwitch(
+            currentSource = {
+                runCatching { center.currentAudioSource.toBridgeSource() }.getOrNull()
+            },
+            sourceWaitTimeoutMs = sourceWaitTimeoutMs,
+            sourcePollDelaysMs = sourcePollDelaysMs,
+            autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
+        )
+        val transitionGeneration = stateHub?.beginSourceTransition(source)
 
         return runCatching {
-            pauseCurrentPlayback(center)
-
-            if (oneOsSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE &&
-                oneOsApp == MediaCenterConstant.AppSource.UNKNOWN
-            ) {
-                center.requestAudioSource(oneOsSource, MediaCenterConstant.AppSource.WECARFLOW)
-            } else if (oneOsApp != MediaCenterConstant.AppSource.UNKNOWN) {
-                center.requestAudioSource(oneOsSource, oneOsApp)
-            } else {
-                center.requestAudioSource(oneOsSource)
+            rememberOnlineSessionBeforeLeaving(center, oneOsSource)
+            val sourceConfirmed = sourceSwitch.requestAndConfirm(
+                target = source,
+                requestTarget = {
+                    if (oneOsSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE &&
+                        oneOsApp == MediaCenterConstant.AppSource.UNKNOWN
+                    ) {
+                        center.requestAudioSource(oneOsSource, MediaCenterConstant.AppSource.WECARFLOW)
+                    } else if (oneOsApp != MediaCenterConstant.AppSource.UNKNOWN) {
+                        center.requestAudioSource(oneOsSource, oneOsApp)
+                    } else {
+                        center.requestAudioSource(oneOsSource)
+                    }
+                },
+            )
+            if (!sourceConfirmed) {
+                Timber.w("OneOS did not confirm source %s within timeout", source.name)
+                return@runCatching false
             }
 
-            // Immediately update stateHub to avoid stale UI state if OneOS skips onSourceChanged
-            // (e.g. when OneOS was already on this native source while an Android MediaSession was active)
+            // Publish only the confirmed target. Intermediate source callbacks are filtered by
+            // MediaStateHub while this transition generation is active.
             stateHub?.onSourceChanged(oneOsSource, oneOsApp)
 
-            if (autoplay) {
-                delay(500L)
-                when (oneOsSource) {
-                    MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO -> {
-                        val radio = center.radioManager
+            val configuredOnlinePackage = if (
+                launchConfiguredOnlinePackage &&
+                oneOsSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE
+            ) {
+                defaultMediaPackage().takeIf(String::isNotBlank)
+            } else {
+                null
+            }
+            val operationSucceeded = if (configuredOnlinePackage != null) {
+                launchPackageAndMaybePlay(
+                    packageName = configuredOnlinePackage,
+                    autoplay = autoplay,
+                    returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+                )
+            } else if (!autoplay) {
+                true
+            } else {
+                autoplayConfirmedSource(center, sourceSwitch, oneOsSource)
+            }
+            refreshConfirmedSourceState(center, oneOsSource)
+            operationSucceeded
+        }.onFailure(Timber::e).getOrDefault(false)
+            .also { succeeded ->
+                if (!succeeded && transitionGeneration != null) {
+                    stateHub?.cancelSourceTransition(transitionGeneration)
+                }
+            }
+    }
+
+    private suspend fun autoplayConfirmedSource(
+        center: MediaCenterManager,
+        sourceSwitch: ConfirmedSourceSwitch,
+        target: MediaCenterConstant.AudioSource,
+    ): Boolean {
+        val targetSource = target.toBridgeSource()
+        return when (target) {
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO -> {
+                val radio = center.radioManager
+                sourceSwitch.playAndConfirm(
+                    target = targetSource,
+                    sendPlay = {
                         radio.requestAudioSource()
                         delay(300L)
                         radio.play()
-                        delay(600L)
-                        if (!isRadioPlaying(radio.radioStatus) && radio.radioStatus != 1) {
-                            Timber.i("Radio not playing yet (status=0x%X), retrying play", radio.radioStatus)
-                            radio.play()
-                        }
-                    }
-                    MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT -> {
-                        playBluetooth(center)
-                    }
-                    MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB -> {
-                        center.musicAdapterManager.play()
-                    }
-                    MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA -> {
-                        carPlayBridge?.play()
-                        launchCarPlayActivity()
-                    }
-                    MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE -> {
-                        val session = preferredSession()
-                        if (session != null) {
-                            session.play()
-                        } else {
-                            val defaultPkg = defaultMediaPackage()
-                            if (defaultPkg.isNotBlank()) {
-                                startDefaultAndPlay(defaultPkg)
-                            }
-                        }
-                    }
-                    else -> {}
+                    },
+                    isPlaying = { isRadioPlaying(radio.radioStatus) },
+                )
+            }
+
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT -> sourceSwitch.playAndConfirmWithFallbackAfterUpdate(
+                target = targetSource,
+                sendPlay = { playBluetooth(center) },
+                fallbackSendPlay = { playBluetoothMediaSession(center) },
+                playbackGeneration = { oneOsPlayStateGeneration(target) },
+                isPlaying = {
+                    center.musicAdapterManager.currentPlayState ==
+                        MediaCenterConstant.PlayState.MUSIC_STATE_PLAY
+                },
+            )
+
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB -> sourceSwitch.playAndConfirm(
+                target = targetSource,
+                sendPlay = { playMusicAdapter(center, target) },
+                isPlaying = {
+                    center.musicAdapterManager.currentPlayState ==
+                        MediaCenterConstant.PlayState.MUSIC_STATE_PLAY
+                },
+            )
+
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA -> {
+                launchCarPlayActivity()
+                sourceSwitch.playAndConfirm(
+                    target = targetSource,
+                    sendPlay = { carPlayBridge?.play() == true },
+                    isPlaying = { carPlayBridge?.isPlaying == true },
+                )
+            }
+
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE -> {
+                val sessionPackage = preferredOnlineSession()?.packageName
+                val controller = sessionPackage?.let(::configuredController)
+                if (controller != null) {
+                    playAndConfirm(controller.packageName, controller)
+                } else {
+                    val defaultPkg = defaultMediaPackage()
+                    defaultPkg.isNotBlank() && launchPackageAndMaybePlay(
+                        packageName = defaultPkg,
+                        autoplay = true,
+                        returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+                    )
                 }
             }
-            true
-        }.onFailure(Timber::e).getOrDefault(false)
+
+            else -> false
+        }
+    }
+
+    private fun rememberOnlineSessionBeforeLeaving(
+        center: MediaCenterManager,
+        targetSource: MediaCenterConstant.AudioSource,
+    ) {
+        if (targetSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) return
+        val currentSource = runCatching { center.currentAudioSource }.getOrNull()
+        if (currentSource != MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) return
+
+        val controllers = sessionObserver.getActiveControllers()
+        val currentPackage = currentMediaPackage()
+        val onlineController = controllers.firstOrNull {
+            it.playbackState?.state == PlaybackState.STATE_PLAYING
+        } ?: controllers.firstOrNull {
+            currentPackage.isNotBlank() && it.packageName == currentPackage
+        } ?: controllers.maxByOrNull {
+            it.playbackState?.lastPositionUpdateTime ?: 0L
+        }
+        rememberOnlineMediaPackage(onlineController?.packageName.orEmpty())
+    }
+
+    internal fun preferredOnlineSession(): MediaSessionCommandTarget? {
+        val controllers = sessionObserver.getActiveControllers()
+        val rememberedPackage = lastOnlineMediaPackageRef.get()
+        if (rememberedPackage.isNotBlank()) {
+            controllers
+                .firstOrNull { it.packageName == rememberedPackage }
+                ?.let { return AndroidMediaSessionTarget(it) }
+        }
+        val configuredPackage = defaultMediaPackage()
+        if (configuredPackage.isNotBlank()) {
+            controllers
+                .firstOrNull { it.packageName == configuredPackage }
+                ?.let { return AndroidMediaSessionTarget(it) }
+        }
+        return null
+    }
+
+    private fun rememberOnlineMediaPackage(packageName: String) {
+        if (packageName.isNotBlank()) lastOnlineMediaPackageRef.set(packageName)
     }
 
     override suspend fun tuneRadio(target: RadioStationTarget, autoplay: Boolean): Boolean {
@@ -303,37 +603,75 @@ class AndroidMediaCommandHost(
         )
     }
 
-    private fun playBluetooth(center: MediaCenterManager) {
+    private fun playBluetooth(center: MediaCenterManager): Boolean {
+        if (runCatching { center.currentAudioSource }
+                .getOrNull() != MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT
+        ) {
+            return false
+        }
         val adapterResult = runCatching { center.musicAdapterManager.play() }.getOrDefault(0)
-        if (adapterResult != 1) {
-            val btController = sessionObserver.getActiveControllers().firstOrNull { controller ->
-                val pkg = controller.packageName?.lowercase(java.util.Locale.ROOT).orEmpty()
-                pkg.contains("bluetooth") || pkg.contains("a2dp") || pkg.contains("btservice")
+        return adapterResult == 1
+    }
+
+    private fun playBluetoothMediaSession(center: MediaCenterManager): Boolean {
+        if (runCatching { center.currentAudioSource }
+                .getOrNull() != MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT
+        ) return false
+
+        val btController = sessionObserver.getActiveControllers().firstOrNull { controller ->
+            val pkg = controller.packageName?.lowercase(java.util.Locale.ROOT).orEmpty()
+            pkg.contains("bluetooth") || pkg.contains("a2dp") || pkg.contains("btservice")
+        }
+        if (btController != null) {
+            return runCatching {
+                btController.transportControls.play()
+                true
+            }.onFailure(Timber::e).getOrDefault(false)
+        }
+        return false
+    }
+
+    private suspend fun refreshConfirmedSourceState(
+        center: MediaCenterManager,
+        target: MediaCenterConstant.AudioSource,
+    ) {
+        if (target == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
+            val packageName = preferredOnlineSession()?.packageName ?: return
+            configuredController(packageName)?.let { stateHub?.onMediaController(it) }
+            return
+        }
+        if (target !in setOf(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_YUNTING,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA,
+            )
+        ) return
+
+        SOURCE_STATE_REFRESH_DELAYS_MS.forEach { refreshDelayMs ->
+            if (refreshDelayMs > 0L) delay(refreshDelayMs)
+            if (runCatching { center.currentAudioSource }.getOrNull() != target) return
+            val adapter = center.musicAdapterManager
+            val data = runCatching { adapter.currentMediaData }.getOrNull()
+            if (data != null) stateHub?.onOneOsMediaData(target, data)
+            runCatching { adapter.currentPlayState }.getOrNull()?.let {
+                stateHub?.onOneOsPlayState(target, it)
             }
-            if (btController != null && btController.playbackState?.state != PlaybackState.STATE_PLAYING) {
-                runCatching { btController.transportControls.play() }.onFailure(Timber::e)
-            }
+            val meaningful = data != null && (
+                !data.id.isNullOrBlank() || !data.name.isNullOrBlank() || !data.artist.isNullOrBlank()
+            )
+            if (meaningful) return
         }
     }
 
-    private fun pauseCurrentPlayback(center: MediaCenterManager) {
-        runCatching { center.radioManager.pause() }.onFailure(Timber::e)
-        runCatching { center.musicAdapterManager.pause() }.onFailure(Timber::e)
-        carPlayBridge?.pause()
-        sessionObserver.getActiveControllers().forEach { controller ->
-            if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
-                runCatching { controller.transportControls.pause() }.onFailure(Timber::e)
-            }
-        }
-        runCatching {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            @Suppress("DEPRECATION")
-            audioManager?.requestAudioFocus(
-                null,
-                android.media.AudioManager.STREAM_MUSIC,
-                android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
-            )
-        }.onFailure(Timber::e)
+    private fun playMusicAdapter(
+        center: MediaCenterManager,
+        target: MediaCenterConstant.AudioSource,
+    ): Boolean {
+        if (runCatching { center.currentAudioSource }.getOrNull() != target) return false
+        return runCatching { center.musicAdapterManager.play() == 1 }
+            .onFailure(Timber::e)
+            .getOrDefault(false)
     }
 
     private fun launchCarPlayActivity() {

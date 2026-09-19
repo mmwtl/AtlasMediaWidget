@@ -2,8 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
-def appVersionCode = 50
-def appVersionName = '3.0.3'
+def appVersionCode = 55
+def appVersionName = '3.1.5'
 def branchName = providers.exec {
     commandLine('git', 'branch', '--show-current')
 }.standardOutput.asText.get().trim()
@@ -72,7 +72,8 @@ android {
 android.applicationVariants.configureEach { variant ->
     variant.outputs.configureEach { output ->
         if (variant.flavorName == 'integrated') {
-            output.outputFileName = "${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget-${variant.buildType.name}.apk"
+            def signatureSuffix = variant.signingConfig == null ? '-unsigned' : ''
+            output.outputFileName = "${effectiveVersionName}[${appVersionCode}]AtlasMediaWidget-${variant.buildType.name}${signatureSuffix}.apk"
         }
     }
 }

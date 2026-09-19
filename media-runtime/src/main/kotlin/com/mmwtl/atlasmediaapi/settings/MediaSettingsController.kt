@@ -114,11 +114,14 @@ class MediaSettingsController(
             autoSwitchToDefaultOnSourceLost = preferences.autoSwitchToDefaultOnSourceLost,
             autoSwitchToDefaultAutoplayOnSourceLost = preferences.autoSwitchToDefaultAutoplayOnSourceLost,
             defaultMediaPackage = preferences.defaultMediaPackage,
+            minimizeOnlinePlayerAfterAutostart = preferences.minimizeOnlinePlayerAfterAutostart,
             switchToOnlineBeforeSessionPlay = preferences.switchToOnlineBeforeSessionPlay,
             radioWidgetBroadcastEnabled = radioCatalogRepository.isWidgetBroadcastEnabled,
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
             clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
+            clusterOnlineProgressEnabled = clusterMediaBridge.isClusterOnlineProgressEnabled,
             clusterWatchdogIntervalMs = clusterMediaBridge.reassertWatchdogIntervalMs,
+            clusterReassertBurstIntervalMs = clusterMediaBridge.reassertBurstIntervalMs,
             catalogType = catalogInfo.type.name,
             catalogStationCount = catalogInfo.stationCount,
             catalogDescription = catalogInfo.description,
@@ -169,6 +172,16 @@ class MediaSettingsController(
                 )
             }
         }
+        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS)) {
+            val interval = update.getLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS)
+            if (interval !in 50L..500L) {
+                return UpdateResult(
+                    snapshot = null,
+                    status = MediaBridgeContract.Status.VALIDATION_ERROR,
+                    errorMessage = "Интервал быстрых повторов должен быть от 50 до 500 мс: $interval",
+                )
+            }
+        }
         if (update.containsKey(MediaBridgeContract.Key.UI_SCALE_TENTHS)) {
             val scale = update.getInt(MediaBridgeContract.Key.UI_SCALE_TENTHS)
             if (scale !in 10..20) {
@@ -209,6 +222,11 @@ class MediaSettingsController(
         if (update.containsKey(MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE)) {
             preferences.defaultMediaPackage = update.getString(MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE).orEmpty()
         }
+        if (update.containsKey(MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART)) {
+            preferences.minimizeOnlinePlayerAfterAutostart = update.getBoolean(
+                MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
+            )
+        }
         if (update.containsKey(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY)) {
             preferences.switchToOnlineBeforeSessionPlay = update.getBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY)
         }
@@ -223,6 +241,9 @@ class MediaSettingsController(
         }
         if (update.containsKey(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS)) {
             clusterMediaBridge.setReassertWatchdogIntervalMs(update.getLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS))
+        }
+        if (update.containsKey(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS)) {
+            clusterMediaBridge.setReassertBurstIntervalMs(update.getLong(MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS))
         }
         if (update.containsKey(MediaBridgeContract.Key.UI_SCALE_TENTHS)) {
             preferences.uiScaleTenths = update.getInt(MediaBridgeContract.Key.UI_SCALE_TENTHS)
@@ -274,11 +295,14 @@ class MediaSettingsController(
             put("autoSwitchToDefaultOnSourceLost", snapshot.autoSwitchToDefaultOnSourceLost)
             put("autoSwitchToDefaultAutoplayOnSourceLost", snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
             put("defaultMediaPackage", snapshot.defaultMediaPackage)
+            put("minimizeOnlinePlayerAfterAutostart", snapshot.minimizeOnlinePlayerAfterAutostart)
             put("switchToOnlineBeforeSessionPlay", snapshot.switchToOnlineBeforeSessionPlay)
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
+            put("clusterOnlineProgressEnabled", snapshot.clusterOnlineProgressEnabled)
             put("clusterWatchdogIntervalMs", snapshot.clusterWatchdogIntervalMs)
+            put("clusterReassertBurstIntervalMs", snapshot.clusterReassertBurstIntervalMs)
         }
         val mediaJsonBytes = mediaJsonObj.toString(2).toByteArray(StandardCharsets.UTF_8)
 
@@ -566,6 +590,10 @@ class MediaSettingsController(
             true,
         )
         preferences.defaultMediaPackage = mediaJson.optString("defaultMediaPackage", "")
+        preferences.minimizeOnlinePlayerAfterAutostart = mediaJson.optBoolean(
+            "minimizeOnlinePlayerAfterAutostart",
+            false,
+        )
         preferences.switchToOnlineBeforeSessionPlay = mediaJson.optBoolean(
             "switchToOnlineBeforeSessionPlay",
             false,
@@ -583,6 +611,11 @@ class MediaSettingsController(
             if (mediaJson.has("clusterWatchdogIntervalMs")) {
                 mediaJson.getLong("clusterWatchdogIntervalMs")
             } else ClusterMediaBridge.DEFAULT_REASSERT_WATCHDOG_INTERVAL_MS,
+        )
+        clusterMediaBridge.setReassertBurstIntervalMs(
+            if (mediaJson.has("clusterReassertBurstIntervalMs")) {
+                mediaJson.getLong("clusterReassertBurstIntervalMs")
+            } else ClusterMediaBridge.DEFAULT_REASSERT_BURST_INTERVAL_MS,
         )
     }
 
@@ -614,11 +647,14 @@ class MediaSettingsController(
             MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE to String::class.java,
+            MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS to java.lang.Long::class.java,
+            MediaBridgeContract.Key.CLUSTER_REASSERT_BURST_INTERVAL_MS to java.lang.Long::class.java,
             MediaBridgeContract.Key.UI_SCALE_TENTHS to Integer::class.java,
         )
         expected.forEach { (key, type) ->
@@ -647,7 +683,11 @@ class MediaSettingsController(
         val booleanFields = listOf(
             "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
             "autoSwitchToDefaultAutoplayOnSourceLost", "switchToOnlineBeforeSessionPlay",
-            "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterOnlineEnabled",
+            "minimizeOnlinePlayerAfterAutostart",
+            "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterRadioFacadeEnabled",
+            "clusterOnlineEnabled",
+            "clusterOnlineProgressEnabled",
+            "clusterOnlineFacadeProgressEnabled",
         )
         stringFields.forEach { if (mediaJson.has(it) && mediaJson.opt(it) !is String) throw IllegalArgumentException("Недопустимый тип поля $it") }
         booleanFields.forEach { if (mediaJson.has(it) && mediaJson.opt(it) !is Boolean) throw IllegalArgumentException("Недопустимый тип поля $it") }
@@ -661,6 +701,10 @@ class MediaSettingsController(
         if (mediaJson.has("clusterWatchdogIntervalMs")) {
             val value = jsonLong(mediaJson, "clusterWatchdogIntervalMs")
             if (value !in 1000L..5000L) throw IllegalArgumentException("Интервал watchdog должен быть от 1000 до 5000 мс: $value")
+        }
+        if (mediaJson.has("clusterReassertBurstIntervalMs")) {
+            val value = jsonLong(mediaJson, "clusterReassertBurstIntervalMs")
+            if (value !in 50L..500L) throw IllegalArgumentException("Интервал быстрых повторов должен быть от 50 до 500 мс: $value")
         }
         if (mediaJson.has("uiScaleTenths")) {
             val value = jsonInt(mediaJson, "uiScaleTenths")

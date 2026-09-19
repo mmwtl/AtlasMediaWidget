@@ -20,4 +20,10 @@ public class BootStartPolicyTest {
         assertFalse(BootStartPolicy.isStartupAction("android.intent.action.SCREEN_ON"));
         assertFalse(BootStartPolicy.isStartupAction("android.intent.action.MY_PACKAGE_REPLACED"));
     }
+
+    @Test public void accessibilityConnectRetriesOnlyConfiguredStartup() {
+        assertTrue(BootStartPolicy.shouldStartWhenAccessibilityConnects(true, false));
+        assertTrue(BootStartPolicy.shouldStartWhenAccessibilityConnects(false, true));
+        assertFalse(BootStartPolicy.shouldStartWhenAccessibilityConnects(false, false));
+    }
 }

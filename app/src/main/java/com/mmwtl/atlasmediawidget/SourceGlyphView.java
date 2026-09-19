@@ -4,11 +4,13 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.drawable.Drawable;
 import android.view.View;
 
 final class SourceGlyphView extends View {
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
+    private final Drawable usbDrawable;
     private MediaSource.Id source = MediaSource.Id.UNKNOWN;
 
     SourceGlyphView(Context context) {
@@ -16,6 +18,7 @@ final class SourceGlyphView extends View {
         paint.setColor(Ui.PRIMARY);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
+        usbDrawable = context.getDrawable(R.drawable.ic_source_usb);
     }
 
     void setSource(MediaSource.Id value) {
@@ -87,24 +90,8 @@ final class SourceGlyphView extends View {
     }
 
     private void drawUsb(Canvas canvas) {
-        float w = getWidth();
-        float h = getHeight();
-        float cx = w * 0.5f;
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeWidth(Math.max(2f, w * 0.09f));
-        canvas.drawLine(cx, h * 0.78f, cx, h * 0.2f, paint);
-        canvas.drawLine(cx, h * 0.45f, w * 0.27f, h * 0.61f, paint);
-        canvas.drawLine(cx, h * 0.38f, w * 0.72f, h * 0.28f, paint);
-        paint.setStyle(Paint.Style.FILL);
-        path.reset();
-        path.moveTo(cx, h * 0.08f);
-        path.lineTo(w * 0.39f, h * 0.24f);
-        path.lineTo(w * 0.61f, h * 0.24f);
-        path.close();
-        canvas.drawPath(path, paint);
-        canvas.drawCircle(w * 0.27f, h * 0.65f, w * 0.08f, paint);
-        canvas.drawRect(w * 0.66f, h * 0.2f, w * 0.8f, h * 0.34f, paint);
-        canvas.drawCircle(cx, h * 0.82f, w * 0.1f, paint);
+        usbDrawable.setBounds(0, 0, getWidth(), getHeight());
+        usbDrawable.draw(canvas);
     }
 
     private void drawOnline(Canvas canvas) {

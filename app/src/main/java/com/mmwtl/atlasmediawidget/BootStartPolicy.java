@@ -11,4 +11,8 @@ final class BootStartPolicy {
                 || ACTION_QUICKBOOT_POWERON.equals(action)
                 || "android.intent.action.USER_UNLOCKED".equals(action);
     }
+
+    static boolean shouldStartWhenAccessibilityConnects(boolean autoStart, boolean serviceEnabled) {
+        return autoStart || serviceEnabled;
+    }
 }

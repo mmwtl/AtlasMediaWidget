@@ -71,6 +71,39 @@ public final class OverlayGeometryTest {
         assertEquals(1120, position.y());
     }
 
+    @Test public void bottomOffsetKeepsFrameBottomWhenCardHeightChanges() {
+        int safeTop = 24;
+        int safeBottom = 1920;
+        int offsetY = 37;
+
+        for (OverlayCorner corner : new OverlayCorner[] {
+                OverlayCorner.BOTTOM_START, OverlayCorner.BOTTOM_END}) {
+            OverlayGeometry.Position shortCard = OverlayGeometry.positionFor(
+                    corner, 0, safeTop, 1440, safeBottom,
+                    500, 150, 0, offsetY);
+            OverlayGeometry.Position tallCard = OverlayGeometry.positionFor(
+                    corner, 0, safeTop, 1440, safeBottom,
+                    500, 500, 0, offsetY);
+
+            assertEquals(safeBottom - offsetY, shortCard.y() + 150);
+            assertEquals(safeBottom - offsetY, tallCard.y() + 500);
+        }
+    }
+
+    @Test public void safeAreaPositionCanBeConvertedToRelativeLayoutParams() {
+        int safeLeft = 12;
+        int safeTop = 24;
+        OverlayGeometry.Position absolute = OverlayGeometry.positionFor(
+                OverlayCorner.BOTTOM_END, safeLeft, safeTop, 1452, 1920,
+                500, 150, 31, 37);
+        OverlayGeometry.Position fromRelativeParams = OverlayGeometry.positionFor(
+                OverlayCorner.TOP_START, safeLeft, safeTop, 1452, 1920,
+                500, 150, absolute.x() - safeLeft, absolute.y() - safeTop);
+
+        assertEquals(absolute.x(), fromRelativeParams.x());
+        assertEquals(absolute.y(), fromRelativeParams.y());
+    }
+
     private static void assertPosition(OverlayCorner corner, int x, int y) {
         OverlayGeometry.Position position = OverlayGeometry.positionFor(corner,
                 LEFT, TOP, RIGHT, BOTTOM, WIDTH, HEIGHT, 0, 0);

@@ -26,6 +26,7 @@ class MediaBackendCoordinator(
     companion object {
         const val GRACE_PERIOD_MS = 30_000L
         val RECONNECT_DELAYS_MS = listOf(2_000L, 5_000L, 10_000L, 30_000L)
+        val DEFAULT_SOURCE_RETRY_DELAYS_MS = listOf(1_000L, 2_000L, 4_000L, 8_000L)
     }
 
     val stateRepository: MediaStateRepository = MediaStateRepository()
@@ -43,8 +44,12 @@ class MediaBackendCoordinator(
         carPlayArtworkProvider = { if (::carPlayBridge.isInitialized) carPlayBridge.getCachedArtwork() else null },
         onActiveSourceLost = ::handleActiveSourceLost,
     )
-    val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(stateHub)
     val sessionObserver: MediaSessionObserver = MediaSessionObserver(context, stateHub)
+    val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(
+        hub = stateHub,
+        scope = scope,
+        onOnlineSourceConfirmed = sessionObserver::refreshActiveController,
+    )
 
     init {
         carPlayBridge = com.mmwtl.atlasmediaapi.media.carplay.CarPlayNativeBridge(
@@ -65,6 +70,7 @@ class MediaBackendCoordinator(
         carPlayBridge = carPlayBridge,
         onUserAction = ::cancelDefaultSourceSwitch,
         stateHub = stateHub,
+        oneOsPlayStateGeneration = oneOsAdapter::playStateGeneration,
     )
     val commandRouter: MediaCommandRouter = MediaCommandRouter(commandHost)
     val demoBackend: DemoMediaBackend = DemoMediaBackend(
@@ -96,6 +102,7 @@ class MediaBackendCoordinator(
     private var graceJob: Job? = null
     private var reconnectJob: Job? = null
     private var defaultSourceJob: Job? = null
+    private var activeSourceLossJob: Job? = null
     private var hasAppliedDefaultSource = false
     private var isBackendStarted = false
     private var activeBackendIsDemo = false
@@ -177,6 +184,9 @@ class MediaBackendCoordinator(
 
         sessionObserver.start()
         carPlayBridge.start()
+        if (preferences.defaultAudioSource == BridgeAudioSource.ONLINE.name) {
+            scheduleDefaultSourceSwitch()
+        }
     }
 
     fun stopBackend() {
@@ -190,6 +200,8 @@ class MediaBackendCoordinator(
         reconnectJob = null
         defaultSourceJob?.cancel()
         defaultSourceJob = null
+        activeSourceLossJob?.cancel()
+        activeSourceLossJob = null
         hasAppliedDefaultSource = false
 
         val wasDemoBackend = activeBackendIsDemo
@@ -227,7 +239,7 @@ class MediaBackendCoordinator(
                     withContext(Dispatchers.Main) {
                         if (connectionGeneration == currentGen && isBackendStarted) {
                             oneOsAdapter.attach(center)
-                            if (!hasAppliedDefaultSource) {
+                            if (!hasAppliedDefaultSource && defaultSourceJob?.isActive != true) {
                                 scheduleDefaultSourceSwitch()
                             }
                         }
@@ -240,8 +252,10 @@ class MediaBackendCoordinator(
             }
         } else {
             Timber.w("OneOS disconnected")
-            defaultSourceJob?.cancel()
-            defaultSourceJob = null
+            if (preferences.defaultAudioSource != BridgeAudioSource.ONLINE.name) {
+                defaultSourceJob?.cancel()
+                defaultSourceJob = null
+            }
             oneOsAdapter.detach(notify = true)
             if (clientCount.get() > 0 && isBackendStarted) {
                 scheduleReconnect()
@@ -257,15 +271,24 @@ class MediaBackendCoordinator(
         defaultSourceJob = null
 
         val targetSourceStr = preferences.defaultAudioSource
-        if (targetSourceStr.isBlank()) return
-        val targetSource = runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
-        if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER) return
-
-        val delayMs = preferences.defaultAudioSourceDelaySec * 1000L
         val autoplay = preferences.defaultAudioSourceAutoplayOnStartup
+        val targetSource = if (targetSourceStr.isBlank()) {
+            null
+        } else {
+            runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
+        }
+        if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER) return
+        if (targetSource == null && !autoplay) return
+
+        val delayMs = if (targetSource != null) {
+            preferences.defaultAudioSourceDelaySec * 1000L
+        } else {
+            0L
+        }
+        val targetDescription = targetSource?.name ?: "current source"
         Timber.i(
-            "Scheduling default audio source switch to %s in %d ms (autoplay=%b)",
-            targetSource.name,
+            "Scheduling startup media action for %s in %d ms (autoplay=%b)",
+            targetDescription,
             delayMs,
             autoplay,
         )
@@ -275,19 +298,51 @@ class MediaBackendCoordinator(
                 delay(delayMs)
             }
             if (!isBackendStarted) return@launch
-            isApplyingDefaultSource = true
-            hasAppliedDefaultSource = true
-            try {
-                Timber.i("Applying default audio source switch to %s (autoplay=%b)", targetSource.name, autoplay)
-                commandMutex.withLock {
-                    commandHost.setSource(
-                        source = targetSource,
-                        appSource = null,
-                        autoplay = autoplay,
+            var attempt = 0
+            while (isBackendStarted && !hasAppliedDefaultSource) {
+                isApplyingDefaultSource = true
+                val applied = try {
+                    Timber.i(
+                        "Applying startup media action for %s (autoplay=%b, attempt=%d)",
+                        targetDescription,
+                        autoplay,
+                        attempt + 1,
                     )
+                    commandMutex.withLock {
+                        if (targetSource != null) {
+                            commandHost.setDefaultSource(
+                                source = targetSource,
+                                autoplay = autoplay,
+                            )
+                        } else {
+                            commandHost.autoplayCurrentSource()
+                        }
+                    }
+                } finally {
+                    isApplyingDefaultSource = false
                 }
-            } finally {
-                isApplyingDefaultSource = false
+                if (applied) {
+                    hasAppliedDefaultSource = true
+                    Timber.i("Startup media action for %s applied", targetDescription)
+                    return@launch
+                }
+                val retryDelay = DEFAULT_SOURCE_RETRY_DELAYS_MS.getOrNull(attempt)
+                if (retryDelay == null) {
+                    Timber.w(
+                        "Startup media action for %s was not applied after %d attempts",
+                        targetDescription,
+                        attempt + 1,
+                    )
+                    return@launch
+                }
+                attempt++
+                if (!isBackendStarted || hasAppliedDefaultSource) return@launch
+                Timber.w(
+                    "Startup media action for %s was not applied; retrying in %d ms",
+                    targetDescription,
+                    retryDelay,
+                )
+                delay(retryDelay)
             }
         }
     }
@@ -308,6 +363,10 @@ class MediaBackendCoordinator(
         if (targetSourceStr.isBlank()) return
         val targetSource = runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
         if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER || targetSource == lostSource) return
+        if (activeSourceLossJob?.isActive == true) {
+            Timber.i("Ignoring duplicate loss of %s while default source switch is active", lostSource.name)
+            return
+        }
 
         val autoplay = preferences.autoSwitchToDefaultAutoplayOnSourceLost && wasPlaying
         Timber.i(
@@ -317,7 +376,7 @@ class MediaBackendCoordinator(
             targetSource.name,
             autoplay,
         )
-        scope.launch {
+        activeSourceLossJob = scope.launch {
             isApplyingDefaultSource = true
             try {
                 commandMutex.withLock {

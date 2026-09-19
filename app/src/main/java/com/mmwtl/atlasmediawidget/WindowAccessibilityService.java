@@ -48,6 +48,12 @@ public final class WindowAccessibilityService extends AccessibilityService {
         info.notificationTimeout = 50L;
         setServiceInfo(info);
         requestWindowRefresh();
+        Prefs prefs = new Prefs(this);
+        if (BootStartPolicy.shouldStartWhenAccessibilityConnects(
+                prefs.getBoolean(Prefs.KEY_AUTO_START, false),
+                prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false))) {
+            BootReceiver.startIfAllowed(this, prefs);
+        }
         AppLog.info("Window accessibility service connected");
     }
 

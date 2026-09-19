@@ -77,6 +77,9 @@ class DiagnosticActivity : Activity() {
     private lateinit var clusterGuardIntervalTitle: TextView
     private lateinit var clusterGuardIntervalValueLabel: TextView
     private lateinit var clusterGuardIntervalSeekBar: SeekBar
+    private lateinit var clusterBurstIntervalTitle: TextView
+    private lateinit var clusterBurstIntervalValueLabel: TextView
+    private lateinit var clusterBurstIntervalSeekBar: SeekBar
     private lateinit var clusterGuardIntervalWarning: TextView
     private lateinit var radioCatalogInfoView: TextView
     private lateinit var exportSampleZipButton: Button
@@ -87,6 +90,9 @@ class DiagnosticActivity : Activity() {
     private var clusterGuardSeekBarTracking = false
     private var pendingClusterGuardIntervalMs: Long? = null
     private var clusterGuardCommitJob: Job? = null
+    private var clusterBurstSeekBarTracking = false
+    private var pendingClusterBurstIntervalMs: Long? = null
+    private var clusterBurstCommitJob: Job? = null
     private var radioCoverLoadJob: Job? = null
     private var renderedRadioArtworkKey: String? = null
 
@@ -407,10 +413,62 @@ class DiagnosticActivity : Activity() {
             radioCard.addView(clusterGuardIntervalSeekBar, DiagnosticUi.fullWrap())
             DiagnosticUi.topMargin(clusterGuardIntervalSeekBar, this, 6f)
 
+            clusterBurstIntervalTitle = DiagnosticUi.text(
+                this,
+                "Базовый интервал быстрых повторов",
+                15f,
+                DiagnosticUi.SECONDARY,
+            ).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            radioCard.addView(clusterBurstIntervalTitle, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterBurstIntervalTitle, this, 12f)
+
+            clusterBurstIntervalValueLabel = DiagnosticUi.text(
+                this,
+                "${coordinator.clusterMediaBridge.reassertBurstIntervalMs} мс",
+                18f,
+                DiagnosticUi.PRIMARY,
+            ).apply {
+                setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            }
+            radioCard.addView(clusterBurstIntervalValueLabel, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterBurstIntervalValueLabel, this, 4f)
+
+            clusterBurstIntervalSeekBar = DiagnosticUi.sizeSeekBar(
+                this,
+                min = (ClusterMediaBridge.MIN_REASSERT_BURST_INTERVAL_MS / 10L).toInt(),
+                max = (ClusterMediaBridge.MAX_REASSERT_BURST_INTERVAL_MS / 10L).toInt(),
+                initial = (coordinator.clusterMediaBridge.reassertBurstIntervalMs / 10L).toInt(),
+            ).apply {
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        if (fromUser) {
+                            val intervalMs = progress * 10L
+                            pendingClusterBurstIntervalMs = intervalMs
+                            clusterBurstIntervalValueLabel.text = "$intervalMs мс"
+                            if (!clusterBurstSeekBarTracking) scheduleClusterBurstCommit()
+                        }
+                    }
+
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) {
+                        clusterBurstSeekBarTracking = true
+                        clusterBurstCommitJob?.cancel()
+                    }
+
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                        clusterBurstSeekBarTracking = false
+                        commitPendingClusterBurstInterval()
+                    }
+                })
+            }
+            radioCard.addView(clusterBurstIntervalSeekBar, DiagnosticUi.fullWrap())
+            DiagnosticUi.topMargin(clusterBurstIntervalSeekBar, this, 6f)
+
             clusterGuardIntervalWarning = DiagnosticUi.text(
                 this,
-                "Смена станции: сразу и через 100/250/500/1000/1500 мс. " +
-                    "Повторный callback: 100/250 мс. Watchdog использует jitter против синхронизации.",
+                "Быстрые повторы используют профиль x1/x1,5/x2,5/x5/x5; " +
+                    "повторный callback — x1/x1,5. Watchdog использует jitter против синхронизации.",
                 13f,
                 DiagnosticUi.ERROR,
             )
@@ -590,6 +648,7 @@ class DiagnosticActivity : Activity() {
         if (!isIntegrated) {
             commitPendingDelay()
             commitPendingClusterGuardInterval()
+            commitPendingClusterBurstInterval()
         }
         super.onPause()
     }
@@ -808,6 +867,25 @@ class DiagnosticActivity : Activity() {
         reportView.text = generateDiagnosticText()
     }
 
+    private fun scheduleClusterBurstCommit() {
+        clusterBurstCommitJob?.cancel()
+        clusterBurstCommitJob = activityScope.launch {
+            delay(SEEK_BAR_COMMIT_DEBOUNCE_MS)
+            clusterBurstCommitJob = null
+            commitPendingClusterBurstInterval()
+        }
+    }
+
+    private fun commitPendingClusterBurstInterval() {
+        clusterBurstCommitJob?.cancel()
+        clusterBurstCommitJob = null
+        val intervalMs = pendingClusterBurstIntervalMs ?: return
+        pendingClusterBurstIntervalMs = null
+        if (coordinator.clusterMediaBridge.reassertBurstIntervalMs == intervalMs) return
+        coordinator.clusterMediaBridge.setReassertBurstIntervalMs(intervalMs)
+        reportView.text = generateDiagnosticText()
+    }
+
     private fun render() {
         if (demoModeSwitch.isChecked != coordinator.isDemoMode()) {
             demoModeSwitch.isChecked = coordinator.isDemoMode()
@@ -836,6 +914,17 @@ class DiagnosticActivity : Activity() {
         clusterGuardIntervalValueLabel.alpha = if (clusterGuardEnabled) 1f else 0.45f
         clusterGuardIntervalSeekBar.isEnabled = clusterGuardEnabled
         clusterGuardIntervalSeekBar.alpha = if (clusterGuardEnabled) 1f else 0.45f
+        val clusterBurstIntervalMs = coordinator.clusterMediaBridge.reassertBurstIntervalMs
+        clusterBurstIntervalTitle.isEnabled = clusterGuardEnabled
+        clusterBurstIntervalTitle.alpha = if (clusterGuardEnabled) 1f else 0.45f
+        if (pendingClusterBurstIntervalMs == null) {
+            clusterBurstIntervalValueLabel.text = "$clusterBurstIntervalMs мс"
+            clusterBurstIntervalSeekBar.progress = (clusterBurstIntervalMs / 10L).toInt()
+        }
+        clusterBurstIntervalValueLabel.isEnabled = clusterGuardEnabled
+        clusterBurstIntervalValueLabel.alpha = if (clusterGuardEnabled) 1f else 0.45f
+        clusterBurstIntervalSeekBar.isEnabled = clusterGuardEnabled
+        clusterBurstIntervalSeekBar.alpha = if (clusterGuardEnabled) 1f else 0.45f
         clusterGuardIntervalWarning.isEnabled = clusterGuardEnabled
         clusterGuardIntervalWarning.alpha = if (clusterGuardEnabled) 1f else 0.45f
         radioCatalogInfoView.text = catalogInfo.description
@@ -1036,10 +1125,6 @@ class DiagnosticActivity : Activity() {
             appendLine("clusterDimArtworkQnxPath: ${clusterStatus.artworkQnxPath.ifBlank { "none" }}")
             appendLine("clusterDimArtworkUriGrants: ${clusterStatus.artworkGrantReport.ifBlank { "none" }}")
             appendLine("clusterDimSendCount: ${clusterStatus.sendCount}")
-            appendLine("clusterDirectDimBound: ${clusterStatus.directDimBound}")
-            appendLine("clusterDirectDimSendCount: ${clusterStatus.directDimSendCount}")
-            appendLine("clusterDirectDimLastResult: ${clusterStatus.directDimLastResult}")
-            appendLine("clusterDirectDimLastError: ${clusterStatus.directDimLastError.ifBlank { "none" }}")
             appendLine("description: ${catalogInfo.description}")
             appendLine()
 

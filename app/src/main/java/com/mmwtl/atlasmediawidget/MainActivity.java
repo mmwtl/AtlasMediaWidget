@@ -6,9 +6,11 @@ import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -31,6 +33,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -43,9 +46,13 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -59,6 +66,8 @@ public final class MainActivity extends ScaledActivity {
     private static final long SETTINGS_READINESS_TIMEOUT_MS = 20_000L;
     private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
+    private static final String MEDIA_BROWSER_SERVICE_ACTION =
+            "android.media.browse.MediaBrowserService";
     private Prefs prefs;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
@@ -74,6 +83,11 @@ public final class MainActivity extends ScaledActivity {
     private TextView defaultSourceTitle;
     private TextView defaultSourceDelayLabel;
     private SeekBar defaultSourceDelaySeekBar;
+    private TextView onlinePlayerTitle;
+    private Spinner onlinePlayerSpinner;
+    private ArrayAdapter<OnlinePlayerOption> onlinePlayerAdapter;
+    private boolean refreshingOnlinePlayer;
+    private Switch minimizeOnlinePlayerSwitch;
     private Switch startupAutoplaySwitch;
     private Switch sourceLostSwitch;
     private Switch sourceLostAutoplaySwitch;
@@ -83,6 +97,8 @@ public final class MainActivity extends ScaledActivity {
     private Switch clusterOnlineSwitch;
     private TextView clusterWatchdogLabel;
     private SeekBar clusterWatchdogSeekBar;
+    private TextView clusterReassertBurstLabel;
+    private SeekBar clusterReassertBurstSeekBar;
     private TextView radioCatalogInfoText;
     private Button restoreDefaultRadioCatalogButton;
     private TextView mediaStatusText;
@@ -1580,6 +1596,59 @@ public final class MainActivity extends ScaledActivity {
         r2Params.topMargin = Ui.dp(this, 6);
         row2.setLayoutParams(r2Params);
 
+        onlinePlayerTitle = text("Онлайн медиаплеер по умолчанию", 15,
+                Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams onlineTitleParams = fullWrap();
+        onlineTitleParams.topMargin = Ui.dp(this, 14);
+        mediaSettingsGroup.addView(onlinePlayerTitle, onlineTitleParams);
+
+        onlinePlayerSpinner = new Spinner(this);
+        onlinePlayerSpinner.setBackground(Ui.background(Ui.NESTED, 8, this));
+        onlinePlayerSpinner.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 12), 0);
+        onlinePlayerAdapter = new ArrayAdapter<OnlinePlayerOption>(
+                this, android.R.layout.simple_spinner_item, queryOnlinePlayerOptions()) {
+            @Override public View getView(int position, View convertView, ViewGroup parent) {
+                return createOnlinePlayerRow(getItem(position), false);
+            }
+
+            @Override public View getDropDownView(int position, View convertView,
+                    ViewGroup parent) {
+                return createOnlinePlayerRow(getItem(position), true);
+            }
+        };
+        onlinePlayerSpinner.setAdapter(onlinePlayerAdapter);
+        onlinePlayerSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                    int position, long id) {
+                if (refreshingOnlinePlayer || currentMediaSettings == null
+                        || position < 0 || position >= onlinePlayerAdapter.getCount()) return;
+                String packageName = onlinePlayerAdapter.getItem(position).packageName;
+                if (!packageName.equals(currentMediaSettings.defaultMediaPackage)) {
+                    sendMediaSettingChange(
+                            MediaBridgeContract.K_DEFAULT_MEDIA_PACKAGE, packageName);
+                }
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        LinearLayout.LayoutParams onlineSpinnerParams = fullWrap();
+        onlineSpinnerParams.topMargin = Ui.dp(this, 4);
+        mediaSettingsGroup.addView(onlinePlayerSpinner, onlineSpinnerParams);
+
+        minimizeOnlinePlayerSwitch = new Switch(this);
+        minimizeOnlinePlayerSwitch.setText("Сворачивать онлайн-плеер после автозапуска");
+        minimizeOnlinePlayerSwitch.setTextColor(Ui.PRIMARY);
+        minimizeOnlinePlayerSwitch.setTextSize(15);
+        minimizeOnlinePlayerSwitch.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(
+                    MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
+                    checked);
+        });
+        LinearLayout.LayoutParams minimizeParams = fullWrap();
+        minimizeParams.topMargin = Ui.dp(this, 10);
+        mediaSettingsGroup.addView(minimizeOnlinePlayerSwitch, minimizeParams);
+
         TextView delayTitle = text("Задержка переключения на старте", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams dtParams = fullWrap();
         dtParams.topMargin = Ui.dp(this, 14);
@@ -1682,7 +1751,7 @@ public final class MainActivity extends ScaledActivity {
         mediaSettingsGroup.addView(clusterCoversSwitch, s6);
 
         clusterOnlineSwitch = new Switch(this);
-        clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название и обложка)");
+        clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название, обложка и прогресс)");
         clusterOnlineSwitch.setTextColor(Ui.PRIMARY);
         clusterOnlineSwitch.setTextSize(15);
         clusterOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
@@ -1693,7 +1762,7 @@ public final class MainActivity extends ScaledActivity {
         s7.topMargin = Ui.dp(this, 10);
         mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
 
-        TextView clusterWatchdogTitle = text("Интервал повторной отправки радио на приборку", 14, Ui.SECONDARY, Typeface.BOLD);
+        TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwtParams = fullWrap();
         cwtParams.topMargin = Ui.dp(this, 12);
         mediaSettingsGroup.addView(clusterWatchdogTitle, cwtParams);
@@ -1717,6 +1786,31 @@ public final class MainActivity extends ScaledActivity {
             }
         });
         mediaSettingsGroup.addView(clusterWatchdogSeekBar, fullWrap());
+
+        TextView clusterReassertBurstTitle = text("Базовый интервал быстрых повторов", 14, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams crbtParams = fullWrap();
+        crbtParams.topMargin = Ui.dp(this, 12);
+        mediaSettingsGroup.addView(clusterReassertBurstTitle, crbtParams);
+
+        clusterReassertBurstLabel = text("100 мс", 16, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams crblParams = fullWrap();
+        crblParams.topMargin = Ui.dp(this, 4);
+        mediaSettingsGroup.addView(clusterReassertBurstLabel, crblParams);
+
+        clusterReassertBurstSeekBar = sizeSeekBar(5, 50); // 50..500 ms
+        clusterReassertBurstSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    long ms = progress * 10L;
+                    clusterReassertBurstLabel.setText(ms + " мс");
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                commitReassertBurstInterval(bar.getProgress() * 10L);
+            }
+        });
+        mediaSettingsGroup.addView(clusterReassertBurstSeekBar, fullWrap());
 
         TextView radioCatalogSectionTitle = text("Каталог радио", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams rcsParams = fullWrap();
@@ -1834,7 +1928,9 @@ public final class MainActivity extends ScaledActivity {
             btn.setTextColor(isSelected ? 0xFFFFFFFF : Ui.SECONDARY);
         }
 
-        boolean hasSource = snapshot.defaultAudioSource != null && !snapshot.defaultAudioSource.isEmpty();
+        boolean hasSource = snapshot.defaultAudioSource != null
+                && !snapshot.defaultAudioSource.isEmpty();
+        updateOnlinePlayerUi(snapshot);
         if (defaultSourceDelayLabel != null) {
             defaultSourceDelayLabel.setText(snapshot.defaultAudioSourceDelaySec + " сек");
             defaultSourceDelayLabel.setEnabled(hasSource);
@@ -1847,8 +1943,8 @@ public final class MainActivity extends ScaledActivity {
         }
         if (startupAutoplaySwitch != null) {
             startupAutoplaySwitch.setChecked(snapshot.defaultAudioSourceAutoplayOnStartup);
-            startupAutoplaySwitch.setEnabled(hasSource);
-            startupAutoplaySwitch.setAlpha(hasSource ? 1f : 0.45f);
+            startupAutoplaySwitch.setEnabled(true);
+            startupAutoplaySwitch.setAlpha(1f);
         }
         if (sourceLostSwitch != null) {
             sourceLostSwitch.setChecked(snapshot.autoSwitchToDefaultOnSourceLost);
@@ -1885,6 +1981,16 @@ public final class MainActivity extends ScaledActivity {
             clusterWatchdogSeekBar.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
             clusterWatchdogSeekBar.setProgress((int) (snapshot.clusterWatchdogIntervalMs / 10L));
         }
+        if (clusterReassertBurstLabel != null) {
+            clusterReassertBurstLabel.setText(snapshot.clusterReassertBurstIntervalMs + " мс");
+            clusterReassertBurstLabel.setEnabled(snapshot.clusterCoversEnabled);
+            clusterReassertBurstLabel.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
+        }
+        if (clusterReassertBurstSeekBar != null) {
+            clusterReassertBurstSeekBar.setEnabled(snapshot.clusterCoversEnabled);
+            clusterReassertBurstSeekBar.setAlpha(snapshot.clusterCoversEnabled ? 1f : 0.45f);
+            clusterReassertBurstSeekBar.setProgress((int) (snapshot.clusterReassertBurstIntervalMs / 10L));
+        }
         if (radioCatalogInfoText != null) {
             radioCatalogInfoText.setText("Тип каталога: " + snapshot.catalogType
                     + " (" + snapshot.catalogStationCount + " станций)");
@@ -1893,6 +1999,162 @@ public final class MainActivity extends ScaledActivity {
             boolean isCustom = "CUSTOM".equalsIgnoreCase(snapshot.catalogType);
             restoreDefaultRadioCatalogButton.setEnabled(isCustom);
             restoreDefaultRadioCatalogButton.setAlpha(isCustom ? 1f : 0.45f);
+        }
+    }
+
+    private void updateOnlinePlayerUi(MediaSettingsSnapshot snapshot) {
+        if (onlinePlayerTitle == null || onlinePlayerSpinner == null
+                || onlinePlayerAdapter == null) return;
+        onlinePlayerTitle.setVisibility(View.VISIBLE);
+        onlinePlayerSpinner.setVisibility(View.VISIBLE);
+        onlinePlayerTitle.setEnabled(true);
+        onlinePlayerSpinner.setEnabled(true);
+        onlinePlayerTitle.setAlpha(1f);
+        onlinePlayerSpinner.setAlpha(1f);
+
+        refreshingOnlinePlayer = true;
+        onlinePlayerSpinner.setSelection(
+                findOnlinePlayerOption(snapshot.defaultMediaPackage), false);
+        refreshingOnlinePlayer = false;
+
+        if (minimizeOnlinePlayerSwitch != null) {
+            boolean hasDefaultOnlinePlayer = snapshot.defaultMediaPackage != null
+                    && !snapshot.defaultMediaPackage.isEmpty();
+            minimizeOnlinePlayerSwitch.setChecked(snapshot.minimizeOnlinePlayerAfterAutostart);
+            minimizeOnlinePlayerSwitch.setEnabled(hasDefaultOnlinePlayer);
+            minimizeOnlinePlayerSwitch.setAlpha(hasDefaultOnlinePlayer ? 1f : 0.45f);
+        }
+    }
+
+    private int findOnlinePlayerOption(String packageName) {
+        String selectedPackage = packageName != null ? packageName : "";
+        for (int i = 0; i < onlinePlayerAdapter.getCount(); i++) {
+            if (selectedPackage.equals(onlinePlayerAdapter.getItem(i).packageName)) return i;
+        }
+        if (!selectedPackage.isEmpty()) {
+            onlinePlayerAdapter.add(new OnlinePlayerOption(
+                    selectedPackage,
+                    "Не установлено: " + selectedPackage,
+                    loadApplicationIcon(getPackageManager(), selectedPackage)));
+            return onlinePlayerAdapter.getCount() - 1;
+        }
+        return 0;
+    }
+
+    private List<OnlinePlayerOption> queryOnlinePlayerOptions() {
+        List<OnlinePlayerOption> options = new ArrayList<>();
+        options.add(new OnlinePlayerOption("", "Не запускать приложение"));
+
+        PackageManager packageManager = getPackageManager();
+        Set<String> mediaPackages = new HashSet<>();
+        Intent musicIntent = new Intent(Intent.ACTION_MAIN);
+        musicIntent.addCategory(Intent.CATEGORY_APP_MUSIC);
+        addMediaActivityPackages(packageManager, mediaPackages, musicIntent);
+        addMediaActivityPackages(packageManager, mediaPackages,
+                new Intent(Intent.ACTION_VIEW).setType("audio/*")
+                        .addCategory(Intent.CATEGORY_DEFAULT));
+        addMediaActivityPackages(packageManager, mediaPackages,
+                new Intent(Intent.ACTION_VIEW).setType("video/*")
+                        .addCategory(Intent.CATEGORY_DEFAULT));
+        addMediaServicePackages(
+                packageManager, mediaPackages, MEDIA_BROWSER_SERVICE_ACTION);
+
+        Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
+        launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+        Map<String, OnlinePlayerOption> byPackage = new HashMap<>();
+        for (ResolveInfo info : packageManager.queryIntentActivities(launcherIntent, 0)) {
+            if (info.activityInfo == null) continue;
+            String candidatePackage = info.activityInfo.packageName;
+            if (getPackageName().equals(candidatePackage)
+                    || !mediaPackages.contains(candidatePackage)
+                    || packageManager.getLaunchIntentForPackage(candidatePackage) == null) {
+                continue;
+            }
+            CharSequence label = info.loadLabel(packageManager);
+            String displayName = label != null && !label.toString().isBlank()
+                    ? label.toString() : candidatePackage;
+            byPackage.putIfAbsent(candidatePackage, new OnlinePlayerOption(
+                    candidatePackage,
+                    displayName,
+                    loadApplicationIcon(packageManager, candidatePackage)));
+        }
+        List<OnlinePlayerOption> discovered = new ArrayList<>(byPackage.values());
+        discovered.sort((left, right) -> left.label.compareToIgnoreCase(right.label));
+        options.addAll(discovered);
+        return options;
+    }
+
+    private View createOnlinePlayerRow(OnlinePlayerOption option, boolean dropdown) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dropdown ? Ui.dp(this, 8) : 0, 0,
+                dropdown ? Ui.dp(this, 8) : 0);
+
+        ImageView icon = new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        if (option != null && option.icon != null) {
+            icon.setImageDrawable(option.icon);
+        } else {
+            icon.setVisibility(View.INVISIBLE);
+        }
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
+                Ui.dp(this, 28), Ui.dp(this, 28));
+        iconParams.rightMargin = Ui.dp(this, 10);
+        row.addView(icon, iconParams);
+
+        TextView label = text(option != null ? option.label : "", 15,
+                Ui.PRIMARY, Typeface.NORMAL);
+        label.setSingleLine(true);
+        row.addView(label, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        return row;
+    }
+
+    private Drawable loadApplicationIcon(PackageManager packageManager, String packageName) {
+        try {
+            return packageManager.getApplicationIcon(packageName);
+        } catch (PackageManager.NameNotFoundException ignored) {
+            return null;
+        }
+    }
+
+    private void addMediaActivityPackages(PackageManager packageManager, Set<String> packages,
+            Intent intent) {
+        for (ResolveInfo info : packageManager.queryIntentActivities(intent, 0)) {
+            if (info.activityInfo != null) {
+                packages.add(info.activityInfo.packageName);
+            }
+        }
+    }
+
+    private void addMediaServicePackages(PackageManager packageManager, Set<String> packages,
+            String action) {
+        Intent serviceIntent = new Intent(action);
+        for (ResolveInfo info : packageManager.queryIntentServices(serviceIntent, 0)) {
+            if (info.serviceInfo != null) {
+                packages.add(info.serviceInfo.packageName);
+            }
+        }
+    }
+
+    private static final class OnlinePlayerOption {
+        final String packageName;
+        final String label;
+        final Drawable icon;
+
+        OnlinePlayerOption(String packageName, String label) {
+            this(packageName, label, null);
+        }
+
+        OnlinePlayerOption(String packageName, String label, Drawable icon) {
+            this.packageName = packageName;
+            this.label = label;
+            this.icon = icon;
+        }
+
+        @Override public String toString() {
+            return label;
         }
     }
 
@@ -1971,6 +2233,10 @@ public final class MainActivity extends ScaledActivity {
 
     private void commitWatchdog(long ms) {
         sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_WATCHDOG_INTERVAL_MS, ms);
+    }
+
+    private void commitReassertBurstInterval(long ms) {
+        sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_REASSERT_BURST_INTERVAL_MS, ms);
     }
 
     private void setMediaControlsEnabled(View view, boolean enabled) {
@@ -2359,6 +2625,9 @@ public final class MainActivity extends ScaledActivity {
         int height = heightInput();
         OverlayCorner corner = OverlayCorner.fromPreference(
                 prefs.getString(Prefs.KEY_POSITION_CORNER, null));
+        if (corner != null) {
+            OverlayPositionMigration.migrate(prefs, bounds, width, height);
+        }
         int storedX = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
         int storedY = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
         if (corner == null) {

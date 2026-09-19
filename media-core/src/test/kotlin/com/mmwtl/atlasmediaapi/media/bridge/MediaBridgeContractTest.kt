@@ -67,6 +67,10 @@ class MediaBridgeContractTest {
         assertEquals("uiScaleTenths", MediaBridgeContract.Key.UI_SCALE_TENTHS)
         assertEquals("settingsRevision", MediaBridgeContract.Key.SETTINGS_REVISION)
         assertEquals("defaultAudioSource", MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE)
+        assertEquals(
+            "minimizeOnlinePlayerAfterAutostart",
+            MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
+        )
     }
 
     @Test
@@ -79,11 +83,14 @@ class MediaBridgeContractTest {
             autoSwitchToDefaultOnSourceLost = true,
             autoSwitchToDefaultAutoplayOnSourceLost = false,
             defaultMediaPackage = "ru.yandex.music",
+            minimizeOnlinePlayerAfterAutostart = true,
             switchToOnlineBeforeSessionPlay = true,
             radioWidgetBroadcastEnabled = false,
             clusterCoversEnabled = false,
             clusterOnlineEnabled = true,
+            clusterOnlineProgressEnabled = true,
             clusterWatchdogIntervalMs = 2500L,
+            clusterReassertBurstIntervalMs = 200L,
             catalogType = "CUSTOM",
             catalogStationCount = 10,
             catalogDescription = "Custom Catalog",

@@ -134,11 +134,14 @@ final class MediaBridgeContract {
     static final String K_AUTO_SWITCH_TO_DEFAULT = "autoSwitchToDefault";
     static final String K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay";
     static final String K_DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage";
+    static final String K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART = "minimizeOnlinePlayerAfterAutostart";
     static final String K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switchToOnlineBeforeSessionPlay";
     static final String K_RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled";
     static final String K_CLUSTER_COVERS_ENABLED = "clusterCoversEnabled";
     static final String K_CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled";
+    static final String K_CLUSTER_ONLINE_PROGRESS_ENABLED = "clusterOnlineProgressEnabled";
     static final String K_CLUSTER_WATCHDOG_INTERVAL_MS = "clusterWatchdogIntervalMs";
+    static final String K_CLUSTER_REASSERT_BURST_INTERVAL_MS = "clusterReassertBurstIntervalMs";
     static final String K_CATALOG_TYPE = "catalogType";
     static final String K_CATALOG_STATION_COUNT = "catalogStationCount";
     static final String K_CATALOG_DESCRIPTION = "catalogDescription";

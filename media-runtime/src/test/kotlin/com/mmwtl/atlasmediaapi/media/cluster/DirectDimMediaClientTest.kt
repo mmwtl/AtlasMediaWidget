@@ -35,6 +35,43 @@ class DirectDimMediaClientTest {
     )
 
     @Test
+    fun `legacy transport preferences are removed and online controls progress`() {
+        val context = RecordingContext()
+        val preferences = context.getSharedPreferences(
+            ClusterMediaBridge.PREFS_NAME,
+            Context.MODE_PRIVATE,
+        )
+        preferences.edit()
+            .clear()
+            .putBoolean(ClusterMediaBridge.KEY_CLUSTER_ONLINE_PROGRESS_ENABLED, true)
+            .putBoolean("cluster_dim_online_facade_progress_enabled", true)
+            .putBoolean("cluster_dim_radio_facade_enabled", false)
+            .commit()
+
+        val bridge = ClusterMediaBridge(context)
+
+        assertFalse(bridge.isClusterOnlineProgressEnabled)
+        assertFalse(preferences.contains(ClusterMediaBridge.KEY_CLUSTER_ONLINE_PROGRESS_ENABLED))
+        assertFalse(preferences.contains("cluster_dim_online_facade_progress_enabled"))
+        assertFalse(preferences.contains("cluster_dim_radio_facade_enabled"))
+
+        bridge.setClusterOnlineEnabled(true)
+        assertTrue(bridge.isClusterOnlineProgressEnabled)
+    }
+
+    @Test
+    fun `radio facade prefers the shared file URI for artwork`() {
+        val sharedFile = java.io.File("/data/vendor/nfs/shared/radio_cover_abc.jpg")
+        val contentUri = Uri.parse("content://atlas/cover.jpg")
+
+        assertEquals(
+            Uri.fromFile(sharedFile),
+            ClusterMediaBridge.radioFacadeArtworkUri(sharedFile, contentUri),
+        )
+        assertEquals(contentUri, ClusterMediaBridge.radioFacadeArtworkUri(null, contentUri))
+    }
+
+    @Test
     fun `online packet without cover preserves text and has no legacy artwork gate`() {
         val context = RecordingContext()
         val client = DirectDimMediaClient(context)
@@ -84,42 +121,30 @@ class DirectDimMediaClientTest {
         assertEquals(0, calls)
     }
     @Test
-    fun `online opt in is independent of radio and stops on source change`() {
+    fun `online opt in controls progress independently of radio setting`() {
         val context = RecordingContext()
         context.getSharedPreferences(ClusterMediaBridge.PREFS_NAME, Context.MODE_PRIVATE).edit().clear().commit()
         val bridge = ClusterMediaBridge(context)
-        var calls = 0
-        context.connection.onServiceConnected(context.intent.component!!, object : Binder() {
-            override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
-                calls++
-                reply!!.writeNoException()
-                return true
-            }
-        })
         val snapshot = MediaSnapshot(
             backendConnected = true, audioSource = "ONLINE", ownerPackage = "player",
             mediaId = "track", title = "Title", playbackState = 3,
         )
         bridge.setActiveSource(BridgeAudioSource.ONLINE)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(0, calls)
         bridge.setClusterOnlineEnabled(true)
+        assertTrue(bridge.isClusterOnlineProgressEnabled)
         bridge.setClusterCoversEnabled(false)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(1, calls)
         bridge.updateOnlinePlayback(snapshot.copy(position = 1000L), null)
-        assertEquals(1, calls)
         bridge.setActiveSource(BridgeAudioSource.RADIO)
         bridge.updateOnlinePlayback(snapshot.copy(title = "Stale"), null)
-        assertEquals(1, calls)
         bridge.setActiveSource(BridgeAudioSource.ONLINE)
         bridge.setClusterOnlineEnabled(false)
+        assertFalse(bridge.isClusterOnlineProgressEnabled)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(1, calls)
         bridge.setClusterOnlineEnabled(true)
         bridge.setActiveSource(BridgeAudioSource.UNKNOWN)
         bridge.updateOnlinePlayback(snapshot, null)
-        assertEquals(1, calls)
     }
 
     @Test

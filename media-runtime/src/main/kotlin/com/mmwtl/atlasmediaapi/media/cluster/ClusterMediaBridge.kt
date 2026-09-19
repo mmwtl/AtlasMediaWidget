@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediaapi.media.cluster
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.SystemClock
 import android.net.Uri
 import android.media.session.PlaybackState
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSnapshot
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import timber.log.Timber
 import java.io.File
 import java.nio.file.Files
@@ -23,6 +25,7 @@ import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
+import kotlin.math.roundToLong
 
 internal enum class ReassertScheduleKind {
     FULL,
@@ -63,6 +66,38 @@ internal class ReassertWatchdogIntervalStore(
     }
 }
 
+internal class ReassertBurstIntervalStore(
+    private val prefs: SharedPreferences,
+) {
+    private val hasStoredValue = prefs.contains(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS)
+    private val storedValue = prefs.getLong(
+        ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS,
+        ClusterMediaBridge.DEFAULT_REASSERT_BURST_INTERVAL_MS,
+    )
+
+    @Volatile
+    var value: Long = ClusterMediaBridge.normalizeReassertBurstInterval(storedValue)
+        private set
+
+    init {
+        if (!hasStoredValue || storedValue != value) {
+            prefs.edit()
+                .putLong(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS, value)
+                .apply()
+        }
+    }
+
+    fun set(intervalMs: Long): Long {
+        val normalized = ClusterMediaBridge.normalizeReassertBurstInterval(intervalMs)
+        if (normalized == value) return normalized
+        value = normalized
+        prefs.edit()
+            .putLong(ClusterMediaBridge.KEY_REASSERT_BURST_INTERVAL_MS, normalized)
+            .apply()
+        return normalized
+    }
+}
+
 /**
  * Manages playback metadata and artwork broadcast to the vehicle digital instrument cluster (DIM/QNX)
  * via the ECarX DimInteraction hardware abstraction layer.
@@ -80,17 +115,19 @@ class ClusterMediaBridge(
         val artworkQnxPath: String,
         val artworkGrantReport: String,
         val sendCount: Int,
-        val directDimBound: Boolean,
-        val directDimSendCount: Int,
-        val directDimLastResult: String,
-        val directDimLastError: String,
     )
 
     companion object {
         const val PREFS_NAME = "cluster_dim_prefs"
         const val KEY_CLUSTER_ONLINE_ENABLED = "cluster_dim_online_enabled"
+        const val KEY_CLUSTER_ONLINE_PROGRESS_ENABLED = "cluster_dim_online_progress_enabled"
+        private const val KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED =
+            "cluster_dim_online_facade_progress_enabled"
         const val KEY_CLUSTER_COVERS_ENABLED = "cluster_dim_covers_enabled"
+        private const val KEY_LEGACY_CLUSTER_RADIO_FACADE_ENABLED =
+            "cluster_dim_radio_facade_enabled"
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
+        const val KEY_REASSERT_BURST_INTERVAL_MS = "reassert_burst_interval_ms"
         private const val NFS_SHARED_DIR = "/data/vendor/nfs/shared"
 
         /**
@@ -99,8 +136,10 @@ class ClusterMediaBridge(
          * repair burst; duplicate callbacks get only a short repair and cannot extend
          * the aggressive window indefinitely.
          */
-        internal val REASSERT_BURST_DELAYS_MS = listOf(100L, 150L, 250L, 500L, 500L)
-        internal val DUPLICATE_REPAIR_DELAYS_MS = listOf(100L, 150L)
+        const val MIN_REASSERT_BURST_INTERVAL_MS = 50L
+        const val MAX_REASSERT_BURST_INTERVAL_MS = 500L
+        const val DEFAULT_REASSERT_BURST_INTERVAL_MS = 100L
+        const val ONLINE_PROGRESS_INTERVAL_MS = 1_000L
         const val MIN_REASSERT_WATCHDOG_INTERVAL_MS = 1_000L
         const val MAX_REASSERT_WATCHDOG_INTERVAL_MS = 5_000L
         const val RECOMMENDED_REASSERT_WATCHDOG_INTERVAL_MS = 1_250L
@@ -113,6 +152,41 @@ class ClusterMediaBridge(
                 MIN_REASSERT_WATCHDOG_INTERVAL_MS,
                 MAX_REASSERT_WATCHDOG_INTERVAL_MS,
             )
+
+        internal fun normalizeReassertBurstInterval(intervalMs: Long): Long =
+            intervalMs.coerceIn(
+                MIN_REASSERT_BURST_INTERVAL_MS,
+                MAX_REASSERT_BURST_INTERVAL_MS,
+            )
+
+        internal fun reassertBurstDelaysMs(intervalMs: Long): List<Long> {
+            val base = normalizeReassertBurstInterval(intervalMs)
+            return listOf(base, base * 3L / 2L, base * 5L / 2L, base * 5L, base * 5L)
+        }
+
+        internal fun duplicateRepairDelaysMs(intervalMs: Long): List<Long> =
+            reassertBurstDelaysMs(intervalMs).take(2)
+
+        internal fun extrapolateOnlineProgress(
+            positionMs: Long,
+            durationMs: Long,
+            speed: Float,
+            updateElapsedRealtime: Long,
+            nowElapsedRealtime: Long,
+        ): Long? {
+            if (positionMs < 0L) return null
+            val elapsedMs = if (updateElapsedRealtime > 0L) {
+                (nowElapsedRealtime - updateElapsedRealtime).coerceAtLeast(0L)
+            } else 0L
+            val progressed = positionMs + (elapsedMs * speed.coerceAtLeast(0f)).roundToLong()
+            return progressed.coerceAtLeast(0L).let { value ->
+                if (durationMs > 0L) value.coerceAtMost(durationMs) else value
+            }
+        }
+
+        internal fun onlinePayloadDedupKey(
+            payload: DirectDimMediaClient.Payload,
+        ): DirectDimMediaClient.Payload = payload.copy(currentProgress = 0L)
 
         internal fun jitteredReassertWatchdogDelayMs(
             intervalMs: Long,
@@ -168,6 +242,9 @@ class ClusterMediaBridge(
         internal fun qnxCoverUriString(sharedFile: File): String =
             "file://${qnxCoverWirePath(sharedFile)}"
 
+        internal fun radioFacadeArtworkUri(sharedFile: File?, fallbackUri: Uri?): Uri? =
+            sharedFile?.let(Uri::fromFile) ?: fallbackUri
+
         private const val DIM_TRANSPORT_MARKER = "atlas_dim=online-qnx-owned-v9"
 
         /**
@@ -194,6 +271,7 @@ class ClusterMediaBridge(
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val reassertWatchdogIntervalStore = ReassertWatchdogIntervalStore(prefs)
+    private val reassertBurstIntervalStore = ReassertBurstIntervalStore(prefs)
 
     @Volatile
     var isClusterCoversEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_COVERS_ENABLED, true)
@@ -203,13 +281,32 @@ class ClusterMediaBridge(
     var isClusterOnlineEnabled: Boolean = prefs.getBoolean(KEY_CLUSTER_ONLINE_ENABLED, false)
         private set
 
+    // Kept in the settings snapshot for compatibility; progress now follows ONLINE transmission.
+    val isClusterOnlineProgressEnabled: Boolean
+        get() = isClusterOnlineEnabled
+
     private var activeSource: BridgeAudioSource? = null
     private var confirmedOnlineActive = false
     private var currentRadioInfo: IMediaInteraction.IPlaybackInfo? = null
     private var lastOnlinePayload: DirectDimMediaClient.Payload? = null
+    private var lastOnlineProgress = -1L
+
+    private data class OnlineProgressState(
+        val positionMs: Long,
+        val durationMs: Long,
+        val speed: Float,
+        val updateElapsedRealtime: Long,
+        val playing: Boolean,
+    )
+
+    @Volatile
+    private var onlineProgressState: OnlineProgressState? = null
 
     val reassertWatchdogIntervalMs: Long
         get() = reassertWatchdogIntervalStore.value
+
+    val reassertBurstIntervalMs: Long
+        get() = reassertBurstIntervalStore.value
 
     @Volatile
     private var lastUpdate = "none"
@@ -240,13 +337,23 @@ class ClusterMediaBridge(
 
     private val sendCount = AtomicInteger(0)
 
-    private val directDimMediaClient = DirectDimMediaClient(context)
-
     init {
-        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || isClusterOnlineEnabled)
+        if (
+            prefs.contains(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED) ||
+            prefs.contains(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED) ||
+            prefs.contains(KEY_LEGACY_CLUSTER_RADIO_FACADE_ENABLED)
+        ) {
+            prefs.edit()
+                .remove(KEY_CLUSTER_ONLINE_PROGRESS_ENABLED)
+                .remove(KEY_LEGACY_CLUSTER_ONLINE_FACADE_PROGRESS_ENABLED)
+                .remove(KEY_LEGACY_CLUSTER_RADIO_FACADE_ENABLED)
+                .apply()
+        }
     }
 
     private val reassertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val onlineProgressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var onlineProgressJob: Job? = null
     private val reassertLock = Any()
     private var reassertJob: Job? = null
     private var duplicateRepairJob: Job? = null
@@ -270,9 +377,7 @@ class ClusterMediaBridge(
     fun setClusterCoversEnabled(enabled: Boolean) {
         isClusterCoversEnabled = enabled
         prefs.edit().putBoolean(KEY_CLUSTER_COVERS_ENABLED, enabled).apply()
-        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || isClusterOnlineEnabled)
         if (!enabled) {
-            if (radioActive) directDimMediaClient.clearPending()
             currentRadioInfo = null
             cancelReassertions()
         }
@@ -286,12 +391,16 @@ class ClusterMediaBridge(
         reassertWatchdogIntervalStore.set(intervalMs)
     }
 
+    /** Changes the base interval used by the bounded startup and duplicate-repair bursts. */
+    fun setReassertBurstIntervalMs(intervalMs: Long) {
+        reassertBurstIntervalStore.set(intervalMs)
+    }
+
     fun isDimAvailable(): Boolean {
         return dimAvailable
     }
 
     fun getStatus(): Status {
-        val directStatus = directDimMediaClient.status()
         return Status(
             available = dimAvailable,
             initializationError = dimInitializationError,
@@ -302,10 +411,6 @@ class ClusterMediaBridge(
             artworkQnxPath = lastArtworkQnxPath,
             artworkGrantReport = lastArtworkGrantReport,
             sendCount = sendCount.get(),
-            directDimBound = directStatus.bound,
-            directDimSendCount = directStatus.sendCount,
-            directDimLastResult = directStatus.lastResult,
-            directDimLastError = directStatus.lastError,
         )
     }
 
@@ -316,8 +421,10 @@ class ClusterMediaBridge(
         val active = source == BridgeAudioSource.RADIO
         confirmedOnlineActive = source == BridgeAudioSource.ONLINE
         lastOnlinePayload = null
+        lastOnlineProgress = -1L
+        onlineProgressState = null
+        if (!confirmedOnlineActive) stopOnlineProgress()
         currentRadioInfo = null
-        directDimMediaClient.clearPending()
         radioActive = active
         if (!active) {
             cancelReassertions()
@@ -387,6 +494,7 @@ class ClusterMediaBridge(
 
             val radioSourceType = if (isAm) IMediaInteraction.SOURCE_TYPE_AM else IMediaInteraction.SOURCE_TYPE_FM
             val displaySourceType = displaySourceType(radioSourceType, clusterArtworkUri != null)
+            val playbackArtworkUri = radioFacadeArtworkUri(clusterArtworkFile, clusterArtworkUri)
 
             val playInfo = ClusterRadioPlaybackInfo(
                 "atlas-radio:$band:$frequencyKHz",
@@ -403,7 +511,7 @@ class ClusterMediaBridge(
                     IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED
                 },
                 IMediaInteraction.IPlaybackInfo.RADIO_MODE_PLAYING,
-                clusterArtworkUri,
+                playbackArtworkUri,
             )
 
             currentRadioInfo = playInfo
@@ -450,8 +558,12 @@ class ClusterMediaBridge(
         isClusterOnlineEnabled = enabled
         prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_ENABLED, enabled).apply()
         lastOnlinePayload = null
-        if (!enabled && confirmedOnlineActive) directDimMediaClient.clearPending()
-        directDimMediaClient.setTransmissionEnabled(isClusterCoversEnabled || enabled)
+        if (!enabled) {
+            lastOnlineProgress = -1L
+            onlineProgressState = null
+            stopOnlineProgress()
+        }
+        if (enabled) ensureOnlineProgress()
     }
 
     /** Sends only resolved ONLINE snapshots; synthetic UNKNOWN/OTHER sessions are excluded. */
@@ -461,10 +573,19 @@ class ClusterMediaBridge(
             snapshot.audioSource != BridgeAudioSource.ONLINE.name || snapshot.ownerPackage.isBlank() ||
             snapshot.mediaId.isBlank()
         ) {
-            if (lastOnlinePayload != null) directDimMediaClient.clearPending()
             lastOnlinePayload = null
+            lastOnlineProgress = -1L
+            onlineProgressState = null
+            stopOnlineProgress()
             return
         }
+        onlineProgressState = OnlineProgressState(
+            positionMs = snapshot.position,
+            durationMs = snapshot.duration,
+            speed = snapshot.speed,
+            updateElapsedRealtime = snapshot.updateElapsedRealtime,
+            playing = snapshot.playbackState == PlaybackState.STATE_PLAYING,
+        )
         val artworkFile = coverFile?.takeIf { it.isFile }?.let { source ->
             val shared = File(NFS_SHARED_DIR)
             if (shared.isDirectory && shared.canWrite()) copyArtworkAtomically(source, shared) else source
@@ -479,12 +600,111 @@ class ClusterMediaBridge(
                 IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PLAYING
             } else IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED,
             radioFrequency = "", radioMode = 0, radioStationName = "",
+            currentProgress = extrapolateOnlineProgress(
+                positionMs = snapshot.position,
+                durationMs = snapshot.duration,
+                speed = snapshot.speed,
+                updateElapsedRealtime = snapshot.updateElapsedRealtime,
+                nowElapsedRealtime = SystemClock.elapsedRealtime(),
+            ) ?: 0L,
         )
-        if (payload == lastOnlinePayload) return
-        val result = directDimMediaClient.sendOrQueue(payload)
-        if (!result.startsWith("send-failed")) lastOnlinePayload = payload
-        lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
-        lastUpdateError = directDimMediaClient.status().lastError
+        if (lastOnlinePayload?.let(::onlinePayloadDedupKey) != onlinePayloadDedupKey(payload)) {
+            stopOnlineProgress()
+            val result = sendOnlineFacadePayload(payload)
+            if (!result.startsWith("send-failed")) {
+                lastOnlinePayload = payload
+                lastOnlineProgress = payload.currentProgress
+            }
+            lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
+            if (!result.startsWith("send-failed")) {
+                lastUpdateError = ""
+            }
+        }
+        if (onlineProgressState?.playing == true) ensureOnlineProgress() else stopOnlineProgress()
+    }
+
+    @Synchronized
+    private fun ensureOnlineProgress() {
+        if (!isClusterOnlineEnabled || !confirmedOnlineActive ||
+            onlineProgressState?.playing != true || lastOnlinePayload == null ||
+            onlineProgressJob?.isActive == true
+        ) return
+        onlineProgressJob = onlineProgressScope.launch {
+            delay(ONLINE_PROGRESS_INTERVAL_MS)
+            while (isActive) {
+                val state = onlineProgressState ?: break
+                if (!state.playing) break
+                val progress = extrapolateOnlineProgress(
+                    positionMs = state.positionMs,
+                    durationMs = state.durationMs,
+                    speed = state.speed,
+                    updateElapsedRealtime = state.updateElapsedRealtime,
+                    nowElapsedRealtime = SystemClock.elapsedRealtime(),
+                )
+                if (progress != null) {
+                    sendOnlineProgress(progress)
+                }
+                delay(ONLINE_PROGRESS_INTERVAL_MS)
+            }
+        }
+    }
+
+    @Synchronized
+    private fun sendOnlineProgress(progress: Long) {
+        if (!isClusterOnlineEnabled || !confirmedOnlineActive ||
+            onlineProgressState?.playing != true || lastOnlinePayload == null || lastOnlineProgress == progress
+        ) return
+
+        val result = runCatching {
+            dimInteraction?.mediaInteraction?.updateCurrentProgress(progress)
+                ?: error("DIM mediaInteraction is unavailable")
+            "facade-progress"
+        }.getOrElse { error ->
+            lastUpdateError = error.diagnosticMessage()
+            Timber.e(error, "Failed to update facade DIM online progress")
+            "send-failed:$lastUpdateError"
+        }
+        if (!result.startsWith("send-failed")) {
+            lastOnlineProgress = progress
+            lastUpdateError = ""
+        }
+        lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress / $result"
+    }
+
+    private fun sendOnlineFacadePayload(payload: DirectDimMediaClient.Payload): String = runCatching {
+        val mediaInteraction = dimInteraction?.mediaInteraction
+            ?: error("DIM mediaInteraction is unavailable")
+        mediaInteraction.updatePlaybackInfo(
+            ClusterRadioPlaybackInfo(
+                payload.uuid,
+                payload.sourceType,
+                payload.radioFrequency,
+                payload.radioStationName,
+                payload.title,
+                payload.artist,
+                payload.album,
+                payload.duration,
+                payload.playbackStatus,
+                payload.radioMode,
+                payload.artworkUri,
+            ),
+        )
+        mediaInteraction.updateCurrentProgress(payload.currentProgress)
+        dimAvailable = true
+        dimInitializationError = ""
+        "facade-sent"
+    }.getOrElse { error ->
+        dimAvailable = false
+        dimInitializationError = error.diagnosticMessage()
+        lastUpdateError = error.diagnosticMessage()
+        Timber.e(error, "Failed to send facade DIM online playback")
+        "send-failed:$lastUpdateError"
+    }
+
+    @Synchronized
+    private fun stopOnlineProgress() {
+        onlineProgressJob?.cancel()
+        onlineProgressJob = null
     }
 
     private fun scheduleReassertions(
@@ -511,7 +731,7 @@ class ClusterMediaBridge(
                 val generation = reassertGeneration.get()
                 duplicateRepairJob?.cancel()
                 duplicateRepairJob = reassertScope.launch {
-                    DUPLICATE_REPAIR_DELAYS_MS.forEachIndexed { index, waitMs ->
+                    duplicateRepairDelaysMs(reassertBurstIntervalMs).forEachIndexed { index, waitMs ->
                         delay(waitMs)
                         if (!isCurrentReassertion(generation)) return@launch
                         val attempt = "duplicate-repair-${index + 1}"
@@ -541,8 +761,7 @@ class ClusterMediaBridge(
             duplicateRepairJob = null
             reassertJob = reassertScope.launch {
                 var consecutiveFailures = 0
-                // Cumulative times after the initial send: 100, 250, 500, 1000, 1500 ms.
-                REASSERT_BURST_DELAYS_MS.forEachIndexed { index, waitMs ->
+                reassertBurstDelaysMs(reassertBurstIntervalMs).forEachIndexed { index, waitMs ->
                     delay(waitMs)
                     if (!isCurrentReassertion(generation)) return@launch
                     val attempt = "adaptive-burst-${index + 1}"
@@ -645,45 +864,21 @@ class ClusterMediaBridge(
         attempt: String,
     ) {
         if (!isClusterCoversEnabled || !radioActive || currentRadioInfo !== playInfo) return
-        // ONLINE's worker uses BitmapFactory.decodeFile(uri.path), not ContentResolver.
-        // Give it the complete Android NFS path; file:///radio_cover.jpg points at the
-        // Android root and can never resolve to /data/vendor/nfs/shared.
-        val directArtworkUri = artworkFile?.let(Uri::fromFile) ?: artworkUri
-        val directPayload = directArtworkUri?.let { uri ->
-            DirectDimMediaClient.Payload(
-                sourceType = displaySourceType,
-                uuid = playInfo.uuid,
-                title = playInfo.title,
-                album = playInfo.album,
-                artist = playInfo.artist,
-                artworkUri = uri,
-                duration = playInfo.duration,
-                playbackStatus = playInfo.playbackStatus,
-                radioFrequency = playInfo.radioFrequency,
-                radioMode = playInfo.radioMode,
-                radioStationName = playInfo.radioStationName,
-            )
-        }
-        val directDimResult = directPayload?.let(directDimMediaClient::sendOrQueue) ?: "not-used"
         val qnxArtworkPath = artworkFile?.let(::qnxCoverWirePath).orEmpty()
-        val directDimSent = directDimResult.startsWith("sent-")
         var sourceUpdateError: Throwable? = null
-        if (!directDimSent) {
-            // Source selection and playback are both public-facade fallbacks. Either call
-            // can race through the facade's async queue and replace a successful direct
-            // ONLINE packet before DIM's 1-second debounce expires.
-            sourceUpdateError = runCatching {
-                mediaInteraction.updateCurrentSourceType(displaySourceType)
-            }.exceptionOrNull()
-            if (sourceUpdateError != null) {
-                Timber.w(sourceUpdateError, "Cluster DIM source update failed; still sending playback info")
-            }
-            mediaInteraction.updatePlaybackInfo(playInfo)
+        // Repeat both facade calls during repair bursts and watchdog ticks so a later
+        // stock-radio publication is overwritten by the same full card.
+        sourceUpdateError = runCatching {
+            mediaInteraction.updateCurrentSourceType(displaySourceType)
+        }.exceptionOrNull()
+        if (sourceUpdateError != null) {
+            Timber.w(sourceUpdateError, "Cluster DIM source update failed; still sending playback info")
         }
+        mediaInteraction.updatePlaybackInfo(playInfo)
         dimAvailable = true
         dimInitializationError = ""
         lastArtworkFilePath = artworkFile?.absolutePath.orEmpty()
-        lastArtworkWirePath = directArtworkUri?.toString().orEmpty()
+        lastArtworkWirePath = playInfo.artwork?.toString().orEmpty()
         lastArtworkQnxPath = qnxArtworkPath
         lastArtworkGrantReport = artworkGrantReport
         sendCount.incrementAndGet()
@@ -694,13 +889,12 @@ class ClusterMediaBridge(
             "source update warning: ${it.diagnosticMessage()}"
         }.orEmpty()
         Timber.i(
-            "Cluster DIM playback sent: freq=%s, name=%s, audioSource=%d, displaySource=%d, artwork=%s, direct=%s, attempt=%s",
+            "Cluster DIM playback sent: freq=%s, name=%s, audioSource=%d, displaySource=%d, artwork=%s, transport=facade, attempt=%s",
             formattedFreq,
             stationName,
             radioSourceType,
             displaySourceType,
             artworkUri,
-            directDimResult,
             attempt,
         )
     }
