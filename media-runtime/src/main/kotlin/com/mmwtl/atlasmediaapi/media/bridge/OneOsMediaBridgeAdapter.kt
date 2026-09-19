@@ -11,12 +11,17 @@ import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import com.geely.lib.oneosapi.mediacenter.listener.DeviceStateListener
 import com.geely.lib.oneosapi.mediacenter.listener.IRadioStateListener
 import com.geely.lib.oneosapi.mediacenter.listener.MusicStateListener
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 class OneOsMediaBridgeAdapter(
     private val hub: MediaStateHub,
+    private val scope: CoroutineScope,
     private val onOnlineSourceConfirmed: () -> Unit = {},
 ) {
     @Volatile
@@ -24,6 +29,7 @@ class OneOsMediaBridgeAdapter(
     private var radioStateListener: IRadioStateListener? = null
     private val deviceListeners = mutableMapOf<MediaCenterConstant.AudioSource, DeviceStateListener>()
     private val playStateGenerations = ConcurrentHashMap<MediaCenterConstant.AudioSource, AtomicLong>()
+    private val sourceCallbackGeneration = AtomicLong()
 
     private val musicStateListener = object : MusicStateListener {
         override fun onMediaDataChanged(
@@ -121,6 +127,7 @@ class OneOsMediaBridgeAdapter(
         // Invalidate radio callbacks before unregistering: BaseRadioManager keeps listeners in a
         // local list and a Binder callback already in flight may finish after closeRadio().
         manager = null
+        sourceCallbackGeneration.incrementAndGet()
         radioStateListener = null
         if (currentManager != null) {
             runCatching {
@@ -148,12 +155,69 @@ class OneOsMediaBridgeAdapter(
         appSource: MediaCenterConstant.AppSource,
     ) {
         val currentManager = manager ?: return
+        val generation = sourceCallbackGeneration.incrementAndGet()
         val currentSource = runCatching { currentManager.currentAudioSource }.getOrNull()
-        if (!isCurrentSourceCallback(source, currentSource)) {
+        if (isKnownSource(currentSource)) {
+            if (isCurrentSourceCallback(source, currentSource)) {
+                publishConfirmedSource(currentManager, source, appSource)
+            } else {
+                Timber.d(
+                    "Ignoring stale OneOS source callback: callback=%s current=%s",
+                    source,
+                    currentSource,
+                )
+                publishCurrentSource(currentManager)
+            }
+            return
+        }
+        scope.launch(Dispatchers.IO) {
+            val actualSource = awaitKnownCurrentSource(
+                currentSource = { runCatching { currentManager.currentAudioSource }.getOrNull() },
+            )
+            if (sourceCallbackGeneration.get() != generation || manager !== currentManager) return@launch
+            if (actualSource == null) {
+                Timber.d(
+                    "Ignoring unconfirmed OneOS source callback: callback=%s current=%s",
+                    source,
+                    actualSource,
+                )
+                return@launch
+            }
+            if (actualSource != source) {
+                Timber.d(
+                    "Reconciling stale OneOS source callback: callback=%s current=%s",
+                    source,
+                    actualSource,
+                )
+            }
+            val confirmedAppSource = if (actualSource == source) {
+                appSource
+            } else {
+                runCatching { currentManager.currentAppSource }
+                    .getOrDefault(MediaCenterConstant.AppSource.UNKNOWN)
+            }
+            publishConfirmedSource(currentManager, actualSource, confirmedAppSource)
+        }
+    }
+
+    private fun publishCurrentSource(owner: MediaCenterManager) {
+        val actualSource = runCatching { owner.currentAudioSource }.getOrNull()
+            ?.takeIf(::isKnownSource) ?: return
+        val actualAppSource = runCatching { owner.currentAppSource }
+            .getOrDefault(MediaCenterConstant.AppSource.UNKNOWN)
+        publishConfirmedSource(owner, actualSource, actualAppSource)
+    }
+
+    private fun publishConfirmedSource(
+        owner: MediaCenterManager,
+        source: MediaCenterConstant.AudioSource,
+        appSource: MediaCenterConstant.AppSource,
+    ) {
+        if (manager !== owner || runCatching { owner.currentAudioSource }.getOrNull() != source) {
             Timber.d(
                 "Ignoring stale OneOS source callback: callback=%s current=%s",
                 source,
-                currentSource,
+                runCatching { owner.currentAudioSource }.getOrNull(),
             )
             return
         }
@@ -328,6 +392,20 @@ class OneOsMediaBridgeAdapter(
 internal fun isCurrentSourceCallback(
     callbackSource: MediaCenterConstant.AudioSource,
     currentSource: MediaCenterConstant.AudioSource?,
-): Boolean = currentSource == null ||
-    currentSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN ||
-    callbackSource == currentSource
+): Boolean = isKnownSource(currentSource) && callbackSource == currentSource
+
+private fun isKnownSource(source: MediaCenterConstant.AudioSource?): Boolean =
+    source != null && source != MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN
+
+internal suspend fun awaitKnownCurrentSource(
+    currentSource: () -> MediaCenterConstant.AudioSource?,
+    pollDelaysMs: List<Long> = listOf(0L, 50L, 100L, 200L, 400L),
+    wait: suspend (Long) -> Unit = { delay(it) },
+): MediaCenterConstant.AudioSource? {
+    pollDelaysMs.forEach { pollDelayMs ->
+        if (pollDelayMs > 0L) wait(pollDelayMs)
+        val actualSource = currentSource()
+        if (isKnownSource(actualSource)) return actualSource
+    }
+    return null
+}

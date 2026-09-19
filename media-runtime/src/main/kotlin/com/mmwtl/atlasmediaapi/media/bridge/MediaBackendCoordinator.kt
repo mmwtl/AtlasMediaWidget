@@ -47,6 +47,7 @@ class MediaBackendCoordinator(
     val sessionObserver: MediaSessionObserver = MediaSessionObserver(context, stateHub)
     val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(
         hub = stateHub,
+        scope = scope,
         onOnlineSourceConfirmed = sessionObserver::refreshActiveController,
     )
 

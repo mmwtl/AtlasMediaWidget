@@ -5,6 +5,7 @@ import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -77,7 +78,7 @@ class MediaStateHubTransitionTest {
     }
 
     @Test
-    fun `stale callback is accepted only when it matches actual OneOS source`() {
+    fun `source callback is accepted only when it matches a known OneOS source`() {
         assertFalse(
             isCurrentSourceCallback(
                 MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
@@ -90,12 +91,51 @@ class MediaStateHubTransitionTest {
                 MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB,
             ),
         )
-        assertTrue(
+        assertFalse(
             isCurrentSourceCallback(
                 MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
                 MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN,
             ),
         )
+    }
+
+    @Test
+    fun `late online callback is rejected after unknown resolves to bluetooth`() = runBlocking {
+        val actualSources = ArrayDeque(
+            listOf(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            ),
+        )
+        val waits = mutableListOf<Long>()
+
+        val actualSource = awaitKnownCurrentSource(
+            currentSource = { actualSources.removeFirst() },
+            pollDelaysMs = listOf(0L, 50L, 100L),
+            wait = { waits += it },
+        )
+
+        assertEquals(MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT, actualSource)
+        assertEquals(listOf(50L, 100L), waits)
+    }
+
+    @Test
+    fun `manual bluetooth callback is published after actual source confirmation`() = runBlocking {
+        val actualSources = ArrayDeque(
+            listOf(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_UNKNOWN,
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            ),
+        )
+
+        val actualSource = awaitKnownCurrentSource(
+            currentSource = { actualSources.removeFirst() },
+            pollDelaysMs = listOf(0L, 50L),
+            wait = {},
+        )
+
+        assertEquals(MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT, actualSource)
     }
 
     private data class Fixture(
