@@ -145,14 +145,6 @@ class AndroidMediaCommandHost(
         }
     }
 
-    override fun beforeSessionPlay() {
-        if (preferences.switchToOnlineBeforeSessionPlay) {
-            runCatching {
-                mediaCenter()?.requestAudioSource(MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE)
-            }.onFailure(Timber::e)
-        }
-    }
-
     override suspend fun sendFallback(packageName: String, command: MediaCommand): Boolean {
         onUserAction?.invoke()
         val controller = sessionObserver.getActiveControllers().firstOrNull { it.packageName == packageName }

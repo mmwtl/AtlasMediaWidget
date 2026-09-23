@@ -115,7 +115,6 @@ class MediaSettingsController(
             autoSwitchToDefaultAutoplayOnSourceLost = preferences.autoSwitchToDefaultAutoplayOnSourceLost,
             defaultMediaPackage = preferences.defaultMediaPackage,
             minimizeOnlinePlayerAfterAutostart = preferences.minimizeOnlinePlayerAfterAutostart,
-            switchToOnlineBeforeSessionPlay = preferences.switchToOnlineBeforeSessionPlay,
             radioWidgetBroadcastEnabled = radioCatalogRepository.isWidgetBroadcastEnabled,
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
             clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
@@ -227,9 +226,6 @@ class MediaSettingsController(
                 MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
             )
         }
-        if (update.containsKey(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY)) {
-            preferences.switchToOnlineBeforeSessionPlay = update.getBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY)
-        }
         if (update.containsKey(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED)) {
             radioCatalogRepository.setWidgetBroadcastEnabled(update.getBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED))
         }
@@ -296,7 +292,6 @@ class MediaSettingsController(
             put("autoSwitchToDefaultAutoplayOnSourceLost", snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
             put("defaultMediaPackage", snapshot.defaultMediaPackage)
             put("minimizeOnlinePlayerAfterAutostart", snapshot.minimizeOnlinePlayerAfterAutostart)
-            put("switchToOnlineBeforeSessionPlay", snapshot.switchToOnlineBeforeSessionPlay)
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
@@ -594,10 +589,6 @@ class MediaSettingsController(
             "minimizeOnlinePlayerAfterAutostart",
             false,
         )
-        preferences.switchToOnlineBeforeSessionPlay = mediaJson.optBoolean(
-            "switchToOnlineBeforeSessionPlay",
-            false,
-        )
         radioCatalogRepository.setWidgetBroadcastEnabled(
             mediaJson.optBoolean("radioWidgetBroadcastEnabled", true),
         )
@@ -648,7 +639,6 @@ class MediaSettingsController(
             MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE to String::class.java,
             MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART to java.lang.Boolean::class.java,
-            MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
@@ -682,7 +672,7 @@ class MediaSettingsController(
         val stringFields = listOf("defaultAudioSource", "defaultMediaPackage")
         val booleanFields = listOf(
             "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
-            "autoSwitchToDefaultAutoplayOnSourceLost", "switchToOnlineBeforeSessionPlay",
+            "autoSwitchToDefaultAutoplayOnSourceLost",
             "minimizeOnlinePlayerAfterAutostart",
             "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterRadioFacadeEnabled",
             "clusterOnlineEnabled",

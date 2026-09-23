@@ -14,7 +14,6 @@ data class MediaSettingsSnapshot(
     val autoSwitchToDefaultAutoplayOnSourceLost: Boolean = true,
     val defaultMediaPackage: String = "",
     val minimizeOnlinePlayerAfterAutostart: Boolean = false,
-    val switchToOnlineBeforeSessionPlay: Boolean = false,
     val radioWidgetBroadcastEnabled: Boolean = true,
     val clusterCoversEnabled: Boolean = true,
     val clusterOnlineEnabled: Boolean = false,
@@ -39,7 +38,6 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
         MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
         minimizeOnlinePlayerAfterAutostart,
     )
-    putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, switchToOnlineBeforeSessionPlay)
     putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, clusterCoversEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled)
@@ -64,7 +62,6 @@ fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnaps
         MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
         false,
     ),
-    switchToOnlineBeforeSessionPlay = getBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false),
     radioWidgetBroadcastEnabled = getBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, true),
     clusterCoversEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, true),
     clusterOnlineEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, false),

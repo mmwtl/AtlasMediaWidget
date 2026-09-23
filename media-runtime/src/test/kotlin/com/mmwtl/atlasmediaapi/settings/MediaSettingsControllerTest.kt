@@ -71,7 +71,6 @@ class MediaSettingsControllerTest {
         assertFalse(snapshot.autoSwitchToDefaultOnSourceLost)
         assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
         assertFalse(snapshot.minimizeOnlinePlayerAfterAutostart)
-        assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
@@ -90,7 +89,6 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY, false)
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
             putBoolean(MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART, true)
-            putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
@@ -108,7 +106,6 @@ class MediaSettingsControllerTest {
         assertFalse(snap.defaultAudioSourceAutoplayOnStartup)
         assertTrue(snap.autoSwitchToDefaultOnSourceLost)
         assertTrue(snap.minimizeOnlinePlayerAfterAutostart)
-        assertTrue(snap.switchToOnlineBeforeSessionPlay)
         assertTrue(snap.clusterOnlineEnabled)
         assertTrue(snap.clusterOnlineProgressEnabled)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
@@ -169,7 +166,6 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY, false)
             putString(MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE, "com.example.player")
-            putBoolean(MediaBridgeContract.Key.SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, true)
             putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, false)
             putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, false)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2500L)
@@ -403,7 +399,6 @@ class MediaSettingsControllerTest {
         preferences.autoSwitchToDefaultAutoplayOnSourceLost = false
         preferences.defaultMediaPackage = "com.example.player"
         preferences.minimizeOnlinePlayerAfterAutostart = true
-        preferences.switchToOnlineBeforeSessionPlay = true
         radioCatalogRepository.setWidgetBroadcastEnabled(false)
         clusterMediaBridge.setClusterCoversEnabled(false)
         clusterMediaBridge.setClusterOnlineEnabled(true)
@@ -437,7 +432,6 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
         assertEquals("", snapshot.defaultMediaPackage)
         assertFalse(snapshot.minimizeOnlinePlayerAfterAutostart)
-        assertFalse(snapshot.switchToOnlineBeforeSessionPlay)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)

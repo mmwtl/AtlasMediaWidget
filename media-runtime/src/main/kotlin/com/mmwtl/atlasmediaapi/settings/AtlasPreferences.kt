@@ -9,7 +9,6 @@ class AtlasPreferences(context: Context) {
         private const val KEY_DEFAULT_MEDIA_PACKAGE = "default_media_package"
         private const val KEY_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART =
             "minimize_online_player_after_autostart"
-        private const val KEY_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switch_to_online_before_session_play"
         private const val KEY_DIAGNOSTIC_LOGGING_ENABLED = "diagnostic_logging_enabled"
         private const val KEY_DEFAULT_AUDIO_SOURCE = "default_audio_source"
         private const val KEY_DEFAULT_AUDIO_SOURCE_DELAY_SEC = "default_audio_source_delay_sec"
@@ -36,10 +35,6 @@ class AtlasPreferences(context: Context) {
         set(value) = prefs.edit()
             .putBoolean(KEY_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART, value)
             .apply()
-
-    var switchToOnlineBeforeSessionPlay: Boolean
-        get() = prefs.getBoolean(KEY_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false)
-        set(value) = prefs.edit().putBoolean(KEY_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, value).apply()
 
     var diagnosticLoggingEnabled: Boolean
         get() = prefs.getBoolean(KEY_DIAGNOSTIC_LOGGING_ENABLED, false)

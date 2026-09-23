@@ -11,7 +11,6 @@ final class MediaSettingsSnapshot {
     final boolean autoSwitchToDefaultAutoplayOnSourceLost;
     final String defaultMediaPackage;
     final boolean minimizeOnlinePlayerAfterAutostart;
-    final boolean switchToOnlineBeforeSessionPlay;
     final boolean radioWidgetBroadcastEnabled;
     final boolean clusterCoversEnabled;
     final boolean clusterOnlineEnabled;
@@ -31,7 +30,6 @@ final class MediaSettingsSnapshot {
             boolean autoSwitchToDefaultOnSourceLost,
             boolean autoSwitchToDefaultAutoplayOnSourceLost,
             String defaultMediaPackage,
-            boolean switchToOnlineBeforeSessionPlay,
             boolean radioWidgetBroadcastEnabled,
             boolean clusterCoversEnabled,
             long clusterWatchdogIntervalMs,
@@ -42,7 +40,7 @@ final class MediaSettingsSnapshot {
         this(revision, defaultAudioSource, defaultAudioSourceDelaySec,
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
-                false, switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
+                false, radioWidgetBroadcastEnabled,
                 clusterCoversEnabled, false, false, clusterWatchdogIntervalMs, 100L, catalogType,
                 catalogStationCount, catalogDescription, uiScaleTenths);
     }
@@ -55,7 +53,6 @@ final class MediaSettingsSnapshot {
             boolean autoSwitchToDefaultOnSourceLost,
             boolean autoSwitchToDefaultAutoplayOnSourceLost,
             String defaultMediaPackage,
-            boolean switchToOnlineBeforeSessionPlay,
             boolean radioWidgetBroadcastEnabled,
             boolean clusterCoversEnabled,
             boolean clusterOnlineEnabled,
@@ -67,7 +64,7 @@ final class MediaSettingsSnapshot {
         this(revision, defaultAudioSource, defaultAudioSourceDelaySec,
                 defaultAudioSourceAutoplayOnStartup, autoSwitchToDefaultOnSourceLost,
                 autoSwitchToDefaultAutoplayOnSourceLost, defaultMediaPackage,
-                false, switchToOnlineBeforeSessionPlay, radioWidgetBroadcastEnabled,
+                false, radioWidgetBroadcastEnabled,
                 clusterCoversEnabled, clusterOnlineEnabled, false, clusterWatchdogIntervalMs, 100L,
                 catalogType, catalogStationCount, catalogDescription, uiScaleTenths);
     }
@@ -81,7 +78,6 @@ final class MediaSettingsSnapshot {
             boolean autoSwitchToDefaultAutoplayOnSourceLost,
             String defaultMediaPackage,
             boolean minimizeOnlinePlayerAfterAutostart,
-            boolean switchToOnlineBeforeSessionPlay,
             boolean radioWidgetBroadcastEnabled,
             boolean clusterCoversEnabled,
             boolean clusterOnlineEnabled,
@@ -100,7 +96,6 @@ final class MediaSettingsSnapshot {
         this.autoSwitchToDefaultAutoplayOnSourceLost = autoSwitchToDefaultAutoplayOnSourceLost;
         this.defaultMediaPackage = defaultMediaPackage != null ? defaultMediaPackage : "";
         this.minimizeOnlinePlayerAfterAutostart = minimizeOnlinePlayerAfterAutostart;
-        this.switchToOnlineBeforeSessionPlay = switchToOnlineBeforeSessionPlay;
         this.radioWidgetBroadcastEnabled = radioWidgetBroadcastEnabled;
         this.clusterCoversEnabled = clusterCoversEnabled;
         this.clusterOnlineEnabled = clusterOnlineEnabled;
@@ -115,7 +110,7 @@ final class MediaSettingsSnapshot {
 
     static MediaSettingsSnapshot fromBundle(Bundle bundle) {
         if (bundle == null) {
-            return new MediaSettingsSnapshot(0L, "", 0, true, false, true, "", false, true, true, 1250L, "BUILT_IN", 0, "", 15);
+            return new MediaSettingsSnapshot(0L, "", 0, true, false, true, "", true, true, 1250L, "BUILT_IN", 0, "", 15);
         }
         return new MediaSettingsSnapshot(
                 bundle.getLong(MediaBridgeContract.K_SETTINGS_REVISION, 0L),
@@ -126,7 +121,6 @@ final class MediaSettingsSnapshot {
                 bundle.getBoolean(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY, true),
                 bundle.getString(MediaBridgeContract.K_DEFAULT_MEDIA_PACKAGE, ""),
                 bundle.getBoolean(MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART, false),
-                bundle.getBoolean(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, false),
                 bundle.getBoolean(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, true),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, true),
                 bundle.getBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, false),
@@ -150,7 +144,6 @@ final class MediaSettingsSnapshot {
         bundle.putString(MediaBridgeContract.K_DEFAULT_MEDIA_PACKAGE, defaultMediaPackage);
         bundle.putBoolean(MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
                 minimizeOnlinePlayerAfterAutostart);
-        bundle.putBoolean(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, switchToOnlineBeforeSessionPlay);
         bundle.putBoolean(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, clusterCoversEnabled);
         bundle.putBoolean(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled);

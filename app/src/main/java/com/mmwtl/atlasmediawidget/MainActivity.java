@@ -91,7 +91,6 @@ public final class MainActivity extends ScaledActivity {
     private Switch startupAutoplaySwitch;
     private Switch sourceLostSwitch;
     private Switch sourceLostAutoplaySwitch;
-    private Switch switchToOnlineSwitch;
     private Switch radioWidgetBroadcastSwitch;
     private Switch clusterCoversSwitch;
     private Switch clusterOnlineSwitch;
@@ -1709,18 +1708,6 @@ public final class MainActivity extends ScaledActivity {
         s3.topMargin = Ui.dp(this, 12);
         mediaSettingsGroup.addView(sourceLostAutoplaySwitch, s3);
 
-        switchToOnlineSwitch = new Switch(this);
-        switchToOnlineSwitch.setText("Переключать на Online перед воспроизведением сессии");
-        switchToOnlineSwitch.setTextColor(Ui.PRIMARY);
-        switchToOnlineSwitch.setTextSize(15);
-        switchToOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY, checked);
-        });
-        LinearLayout.LayoutParams s4 = fullWrap();
-        s4.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(switchToOnlineSwitch, s4);
-
         TextView radioClusterTitle = text("Радио и приборная панель", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams rctParams = fullWrap();
         rctParams.topMargin = Ui.dp(this, 16);
@@ -1956,9 +1943,6 @@ public final class MainActivity extends ScaledActivity {
             sourceLostAutoplaySwitch.setChecked(snapshot.autoSwitchToDefaultAutoplayOnSourceLost);
             sourceLostAutoplaySwitch.setEnabled(canAutoplay);
             sourceLostAutoplaySwitch.setAlpha(canAutoplay ? 1f : 0.45f);
-        }
-        if (switchToOnlineSwitch != null) {
-            switchToOnlineSwitch.setChecked(snapshot.switchToOnlineBeforeSessionPlay);
         }
         if (radioWidgetBroadcastSwitch != null) {
             radioWidgetBroadcastSwitch.setChecked(snapshot.radioWidgetBroadcastEnabled);

@@ -132,7 +132,6 @@ object MediaBridgeContract {
         const val AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay"
         const val DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage"
         const val MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART = "minimizeOnlinePlayerAfterAutostart"
-        const val SWITCH_TO_ONLINE_BEFORE_SESSION_PLAY = "switchToOnlineBeforeSessionPlay"
         const val RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled"
         const val CLUSTER_COVERS_ENABLED = "clusterCoversEnabled"
         const val CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled"

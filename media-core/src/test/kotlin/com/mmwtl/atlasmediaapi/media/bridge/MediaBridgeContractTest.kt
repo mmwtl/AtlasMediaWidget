@@ -84,7 +84,6 @@ class MediaBridgeContractTest {
             autoSwitchToDefaultAutoplayOnSourceLost = false,
             defaultMediaPackage = "ru.yandex.music",
             minimizeOnlinePlayerAfterAutostart = true,
-            switchToOnlineBeforeSessionPlay = true,
             radioWidgetBroadcastEnabled = false,
             clusterCoversEnabled = false,
             clusterOnlineEnabled = true,
