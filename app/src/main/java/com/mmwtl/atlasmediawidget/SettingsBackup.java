@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 11;
+    private static final int SCHEMA_VERSION = 12;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
@@ -215,6 +215,8 @@ final class SettingsBackup {
                     0, Prefs.MAX_PROGRESS_GAP_DP);
             requireRange(path + ".progressThicknessDp", appearance.progressThicknessDp,
                     Prefs.MIN_PROGRESS_THICKNESS_DP, Prefs.MAX_PROGRESS_THICKNESS_DP);
+            requireRange(path + ".thumbnailSizeDp", appearance.thumbnailSizeDp,
+                    Prefs.MIN_THUMBNAIL_SIZE_DP, Prefs.MAX_THUMBNAIL_SIZE_DP);
             if (appearance.coverDimPreset == null) {
                 throw invalid("Нет пресета затемнения обложки: " + path);
             }
@@ -445,6 +447,7 @@ final class SettingsBackup {
                 .put("timeTextSizeSp", value.timeTextSizeSp)
                 .put("progressGapDp", value.progressGapDp)
                 .put("progressThicknessDp", value.progressThicknessDp)
+                .put("thumbnailSizeDp", value.thumbnailSizeDp)
                 .put("coverDimPreset", value.coverDimPreset.backupName);
     }
 
@@ -484,7 +487,10 @@ final class SettingsBackup {
                         requireInt(object, "progressGapDp", path + ".progressGapDp"),
                         requireInt(object, "progressThicknessDp",
                                 path + ".progressThicknessDp"),
-                        coverDimPreset));
+                        coverDimPreset,
+                        schemaVersion >= 12
+                                ? requireInt(object, "thumbnailSizeDp", path + ".thumbnailSizeDp")
+                                : Prefs.DEFAULT_THUMBNAIL_SIZE_DP));
     }
 
     private static CardStyle parseStyleName(String value) throws IOException {

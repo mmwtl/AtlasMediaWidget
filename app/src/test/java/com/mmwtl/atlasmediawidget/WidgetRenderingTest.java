@@ -54,12 +54,22 @@ public class WidgetRenderingTest {
                 if (preset != defaults.coverDimPreset) assertFalse(preset.name(),
                         Arrays.equals(original, pixels(context, prefs, cover)));
             }
+            if (style == CardStyle.COMPACT) {
+                prefs.putAppearance(style, appearance(defaultsArray,
+                        defaults.coverDimPreset, 104));
+                assertFalse("compact thumbnail size must affect actual widget pixels",
+                        Arrays.equals(original, pixels(context, prefs, cover)));
+            }
         }
     }
 
     private WidgetAppearance appearance(int[] a, CoverDimPreset preset) {
+        return appearance(a, preset, Prefs.DEFAULT_THUMBNAIL_SIZE_DP);
+    }
+
+    private WidgetAppearance appearance(int[] a, CoverDimPreset preset, int thumbnailSizeDp) {
         return new WidgetAppearance(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
-                a[8], a[9], a[10], a[11], a[12], a[13], preset);
+                a[8], a[9], a[10], a[11], a[12], a[13], preset, thumbnailSizeDp);
     }
 
     private int[] pixels(Context context, Prefs prefs, Bitmap cover) {

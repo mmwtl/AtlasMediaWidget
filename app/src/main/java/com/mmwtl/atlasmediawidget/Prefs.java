@@ -42,6 +42,7 @@ final class Prefs {
     private static final String KEY_PROGRESS_GAP_PREFIX = "progress_gap_";
     private static final String KEY_PROGRESS_THICKNESS_PREFIX = "progress_thickness_";
     private static final String KEY_COVER_DIM_PRESET_PREFIX = "cover_dim_preset_";
+    private static final String KEY_THUMBNAIL_SIZE_PREFIX = "thumbnail_size_";
     private static final String KEY_COVER_DIM_PRESET_MIGRATED = "cover_dim_preset_migrated";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int MIN_CARD_WIDTH_DP = 360;
@@ -77,6 +78,9 @@ final class Prefs {
     static final int MAX_PROGRESS_GAP_DP = 40;
     static final int MIN_PROGRESS_THICKNESS_DP = 2;
     static final int MAX_PROGRESS_THICKNESS_DP = 16;
+    static final int MIN_THUMBNAIL_SIZE_DP = 48;
+    static final int MAX_THUMBNAIL_SIZE_DP = 104;
+    static final int DEFAULT_THUMBNAIL_SIZE_DP = 76;
     static final int MIN_RADIO_FAVORITES_GRID_COLUMNS = 2;
     static final int MAX_RADIO_FAVORITES_GRID_COLUMNS = 4;
     static final int MIN_RADIO_FAVORITES_GRID_ROWS = 2;
@@ -330,7 +334,9 @@ final class Prefs {
                         0, MAX_PROGRESS_GAP_DP),
                 ranged(KEY_PROGRESS_THICKNESS_PREFIX, style, defaults.progressThicknessDp,
                         MIN_PROGRESS_THICKNESS_DP, MAX_PROGRESS_THICKNESS_DP),
-                coverDimPreset(style));
+                coverDimPreset(style),
+                ranged(KEY_THUMBNAIL_SIZE_PREFIX, style, defaults.thumbnailSizeDp,
+                        MIN_THUMBNAIL_SIZE_DP, MAX_THUMBNAIL_SIZE_DP));
     }
 
     void putAppearance(CardStyle style, WidgetAppearance value) {
@@ -376,6 +382,9 @@ final class Prefs {
                                 MAX_PROGRESS_THICKNESS_DP))
                 .putInt(KEY_COVER_DIM_PRESET_PREFIX + style.preferenceValue,
                         value.coverDimPreset.preferenceValue)
+                .putInt(KEY_THUMBNAIL_SIZE_PREFIX + style.preferenceValue,
+                        clamp(value.thumbnailSizeDp, MIN_THUMBNAIL_SIZE_DP,
+                                MAX_THUMBNAIL_SIZE_DP))
                 .apply();
     }
 
@@ -441,7 +450,8 @@ final class Prefs {
                 .putInt(KEY_PROGRESS_GAP_PREFIX + suffix, value.progressGapDp)
                 .putInt(KEY_PROGRESS_THICKNESS_PREFIX + suffix, value.progressThicknessDp)
                 .putInt(KEY_COVER_DIM_PRESET_PREFIX + suffix,
-                        value.coverDimPreset.preferenceValue);
+                        value.coverDimPreset.preferenceValue)
+                .putInt(KEY_THUMBNAIL_SIZE_PREFIX + suffix, value.thumbnailSizeDp);
     }
 
     private int ranged(String prefix, CardStyle style, int fallback, int min, int max) {

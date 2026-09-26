@@ -7,8 +7,8 @@ import static org.junit.Assert.assertNull;
 import org.junit.Test;
 
 public final class CoverDimPresetTest {
-    @Test public void maximumPreservesOriginalGradients() {
-        assertArrayEquals(new int[]{0x5E1D2228, 0x221D2228, 0xAD1D2228, 0xF51D2228},
+    @Test public void maximumDarkensCompactBackgroundAcrossTheCard() {
+        assertArrayEquals(new int[]{0xA81D2228, 0x981D2228, 0xC81D2228, 0xF51D2228},
                 CoverDimPreset.MAXIMUM.colors(CardStyle.COMPACT));
         assertArrayEquals(new int[]{0x601D2228, 0x101D2228, 0xB01D2228, 0xFA1D2228},
                 CoverDimPreset.MAXIMUM.colors(CardStyle.SQUARE));

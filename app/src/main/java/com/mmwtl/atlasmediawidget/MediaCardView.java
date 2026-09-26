@@ -2,7 +2,9 @@ package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Path;
 import android.graphics.Typeface;
 import android.graphics.drawable.ClipDrawable;
 import android.graphics.drawable.Drawable;
@@ -260,11 +262,27 @@ final class MediaCardView extends FrameLayout {
 
         metadata = new LinearLayout(context);
         metadata.setGravity(Gravity.CENTER_VERTICAL);
-        artworkThumbnail = new ImageView(context);
+        artworkThumbnail = new ImageView(context) {
+            private final Path roundedClip = new Path();
+
+            @Override protected void onSizeChanged(int width, int height,
+                    int oldWidth, int oldHeight) {
+                super.onSizeChanged(width, height, oldWidth, oldHeight);
+                roundedClip.reset();
+                roundedClip.addRoundRect(0, 0, width, height, d(10), d(10), Path.Direction.CW);
+            }
+
+            @Override protected void onDraw(Canvas canvas) {
+                int save = canvas.save();
+                canvas.clipPath(roundedClip);
+                super.onDraw(canvas);
+                canvas.restoreToCount(save);
+            }
+        };
         artworkThumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
         artworkThumbnail.setBackground(Ui.background(Ui.NESTED, 10 * uiScale, context));
-        artworkThumbnail.setClipToOutline(true);
-        metadata.addView(artworkThumbnail, new LinearLayout.LayoutParams(d(76), d(76)));
+        metadata.addView(artworkThumbnail, new LinearLayout.LayoutParams(
+                d(appearance.thumbnailSizeDp), d(appearance.thumbnailSizeDp)));
 
         LinearLayout textColumn = new LinearLayout(context);
         textColumn.setOrientation(LinearLayout.VERTICAL);

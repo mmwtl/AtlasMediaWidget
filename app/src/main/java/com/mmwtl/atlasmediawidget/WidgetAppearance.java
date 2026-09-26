@@ -16,6 +16,7 @@ final class WidgetAppearance {
     final int progressGapDp;
     final int progressThicknessDp;
     final CoverDimPreset coverDimPreset;
+    final int thumbnailSizeDp;
 
     WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
             int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
@@ -33,6 +34,19 @@ final class WidgetAppearance {
             int topInsetDp, int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
             int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
             int progressGapDp, int progressThicknessDp, CoverDimPreset coverDimPreset) {
+        this(metadataProgressGapDp, controlPanelHeightDp, controlIconScalePercent,
+                controlSpreadPercent, controlBottomInsetDp, topInsetDp, contentInsetDp,
+                topRowTextSizeSp, titleTextSizeSp, subtitleTextSizeSp, subtitleGapDp,
+                timeTextSizeSp, progressGapDp, progressThicknessDp, coverDimPreset,
+                Prefs.DEFAULT_THUMBNAIL_SIZE_DP);
+    }
+
+    WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
+            int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
+            int topInsetDp, int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
+            int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
+            int progressGapDp, int progressThicknessDp, CoverDimPreset coverDimPreset,
+            int thumbnailSizeDp) {
         this.metadataProgressGapDp = metadataProgressGapDp;
         this.controlPanelHeightDp = controlPanelHeightDp;
         this.controlIconScalePercent = controlIconScalePercent;
@@ -48,6 +62,7 @@ final class WidgetAppearance {
         this.progressGapDp = progressGapDp;
         this.progressThicknessDp = progressThicknessDp;
         this.coverDimPreset = coverDimPreset == null ? CoverDimPreset.DEFAULT : coverDimPreset;
+        this.thumbnailSizeDp = thumbnailSizeDp;
     }
 
     static WidgetAppearance defaults(CardStyle style) {

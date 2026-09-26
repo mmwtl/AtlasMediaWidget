@@ -152,6 +152,8 @@ public final class MainActivity extends ScaledActivity {
     private Button importRadioCatalogButton;
     private RadioGroup coverDimPresetGroup;
     private RadioButton[] coverDimPresetButtons;
+    private LinearLayout thumbnailSizeSection;
+    private LabeledSeek thumbnailSizeSetting;
     private EditText widthSize;
     private EditText heightSize;
     private SeekBar hideThreshold;
@@ -466,6 +468,13 @@ public final class MainActivity extends ScaledActivity {
         });
         serviceCard.addView(coverDimPresetGroup, fullWrap());
 
+        thumbnailSizeSection = new LinearLayout(this);
+        thumbnailSizeSection.setOrientation(LinearLayout.VERTICAL);
+        thumbnailSizeSetting = addLabeledSeek(thumbnailSizeSection,
+                "Размер маленькой обложки", Prefs.MIN_THUMBNAIL_SIZE_DP,
+                Prefs.MAX_THUMBNAIL_SIZE_DP);
+        serviceCard.addView(thumbnailSizeSection, fullWrap());
+
         TextView sizeTitle = text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams sizeTitleParams = fullWrap();
         sizeTitleParams.topMargin = Ui.dp(this, 14);
@@ -656,7 +665,7 @@ public final class MainActivity extends ScaledActivity {
                 };
         bind(appearanceListener, topInsetSetting, contentInsetSetting, topRowTextSetting,
                 titleTextSetting, subtitleTextSetting, subtitleGapSetting, timeTextSetting,
-                progressGapSetting, progressThicknessSetting);
+                progressGapSetting, progressThicknessSetting, thumbnailSizeSetting);
 
         Button resetAppearance = actionButton("Вернуть текст и отступы по умолчанию");
         resetAppearance.setOnClickListener(v -> {
@@ -678,7 +687,8 @@ public final class MainActivity extends ScaledActivity {
                     defaults.timeTextSizeSp,
                     defaults.progressGapDp,
                     defaults.progressThicknessDp,
-                    existing.coverDimPreset));
+                    existing.coverDimPreset,
+                    existing.thumbnailSizeDp));
             refreshSizeControls(current);
             refreshOverlayIfRunning();
         });
@@ -2710,7 +2720,8 @@ public final class MainActivity extends ScaledActivity {
         if (widthSize == null || heightSize == null || metadataProgressGap == null
                 || controlPanelHeight == null || controlIconScale == null
                 || controlSpread == null || controlBottomInset == null
-                || topInsetSetting == null || coverDimPresetButtons == null) return;
+                || topInsetSetting == null || coverDimPresetButtons == null
+                || thumbnailSizeSetting == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
@@ -2732,6 +2743,8 @@ public final class MainActivity extends ScaledActivity {
         timeTextSetting.seek.setProgress(appearance.timeTextSizeSp);
         progressGapSetting.seek.setProgress(appearance.progressGapDp);
         progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
+        thumbnailSizeSetting.seek.setProgress(appearance.thumbnailSizeDp);
+        thumbnailSizeSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
         updateMetadataProgressGapLabel();
         updateControlLabels();
@@ -2821,6 +2834,7 @@ public final class MainActivity extends ScaledActivity {
         progressGapSetting.value.setText(progressGapSetting.seek.getProgress() + " dp");
         progressThicknessSetting.value.setText(
                 progressThicknessSetting.seek.getProgress() + " dp");
+        thumbnailSizeSetting.value.setText(thumbnailSizeSetting.seek.getProgress() + " dp");
     }
 
     private void refreshPositionControls() {
@@ -2952,7 +2966,8 @@ public final class MainActivity extends ScaledActivity {
                 timeTextSetting.seek.getProgress(),
                 progressGapSetting.seek.getProgress(),
                 progressThicknessSetting.seek.getProgress(),
-                selectedCoverDimPreset());
+                selectedCoverDimPreset(),
+                thumbnailSizeSetting.seek.getProgress());
     }
 
     private CoverDimPreset selectedCoverDimPreset() {
@@ -3020,7 +3035,7 @@ public final class MainActivity extends ScaledActivity {
         MediaCardView preview = new MediaCardView(widgetContext,
                 configuredWidthPx, configuredHeightPx,
                 configuredWidthPx, configuredHeightPx, currentStyle(),
-                prefs.appearance(currentStyle()),
+                currentAppearance(),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
                 favoriteColumns == null ? prefs.radioFavoritesColumns()
