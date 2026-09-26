@@ -53,7 +53,18 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
         </activity>
+
+        <receiver android:name=".AtlasMediaWidgetProvider" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/atlas_media_widget" />
+        </receiver>
 
         <service
             android:name=".OverlayService"
@@ -63,7 +74,7 @@
             android:stopWithTask="false">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Media controls overlay visible only while the HOME activity is foreground" />
+                android:value="Media controls and Media Bridge connection for HOME overlay or Android AppWidget" />
         </service>
 
         <service

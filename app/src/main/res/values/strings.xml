@@ -11,7 +11,7 @@
     <string name="bridge_connecting">Подключение к Atlas Media API…</string>
     <string name="unknown_track">Ничего не воспроизводится</string>
     <string name="empty_hint">Выберите источник • включите звук</string>
-    <string name="main_subtitle">Медиакарточка поверх главного экрана. Состояние и команды приходят из Atlas Media API protocol v1.</string>
+    <string name="main_subtitle">Медиакарточка: оверлей или системный виджет. Данные и команды — через встроенный Media Bridge.</string>
     <string name="preview_title">Предпросмотр медиакарточки</string>
     <string name="settings_section_system">СИСТЕМА</string>
     <string name="settings_section_content">СОДЕРЖИМОЕ И ПОВЕДЕНИЕ</string>
@@ -35,4 +35,5 @@
     <string name="section_system">Система</string>
     <string name="section_backup">Резервная копия</string>
     <string name="section_diagnostics">Диагностика</string>
+    <string name="widget_waiting">Нет соединения · открыть настройки</string>
 </resources>

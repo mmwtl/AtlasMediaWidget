@@ -11,6 +11,10 @@ public final class BootReceiver extends BroadcastReceiver {
         if (intent == null) return;
         Prefs prefs = new Prefs(context);
         String action = intent.getAction();
+        if (prefs.isWidgetMode()) {
+            if (isUserUnlocked(context)) AtlasMediaWidgetProvider.refresh(context);
+            return;
+        }
         if (BootStartPolicy.isStartupAction(action)) {
             if (!prefs.getBoolean(Prefs.KEY_AUTO_START, false)) {
                 if (isUserUnlocked(context)) {
@@ -31,6 +35,10 @@ public final class BootReceiver extends BroadcastReceiver {
     }
 
     static void startIfAllowed(Context context, Prefs prefs) {
+        if (prefs.isWidgetMode()) {
+            AtlasMediaWidgetProvider.refresh(context);
+            return;
+        }
         if (!Settings.canDrawOverlays(context)) {
             AppLog.info("Boot start skipped: overlay permission is missing");
             return;

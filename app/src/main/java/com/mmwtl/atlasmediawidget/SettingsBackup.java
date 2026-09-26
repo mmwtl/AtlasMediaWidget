@@ -16,12 +16,13 @@ import java.nio.charset.StandardCharsets;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 10;
+    private static final int SCHEMA_VERSION = 11;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
         final int freeformHideThresholdPercent;
+        final boolean widgetMode;
         final boolean autoStart;
         final boolean radioSavedNavigation;
         final boolean radioFavoritesNavigation;
@@ -99,6 +100,19 @@ final class SettingsBackup {
                 StyleData compact, StyleData square, Integer cardWidthPx, Integer cardHeightPx,
                 int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, freeformHideThresholdPercent, false);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths, CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner, StyleData compact, StyleData square,
+                Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
+                boolean widgetMode) throws IOException {
+            this.widgetMode = widgetMode;
             this.freeformHideThresholdPercent = requireRange(
                     "settings.freeformHideThresholdPercent", freeformHideThresholdPercent,
                     WindowVisibilityPolicy.MIN_HIDE_THRESHOLD_PERCENT,
@@ -232,7 +246,7 @@ final class SettingsBackup {
                 prefs.cardWidthPx(), prefs.cardHeightPx(),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
-                prefs.freeformHideThresholdPercent());
+                prefs.freeformHideThresholdPercent(), prefs.isWidgetMode());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -275,6 +289,7 @@ final class SettingsBackup {
             root.put("schemaVersion", SCHEMA_VERSION);
             root.put("appVersion", appVersion == null ? "" : appVersion);
             JSONObject settings = new JSONObject();
+            settings.put("widgetMode", data.widgetMode);
             settings.put("freeformHideThresholdPercent", data.freeformHideThresholdPercent);
             settings.put("autoStart", data.autoStart);
             settings.put("radioSavedNavigation", data.radioSavedNavigation);
@@ -385,7 +400,8 @@ final class SettingsBackup {
                             "settings.radioFavoritesNavigation"),
                     version >= 10 ? requireInt(settings, "freeformHideThresholdPercent",
                             "settings.freeformHideThresholdPercent")
-                            : WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT);
+                            : WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT,
+                    version >= 11 && requireBoolean(settings, "widgetMode", "settings.widgetMode"));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }

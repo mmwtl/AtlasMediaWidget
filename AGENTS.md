@@ -6,10 +6,10 @@ These instructions apply to the entire repository.
 
 ## Current project
 
-AtlasMediaWidget is an Android media overlay for a portrait Geely OneOS head unit. The current
-implementation uses a `TYPE_APPLICATION_OVERLAY` window and shows the card only while HOME is in
-the foreground. The card is not a launcher `AppWidget`, and the repository must not describe it as
-a drop-in third-party launcher widget.
+AtlasMediaWidget is an Android media card for a portrait Geely OneOS head unit. It supports
+exclusive Overlay and Android AppWidget display modes. Overlay uses `TYPE_APPLICATION_OVERLAY`
+and is shown only while HOME is foreground; AppWidget uses Android 11 RemoteViews, with size and
+placement owned by the launcher. Shared preferences default to Overlay on existing installations.
 
 The only supported distribution is the integrated Widget APK:
 
@@ -39,6 +39,18 @@ migration request.
   firmware versions without a device test.
 - Build and unit-test success does not prove correct OEM Binder behavior, source arbitration,
   cold-boot startup, dashboard output or sleep/wake recovery on the head unit.
+
+## Android AppWidget behavior
+
+- Keep MainActivity as the only settings editor, including ACTION_APPWIDGET_CONFIGURE.
+- Validate appWidgetId ownership; return the original ID with OK or CANCELED. Settings apply
+  immediately and are shared across instances; the launcher owns allocation and cancellation.
+- OverlayService owns the existing MediaBridgeClient for both display modes. Do not stop it when
+  hiding the overlay while AppWidgets need it. In widget mode, do not run HOME observations.
+- RemoteViews pixels and preview use the measured MediaCardView. Transport targets use its actual
+  translated bounds; read-only progress uses partial updates without resending artwork.
+- Keep launcher configuration controls off the media card. Document Android 11 host requirements
+  in docs/android-appwidget.md; do not assume widgetFeatures enables reconfiguration on Android 11.
 
 ## Overlay behavior
 

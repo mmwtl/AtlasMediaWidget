@@ -27,6 +27,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
         thread.setDaemon(true);
         return thread;
     });
+    private Prefs prefs;
     private String lastEventPackage = "";
     private String lastEventClass = "";
     private boolean refreshInFlight;
@@ -47,8 +48,8 @@ public final class WindowAccessibilityService extends AccessibilityService {
                 | AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         info.notificationTimeout = 50L;
         setServiceInfo(info);
+        prefs = new Prefs(this);
         requestWindowRefresh();
-        Prefs prefs = new Prefs(this);
         if (BootStartPolicy.shouldStartWhenAccessibilityConnects(
                 prefs.getBoolean(Prefs.KEY_AUTO_START, false),
                 prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false))) {
@@ -59,7 +60,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event == null) {
+        if (event == null || prefs != null && prefs.isWidgetMode()) {
             return;
         }
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
@@ -92,7 +93,7 @@ public final class WindowAccessibilityService extends AccessibilityService {
 
     @SuppressWarnings("deprecation")
     private void requestWindowRefresh() {
-        if (destroyed) {
+        if (destroyed || prefs != null && prefs.isWidgetMode()) {
             return;
         }
         if (refreshInFlight) {

@@ -115,6 +115,24 @@ final class Prefs {
         }
     }
 
+    static final String KEY_DISPLAY_MODE = "display_mode";
+
+    boolean isWidgetMode() {
+        return "widget".equals(getString(KEY_DISPLAY_MODE, "overlay"));
+    }
+
+    void setWidgetMode(boolean widget) {
+        putString(KEY_DISPLAY_MODE, widget ? "widget" : "overlay");
+    }
+
+    void observe(android.content.SharedPreferences.OnSharedPreferenceChangeListener listener) {
+        preferences.registerOnSharedPreferenceChangeListener(listener);
+    }
+
+    void unobserve(android.content.SharedPreferences.OnSharedPreferenceChangeListener listener) {
+        preferences.unregisterOnSharedPreferenceChangeListener(listener);
+    }
+
     boolean getBoolean(String key, boolean fallback) {
         return preferences.getBoolean(key, fallback);
     }
@@ -363,6 +381,7 @@ final class Prefs {
 
     boolean replacePortableSettings(SettingsBackup.Data data) {
         SharedPreferences.Editor editor = preferences.edit()
+                .putString(KEY_DISPLAY_MODE, data.widgetMode ? "widget" : "overlay")
                 .putBoolean(KEY_AUTO_START, data.autoStart)
                 .putBoolean(KEY_RADIO_SAVED_NAVIGATION, data.radioSavedNavigation)
                 .putBoolean(KEY_RADIO_FAVORITES_NAVIGATION,

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="280dp" android:minHeight="200dp"
+    android:minResizeWidth="280dp" android:minResizeHeight="180dp"
+    android:configure="com.mmwtl.atlasmediawidget.MainActivity"
+    android:widgetFeatures="reconfigurable|configuration_optional"
+    android:initialLayout="@layout/media_widget_empty"
+    android:previewImage="@mipmap/ic_launcher"
+    android:updatePeriodMillis="1800000"
+    android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen" />

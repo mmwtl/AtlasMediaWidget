@@ -4,20 +4,26 @@
 
 # Atlas Media Widget
 
-A media overlay for portrait Geely OneOS automotive head units running Android 11.
+A media card with Overlay and Android Widget modes for portrait Geely OneOS automotive head units running Android 11.
 [Русская версия](README.md)
 
 Atlas Media Widget shows artwork, metadata, playback progress, transport controls and available
 audio sources on the home screen. State and commands use the private Media Bridge protocol v1.
 
-The app uses `TYPE_APPLICATION_OVERLAY`, not a system `AppWidget`: the card is visible only over
-HOME and does not block interaction with the rest of the screen.
+**Overlay** uses `TYPE_APPLICATION_OVERLAY` and appears only over HOME. **Widget** is a system
+Android AppWidget, sized and placed by the launcher. Existing installations default to Overlay.
+Appearance is shared across instances; switching modes preserves the overlay geometry.
+
+Use **Add widget** or HOME’s widget picker. Settings open through the app or HOME’s edit mode
+when supported by the launcher. Done completes configuration; Back cancels initial placement but
+does not undo shared settings already applied. Placed widgets stay inactive when Overlay is selected.
+On Android 11 the launcher must explicitly support reconfiguration; widgetFeatures alone is insufficient.
 
 ## Current architecture
 
 Only the integrated Widget APK is supported. It contains:
 
-- the overlay application in `:app`;
+- the overlay and AppWidget application in `:app`;
 - the embedded media runtime in `:media-runtime`;
 - the private `:media` process with the Media Bridge, media sessions and diagnostics;
 - OneOS and ECarX adapters, shared models and tests in `:media-core`, `:vendor-oneos` and
@@ -30,7 +36,10 @@ Widget application; its standalone launcher is removed from the integrated varia
 
 The card occupies only its configured area over the stock HOME screen. It can be moved and
 configured by size and appearance; tapping its free area opens the active source. Settings include
-a live preview using the same `MediaCardView` as the overlay.
+a preview using the same rendering path as the selected mode. AppWidget previews use the selected
+instance’s size; before placement a labeled sample size with demo media is shown. Progress on HOME
+updates every five seconds. Tapping progress opens precise seeking in the app; sources and favorites
+also open the existing media card controls there. HOME does not support gestures or a draggable SeekBar.
 
 <p align="center">
   <a href="docs/images/home-overview.webp">
@@ -95,8 +104,8 @@ a live preview using the same `MediaCardView` as the overlay.
 - Android 11 or newer; `minSdk 30`, `compileSdk` and `targetSdk` 36;
 - portrait automotive display, with 1440×1920 as the target configuration;
 - JDK 17 for builds;
-- Display over other apps;
-- Usage Access and the accessibility service to determine HOME visibility;
+- Display over other apps (Overlay mode only);
+- Usage Access and the accessibility service to determine HOME visibility (Overlay mode only);
 - Notification Access to observe Android media sessions;
 - storage access for USB artwork and radio-catalog imports.
 
@@ -106,10 +115,10 @@ on the OneOS firmware and its power-management settings.
 ## Installation and quick start
 
 1. Build or install the only supported integrated APK.
-2. Open **Atlas Media Widget** and grant the required permissions in **System**.
+2. Open **Atlas Media Widget**, select the display mode and grant the permissions shown in **System**.
 3. In **Media**, check the media service, default source and startup behavior.
-4. In **Widget**, configure the card size, position and appearance.
-5. Tap **Start**. Enable launch on boot if required by the head unit setup.
+4. In **Widget**, configure appearance. Overlay also provides manual size and position.
+5. For Overlay, tap **Start** and enable launch on boot if required. For Widget, add an instance to HOME; the media service runs independently of the settings window.
 
 ## Build and checks
 

@@ -406,6 +406,47 @@ final class MediaCardView extends FrameLayout {
         renderDisconnected(getResources().getString(R.string.bridge_connecting));
     }
 
+    // The same measured card supplies RemoteViews pixels and exact click bounds.
+    View widgetTarget(String action) {
+        return switch (action) {
+            case "PREVIOUS" -> previous;
+            case "PLAY_PAUSE" -> playPause;
+            case "NEXT" -> next;
+            case "sources" -> sourcePill;
+            case "favorites" -> favoritesButton;
+            case "seek" -> progressRow;
+            default -> metadata;
+        };
+    }
+
+    android.graphics.Rect widgetBounds(View target) {
+        android.graphics.Rect bounds = new android.graphics.Rect(0, 0,
+                target.getWidth(), target.getHeight());
+        offsetDescendantRectToMyCoords(target, bounds);
+        bounds.offset(Math.round(target.getTranslationX()), Math.round(target.getTranslationY()));
+        return bounds;
+    }
+
+    void prepareWidgetArtwork(Bitmap bitmap) {
+        setArtwork(bitmap);
+        artwork.animate().cancel();
+        artwork.setAlpha(bitmap == null ? 0f : 1f);
+        // A RemoteViews progress strip is a read-only indicator, with no draggable thumb.
+        progress.setThumb(null);
+    }
+
+    void renderWidgetUnavailable(boolean connected) {
+        renderDisconnected(connected ? "Нет данных" : "Нет соединения");
+        title.setText(connected ? "Нет данных" : "Нет соединения");
+        subtitle.setText(connected ? "Ожидание медиаданных" : "Ожидание медиасервиса");
+        statusPill.setVisibility(GONE);
+    }
+
+    void openWidgetChooser(String action) {
+        if ("sources".equals(action)) toggleSourceChooser();
+        else if ("favorites".equals(action)) toggleFavoritesChooser();
+    }
+
     int cardWidth() { return cardWidth; }
     int cardHeight() { return cardHeight; }
 
