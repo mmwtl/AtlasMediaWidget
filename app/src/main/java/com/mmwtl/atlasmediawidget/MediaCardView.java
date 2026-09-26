@@ -261,7 +261,8 @@ final class MediaCardView extends FrameLayout {
         addView(dragHandle, dragParams);
 
         metadata = new LinearLayout(context);
-        metadata.setGravity(Gravity.CENTER_VERTICAL);
+        metadata.setGravity(style == CardStyle.COMPACT
+                ? Gravity.BOTTOM | Gravity.START : Gravity.CENTER_VERTICAL);
         artworkThumbnail = new ImageView(context) {
             private final Path roundedClip = new Path();
 
