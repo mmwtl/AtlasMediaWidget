@@ -109,6 +109,11 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
 
         Frame(Context context, Prefs prefs, Bundle options, int id, MediaSnapshot snapshot,
                 Bitmap artwork, boolean connected, MediaCardView.Listener listener) {
+            this(context, prefs, options, id, snapshot, artwork, connected, false, listener);
+        }
+
+        Frame(Context context, Prefs prefs, Bundle options, int id, MediaSnapshot snapshot,
+                Bitmap artwork, boolean connected, boolean showSources, MediaCardView.Listener listener) {
             width = Math.min(4096, Ui.dp(context, widthDp(context, options)));
             height = Math.min(4096, Ui.dp(context, heightDp(context, options)));
             CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE,
@@ -118,12 +123,13 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
             if (snapshot == null || !connected) card.renderWidgetUnavailable(connected);
             else card.renderSnapshot(snapshot, true);
+            if (showSources && snapshot != null && connected) card.openWidgetChooser("sources");
             card.prepareWidgetArtwork(connected ? artwork : null);
             card.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
             card.layout(0, 0, width, height);
             View progress = card.widgetTarget("seek");
-            progressBounds = progress.getVisibility() == View.VISIBLE
+            progressBounds = !showSources && progress.getVisibility() == View.VISIBLE
                     ? card.widgetBounds(progress) : new Rect();
             views = new RemoteViews(context.getPackageName(), R.layout.media_widget);
             int visibility = progress.getVisibility();
@@ -147,6 +153,22 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             views.setOnClickPendingIntent(R.id.widget_card, click(context, id, "open", false));
             setProgress(views);
             views.removeAllViews(R.id.widget_targets);
+            if (showSources && snapshot != null && connected) {
+                addTarget(context, id, "dismiss_sources", "Закрыть выбор источника",
+                        new Rect(0, 0, width, height), true);
+                for (MediaSource.Id source : new MediaSource.Id[]{MediaSource.Id.RADIO,
+                        MediaSource.Id.BT, MediaSource.Id.USB, MediaSource.Id.ONLINE,
+                        MediaSource.Id.CPAA}) {
+                    View option = card.widgetSourceOption(source);
+                    if (option != null && option.isEnabled()) {
+                        addTarget(context, id, "source_" + source.name(), source.label(),
+                                card.widgetBounds(option), true);
+                    }
+                }
+                addTarget(context, id, "sources", "Закрыть выбор источника",
+                        card.widgetBounds(card.widgetTarget("sources")), true);
+                return;
+            }
             for (String action : ACTIONS) {
                 View target = card.widgetTarget(action);
                 if (target.getVisibility() != View.VISIBLE || !target.isEnabled()) continue;
@@ -161,10 +183,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                             -Math.max(0, (minimum - rect.height()) / 2));
                     if (!rect.intersect(0, 0, width, height)) continue;
                 }
-                RemoteViews hit = new RemoteViews(context.getPackageName(), R.layout.media_widget_target);
-                hit.setViewPadding(R.id.widget_target_box, Math.max(0, rect.left), Math.max(0, rect.top),
-                        Math.max(0, width - rect.right), Math.max(0, height - rect.bottom));
-                hit.setContentDescription(R.id.widget_target, switch (action) {
+                addTarget(context, id, action, switch (action) {
                     case "PREVIOUS" -> "Предыдущий";
                     case "PLAY_PAUSE" -> snapshot != null && snapshot.isPlaying() ? "Пауза" : "Воспроизвести";
                     case "NEXT" -> "Следующий";
@@ -172,10 +191,18 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     case "favorites" -> "Избранные станции";
                     case "seek" -> "Открыть перемотку";
                     default -> "Открыть источник";
-                });
-                hit.setOnClickPendingIntent(R.id.widget_target, click(context, id, action, command));
-                views.addView(R.id.widget_targets, hit);
+                }, rect, command || "sources".equals(action));
             }
+        }
+
+        private void addTarget(Context context, int id, String action, String description,
+                Rect rect, boolean command) {
+            RemoteViews hit = new RemoteViews(context.getPackageName(), R.layout.media_widget_target);
+            hit.setViewPadding(R.id.widget_target_box, Math.max(0, rect.left), Math.max(0, rect.top),
+                    Math.max(0, width - rect.right), Math.max(0, height - rect.bottom));
+            hit.setContentDescription(R.id.widget_target, description);
+            hit.setOnClickPendingIntent(R.id.widget_target, click(context, id, action, command));
+            views.addView(R.id.widget_targets, hit);
         }
 
         RemoteViews progress(Context context, MediaSnapshot snapshot) {

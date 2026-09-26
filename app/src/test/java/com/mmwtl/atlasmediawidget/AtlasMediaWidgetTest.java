@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediawidget;
 import static org.junit.Assert.*;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
@@ -147,6 +148,56 @@ public class AtlasMediaWidgetTest {
         controller.destroy();
     }
 
+    @Test public void sourceChooserRendersAndRoutesSelectionInsideWidget() {
+        Bundle options = new Bundle();
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 400);
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+        var frame = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context),
+                options, 41, sourceSnapshot(), null, true, true, listener);
+        assertEquals(View.VISIBLE, frame.card.widgetTarget("source_chooser").getVisibility());
+        assertTrue(frame.progressBounds.isEmpty());
+        assertTrue(frame.card.widgetSourceOption(MediaSource.Id.RADIO).isEnabled());
+        assertFalse(frame.card.widgetSourceOption(MediaSource.Id.BT).isEnabled());
+        assertFalse(frame.card.widgetSourceOption(MediaSource.Id.ONLINE).isEnabled());
+        View rendered = frame.views.apply(context, null);
+        assertEquals(3, ((ViewGroup) rendered.findViewById(R.id.widget_targets)).getChildCount());
+        PendingIntent source = AtlasMediaWidgetProvider.click(context, 41, "sources", true);
+        Intent intent = Shadows.shadowOf(source).getSavedIntent();
+        assertEquals(new ComponentName(context, OverlayService.class), intent.getComponent());
+        assertEquals(AtlasMediaWidgetProvider.ACTION_COMMAND, intent.getAction());
+        assertNotEquals(source, AtlasMediaWidgetProvider.click(context, 41, "source_RADIO", true));
+    }
+
+    @Test public void sourceChoiceChangesOnlyItsWidgetAndIgnoresUnavailableChoices() throws Exception {
+        Prefs prefs = new Prefs(context);
+        prefs.setWidgetMode(true);
+        bind(41);
+        bind(42);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var controller = Robolectric.buildService(OverlayService.class).create();
+        OverlayService service = controller.get();
+        try {
+            service.onStartCommand(new Intent(OverlayService.ACTION_WIDGET_REFRESH), 0, 1);
+            service.onBridgeState(MediaBridgeClient.State.CONNECTED, "");
+            service.onSnapshot(sourceSnapshot());
+            service.onStartCommand(widgetCommand(41, "sources"), 0, 2);
+            var frames = (java.util.Map<?, ?>) field(service, "widgetFrames");
+            assertEquals(View.VISIBLE, ((AtlasMediaWidgetProvider.Frame) frames.get(41))
+                    .card.widgetTarget("source_chooser").getVisibility());
+            assertEquals(View.GONE, ((AtlasMediaWidgetProvider.Frame) frames.get(42))
+                    .card.widgetTarget("source_chooser").getVisibility());
+            service.onStartCommand(widgetCommand(41, "source_BT"), 0, 3);
+            assertEquals(View.VISIBLE, ((AtlasMediaWidgetProvider.Frame) frames.get(41))
+                    .card.widgetTarget("source_chooser").getVisibility());
+            service.onStartCommand(widgetCommand(41, "source_RADIO"), 0, 4);
+            assertEquals(View.GONE, ((AtlasMediaWidgetProvider.Frame) frames.get(41))
+                    .card.widgetTarget("source_chooser").getVisibility());
+        } finally {
+            controller.destroy();
+        }
+    }
+
     @Test public void unavailableWidgetDistinguishesMissingDataFromConnectionLoss() {
         for (boolean connected : new boolean[]{false, true}) {
             var frame = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context),
@@ -220,6 +271,31 @@ public class AtlasMediaWidgetTest {
     private Intent configure(int id) {
         return new Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+    }
+
+    private Intent widgetCommand(int id, String control) {
+        return new Intent(context, OverlayService.class)
+                .setAction(AtlasMediaWidgetProvider.ACTION_COMMAND)
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .putExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL, control);
+    }
+
+    private MediaSnapshot sourceSnapshot() {
+        MediaSnapshot base = snapshot(MediaBridgeContract.CAP_PLAY);
+        return new MediaSnapshot(base.protocolVersion, base.generation, base.timestamp,
+                base.backendConnected, base.backendErrorCode, base.backendErrorMessage,
+                base.audioSource, base.appSource, List.of(
+                new MediaSource(MediaSource.Id.RADIO, true, true, false,
+                        MediaBridgeContract.CAP_SET_SOURCE),
+                new MediaSource(MediaSource.Id.BT, false, false, false,
+                        MediaBridgeContract.CAP_SET_SOURCE),
+                new MediaSource(MediaSource.Id.ONLINE, true, true, true,
+                        MediaBridgeContract.CAP_SET_SOURCE)),
+                base.ownerPackage, base.ownerApp, base.mediaId, base.title, base.artist,
+                base.album, base.duration, base.position, base.updateElapsedRealtime,
+                base.speed, base.playbackState, base.playbackErrorCode,
+                base.playbackErrorMessage, base.playbackActions, base.capabilities,
+                base.artworkUri, base.artworkRevision);
     }
 
     private static View find(View view, String text) {

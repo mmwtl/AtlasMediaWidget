@@ -38,8 +38,9 @@ The card occupies only its configured area over the stock HOME screen. It can be
 configured by size and appearance; tapping its free area opens the active source. Settings include
 a preview using the same rendering path as the selected mode. AppWidget previews use the selected
 instance’s size; before placement a labeled sample size with demo media is shown. Progress on HOME
-updates every five seconds. Tapping progress opens precise seeking in the app; sources and favorites
-also open the existing media card controls there. HOME does not support gestures or a draggable SeekBar.
+updates every five seconds. Tapping progress opens precise seeking in the app; source selection
+stays inside the AppWidget, while favorites open the existing media card controls. HOME does not
+support gestures or a draggable SeekBar.
 
 <p align="center">
   <a href="docs/images/home-overview.webp">

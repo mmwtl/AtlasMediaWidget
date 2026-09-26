@@ -415,8 +415,19 @@ final class MediaCardView extends FrameLayout {
             case "sources" -> sourcePill;
             case "favorites" -> favoritesButton;
             case "seek" -> progressRow;
+            case "source_chooser" -> sourceChooser;
             default -> metadata;
         };
+    }
+
+    View widgetSourceOption(MediaSource.Id id) {
+        for (int index = 0; index < availableSources.size(); index++) {
+            if (availableSources.get(index).id.displayId() == id) {
+                LinearLayout row = (LinearLayout) sourceOptions.getChildAt(index < 2 ? 0 : 1);
+                return row.getChildAt(index < 2 ? index : index - 2);
+            }
+        }
+        return null;
     }
 
     android.graphics.Rect widgetBounds(View target) {
