@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Insets;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -72,6 +74,7 @@ public final class MainActivity extends ScaledActivity {
     private int configureWidgetId;
     private boolean builtWidgetMode;
     private TextView widgetPreviewTitle;
+    private Bitmap previewArtwork;
     private final java.util.List<View> overlayOnly = new java.util.ArrayList<>();
     private MediaCardView widgetControls;
     private ArtworkLoader controlsArtwork;
@@ -1007,7 +1010,7 @@ public final class MainActivity extends ScaledActivity {
                 + AtlasMediaWidgetProvider.widthDp(context, options) + "×"
                 + AtlasMediaWidgetProvider.heightDp(context, options) + " dp · демо");
         var frame = new AtlasMediaWidgetProvider.Frame(context, prefs, options, 0,
-                previewSnapshot(), null, true, previewListener);
+                previewSnapshot(), previewArtwork(), true, previewListener);
         View preview = frame.views.apply(context, previewHost);
         int available = previewHost.getWidth() - previewHost.getPaddingLeft() - previewHost.getPaddingRight();
         int maxHeight = Math.round(getWindowManager().getCurrentWindowMetrics().getBounds().height() * .30f);
@@ -3000,7 +3003,7 @@ public final class MainActivity extends ScaledActivity {
             renderSystemWidgetPreview();
             return;
         }
-        widgetPreviewTitle.setText(R.string.preview_title);
+        widgetPreviewTitle.setText("Предпросмотр · демо");
         int configuredWidthPx = widthInput();
         int configuredHeightPx = heightInput();
         android.content.Context widgetContext = getApplicationContext();
@@ -3025,6 +3028,7 @@ public final class MainActivity extends ScaledActivity {
                 favoriteRows == null ? prefs.radioFavoritesRows() : favoriteRows.getProgress(),
                 previewListener);
         preview.renderSnapshot(previewSnapshot(), true);
+        preview.setArtwork(previewArtwork());
         preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 
         previewHost.removeAllViews();
@@ -3056,16 +3060,24 @@ public final class MainActivity extends ScaledActivity {
                 | MediaBridgeContract.CAP_SET_SOURCE | MediaBridgeContract.CAP_TUNE_RADIO;
         return new MediaSnapshot(
                 MediaBridgeContract.VERSION, 1L, System.currentTimeMillis(), true, 0, "",
-                MediaSource.Id.RADIO, "",
+                MediaSource.Id.USB, "DEMO",
                 Arrays.asList(
                         new MediaSource(MediaSource.Id.BT, true, true, false, capabilities),
-                        new MediaSource(MediaSource.Id.RADIO, true, true, true, capabilities),
-                        new MediaSource(MediaSource.Id.USB, true, true, false, capabilities),
+                        new MediaSource(MediaSource.Id.RADIO, true, true, false, capabilities),
+                        new MediaSource(MediaSource.Id.USB, true, true, true, capabilities),
                         new MediaSource(MediaSource.Id.ONLINE, true, true, false, capabilities)),
-                "preview", "Радио", "preview-station", "Радио Дача",
-                "98.8 FM", "", 0L, 0L,
+                "com.mmwtl.atlasmediaapi.demo.usb", "Atlas demo USB", "demo:USB:0",
+                "Liminal Hours (Extended Night Drive Version)",
+                "Northern Signal Department feat. Elena Markova", "The Roads We Leave Behind",
+                286_000L, 47_000L,
                 SystemClock.elapsedRealtime(), 1f, MediaSnapshot.STATE_PLAYING,
                 0, "", 0L, capabilities, "", 0L);
+    }
+
+    private Bitmap previewArtwork() {
+        if (previewArtwork == null) previewArtwork = BitmapFactory.decodeResource(
+                getResources(), com.mmwtl.atlasmediaapi.R.drawable.demo_neon_drive);
+        return previewArtwork;
     }
 
     private LinearLayout.LayoutParams labelParams() {
