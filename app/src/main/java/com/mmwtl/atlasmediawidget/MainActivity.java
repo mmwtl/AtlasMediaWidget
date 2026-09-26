@@ -424,10 +424,11 @@ public final class MainActivity extends ScaledActivity {
         serviceCard.addView(text(getString(R.string.appearance_title),
                 20, Ui.PRIMARY, Typeface.BOLD));
 
+        serviceCard.addView(text("Компоновка карточки", 15, Ui.SECONDARY, Typeface.BOLD));
         RadioGroup styles = new RadioGroup(this);
         styles.setOrientation(RadioGroup.HORIZONTAL);
         RadioButton compactStyle = styleButton("Компактная");
-        RadioButton squareStyle = styleButton("Квадратная");
+        RadioButton squareStyle = styleButton("Просторная");
         styles.addView(compactStyle);
         styles.addView(squareStyle);
         styles.check(currentStyle() == CardStyle.COMPACT ? compactStyle.getId() : squareStyle.getId());
@@ -440,6 +441,8 @@ public final class MainActivity extends ScaledActivity {
             refreshOverlayIfRunning();
         });
         serviceCard.addView(styles);
+        serviceCard.addView(text("Компактная подходит для широкой невысокой карточки; просторная — для квадратной или высокой. Выбор не меняет размер карточки.",
+                13, Ui.SECONDARY, Typeface.NORMAL));
         TextView coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams coverDimTitleParams = fullWrap();
         coverDimTitleParams.topMargin = Ui.dp(this, 14);
