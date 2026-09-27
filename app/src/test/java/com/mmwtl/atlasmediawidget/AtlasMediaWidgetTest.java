@@ -148,6 +148,77 @@ public class AtlasMediaWidgetTest {
         controller.destroy();
     }
 
+    @Test public void widgetClicksKeepSettingsSeparateFromPlaybackUi() {
+        for (String action : new String[]{"open", "favorites", "seek", "settings"}) {
+            Intent intent = Shadows.shadowOf(AtlasMediaWidgetProvider.click(context, 41, action, false))
+                    .getSavedIntent();
+            assertEquals(new ComponentName(context, "settings".equals(action)
+                    ? MainActivity.class : WidgetControlActivity.class), intent.getComponent());
+            assertEquals(41, intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
+        }
+        for (String action : new String[]{"PREVIOUS", "PLAY_PAUSE", "NEXT", "sources",
+                "source_RADIO", "dismiss_sources"}) {
+            assertEquals(new ComponentName(context, OverlayService.class),
+                    Shadows.shadowOf(AtlasMediaWidgetProvider.click(context, 41, action, true))
+                            .getSavedIntent().getComponent());
+        }
+    }
+
+    @Test public void openSourceDoesNotBuildCardAndLaunchesOnlyOnce() {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        var controller = Robolectric.buildActivity(WidgetControlActivity.class,
+                widgetControl("open")).create();
+        WidgetControlActivity activity = controller.get();
+        assertEquals(0, ((ViewGroup) activity.findViewById(android.R.id.content)).getChildCount());
+        MediaSnapshot state = snapshot(MediaBridgeContract.CAP_PLAY);
+        activity.onSnapshot(state);
+        assertTrue(activity.isFinishing());
+        Intent launch = Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedActivity();
+        assertNotNull(launch);
+        assertNull(launch.getComponent()); // Music selector when the test player is not installed.
+        assertNotNull(launch.getSelector());
+        activity.onSnapshot(state);
+        assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedActivity());
+        controller.destroy();
+    }
+
+    @Test public void openSourceTimesOutAndCannotLaunchAfterCancellation() {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var controller = Robolectric.buildActivity(WidgetControlActivity.class,
+                widgetControl("open")).create().start();
+        Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(5));
+        assertTrue(controller.get().isFinishing());
+        controller.get().onSnapshot(snapshot(MediaBridgeContract.CAP_PLAY));
+        assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedActivity());
+        controller.stop().destroy();
+    }
+
+    @Test public void widgetDialogsShowOnlyTheCardAndRejectForeignIds() {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        for (String action : new String[]{"favorites", "seek"}) {
+            var controller = Robolectric.buildActivity(WidgetControlActivity.class,
+                    widgetControl(action)).create();
+            ViewGroup content = controller.get().findViewById(android.R.id.content);
+            assertEquals(1, content.getChildCount());
+            assertTrue(content.getChildAt(0) instanceof MediaCardView);
+            assertNull(find(content, "Добавить виджет"));
+            controller.destroy();
+        }
+        var controller = Robolectric.buildActivity(WidgetControlActivity.class,
+                widgetControl("open").putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 99)).create();
+        assertTrue(controller.get().isFinishing());
+        controller.destroy();
+    }
+
+    private Intent widgetControl(String action) {
+        return Shadows.shadowOf(AtlasMediaWidgetProvider.click(context, 41, action, false)).getSavedIntent();
+    }
+
     @Test public void sourceChooserRendersAndRoutesSelectionInsideWidget() {
         Bundle options = new Bundle();
         options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 400);

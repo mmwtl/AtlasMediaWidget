@@ -8,4 +8,14 @@
         <item name="android:windowBackground">@color/atlas_background</item>
         <item name="android:colorAccent">@color/atlas_accent</item>
     </style>
+    <style name="Theme.AtlasMediaWidget.WidgetControl" parent="android:style/Theme.Material.Dialog.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@color/atlas_accent</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

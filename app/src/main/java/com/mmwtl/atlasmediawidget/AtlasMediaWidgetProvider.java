@@ -90,11 +90,15 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     }
 
     static PendingIntent click(Context context, int id, String action, boolean command) {
-        Intent intent = new Intent(context, command ? OverlayService.class : MainActivity.class)
+        Intent intent = new Intent(context, command ? OverlayService.class
+                : "settings".equals(action) ? MainActivity.class : WidgetControlActivity.class)
                 .setAction(command ? ACTION_COMMAND : Intent.ACTION_VIEW)
                 .setData(Uri.parse("atlasmediawidget://" + id + "/" + action))
                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                 .putExtra(EXTRA_CONTROL, action);
+        if (!command && !"settings".equals(action)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        }
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
         return command ? PendingIntent.getForegroundService(context, id, intent, flags)
                 : PendingIntent.getActivity(context, id, intent, flags);

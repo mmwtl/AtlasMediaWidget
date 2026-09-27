@@ -76,33 +76,6 @@ public final class MainActivity extends ScaledActivity {
     private TextView widgetPreviewTitle;
     private Bitmap previewArtwork;
     private final java.util.List<View> overlayOnly = new java.util.ArrayList<>();
-    private MediaCardView widgetControls;
-    private ArtworkLoader controlsArtwork;
-    private String controlsArtworkKey = "";
-    private long controlsArtworkToken;
-    private String requestedWidgetControl;
-    private android.app.Dialog controlsDialog;
-    private final MediaCardView.Listener controlsListener = new MediaCardView.Listener() {
-        private OverlayService service() { return OverlayService.current(); }
-        @Override public boolean onDragTouch(View view, MotionEvent event) { return false; }
-        @Override public void onCommand(String command) { if (service() != null) service().onCommand(command); }
-        @Override public void onSeek(long positionMs) { if (service() != null) service().onSeek(positionMs); }
-        @Override public void onSource(MediaSource.Id source) { if (service() != null) service().onSource(source); }
-        @Override public void onOpenSource() { if (service() != null) service().onOpenSource(); }
-        @Override public void onRadioStationsRequested() { mediaBridgeClient.requestRadioStations(); }
-        @Override public void onRadioStation(RadioStation station) { if (service() != null) service().onRadioStation(station); }
-        @Override public void onRadioArtworkRequested(RadioStation station) {
-            if (controlsRadioArtwork != null) controlsRadioArtwork.load(station);
-        }
-    };
-    private RadioArtworkLoader controlsRadioArtwork;
-    private final Runnable controlsTick = new Runnable() {
-        @Override public void run() {
-            if (widgetControls == null) return;
-            widgetControls.tick(SystemClock.elapsedRealtime());
-            main.postDelayed(this, 1000L);
-        }
-    };
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private MediaBridgeClient mediaBridgeClient;
@@ -207,11 +180,6 @@ public final class MainActivity extends ScaledActivity {
     private final MediaBridgeClient.Listener mediaBridgeListener = new MediaBridgeClient.Listener() {
         @Override public void onBridgeState(MediaBridgeClient.State state, String detail) {
             if (isDestroyed()) return;
-            if (widgetControls != null && state != MediaBridgeClient.State.CONNECTED) {
-                widgetControls.renderDisconnected("Нет соединения");
-                controlsArtworkKey = "";
-                if (controlsArtwork != null) controlsArtworkToken = controlsArtwork.clear();
-            }
             if (mediaStatusText != null) {
                 if (state == MediaBridgeClient.State.CONNECTED) {
                     mediaStatusText.setText("Медиасервис подключён.");
@@ -236,35 +204,10 @@ public final class MainActivity extends ScaledActivity {
             }
         }
 
-        @Override public void onSnapshot(MediaSnapshot snapshot) {
-            if (widgetControls == null) return;
-            widgetControls.renderSnapshot(snapshot, true);
-            if ("open".equals(requestedWidgetControl)) {
-                requestedWidgetControl = null;
-                new MediaSourceLauncher(MainActivity.this).open(snapshot);
-                finish();
-                return;
-            }
-            String key = snapshot.audioSource + ":" + snapshot.mediaId + ":" + snapshot.title
-                    + ":" + snapshot.artworkUri + ":" + snapshot.artworkRevision;
-            if (!key.equals(controlsArtworkKey)) {
-                controlsArtworkKey = key;
-                widgetControls.setArtwork(null);
-                controlsArtworkToken = controlsArtwork.load(ArtworkRef.mediaUri(snapshot.artworkUri),
-                        snapshot.generation, snapshot.artworkRevision);
-            }
-            if (requestedWidgetControl != null) {
-                widgetControls.openWidgetChooser(requestedWidgetControl);
-                requestedWidgetControl = null;
-            }
-        }
+        @Override public void onSnapshot(MediaSnapshot snapshot) {}
         @Override public void onCommandResult(String requestId, int status, String message, long generation) {}
-        @Override public void onRadioStations(RadioStationLists lists) {
-            if (widgetControls != null) widgetControls.setRadioStations(lists);
-        }
-        @Override public void onRadioStationsError(int status, String message) {
-            if (widgetControls != null) widgetControls.setRadioStationsError(message);
-        }
+        @Override public void onRadioStations(RadioStationLists lists) {}
+        @Override public void onRadioStationsError(int status, String message) {}
     };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -283,11 +226,6 @@ public final class MainActivity extends ScaledActivity {
         View content = buildContent();
         setContentView(content);
         Ui.applySystemBarInsets(content);
-        String control = getIntent().getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL);
-        if (prefs.isWidgetMode() && control != null && !"settings".equals(control)) {
-            requestedWidgetControl = control;
-            content.post(this::showWidgetControls);
-        }
         AtlasMediaWidgetProvider.refresh(this);
     }
 
@@ -331,9 +269,6 @@ public final class MainActivity extends ScaledActivity {
             pendingRadioImportFile.delete();
             pendingRadioImportFile = null;
         }
-        if (controlsArtwork != null) controlsArtwork.shutdown();
-        if (controlsRadioArtwork != null) controlsRadioArtwork.shutdown();
-        if (controlsDialog != null) controlsDialog.dismiss();
         main.removeCallbacksAndMessages(null);
         ioExecutor.shutdownNow();
         super.onDestroy();
@@ -1037,34 +972,6 @@ public final class MainActivity extends ScaledActivity {
         var params = previewHost.getLayoutParams();
         params.height = Math.round(height * scale) + previewHost.getPaddingTop() + previewHost.getPaddingBottom();
         previewHost.setLayoutParams(params);
-    }
-
-    private void showWidgetControls() {
-        if (isFinishing()) return;
-        AtlasMediaWidgetProvider.refresh(this);
-        var context = getApplicationContext();
-        int width = Math.min(Ui.dp(context, 500), getWindowManager().getCurrentWindowMetrics().getBounds().width() - Ui.dp(this, 32));
-        int height = Math.min(Ui.dp(context, 500), getWindowManager().getCurrentWindowMetrics().getBounds().height() - Ui.dp(this, 80));
-        CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
-        widgetControls = new MediaCardView(context, width, height, width, height, style,
-                prefs.appearance(style), prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
-                false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), controlsListener);
-        widgetControls.renderDisconnected("Подключение…");
-        controlsArtwork = new ArtworkLoader(this, (token, bitmap) -> {
-            if (token == controlsArtworkToken && widgetControls != null) widgetControls.setArtwork(bitmap);
-        });
-        controlsRadioArtwork = new RadioArtworkLoader(this, (key, bitmap) -> {
-            if (widgetControls != null) widgetControls.setRadioArtwork(key, bitmap);
-        });
-        controlsDialog = new android.app.Dialog(this);
-        controlsDialog.setContentView(widgetControls);
-        controlsDialog.setOnDismissListener(dialog -> { widgetControls = null; finish(); });
-        controlsDialog.show();
-        main.post(controlsTick);
-        controlsDialog.getWindow().setLayout(width, height);
-        controlsDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-        mediaBridgeClient.requestSnapshot();
-        mediaBridgeClient.requestRadioStations();
     }
 
     private void addSectionHeading(LinearLayout parent, String label, boolean first) {

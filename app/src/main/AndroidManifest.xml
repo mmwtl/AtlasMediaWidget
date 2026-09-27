@@ -58,6 +58,14 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".WidgetControlActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.AtlasMediaWidget.WidgetControl" />
+
         <receiver android:name=".AtlasMediaWidgetProvider" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
