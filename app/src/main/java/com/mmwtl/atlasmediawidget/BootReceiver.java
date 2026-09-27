@@ -12,6 +12,12 @@ public final class BootReceiver extends BroadcastReceiver {
         Prefs prefs = new Prefs(context);
         String action = intent.getAction();
         if (prefs.isWidgetMode()) {
+            if (!BootStartPolicy.isStartupAction(action)
+                    && !Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) return;
+            // A manifest receiver does not receive USER_UNLOCKED. Keep a system-owned
+            // retry across process death and let its non-Direct-Boot service wait for unlock.
+            AppLog.info("Widget startup signal " + action);
+            WidgetStartupJob.schedule(context);
             if (isUserUnlocked(context)) AtlasMediaWidgetProvider.refresh(context);
             return;
         }
