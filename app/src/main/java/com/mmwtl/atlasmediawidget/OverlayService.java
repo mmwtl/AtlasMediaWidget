@@ -70,6 +70,8 @@ public final class OverlayService extends Service
 
     static OverlayService current() { return instance; }
 
+    boolean maintainMediaStartup() { return bridge.maintainStartupConnection(); }
+
     private static final String CHANNEL_ID = "atlas_media_widget_service";
     private static final int NOTIFICATION_ID = 2407;
     private static final int PROGRESS_TICK_MS = 250;

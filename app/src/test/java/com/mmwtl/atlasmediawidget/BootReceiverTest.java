@@ -9,6 +9,8 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.os.UserManager;
+import android.os.Looper;
+import java.time.Duration;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -51,7 +53,7 @@ public class BootReceiverTest {
         var job = context.getSystemService(JobScheduler.class).getPendingJob(WidgetStartupJob.JOB_ID);
         assertNotNull(job);
         assertEquals(new ComponentName(context, WidgetStartupJob.class), job.getService());
-        assertEquals(10_000L, job.getMinLatencyMillis());
+        assertEquals(1_000L, job.getMinLatencyMillis());
         var serviceInfo = context.getPackageManager().getServiceInfo(job.getService(), 0);
         assertFalse(serviceInfo.directBootAware);
         assertEquals("android.permission.BIND_JOB_SERVICE", serviceInfo.permission);
@@ -83,10 +85,66 @@ public class BootReceiverTest {
         assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService());
     }
 
+    @Test public void startupRetriesEverySecondAndStopsAtFifteenSeconds() {
+        new Prefs(context).setWidgetMode(true);
+        bindWidget();
+        var controller = Robolectric.buildService(WidgetStartupJob.class).create();
+        try {
+            assertTrue(controller.get().onStartJob(null));
+            assertWidgetStartRequested();
+            Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(999));
+            assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService());
+            Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1));
+            assertWidgetStartRequested();
+            for (int second = 2; second < 15; second++) {
+                Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+                assertWidgetStartRequested();
+            }
+            assertFalse(Shadows.shadowOf(controller.get()).getIsJobFinished());
+            Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(30));
+            assertTrue(Shadows.shadowOf(controller.get()).getIsJobFinished());
+            assertFalse(Shadows.shadowOf(controller.get()).getIsRescheduleNeeded());
+            assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService());
+        } finally {
+            controller.destroy();
+        }
+    }
+
+    @Test public void modeChangeAndSystemStopCancelStartupCallbacks() {
+        Prefs prefs = new Prefs(context);
+        bindWidget();
+        for (boolean systemStop : new boolean[]{false, true}) {
+            prefs.setWidgetMode(true);
+            var controller = Robolectric.buildService(WidgetStartupJob.class).create();
+            try {
+                assertTrue(controller.get().onStartJob(null));
+                assertWidgetStartRequested();
+                if (systemStop) assertFalse(controller.get().onStopJob(null));
+                else prefs.setWidgetMode(false);
+                Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(20));
+                assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService());
+                assertEquals(!systemStop, Shadows.shadowOf(controller.get()).getIsJobFinished());
+            } finally {
+                controller.destroy();
+            }
+        }
+    }
+
+    @Test public void destroyedJobDoesNotKeepStartingService() {
+        new Prefs(context).setWidgetMode(true);
+        bindWidget();
+        var controller = Robolectric.buildService(WidgetStartupJob.class).create();
+        assertTrue(controller.get().onStartJob(null));
+        assertWidgetStartRequested();
+        controller.destroy();
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(20));
+        assertNull(Shadows.shadowOf(RuntimeEnvironment.getApplication()).getNextStartedService());
+    }
+
     private void runStartupJob() {
         var controller = Robolectric.buildService(WidgetStartupJob.class).create();
         try {
-            assertFalse(controller.get().onStartJob(null));
+            controller.get().onStartJob(null);
         } finally {
             controller.destroy();
         }

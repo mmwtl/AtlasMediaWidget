@@ -5,6 +5,9 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
+import android.content.ContextWrapper;
+import android.content.Intent;
+import android.content.ServiceConnection;
 import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.os.Bundle;
@@ -30,6 +33,51 @@ import org.robolectric.shadows.ShadowLooper;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 30)
 public final class MediaBridgeClientTest {
+    @Test public void startupProbesPreserveHandshakeAndFinishOnlyAfterSnapshot() throws Exception {
+        MediaBridgeClient client = newClient();
+        setStarted(client, true);
+        BridgeConnectionState state = connectionState(client);
+        state.startBinding();
+        assertTrue(client.maintainStartupConnection());
+        assertTrue(state.is(BridgeConnectionState.Phase.BINDING));
+        state.onServiceConnected();
+        assertTrue(client.maintainStartupConnection());
+        assertTrue(state.is(BridgeConnectionState.Phase.REGISTERING));
+        state.onRegistered();
+        assertTrue(client.maintainStartupConnection());
+        assertTrue(state.is(BridgeConnectionState.Phase.WAITING_SNAPSHOT));
+        state.onSnapshot();
+        assertFalse(client.maintainStartupConnection());
+        state.onIncompatible();
+        assertFalse(client.maintainStartupConnection());
+    }
+
+    @Test public void startupProbeBringsForwardFailedBindWithoutLeavingDuplicateRetry() {
+        AtomicInteger binds = new AtomicInteger();
+        Context context = new ContextWrapper(RuntimeEnvironment.getApplication()) {
+            @Override public Context getApplicationContext() { return this; }
+            @Override public boolean bindService(Intent intent, ServiceConnection connection, int flags) {
+                binds.incrementAndGet();
+                return false;
+            }
+        };
+        MediaBridgeClient client = newClient(context);
+        try {
+            client.start();
+            ShadowLooper.getShadowMainLooper().idle();
+            assertEquals(1, binds.get());
+            assertTrue(client.maintainStartupConnection());
+            assertEquals(2, binds.get());
+            ShadowLooper.getShadowMainLooper().idleFor(Duration.ofMillis(500));
+            assertEquals(2, binds.get());
+            ShadowLooper.getShadowMainLooper().idleFor(Duration.ofMillis(500));
+            assertEquals(3, binds.get());
+        } finally {
+            client.stop();
+            ShadowLooper.getShadowMainLooper().idle();
+        }
+    }
+
     @Test
     public void waitsForSettingsRegistrationWithoutBlockingMain() throws Exception {
         MediaBridgeClient client = newClient();
@@ -227,7 +275,10 @@ public final class MediaBridgeClientTest {
     }
 
     private static MediaBridgeClient newClient() {
-        Context context = RuntimeEnvironment.getApplication();
+        return newClient(RuntimeEnvironment.getApplication());
+    }
+
+    private static MediaBridgeClient newClient(Context context) {
         return new MediaBridgeClient(context, new MediaBridgeClient.Listener() {
             @Override public void onBridgeState(MediaBridgeClient.State state, String detail) {
             }

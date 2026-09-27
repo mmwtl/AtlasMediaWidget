@@ -312,6 +312,19 @@ final class MediaBridgeClient {
 
     private final Runnable rebind = this::bindNow;
 
+    /** Main-thread startup probe. Returns false after a snapshot or terminal protocol error. */
+    boolean maintainStartupConnection() {
+        if (connectionState.is(BridgeConnectionState.Phase.READY)
+                || connectionState.is(BridgeConnectionState.Phase.INCOMPATIBLE)) return false;
+        // Never interrupt a pending bind/register/snapshot handshake. Only bring forward
+        // the retry of a failed connection; ordinary backoff resumes when probes stop.
+        if (started && connectionState.is(BridgeConnectionState.Phase.STOPPED)) {
+            main.removeCallbacks(rebind);
+            bindNow();
+        }
+        return true;
+    }
+
     private void scheduleRebind(long delayMs) {
         if (!started || delayMs < 0L) return;
         main.removeCallbacks(rebind);
