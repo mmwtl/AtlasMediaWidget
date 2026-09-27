@@ -43,6 +43,7 @@ public final class OverlayService extends Service
     private final java.util.Set<Integer> openSourceWidgetIds = new java.util.HashSet<>();
     private android.graphics.Bitmap currentArtwork;
     private long lastWidgetSnapshotAt;
+    private long lastWidgetReconciliationAt;
     private java.util.List<?> widgetRenderKey;
     private String pendingWidgetCommand;
     private long pendingWidgetCommandAt;
@@ -62,9 +63,14 @@ public final class OverlayService extends Service
             if (destroyed || !prefs.isWidgetMode()) return;
             if (getSystemService(android.os.PowerManager.class).isInteractive()) {
                 renderWidgets(false);
-                if (bridgeState == MediaBridgeClient.State.CONNECTED) bridge.requestSnapshot();
+                long now = SystemClock.elapsedRealtime();
+                if (bridgeState == MediaBridgeClient.State.CONNECTED
+                        && now - lastWidgetReconciliationAt >= SNAPSHOT_RECONCILIATION_MS) {
+                    lastWidgetReconciliationAt = now;
+                    bridge.requestSnapshot();
+                }
             }
-            main.postDelayed(this, 5_000L);
+            main.postDelayed(this, WIDGET_PROGRESS_TICK_MS);
         }
     };
 
@@ -75,6 +81,7 @@ public final class OverlayService extends Service
     private static final String CHANNEL_ID = "atlas_media_widget_service";
     private static final int NOTIFICATION_ID = 2407;
     private static final int PROGRESS_TICK_MS = 250;
+    private static final long WIDGET_PROGRESS_TICK_MS = 1_000L;
     private static final long SNAPSHOT_RECONCILIATION_MS = 5_000L;
     private static volatile boolean running;
     private static volatile OverlayService instance;
@@ -326,7 +333,8 @@ public final class OverlayService extends Service
                 return;
             }
             renderWidgets(true);
-            main.postDelayed(widgetTick, 5_000L);
+            lastWidgetReconciliationAt = SystemClock.elapsedRealtime();
+            main.postDelayed(widgetTick, WIDGET_PROGRESS_TICK_MS);
             updateNotification(3);
         } else {
             widgetFrames.clear();
