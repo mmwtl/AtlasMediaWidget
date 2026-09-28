@@ -90,6 +90,23 @@ final class Ui {
         view.requestApplyInsets();
     }
 
+    /** One option of a segmented control; the caller lays options out with equal weight. */
+    static TextView segment(Context context, String value) {
+        TextView segment = text(context, value, 14, PRIMARY);
+        segment.setGravity(Gravity.CENTER);
+        segment.setMaxLines(1);
+        segment.setPadding(dp(context, 8), dp(context, 11), dp(context, 8), dp(context, 11));
+        segment.setClickable(true);
+        setSegmentSelected(context, segment, false);
+        return segment;
+    }
+
+    static void setSegmentSelected(Context context, TextView segment, boolean selected) {
+        segment.setSelected(selected);
+        segment.setBackground(background(selected ? ACCENT : NESTED, 8, context));
+        segment.setTextColor(selected ? ON_ACCENT : PRIMARY);
+    }
+
     static void margins(View view, int left, int top, int right, int bottom) {
         ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) view.getLayoutParams();
         params.setMargins(left, top, right, bottom);

@@ -8,8 +8,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Insets;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -19,7 +17,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.Editable;
@@ -49,7 +46,6 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -71,11 +67,23 @@ public final class MainActivity extends ScaledActivity {
     private static final String MEDIA_BROWSER_SERVICE_ACTION =
             "android.media.browse.MediaBrowserService";
     private Prefs prefs;
-    private int configureWidgetId;
+    private static final String STATE_TAB = "settings_tab";
+    private static final int TAB_CARD = 0;
+    private static final int TAB_MEDIA = 1;
+    private static final int TAB_RADIO = 2;
+    private static final int TAB_SYSTEM = 3;
+    private static final int[] TAB_LABELS = {R.string.tab_card, R.string.tab_media,
+            R.string.tab_radio, R.string.tab_system};
     private boolean builtWidgetMode;
     private TextView widgetPreviewTitle;
-    private Bitmap previewArtwork;
-    private final java.util.List<View> overlayOnly = new java.util.ArrayList<>();
+    private final List<View> overlayOnly = new ArrayList<>();
+    private final List<View> widgetOnly = new ArrayList<>();
+    private final LinearLayout[] tabPages = new LinearLayout[TAB_LABELS.length];
+    private final TextView[] tabButtons = new TextView[TAB_LABELS.length];
+    private int selectedTab;
+    private ScrollView settingsScroll;
+    private TextView widgetPlacementStatus;
+    private Button addWidgetButton;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
     private MediaBridgeClient mediaBridgeClient;
@@ -108,7 +116,7 @@ public final class MainActivity extends ScaledActivity {
     private TextView radioCatalogInfoText;
     private Button restoreDefaultRadioCatalogButton;
     private TextView mediaStatusText;
-    private LinearLayout mediaSettingsGroup;
+    private final List<View> mediaSettingsViews = new ArrayList<>();
     private Button overlayPermissionButton;
     private Button usageAccessButton;
     private Button accessibilityAccessButton;
@@ -166,17 +174,6 @@ public final class MainActivity extends ScaledActivity {
     private SeekBar favoriteRows;
     private boolean refreshingStyle;
 
-    private final MediaCardView.Listener previewListener = new MediaCardView.Listener() {
-        @Override public boolean onDragTouch(View view, MotionEvent event) { return true; }
-        @Override public void onCommand(String command) {}
-        @Override public void onSeek(long positionMs) {}
-        @Override public void onSource(MediaSource.Id source) {}
-        @Override public void onOpenSource() {}
-        @Override public void onRadioStationsRequested() {}
-        @Override public void onRadioStation(RadioStation station) {}
-        @Override public void onRadioArtworkRequested(RadioStation station) {}
-    };
-
     private final MediaBridgeClient.Listener mediaBridgeListener = new MediaBridgeClient.Listener() {
         @Override public void onBridgeState(MediaBridgeClient.State state, String detail) {
             if (isDestroyed()) return;
@@ -190,13 +187,13 @@ public final class MainActivity extends ScaledActivity {
                     }
                 } else if (state == MediaBridgeClient.State.CONNECTING) {
                     currentMediaSettings = null;
-                    setMediaControlsEnabled(mediaSettingsGroup, false);
+                    setMediaSettingsEnabled(false);
                     setRadioCatalogTransferEnabled(false);
                     mediaStatusText.setText("Подключение к медиасервису…");
                     mediaStatusText.setTextColor(Ui.SECONDARY);
                 } else {
                     currentMediaSettings = null;
-                    setMediaControlsEnabled(mediaSettingsGroup, false);
+                    setMediaSettingsEnabled(false);
                     setRadioCatalogTransferEnabled(false);
                     mediaStatusText.setText("Медиасервис недоступен: " + (detail != null ? detail : state.name()));
                     mediaStatusText.setTextColor(Ui.ERROR);
@@ -213,20 +210,17 @@ public final class MainActivity extends ScaledActivity {
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Prefs(this);
-        if (android.appwidget.AppWidgetManager.ACTION_APPWIDGET_CONFIGURE.equals(getIntent().getAction())) {
-            configureWidgetId = getIntent().getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, 0);
-            setResult(RESULT_CANCELED, new Intent().putExtra(
-                    android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, configureWidgetId));
-            if (!AtlasMediaWidgetProvider.owns(this, configureWidgetId)) {
-                finish();
-                return;
-            }
-        }
         mediaBridgeClient = new MediaBridgeClient(this, mediaBridgeListener);
-        View content = buildContent();
+        View content = buildContent(savedInstanceState == null ? TAB_CARD
+                : savedInstanceState.getInt(STATE_TAB, TAB_CARD));
         setContentView(content);
         Ui.applySystemBarInsets(content);
         AtlasMediaWidgetProvider.refresh(this);
+    }
+
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_TAB, selectedTab);
     }
 
     @Override protected void onStart() {
@@ -286,7 +280,7 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private View buildContent() {
+    private View buildContent(int initialTab) {
         builtWidgetMode = prefs.isWidgetMode();
         LinearLayout screen = new LinearLayout(this);
         screen.setOrientation(LinearLayout.VERTICAL);
@@ -322,98 +316,208 @@ public final class MainActivity extends ScaledActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 110));
         previewParams.topMargin = Ui.dp(this, 8);
         stickyPreview.addView(previewHost, previewParams);
+
+        LinearLayout tabs = new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        for (int i = 0; i < TAB_LABELS.length; i++) {
+            int tab = i;
+            TextView button = Ui.segment(this, getString(TAB_LABELS[i]));
+            button.setTextSize(15);
+            button.setOnClickListener(v -> selectTab(tab));
+            tabButtons[i] = button;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (i > 0) params.leftMargin = Ui.dp(this, 6);
+            tabs.addView(button, params);
+        }
+        LinearLayout.LayoutParams tabsParams = fullWrap();
+        tabsParams.topMargin = Ui.dp(this, 12);
+        stickyPreview.addView(tabs, tabsParams);
         screen.addView(stickyPreview, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        ScrollView scroll = new ScrollView(this);
-        scroll.setFillViewport(true);
-        scroll.setBackgroundColor(Ui.BACKGROUND);
+        settingsScroll = new ScrollView(this);
+        settingsScroll.setFillViewport(true);
+        settingsScroll.setBackgroundColor(Ui.BACKGROUND);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(Ui.dp(this, 24), Ui.dp(this, 12),
+        root.setPadding(Ui.dp(this, 24), Ui.dp(this, 8),
                 Ui.dp(this, 24), Ui.dp(this, 42));
-        scroll.addView(root, new ScrollView.LayoutParams(
+        settingsScroll.addView(root, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
+        for (int i = 0; i < tabPages.length; i++) {
+            tabPages[i] = new LinearLayout(this);
+            tabPages[i].setOrientation(LinearLayout.VERTICAL);
+            root.addView(tabPages[i], fullWrap());
+        }
 
-        TextView intro = text(getString(R.string.main_subtitle),
-                15, Ui.SECONDARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams introParams = fullWrap();
-        introParams.topMargin = Ui.dp(this, 10);
-        root.addView(intro, introParams);
+        buildCardTab(tabPages[TAB_CARD]);
+        buildMediaTab(tabPages[TAB_MEDIA]);
+        buildRadioTab(tabPages[TAB_RADIO]);
+        buildSystemTab(tabPages[TAB_SYSTEM]);
+        setMediaSettingsEnabled(false);
 
-        LinearLayout accessCard = card();
-        accessCard.addView(text(getString(R.string.permissions_title),
-                20, Ui.PRIMARY, Typeface.BOLD));
+        refreshModeVisibility();
+        screen.addView(settingsScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        selectTab(initialTab < 0 || initialTab >= tabPages.length ? TAB_CARD : initialTab);
+        return screen;
+    }
+
+    private void selectTab(int tab) {
+        selectedTab = tab;
+        for (int i = 0; i < tabPages.length; i++) {
+            tabPages[i].setVisibility(i == tab ? View.VISIBLE : View.GONE);
+            Ui.setSegmentSelected(this, tabButtons[i], i == tab);
+        }
+        int preview = tab == TAB_CARD ? View.VISIBLE : View.GONE;
+        previewHost.setVisibility(preview);
+        widgetPreviewTitle.setVisibility(preview);
+        settingsScroll.scrollTo(0, 0);
+        if (tab == TAB_CARD) renderPreview();
+    }
+
+    private void refreshModeVisibility() {
+        boolean widgetMode = prefs.isWidgetMode();
+        for (View view : overlayOnly) view.setVisibility(widgetMode ? View.GONE : View.VISIBLE);
+        for (View view : widgetOnly) view.setVisibility(widgetMode ? View.VISIBLE : View.GONE);
+    }
+
+    private void buildCardTab(LinearLayout page) {
+        page.addView(createModeCard());
+        LinearLayout placementCard = createWidgetPlacementCard();
+        page.addView(placementCard);
+        widgetOnly.add(placementCard);
+
+        LinearLayout overlayCard = card();
+        overlayCard.addView(text("Оверлей", 20, Ui.PRIMARY, Typeface.BOLD));
+        TextView overlayNote = text(
+                "Карточка показывается поверх HOME, только когда он на переднем плане. "
+                        + "Перетаскивание — за точки ⋮ в правом верхнем углу, нажатие на "
+                        + "свободную область открывает активный медиаисточник.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams overlayNoteParams = fullWrap();
+        overlayNoteParams.topMargin = Ui.dp(this, 6);
+        overlayCard.addView(overlayNote, overlayNoteParams);
+        overlayCard.addView(text(getString(R.string.permissions_title), 15,
+                Ui.SECONDARY, Typeface.BOLD), labelParams());
         overlayPermissionButton = actionButton("Разрешить поверх окон");
         overlayPermissionButton.setOnClickListener(v -> openOverlaySettings());
-        accessCard.addView(overlayPermissionButton, buttonParams());
+        overlayCard.addView(overlayPermissionButton, buttonParams());
         usageAccessButton = actionButton("Разрешить историю использования");
         usageAccessButton.setOnClickListener(v -> openUsageSettingsForApp());
-        accessCard.addView(usageAccessButton, buttonParams());
+        overlayCard.addView(usageAccessButton, buttonParams());
         accessibilityAccessButton = actionButton(getString(R.string.allow_accessibility));
         accessibilityAccessButton.setOnClickListener(v -> openAccessibilitySettings());
-        accessCard.addView(accessibilityAccessButton, buttonParams());
-        notificationAccessButton = actionButton("Разрешить доступ к уведомлениям (медиа)");
-        notificationAccessButton.setOnClickListener(v -> openNotificationAccessSettings());
-        accessCard.addView(notificationAccessButton, buttonParams());
-        storageAccessButton = actionButton("Разрешить доступ к хранилищу (USB)");
-        storageAccessButton.setOnClickListener(v -> requestStorageAccess());
-        accessCard.addView(storageAccessButton, buttonParams());
-
-        LinearLayout serviceCard = card();
-        serviceCard.addView(text(getString(R.string.appearance_title),
-                20, Ui.PRIMARY, Typeface.BOLD));
-
-        serviceCard.addView(text("Компоновка карточки", 15, Ui.SECONDARY, Typeface.BOLD));
-        RadioGroup styles = new RadioGroup(this);
-        styles.setOrientation(RadioGroup.HORIZONTAL);
-        RadioButton compactStyle = styleButton("Компактная");
-        RadioButton squareStyle = styleButton("Просторная");
-        styles.addView(compactStyle);
-        styles.addView(squareStyle);
-        styles.check(currentStyle() == CardStyle.COMPACT ? compactStyle.getId() : squareStyle.getId());
-        styles.setOnCheckedChangeListener((group, id) -> {
-            prefs.putInt(Prefs.KEY_CARD_STYLE, (id == compactStyle.getId()
-                    ? CardStyle.COMPACT : CardStyle.SQUARE).preferenceValue);
-            refreshingStyle = true;
-            refreshSizeControls(currentStyle());
-            refreshingStyle = false;
-            refreshOverlayIfRunning();
+        overlayCard.addView(accessibilityAccessButton, buttonParams());
+        serviceButton = actionButton("Запустить");
+        serviceButton.setOnClickListener(v -> toggleService());
+        LinearLayout.LayoutParams serviceParams = buttonParams();
+        serviceParams.topMargin = Ui.dp(this, 18);
+        overlayCard.addView(serviceButton, serviceParams);
+        autoStart = new Switch(this);
+        autoStart.setText("Автозапуск после загрузки ГУ");
+        autoStart.setTextColor(Ui.PRIMARY);
+        autoStart.setTextSize(15);
+        autoStart.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_AUTO_START, checked);
+            if (checked && (!Settings.canDrawOverlays(this)
+                    || !ForegroundAppDetector.hasUsageAccess(this)
+                    || !AccessibilityWindowState.isEnabled(this))) {
+                Toast.makeText(this, R.string.auto_start_permission_warning,
+                        Toast.LENGTH_LONG).show();
+            }
         });
-        serviceCard.addView(styles);
-        serviceCard.addView(text("Компактная подходит для широкой невысокой карточки; просторная — для квадратной или высокой. Выбор не меняет размер карточки.",
+        LinearLayout.LayoutParams switchParams = fullWrap();
+        switchParams.topMargin = Ui.dp(this, 14);
+        overlayCard.addView(autoStart, switchParams);
+        page.addView(overlayCard);
+        overlayOnly.add(overlayCard);
+
+        LinearLayout geometryCard = createGeometryCard();
+        page.addView(geometryCard);
+        overlayOnly.add(geometryCard);
+        LinearLayout visibilityCard = createVisibilityCard();
+        page.addView(visibilityCard);
+        overlayOnly.add(visibilityCard);
+
+        page.addView(createLookCard());
+        createTypographySection(collapsibleCard(page, "Текст и отступы",
+                "Размеры шрифтов, отступы и линия прогресса"));
+        createControlsSection(collapsibleCard(page, "Панель управления",
+                "Высота панели, размер и разбежка кнопок"));
+    }
+
+    private LinearLayout createModeCard() {
+        LinearLayout card = card();
+        card.addView(text("Режим отображения", 20, Ui.PRIMARY, Typeface.BOLD));
+        RadioGroup modes = new RadioGroup(this);
+        modes.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton overlay = styleButton("Оверлей");
+        RadioButton widget = styleButton("Виджет");
+        modes.addView(overlay);
+        modes.addView(widget);
+        modes.check(prefs.isWidgetMode() ? widget.getId() : overlay.getId());
+        modes.setOnCheckedChangeListener((group, id) -> {
+            boolean nativeWidget = id == widget.getId();
+            if (nativeWidget == prefs.isWidgetMode()) return;
+            prefs.setWidgetMode(nativeWidget);
+            AtlasMediaWidgetProvider.refresh(this);
+            if (!nativeWidget && prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                BootReceiver.startIfAllowed(this, prefs);
+            }
+            recreate();
+        });
+        card.addView(modes);
+        card.addView(text(prefs.isWidgetMode()
+                        ? "Системный виджет HOME: размер и место задаёт лаунчер."
+                        : "Отдельное окно поверх HOME: размер и положение задаются здесь.",
                 13, Ui.SECONDARY, Typeface.NORMAL));
-        TextView coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams coverDimTitleParams = fullWrap();
-        coverDimTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(coverDimTitle, coverDimTitleParams);
-        coverDimPresetGroup = new RadioGroup(this);
-        coverDimPresetGroup.setOrientation(RadioGroup.HORIZONTAL);
-        coverDimPresetButtons = new RadioButton[CoverDimPreset.values().length];
-        for (CoverDimPreset preset : CoverDimPreset.values()) {
-            RadioButton button = styleButton(preset.label);
-            button.setTextSize(11);
-            button.setTag(preset);
-            coverDimPresetButtons[preset.preferenceValue] = button;
-            coverDimPresetGroup.addView(button, new RadioGroup.LayoutParams(0,
-                    RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
-        }
-        coverDimPresetGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (!refreshingStyle) saveAppearance();
+        return card;
+    }
+
+    private LinearLayout createWidgetPlacementCard() {
+        LinearLayout card = card();
+        card.addView(text("На главном экране", 20, Ui.PRIMARY, Typeface.BOLD));
+        widgetPlacementStatus = text("", 15, Ui.PRIMARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams statusParams = fullWrap();
+        statusParams.topMargin = Ui.dp(this, 6);
+        card.addView(widgetPlacementStatus, statusParams);
+        addWidgetButton = actionButton("Добавить виджет");
+        addWidgetButton.setOnClickListener(v -> {
+            var manager = android.appwidget.AppWidgetManager.getInstance(this);
+            if (manager.isRequestPinAppWidgetSupported() && manager.requestPinAppWidget(
+                    new ComponentName(this, AtlasMediaWidgetProvider.class), null, null)) return;
+            Toast.makeText(this, "Удерживайте свободное место на HOME → Виджеты → Atlas Media Widget",
+                    Toast.LENGTH_LONG).show();
         });
-        serviceCard.addView(coverDimPresetGroup, fullWrap());
+        card.addView(addWidgetButton, buttonParams());
+        TextView hint = text("Или удерживайте свободное место на HOME → Виджеты → "
+                        + "Atlas Media Widget. Оформление общее для всех виджетов. "
+                        + "Медиасервис запускается сам после загрузки ГУ, пока размещён "
+                        + "хотя бы один виджет.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams hintParams = fullWrap();
+        hintParams.topMargin = Ui.dp(this, 10);
+        card.addView(hint, hintParams);
+        return card;
+    }
 
-        thumbnailSizeSection = new LinearLayout(this);
-        thumbnailSizeSection.setOrientation(LinearLayout.VERTICAL);
-        thumbnailSizeSetting = addLabeledSeek(thumbnailSizeSection,
-                "Размер маленькой обложки", Prefs.MIN_THUMBNAIL_SIZE_DP,
-                Prefs.MAX_THUMBNAIL_SIZE_DP);
-        serviceCard.addView(thumbnailSizeSection, fullWrap());
+    private void refreshWidgetPlacement() {
+        if (widgetPlacementStatus == null) return;
+        int placed = AtlasMediaWidgetProvider.ids(this).length;
+        widgetPlacementStatus.setText(placed == 0 ? "Виджет ещё не добавлен"
+                : "Размещено виджетов: " + placed);
+        addWidgetButton.setBackground(Ui.background(placed == 0 ? Ui.ACCENT : Ui.NESTED, 8, this));
+        addWidgetButton.setTextColor(placed == 0 ? Ui.ON_ACCENT : Ui.PRIMARY);
+    }
 
-        TextView sizeTitle = text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams sizeTitleParams = fullWrap();
-        sizeTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(sizeTitle, sizeTitleParams);
+    private LinearLayout createGeometryCard() {
+        LinearLayout geometryCard = card();
+        geometryCard.addView(text("Размер и положение", 20, Ui.PRIMARY, Typeface.BOLD));
+        geometryCard.addView(text("Размер карточки", 15, Ui.SECONDARY, Typeface.BOLD),
+                labelParams());
         LinearLayout sizeRow = new LinearLayout(this);
         sizeRow.setOrientation(LinearLayout.HORIZONTAL);
         sizeRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -432,12 +536,14 @@ public final class MainActivity extends ScaledActivity {
         sizeRow.addView(heightSize, sizeInputParams());
         sizeRow.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL),
                 compactUnitParams());
-        serviceCard.addView(sizeRow, fullWrap());
+        LinearLayout.LayoutParams sizeRowParams = fullWrap();
+        sizeRowParams.topMargin = Ui.dp(this, 6);
+        geometryCard.addView(sizeRow, sizeRowParams);
 
         TextView positionTitle = text("Положение карточки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams positionTitleParams = fullWrap();
         positionTitleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(positionTitle, positionTitleParams);
+        geometryCard.addView(positionTitle, positionTitleParams);
         positionCornerSpinner = new Spinner(this);
         positionCornerSpinner.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, cornerLabels()));
@@ -473,11 +579,11 @@ public final class MainActivity extends ScaledActivity {
         positionGrid.setOrientation(LinearLayout.VERTICAL);
         LinearLayout positionHeader = new LinearLayout(this);
         positionHeader.setOrientation(LinearLayout.HORIZONTAL);
-        positionHeader.addView(text("Угол привязки", 14, Ui.SECONDARY, Typeface.BOLD),
+        positionHeader.addView(text("Угол привязки", 14, Ui.SECONDARY, Typeface.NORMAL),
                 positionColumnParams(1.25f, 0));
-        positionHeader.addView(text("Отступ X", 14, Ui.SECONDARY, Typeface.BOLD),
+        positionHeader.addView(text("Отступ X", 14, Ui.SECONDARY, Typeface.NORMAL),
                 positionColumnParams(1f, 8));
-        positionHeader.addView(text("Отступ Y", 14, Ui.SECONDARY, Typeface.BOLD),
+        positionHeader.addView(text("Отступ Y", 14, Ui.SECONDARY, Typeface.NORMAL),
                 positionColumnParams(1f, 8));
         positionGrid.addView(positionHeader, fullWrap());
 
@@ -504,9 +610,10 @@ public final class MainActivity extends ScaledActivity {
         yCell.addView(text("px", 14, Ui.SECONDARY, Typeface.NORMAL), compactUnitParams());
         positionRow.addView(yCell, positionColumnParams(1f, 8));
         positionGrid.addView(positionRow, fullWrap());
-        serviceCard.addView(positionGrid, fullWrap());
+        geometryCard.addView(positionGrid, fullWrap());
+
         dragHandleVisible = new Switch(this);
-        dragHandleVisible.setText("Показывать точки перемещения на виджете");
+        dragHandleVisible.setText("Показывать точки перемещения на карточке");
         dragHandleVisible.setTextColor(Ui.PRIMARY);
         dragHandleVisible.setTextSize(15);
         dragHandleVisible.setOnCheckedChangeListener((button, checked) -> {
@@ -517,13 +624,13 @@ public final class MainActivity extends ScaledActivity {
         });
         LinearLayout.LayoutParams dragHandleParams = fullWrap();
         dragHandleParams.topMargin = Ui.dp(this, 14);
-        serviceCard.addView(dragHandleVisible, dragHandleParams);
+        geometryCard.addView(dragHandleVisible, dragHandleParams);
         TextView dragHandleHint = text(
-                "Если точки скрыты, включите их здесь снова, чтобы переместить виджет.",
+                "Если точки скрыты, включите их здесь снова, чтобы переместить карточку.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams dragHandleHintParams = fullWrap();
         dragHandleHintParams.topMargin = Ui.dp(this, 5);
-        serviceCard.addView(dragHandleHint, dragHandleHintParams);
+        geometryCard.addView(dragHandleHint, dragHandleHintParams);
         TextWatcher geometryWatcher = new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start,
                     int count, int after) {}
@@ -541,12 +648,75 @@ public final class MainActivity extends ScaledActivity {
         positionX.addTextChangedListener(geometryWatcher);
         positionY.addTextChangedListener(geometryWatcher);
 
-        LinearLayout typographyCard = card();
-        typographyCard.addView(text("Текст и отступы", 20, Ui.PRIMARY, Typeface.BOLD));
-        typographyCard.addView(text("Отступ текста от прогресса",
+        Button resetSize = actionButton("Вернуть размер по умолчанию");
+        resetSize.setOnClickListener(v -> {
+            prefs.putCardSizePx(500, 500);
+            refreshSizeControls(currentStyle());
+            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
+                OverlayService.refreshStyle(this);
+            }
+        });
+        geometryCard.addView(resetSize, buttonParams());
+        return geometryCard;
+    }
+
+    private LinearLayout createLookCard() {
+        LinearLayout lookCard = card();
+        lookCard.addView(text(getString(R.string.appearance_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        lookCard.addView(text("Компоновка", 15, Ui.SECONDARY, Typeface.BOLD), labelParams());
+        RadioGroup styles = new RadioGroup(this);
+        styles.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton compactStyle = styleButton("Компактная");
+        RadioButton squareStyle = styleButton("Просторная");
+        styles.addView(compactStyle);
+        styles.addView(squareStyle);
+        styles.check(currentStyle() == CardStyle.COMPACT ? compactStyle.getId() : squareStyle.getId());
+        styles.setOnCheckedChangeListener((group, id) -> {
+            prefs.putInt(Prefs.KEY_CARD_STYLE, (id == compactStyle.getId()
+                    ? CardStyle.COMPACT : CardStyle.SQUARE).preferenceValue);
+            refreshingStyle = true;
+            refreshSizeControls(currentStyle());
+            refreshingStyle = false;
+            refreshOverlayIfRunning();
+        });
+        lookCard.addView(styles);
+        lookCard.addView(text("Компактная подходит для широкой невысокой карточки; просторная — для квадратной или высокой. Выбор не меняет размер карточки.",
+                13, Ui.SECONDARY, Typeface.NORMAL));
+        TextView coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams coverDimTitleParams = fullWrap();
+        coverDimTitleParams.topMargin = Ui.dp(this, 14);
+        lookCard.addView(coverDimTitle, coverDimTitleParams);
+        coverDimPresetGroup = new RadioGroup(this);
+        coverDimPresetGroup.setOrientation(RadioGroup.HORIZONTAL);
+        coverDimPresetButtons = new RadioButton[CoverDimPreset.values().length];
+        for (CoverDimPreset preset : CoverDimPreset.values()) {
+            RadioButton button = styleButton(preset.label);
+            button.setTextSize(11);
+            button.setTag(preset);
+            coverDimPresetButtons[preset.preferenceValue] = button;
+            coverDimPresetGroup.addView(button, new RadioGroup.LayoutParams(0,
+                    RadioGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        coverDimPresetGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (!refreshingStyle) saveAppearance();
+        });
+        lookCard.addView(coverDimPresetGroup, fullWrap());
+
+        thumbnailSizeSection = new LinearLayout(this);
+        thumbnailSizeSection.setOrientation(LinearLayout.VERTICAL);
+        thumbnailSizeSetting = addLabeledSeek(thumbnailSizeSection,
+                "Размер маленькой обложки", Prefs.MIN_THUMBNAIL_SIZE_DP,
+                Prefs.MAX_THUMBNAIL_SIZE_DP);
+        lookCard.addView(thumbnailSizeSection, fullWrap());
+        return lookCard;
+    }
+
+    private void createTypographySection(LinearLayout body) {
+        body.addView(text("Отступ текста от прогресса",
                 14, Ui.SECONDARY, Typeface.NORMAL), labelParams());
         metadataProgressGapValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        typographyCard.addView(metadataProgressGapValue, fullWrap());
+        body.addView(metadataProgressGapValue, fullWrap());
         metadataProgressGap = sizeSeekBar(Prefs.MIN_METADATA_PROGRESS_GAP_DP,
                 Prefs.MAX_METADATA_PROGRESS_GAP_DP);
         metadataProgressGap.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -563,26 +733,26 @@ public final class MainActivity extends ScaledActivity {
                 saveAppearance();
             }
         });
-        typographyCard.addView(metadataProgressGap, fullWrap());
+        body.addView(metadataProgressGap, fullWrap());
 
-        topInsetSetting = addLabeledSeek(typographyCard, "Отступ верхней строки",
+        topInsetSetting = addLabeledSeek(body, "Отступ верхней строки",
                 Prefs.MIN_TOP_INSET_DP, Prefs.MAX_TOP_INSET_DP);
-        contentInsetSetting = addLabeledSeek(typographyCard, "Боковой отступ контента",
+        contentInsetSetting = addLabeledSeek(body, "Боковой отступ контента",
                 Prefs.MIN_CONTENT_INSET_DP, Prefs.MAX_CONTENT_INSET_DP);
-        topRowTextSetting = addLabeledSeek(typographyCard,
+        topRowTextSetting = addLabeledSeek(body,
                 "Размер плашек источника и избранного",
                 Prefs.MIN_TOP_ROW_TEXT_SIZE_SP, Prefs.MAX_TOP_ROW_TEXT_SIZE_SP);
-        titleTextSetting = addLabeledSeek(typographyCard, "Размер названия",
+        titleTextSetting = addLabeledSeek(body, "Размер названия",
                 Prefs.MIN_TITLE_TEXT_SIZE_SP, Prefs.MAX_TITLE_TEXT_SIZE_SP);
-        subtitleTextSetting = addLabeledSeek(typographyCard, "Размер исполнителя и альбома",
+        subtitleTextSetting = addLabeledSeek(body, "Размер исполнителя и альбома",
                 Prefs.MIN_SUBTITLE_TEXT_SIZE_SP, Prefs.MAX_SUBTITLE_TEXT_SIZE_SP);
-        subtitleGapSetting = addLabeledSeek(typographyCard, "Отступ подзаголовка",
+        subtitleGapSetting = addLabeledSeek(body, "Отступ подзаголовка",
                 0, Prefs.MAX_SUBTITLE_GAP_DP);
-        timeTextSetting = addLabeledSeek(typographyCard, "Размер времени",
+        timeTextSetting = addLabeledSeek(body, "Размер времени",
                 Prefs.MIN_TIME_TEXT_SIZE_SP, Prefs.MAX_TIME_TEXT_SIZE_SP);
-        progressGapSetting = addLabeledSeek(typographyCard, "Отступ прогресса от панели",
+        progressGapSetting = addLabeledSeek(body, "Отступ прогресса от панели",
                 0, Prefs.MAX_PROGRESS_GAP_DP);
-        progressThicknessSetting = addLabeledSeek(typographyCard, "Толщина линии прогресса",
+        progressThicknessSetting = addLabeledSeek(body, "Толщина линии прогресса",
                 Prefs.MIN_PROGRESS_THICKNESS_DP, Prefs.MAX_PROGRESS_THICKNESS_DP);
         SeekBar.OnSeekBarChangeListener appearanceListener =
                 new SeekBar.OnSeekBarChangeListener() {
@@ -627,32 +797,41 @@ public final class MainActivity extends ScaledActivity {
             refreshSizeControls(current);
             refreshOverlayIfRunning();
         });
-        typographyCard.addView(resetAppearance, buttonParams());
+        body.addView(resetAppearance, buttonParams());
+    }
 
-        LinearLayout controlsCard = card();
-        controlsCard.addView(text("Панель управления", 20, Ui.PRIMARY, Typeface.BOLD));
-        controlsCard.addView(text("Высота нижней панели", 14,
+    private void createControlsSection(LinearLayout body) {
+        body.addView(text("Высота нижней панели", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlPanelHeightValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        controlsCard.addView(controlPanelHeightValue, fullWrap());
+        body.addView(controlPanelHeightValue, fullWrap());
         controlPanelHeight = sizeSeekBar(Prefs.MIN_CONTROL_PANEL_HEIGHT_DP,
                 Prefs.MAX_CONTROL_PANEL_HEIGHT_DP);
-        controlsCard.addView(controlPanelHeight, fullWrap());
+        body.addView(controlPanelHeight, fullWrap());
 
-        controlsCard.addView(text("Размер иконок", 14,
+        body.addView(text("Размер иконок", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlIconScaleValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        controlsCard.addView(controlIconScaleValue, fullWrap());
+        body.addView(controlIconScaleValue, fullWrap());
         controlIconScale = sizeSeekBar(Prefs.MIN_CONTROL_ICON_SCALE_PERCENT,
                 Prefs.MAX_CONTROL_ICON_SCALE_PERCENT);
-        controlsCard.addView(controlIconScale, fullWrap());
+        body.addView(controlIconScale, fullWrap());
 
-        controlsCard.addView(text("Разбежка боковых иконок от центра", 14,
+        body.addView(text("Разбежка боковых иконок от центра", 14,
                 Ui.SECONDARY, Typeface.NORMAL), labelParams());
         controlSpreadValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        controlsCard.addView(controlSpreadValue, fullWrap());
+        body.addView(controlSpreadValue, fullWrap());
         controlSpread = sizeSeekBar(Prefs.MIN_CONTROL_SPREAD_PERCENT,
                 Prefs.MAX_CONTROL_SPREAD_PERCENT);
+        body.addView(controlSpread, fullWrap());
+
+        body.addView(text("Дополнительный отступ иконок от нижней границы", 14,
+                Ui.SECONDARY, Typeface.NORMAL), labelParams());
+        controlBottomInsetValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        body.addView(controlBottomInsetValue, fullWrap());
+        controlBottomInset = sizeSeekBar(0, Prefs.MAX_CONTROL_BOTTOM_INSET_DP);
+        body.addView(controlBottomInset, fullWrap());
+
         SeekBar.OnSeekBarChangeListener controlListener = new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress,
                     boolean fromUser) {
@@ -670,15 +849,7 @@ public final class MainActivity extends ScaledActivity {
         controlPanelHeight.setOnSeekBarChangeListener(controlListener);
         controlIconScale.setOnSeekBarChangeListener(controlListener);
         controlSpread.setOnSeekBarChangeListener(controlListener);
-        controlsCard.addView(controlSpread, fullWrap());
-
-        controlsCard.addView(text("Дополнительный отступ иконок от нижней границы", 14,
-                Ui.SECONDARY, Typeface.NORMAL), labelParams());
-        controlBottomInsetValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        controlsCard.addView(controlBottomInsetValue, fullWrap());
-        controlBottomInset = sizeSeekBar(0, Prefs.MAX_CONTROL_BOTTOM_INSET_DP);
         controlBottomInset.setOnSeekBarChangeListener(controlListener);
-        controlsCard.addView(controlBottomInset, fullWrap());
 
         Button resetControls = actionButton("Вернуть панель по умолчанию");
         resetControls.setOnClickListener(v -> {
@@ -687,57 +858,14 @@ public final class MainActivity extends ScaledActivity {
                     Prefs.DEFAULT_CONTROL_ICON_SCALE_PERCENT,
                     Prefs.DEFAULT_CONTROL_SPREAD_PERCENT, 0);
             refreshSizeControls(current);
-            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                OverlayService.refreshStyle(this);
-            }
+            refreshOverlayIfRunning();
         });
-        controlsCard.addView(resetControls, buttonParams());
+        body.addView(resetControls, buttonParams());
+    }
 
-        Button resetSize = actionButton("Вернуть размер по умолчанию");
-        resetSize.setOnClickListener(v -> {
-            prefs.putCardSizePx(500, 500);
-            refreshSizeControls(currentStyle());
-            if (prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                OverlayService.refreshStyle(this);
-            }
-        });
-        serviceCard.addView(resetSize, buttonParams());
-
-        LinearLayout runtimeCard = card();
-        runtimeCard.addView(text(getString(R.string.service_title),
-                20, Ui.PRIMARY, Typeface.BOLD));
-        serviceButton = actionButton("Запустить");
-        serviceButton.setOnClickListener(v -> toggleService());
-        runtimeCard.addView(serviceButton, buttonParams());
-        autoStart = new Switch(this);
-        autoStart.setText("Автозапуск после загрузки ГУ");
-        autoStart.setTextColor(Ui.PRIMARY);
-        autoStart.setTextSize(15);
-        autoStart.setOnCheckedChangeListener((button, checked) -> {
-            if (!button.isPressed()) return;
-            prefs.putBoolean(Prefs.KEY_AUTO_START, checked);
-            if (checked && (!Settings.canDrawOverlays(this)
-                    || !ForegroundAppDetector.hasUsageAccess(this)
-                    || !AccessibilityWindowState.isEnabled(this))) {
-                Toast.makeText(this, R.string.auto_start_permission_warning,
-                        Toast.LENGTH_LONG).show();
-            }
-        });
-        LinearLayout.LayoutParams switchParams = fullWrap();
-        switchParams.topMargin = Ui.dp(this, 14);
-        runtimeCard.addView(autoStart, switchParams);
-
-        LinearLayout behaviorCard = card();
-        behaviorCard.addView(text(getString(R.string.behavior_title),
-                20, Ui.PRIMARY, Typeface.BOLD));
-        TextView note = text(
-                "Карточка отображается только когда HOME находится на переднем плане. "
-                        + "Перетаскивание выполняется за точки ⋮ в правом верхнем углу. "
-                        + "Нажатие на свободную область открывает активный медиаисточник.",
-                14, Ui.SECONDARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams noteParams = fullWrap();
-        noteParams.topMargin = Ui.dp(this, 8);
-        behaviorCard.addView(note, noteParams);
+    private void buildRadioTab(LinearLayout page) {
+        LinearLayout navigationCard = card();
+        navigationCard.addView(text("Переключение станций", 20, Ui.PRIMARY, Typeface.BOLD));
         radioSavedNavigation = new Switch(this);
         radioSavedNavigation.setText("Переключать радио без поиска по эфиру");
         radioSavedNavigation.setTextColor(Ui.PRIMARY);
@@ -750,14 +878,14 @@ public final class MainActivity extends ScaledActivity {
         });
         LinearLayout.LayoutParams radioNavigationParams = fullWrap();
         radioNavigationParams.topMargin = Ui.dp(this, 14);
-        behaviorCard.addView(radioSavedNavigation, radioNavigationParams);
+        navigationCard.addView(radioSavedNavigation, radioNavigationParams);
         TextView radioNavigationHint = text(
                 "Когда Радио активно, кнопки назад и вперёд напрямую выбирают соседнюю "
-                        + "станцию из выбранного ниже списка.",
+                        + "сохранённую станцию.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams radioHintParams = fullWrap();
         radioHintParams.topMargin = Ui.dp(this, 5);
-        behaviorCard.addView(radioNavigationHint, radioHintParams);
+        navigationCard.addView(radioNavigationHint, radioHintParams);
         radioFavoritesNavigation = new Switch(this);
         radioFavoritesNavigation.setText("Переключать только по избранным");
         radioFavoritesNavigation.setTextColor(Ui.PRIMARY);
@@ -769,34 +897,32 @@ public final class MainActivity extends ScaledActivity {
         });
         LinearLayout.LayoutParams radioFavoritesNavigationParams = fullWrap();
         radioFavoritesNavigationParams.topMargin = Ui.dp(this, 10);
-        behaviorCard.addView(radioFavoritesNavigation, radioFavoritesNavigationParams);
+        navigationCard.addView(radioFavoritesNavigation, radioFavoritesNavigationParams);
         TextView radioFavoritesNavigationHint = text(
                 "Если выключено, кнопки перелистывают все сохранённые станции.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams radioFavoritesHintParams = fullWrap();
         radioFavoritesHintParams.topMargin = Ui.dp(this, 5);
-        behaviorCard.addView(radioFavoritesNavigationHint, radioFavoritesHintParams);
+        navigationCard.addView(radioFavoritesNavigationHint, radioFavoritesHintParams);
+        page.addView(navigationCard);
+
         LinearLayout favoritesGridCard = card();
-        favoritesGridCard.addView(text("Сетка избранных радиостанций",
+        favoritesGridCard.addView(text("Сетка избранного",
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView favoritesGridHint = text(
-                "Настройте число столбцов и строк в первом экране списка избранного. "
+                "Число столбцов и строк на первом экране списка избранного. "
                         + "Остальные станции доступны прокруткой.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams favoritesGridHintParams = fullWrap();
         favoritesGridHintParams.topMargin = Ui.dp(this, 8);
         favoritesGridCard.addView(favoritesGridHint, favoritesGridHintParams);
-        favoritesGridCard.addView(text("Столбцы", 14, Ui.SECONDARY, Typeface.NORMAL),
-                labelParams());
         favoriteColumnsValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        favoritesGridCard.addView(favoriteColumnsValue, fullWrap());
+        favoritesGridCard.addView(favoriteColumnsValue, labelParams());
         favoriteColumns = sizeSeekBar(Prefs.MIN_RADIO_FAVORITES_GRID_COLUMNS,
                 Prefs.MAX_RADIO_FAVORITES_GRID_COLUMNS);
         favoritesGridCard.addView(favoriteColumns, fullWrap());
-        favoritesGridCard.addView(text("Строки", 14, Ui.SECONDARY, Typeface.NORMAL),
-                labelParams());
         favoriteRowsValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
-        favoritesGridCard.addView(favoriteRowsValue, fullWrap());
+        favoritesGridCard.addView(favoriteRowsValue, labelParams());
         favoriteRows = sizeSeekBar(Prefs.MIN_RADIO_FAVORITES_GRID_ROWS,
                 Prefs.MAX_RADIO_FAVORITES_GRID_ROWS);
         favoritesGridCard.addView(favoriteRows, fullWrap());
@@ -817,23 +943,19 @@ public final class MainActivity extends ScaledActivity {
                 };
         favoriteColumns.setOnSeekBarChangeListener(favoritesGridListener);
         favoriteRows.setOnSeekBarChangeListener(favoritesGridListener);
+        page.addView(favoritesGridCard);
 
-        LinearLayout scaleCard = card();
-        scaleCard.addView(text(getString(R.string.scale_title),
-                20, Ui.PRIMARY, Typeface.BOLD));
-        TextView scaleHint = text(getString(R.string.scale_hint),
-                13, Ui.SECONDARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams scaleHintParams = fullWrap();
-        scaleHintParams.topMargin = Ui.dp(this, 6);
-        scaleCard.addView(scaleHint, scaleHintParams);
-        addScaleSlider(scaleCard);
+        page.addView(createRadioCatalogCard());
+    }
 
+    private void buildSystemTab(LinearLayout page) {
         LinearLayout settingsBackupCard = card();
-        settingsBackupCard.addView(text("Настройки: резервная копия",
+        settingsBackupCard.addView(text("Резервная копия настроек",
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView settingsBackupHint = text(
                 "Архив ZIP содержит настройки карточки, источника звука и приборной панели. "
-                        + "Также поддерживается импорт прежних JSON-настроек.",
+                        + "Также поддерживается импорт прежних JSON-настроек. "
+                        + "Каталог радио сохраняется отдельно во вкладке «Радио».",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         settingsBackupHint.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams settingsBackupHintParams = fullWrap();
@@ -845,103 +967,61 @@ public final class MainActivity extends ScaledActivity {
         importSettingsButton = actionButton("Импортировать настройки (ZIP / JSON)");
         importSettingsButton.setOnClickListener(v -> chooseSettingsImport());
         settingsBackupCard.addView(importSettingsButton, buttonParams());
+        page.addView(settingsBackupCard);
 
-        // 1. Секция «Система»
-        addSectionHeading(root, getString(R.string.section_system), true);
-        root.addView(createModeCard());
-        root.addView(accessCard);
-        root.addView(runtimeCard);
+        page.addView(createDiagnosticCard());
 
-        // 2. Секция «Медиа»
-        addSectionHeading(root, getString(R.string.section_media), false);
-        LinearLayout mediaCard = createMediaCard();
-        root.addView(mediaCard);
-        root.addView(createRadioCatalogTransferCard());
-
-        // 3. Секция «Виджет»
-        addSectionHeading(root, getString(R.string.section_widget), false);
-        root.addView(serviceCard);
-        LinearLayout visibilityCard = createVisibilityCard();
-        root.addView(visibilityCard);
-        overlayOnly.add(visibilityCard);
-        root.addView(typographyCard);
-        root.addView(controlsCard);
-        root.addView(behaviorCard);
-        root.addView(favoritesGridCard);
-
-        // 4. Секция «Резервная копия»
-        addSectionHeading(root, getString(R.string.section_backup), false);
-        root.addView(settingsBackupCard);
-
-        // 5. Секция «Диагностика»
-        addSectionHeading(root, getString(R.string.section_diagnostics), false);
-        LinearLayout diagnosticCard = createDiagnosticCard();
-        root.addView(diagnosticCard);
-        root.addView(scaleCard);
-
-        java.util.Collections.addAll(overlayOnly, overlayPermissionButton, usageAccessButton,
-                accessibilityAccessButton, sizeTitle, sizeRow, positionTitle, positionGrid,
-                dragHandleVisible, dragHandleHint, resetSize, note, runtimeCard);
-        for (View view : overlayOnly) view.setVisibility(prefs.isWidgetMode() ? View.GONE : View.VISIBLE);
-        if (configureWidgetId != 0) {
-            Button done = actionButton("Готово");
-            done.setOnClickListener(v -> {
-                if (!AtlasMediaWidgetProvider.owns(this, configureWidgetId)) { finish(); return; }
-                AtlasMediaWidgetProvider.refresh(this);
-                setResult(RESULT_OK, new Intent().putExtra(
-                        android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, configureWidgetId));
-                finish();
-            });
-            screen.addView(done, fullWrap());
-        }
-        screen.addView(scroll, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        return screen;
+        LinearLayout scaleCard = card();
+        scaleCard.addView(text(getString(R.string.scale_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        TextView scaleHint = text(getString(R.string.scale_hint),
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams scaleHintParams = fullWrap();
+        scaleHintParams.topMargin = Ui.dp(this, 6);
+        scaleCard.addView(scaleHint, scaleHintParams);
+        addScaleSlider(scaleCard);
+        page.addView(scaleCard);
     }
 
-    private LinearLayout createModeCard() {
+    /** Adds a card whose body starts collapsed and returns the body for its controls. */
+    private LinearLayout collapsibleCard(LinearLayout page, String title, String summary) {
         LinearLayout card = card();
-        card.addView(text("Режим отображения", 20, Ui.PRIMARY, Typeface.BOLD));
-        RadioGroup modes = new RadioGroup(this);
-        modes.setOrientation(RadioGroup.HORIZONTAL);
-        RadioButton overlay = styleButton("Оверлей");
-        RadioButton widget = styleButton("Виджет");
-        modes.addView(overlay);
-        modes.addView(widget);
-        modes.check(prefs.isWidgetMode() ? widget.getId() : overlay.getId());
-        modes.setOnCheckedChangeListener((group, id) -> {
-            boolean nativeWidget = id == widget.getId();
-            if (nativeWidget == prefs.isWidgetMode()) return;
-            prefs.setWidgetMode(nativeWidget);
-            AtlasMediaWidgetProvider.refresh(this);
-            if (!nativeWidget && prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
-                BootReceiver.startIfAllowed(this, prefs);
-            }
-            recreate();
-        });
-        card.addView(modes);
-        if (prefs.isWidgetMode()) {
-            card.addView(text("Оформление общее для всех экземпляров. Размер и положение задаёт HOME. "
-                    + "Источники и избранное открываются в карточке управления приложения. "
-                    + "Линия прогресса обновляется раз в секунду; нажатие открывает точную перемотку. "
-                    + "Жесты и перетаскивание ползунка на HOME не поддерживаются. "
-                    + "Медиасервис запускается автоматически после загрузки и разблокировки ГУ, "
-                    + "если размещён хотя бы один виджет. Открывать приложение не нужно. "
-                    + "Переключатель автозапуска оверлея на виджет не влияет.",
-                    13, Ui.SECONDARY, Typeface.NORMAL));
-            Button add = actionButton("Добавить виджет");
-            add.setOnClickListener(v -> {
-                var manager = android.appwidget.AppWidgetManager.getInstance(this);
-                if (manager.isRequestPinAppWidgetSupported() && manager.requestPinAppWidget(
-                        new ComponentName(this, AtlasMediaWidgetProvider.class), null, null)) return;
-                Toast.makeText(this, "Удерживайте свободное место на HOME → Виджеты → AtlasMediaWidget",
-                        Toast.LENGTH_LONG).show();
-            });
-            card.addView(add, buttonParams());
-            card.addView(text("Ручное добавление: удерживайте свободное место на HOME → Виджеты → AtlasMediaWidget.",
-                    13, Ui.SECONDARY, Typeface.NORMAL));
+        LinearLayout body = collapsible(card, title, summary, 20, Ui.PRIMARY);
+        page.addView(card);
+        return body;
+    }
+
+    /** The header stays outside the body so it remains usable while the body is disabled. */
+    private LinearLayout collapsible(LinearLayout parent, String title, String summary,
+            float titleSize, int titleColor) {
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.VERTICAL);
+        header.setMinimumHeight(Ui.dp(this, 40));
+        header.setClickable(true);
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.addView(text(title, titleSize, titleColor, Typeface.BOLD),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView chevron = text("▸", 26, Ui.ACCENT, Typeface.BOLD);
+        chevron.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        titleRow.addView(chevron);
+        header.addView(titleRow, fullWrap());
+        if (summary != null) {
+            header.addView(text(summary, 13, Ui.SECONDARY, Typeface.NORMAL), fullWrap());
         }
-        return card;
+        parent.addView(header, fullWrap());
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setVisibility(View.GONE);
+        parent.addView(body, fullWrap());
+        header.setContentDescription(title + ", свёрнуто");
+        header.setOnClickListener(v -> {
+            boolean expand = body.getVisibility() != View.VISIBLE;
+            body.setVisibility(expand ? View.VISIBLE : View.GONE);
+            chevron.setText(expand ? "▾" : "▸");
+            header.setContentDescription(title + (expand ? ", развёрнуто" : ", свёрнуто"));
+        });
+        return body;
     }
 
     private void renderSystemWidgetPreview() {
@@ -951,35 +1031,11 @@ public final class MainActivity extends ScaledActivity {
         int id = getIntent().getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, 0);
         if (!AtlasMediaWidgetProvider.owns(context, id)) id = ids.length == 0 ? 0 : ids[0];
         Bundle options = id == 0 ? new Bundle() : manager.getAppWidgetOptions(id);
-        int width = Ui.dp(context, AtlasMediaWidgetProvider.widthDp(context, options));
-        int height = Ui.dp(context, AtlasMediaWidgetProvider.heightDp(context, options));
         widgetPreviewTitle.setText((id == 0 ? "Пример размера " : "Размер #" + id + " ")
                 + AtlasMediaWidgetProvider.widthDp(context, options) + "×"
                 + AtlasMediaWidgetProvider.heightDp(context, options) + " dp · демо");
-        var frame = new AtlasMediaWidgetProvider.Frame(context, prefs, options, 0,
-                previewSnapshot(), previewArtwork(), true, previewListener);
-        View preview = frame.views.apply(context, previewHost);
-        int available = previewHost.getWidth() - previewHost.getPaddingLeft() - previewHost.getPaddingRight();
         int maxHeight = Math.round(getWindowManager().getCurrentWindowMetrics().getBounds().height() * .30f);
-        float scale = Math.min(1f, Math.min(available / (float) width, maxHeight / (float) height));
-        preview.setScaleX(scale);
-        preview.setScaleY(scale);
-        previewHost.removeAllViews();
-        previewHost.addView(preview, new FrameLayout.LayoutParams(width, height, Gravity.CENTER));
-        View blocker = new View(this);
-        blocker.setClickable(true);
-        previewHost.addView(blocker, new FrameLayout.LayoutParams(-1, -1));
-        var params = previewHost.getLayoutParams();
-        params.height = Math.round(height * scale) + previewHost.getPaddingTop() + previewHost.getPaddingBottom();
-        previewHost.setLayoutParams(params);
-    }
-
-    private void addSectionHeading(LinearLayout parent, String label, boolean first) {
-        TextView heading = text(label, 16, Ui.ACCENT, Typeface.BOLD);
-        LinearLayout.LayoutParams params = fullWrap();
-        params.topMargin = Ui.dp(this, first ? 20 : 14);
-        params.bottomMargin = Ui.dp(this, 10);
-        parent.addView(heading, params);
+        WidgetPreview.renderWidget(context, previewHost, prefs, options, maxHeight);
     }
 
     private LinearLayout createVisibilityCard() {
@@ -1059,7 +1115,8 @@ public final class MainActivity extends ScaledActivity {
 
     private void refresh() {
         if (builtWidgetMode != prefs.isWidgetMode()) { recreate(); return; }
-        for (View view : overlayOnly) view.setVisibility(prefs.isWidgetMode() ? View.GONE : View.VISIBLE);
+        refreshModeVisibility();
+        refreshWidgetPlacement();
         if (hideThreshold != null) hideThreshold.setProgress(prefs.freeformHideThresholdPercent());
         boolean overlay = Settings.canDrawOverlays(this);
         boolean usage = ForegroundAppDetector.hasUsageAccess(this);
@@ -1223,7 +1280,7 @@ public final class MainActivity extends ScaledActivity {
                 || importInProgress || mediaBridgeClient == null
                 || !mediaBridgeClient.isSettingsSupported()) return;
         radioCatalogBusy = true;
-        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setMediaSettingsEnabled(false);
         setRadioCatalogTransferEnabled(false);
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
@@ -1278,7 +1335,7 @@ public final class MainActivity extends ScaledActivity {
                         if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
                             updateMediaSettingsUi(currentMediaSettings);
                         } else {
-                            setMediaControlsEnabled(mediaSettingsGroup, false);
+                            setMediaSettingsEnabled(false);
                         }
                         setRadioCatalogTransferEnabled(true);
                         setSettingsTransferEnabled(true);
@@ -1293,7 +1350,7 @@ public final class MainActivity extends ScaledActivity {
         if (radioCatalogBusy || settingsTransferBusy || recoveryInProgress
                 || importInProgress) return;
         radioCatalogBusy = true;
-        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setMediaSettingsEnabled(false);
         setRadioCatalogTransferEnabled(false);
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
@@ -1399,7 +1456,7 @@ public final class MainActivity extends ScaledActivity {
                         if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
                             updateMediaSettingsUi(currentMediaSettings);
                         } else {
-                            setMediaControlsEnabled(mediaSettingsGroup, false);
+                            setMediaSettingsEnabled(false);
                         }
                         setRadioCatalogTransferEnabled(true);
                         setSettingsTransferEnabled(true);
@@ -1417,7 +1474,7 @@ public final class MainActivity extends ScaledActivity {
         if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
             updateMediaSettingsUi(currentMediaSettings);
         } else {
-            setMediaControlsEnabled(mediaSettingsGroup, false);
+            setMediaSettingsEnabled(false);
         }
         setRadioCatalogTransferEnabled(true);
         setSettingsTransferEnabled(true);
@@ -1698,50 +1755,79 @@ public final class MainActivity extends ScaledActivity {
                 }));
     }
 
-    private LinearLayout createMediaCard() {
-        LinearLayout mediaCard = card();
-        mediaCard.addView(text("Медиасервис OneOS", 20, Ui.PRIMARY, Typeface.BOLD));
-
+    private void buildMediaTab(LinearLayout page) {
+        LinearLayout statusCard = card();
+        statusCard.addView(text("Медиасервис OneOS", 20, Ui.PRIMARY, Typeface.BOLD));
         mediaStatusText = text("Подключение к медиасервису…", 13, Ui.SECONDARY, Typeface.NORMAL);
         mediaStatusText.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams statusParams = fullWrap();
         statusParams.topMargin = Ui.dp(this, 8);
-        mediaCard.addView(mediaStatusText, statusParams);
+        statusCard.addView(mediaStatusText, statusParams);
+        notificationAccessButton = actionButton("Разрешить доступ к уведомлениям (медиа)");
+        notificationAccessButton.setOnClickListener(v -> openNotificationAccessSettings());
+        statusCard.addView(notificationAccessButton, buttonParams());
+        storageAccessButton = actionButton("Разрешить доступ к хранилищу (USB)");
+        storageAccessButton.setOnClickListener(v -> requestStorageAccess());
+        statusCard.addView(storageAccessButton, buttonParams());
+        page.addView(statusCard);
 
-        mediaSettingsGroup = new LinearLayout(this);
-        mediaSettingsGroup.setOrientation(LinearLayout.VERTICAL);
-        mediaCard.addView(mediaSettingsGroup, fullWrap());
-
+        LinearLayout startupCard = card();
+        startupCard.addView(text("Источник при запуске", 20, Ui.PRIMARY, Typeface.BOLD));
+        LinearLayout startup = mediaSettingsBody(startupCard);
         defaultSourceTitle = text("Источник звука по умолчанию", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams dstParams = fullWrap();
-        dstParams.topMargin = Ui.dp(this, 14);
-        mediaSettingsGroup.addView(defaultSourceTitle, dstParams);
+        startup.addView(defaultSourceTitle, labelParams());
 
         LinearLayout row1 = createSourceTileRow(new String[][]{
                 {"Отключено", ""},
                 {"Radio", "RADIO"},
                 {"Bluetooth", "BT"}
         });
-        mediaSettingsGroup.addView(row1);
         LinearLayout.LayoutParams r1Params = fullWrap();
         r1Params.topMargin = Ui.dp(this, 8);
-        row1.setLayoutParams(r1Params);
+        startup.addView(row1, r1Params);
 
         LinearLayout row2 = createSourceTileRow(new String[][]{
                 {"USB", "USB"},
                 {"Online", "ONLINE"},
                 {"CarPlay", "CPAA"}
         });
-        mediaSettingsGroup.addView(row2);
         LinearLayout.LayoutParams r2Params = fullWrap();
         r2Params.topMargin = Ui.dp(this, 6);
-        row2.setLayoutParams(r2Params);
+        startup.addView(row2, r2Params);
 
-        onlinePlayerTitle = text("Онлайн медиаплеер по умолчанию", 15,
-                Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams onlineTitleParams = fullWrap();
-        onlineTitleParams.topMargin = Ui.dp(this, 14);
-        mediaSettingsGroup.addView(onlinePlayerTitle, onlineTitleParams);
+        TextView delayTitle = text("Задержка переключения на старте", 15, Ui.SECONDARY, Typeface.BOLD);
+        LinearLayout.LayoutParams dtParams = fullWrap();
+        dtParams.topMargin = Ui.dp(this, 14);
+        startup.addView(delayTitle, dtParams);
+
+        defaultSourceDelayLabel = text("0 сек", 18, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams dslParams = fullWrap();
+        dslParams.topMargin = Ui.dp(this, 4);
+        startup.addView(defaultSourceDelayLabel, dslParams);
+
+        defaultSourceDelaySeekBar = sizeSeekBar(0, 30);
+        defaultSourceDelaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) {
+                    defaultSourceDelayLabel.setText(progress + " сек");
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                commitDelaySetting(bar.getProgress());
+            }
+        });
+        startup.addView(defaultSourceDelaySeekBar, fullWrap());
+
+        startupAutoplaySwitch = mediaSwitch(startup, "Автовоспроизведение при старте", 12,
+                MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY);
+        page.addView(startupCard);
+
+        LinearLayout onlineCard = card();
+        onlineCard.addView(text("Онлайн-плеер", 20, Ui.PRIMARY, Typeface.BOLD));
+        LinearLayout online = mediaSettingsBody(onlineCard);
+        onlinePlayerTitle = text("Плеер по умолчанию", 15, Ui.SECONDARY, Typeface.BOLD);
+        online.addView(onlinePlayerTitle, labelParams());
 
         onlinePlayerSpinner = new Spinner(this);
         onlinePlayerSpinner.setBackground(Ui.background(Ui.NESTED, 8, this));
@@ -1774,132 +1860,49 @@ public final class MainActivity extends ScaledActivity {
         });
         LinearLayout.LayoutParams onlineSpinnerParams = fullWrap();
         onlineSpinnerParams.topMargin = Ui.dp(this, 4);
-        mediaSettingsGroup.addView(onlinePlayerSpinner, onlineSpinnerParams);
+        online.addView(onlinePlayerSpinner, onlineSpinnerParams);
 
-        minimizeOnlinePlayerSwitch = new Switch(this);
-        minimizeOnlinePlayerSwitch.setText("Сворачивать онлайн-плеер после автозапуска");
-        minimizeOnlinePlayerSwitch.setTextColor(Ui.PRIMARY);
-        minimizeOnlinePlayerSwitch.setTextSize(15);
-        minimizeOnlinePlayerSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(
-                    MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
-                    checked);
-        });
-        LinearLayout.LayoutParams minimizeParams = fullWrap();
-        minimizeParams.topMargin = Ui.dp(this, 10);
-        mediaSettingsGroup.addView(minimizeOnlinePlayerSwitch, minimizeParams);
+        minimizeOnlinePlayerSwitch = mediaSwitch(online,
+                "Сворачивать онлайн-плеер после автозапуска", 10,
+                MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART);
+        page.addView(onlineCard);
 
-        TextView delayTitle = text("Задержка переключения на старте", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams dtParams = fullWrap();
-        dtParams.topMargin = Ui.dp(this, 14);
-        mediaSettingsGroup.addView(delayTitle, dtParams);
+        LinearLayout sourceLostCard = card();
+        sourceLostCard.addView(text("Потеря источника", 20, Ui.PRIMARY, Typeface.BOLD));
+        LinearLayout sourceLost = mediaSettingsBody(sourceLostCard);
+        sourceLostSwitch = mediaSwitch(sourceLost, "Автопереключение на источник по умолчанию",
+                12, MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT);
+        sourceLostAutoplaySwitch = mediaSwitch(sourceLost,
+                "Автовоспроизведение после переключения", 12,
+                MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY);
+        page.addView(sourceLostCard);
 
-        defaultSourceDelayLabel = text("0 сек", 18, Ui.PRIMARY, Typeface.BOLD);
-        LinearLayout.LayoutParams dslParams = fullWrap();
-        dslParams.topMargin = Ui.dp(this, 4);
-        mediaSettingsGroup.addView(defaultSourceDelayLabel, dslParams);
+        LinearLayout broadcastCard = card();
+        broadcastCard.addView(text("Приборная панель", 20, Ui.PRIMARY, Typeface.BOLD));
+        LinearLayout broadcast = mediaSettingsBody(broadcastCard);
+        clusterCoversSwitch = mediaSwitch(broadcast,
+                "Трансляция радио (название и обложка)", 12,
+                MediaBridgeContract.K_CLUSTER_COVERS_ENABLED);
+        clusterOnlineSwitch = mediaSwitch(broadcast,
+                "Трансляция онлайн-плеера (название, обложка и прогресс)", 10,
+                MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED);
 
-        defaultSourceDelaySeekBar = sizeSeekBar(0, 30);
-        defaultSourceDelaySeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
-                if (fromUser) {
-                    defaultSourceDelayLabel.setText(progress + " сек");
-                }
-            }
-            @Override public void onStartTrackingTouch(SeekBar bar) {}
-            @Override public void onStopTrackingTouch(SeekBar bar) {
-                commitDelaySetting(bar.getProgress());
-            }
-        });
-        mediaSettingsGroup.addView(defaultSourceDelaySeekBar, fullWrap());
+        LinearLayout tuningSpacer = new LinearLayout(this);
+        tuningSpacer.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams tuningParams = fullWrap();
+        tuningParams.topMargin = Ui.dp(this, 16);
+        broadcastCard.addView(tuningSpacer, tuningParams);
+        LinearLayout tuning = collapsible(tuningSpacer, "Тонкая настройка трансляции радио",
+                null, 15, Ui.SECONDARY);
+        mediaSettingsViews.add(tuning);
 
-        startupAutoplaySwitch = new Switch(this);
-        startupAutoplaySwitch.setText("Автовоспроизведение при старте");
-        startupAutoplaySwitch.setTextColor(Ui.PRIMARY);
-        startupAutoplaySwitch.setTextSize(15);
-        startupAutoplaySwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY, checked);
-        });
-        LinearLayout.LayoutParams s1 = fullWrap();
-        s1.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(startupAutoplaySwitch, s1);
-
-        sourceLostSwitch = new Switch(this);
-        sourceLostSwitch.setText("Автопереключение при потере источника");
-        sourceLostSwitch.setTextColor(Ui.PRIMARY);
-        sourceLostSwitch.setTextSize(15);
-        sourceLostSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT, checked);
-        });
-        LinearLayout.LayoutParams s2 = fullWrap();
-        s2.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(sourceLostSwitch, s2);
-
-        sourceLostAutoplaySwitch = new Switch(this);
-        sourceLostAutoplaySwitch.setText("Автовоспроизведение при потере источника");
-        sourceLostAutoplaySwitch.setTextColor(Ui.PRIMARY);
-        sourceLostAutoplaySwitch.setTextSize(15);
-        sourceLostAutoplaySwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY, checked);
-        });
-        LinearLayout.LayoutParams s3 = fullWrap();
-        s3.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(sourceLostAutoplaySwitch, s3);
-
-        TextView radioClusterTitle = text("Радио и приборная панель", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams rctParams = fullWrap();
-        rctParams.topMargin = Ui.dp(this, 16);
-        mediaSettingsGroup.addView(radioClusterTitle, rctParams);
-
-        radioWidgetBroadcastSwitch = new Switch(this);
-        radioWidgetBroadcastSwitch.setText("Трансляция радио в виджет (название и обложка)");
-        radioWidgetBroadcastSwitch.setTextColor(Ui.PRIMARY);
-        radioWidgetBroadcastSwitch.setTextSize(15);
-        radioWidgetBroadcastSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED, checked);
-        });
-        LinearLayout.LayoutParams s5 = fullWrap();
-        s5.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(radioWidgetBroadcastSwitch, s5);
-
-        clusterCoversSwitch = new Switch(this);
-        clusterCoversSwitch.setText("Трансляция радио на приборку (название и обложка)");
-        clusterCoversSwitch.setTextColor(Ui.PRIMARY);
-        clusterCoversSwitch.setTextSize(15);
-        clusterCoversSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_COVERS_ENABLED, checked);
-        });
-        LinearLayout.LayoutParams s6 = fullWrap();
-        s6.topMargin = Ui.dp(this, 10);
-        mediaSettingsGroup.addView(clusterCoversSwitch, s6);
-
-        clusterOnlineSwitch = new Switch(this);
-        clusterOnlineSwitch.setText("Трансляция онлайн-плеера на приборку (название, обложка и прогресс)");
-        clusterOnlineSwitch.setTextColor(Ui.PRIMARY);
-        clusterOnlineSwitch.setTextSize(15);
-        clusterOnlineSwitch.setOnCheckedChangeListener((btn, checked) -> {
-            if (!btn.isPressed()) return;
-            sendMediaSettingChange(MediaBridgeContract.K_CLUSTER_ONLINE_ENABLED, checked);
-        });
-        LinearLayout.LayoutParams s7 = fullWrap();
-        s7.topMargin = Ui.dp(this, 10);
-        mediaSettingsGroup.addView(clusterOnlineSwitch, s7);
-
-        TextView clusterWatchdogTitle = text("Период watchdog радио на приборке", 14, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams cwtParams = fullWrap();
-        cwtParams.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(clusterWatchdogTitle, cwtParams);
+        TextView clusterWatchdogTitle = text("Период watchdog", 14, Ui.SECONDARY, Typeface.BOLD);
+        tuning.addView(clusterWatchdogTitle, labelParams());
 
         clusterWatchdogLabel = text("1250 мс", 16, Ui.PRIMARY, Typeface.BOLD);
         LinearLayout.LayoutParams cwlParams = fullWrap();
         cwlParams.topMargin = Ui.dp(this, 4);
-        mediaSettingsGroup.addView(clusterWatchdogLabel, cwlParams);
+        tuning.addView(clusterWatchdogLabel, cwlParams);
 
         clusterWatchdogSeekBar = sizeSeekBar(100, 500); // 1000..5000 ms
         clusterWatchdogSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1914,17 +1917,15 @@ public final class MainActivity extends ScaledActivity {
                 commitWatchdog(bar.getProgress() * 10L);
             }
         });
-        mediaSettingsGroup.addView(clusterWatchdogSeekBar, fullWrap());
+        tuning.addView(clusterWatchdogSeekBar, fullWrap());
 
         TextView clusterReassertBurstTitle = text("Базовый интервал быстрых повторов", 14, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams crbtParams = fullWrap();
-        crbtParams.topMargin = Ui.dp(this, 12);
-        mediaSettingsGroup.addView(clusterReassertBurstTitle, crbtParams);
+        tuning.addView(clusterReassertBurstTitle, labelParams());
 
         clusterReassertBurstLabel = text("100 мс", 16, Ui.PRIMARY, Typeface.BOLD);
         LinearLayout.LayoutParams crblParams = fullWrap();
         crblParams.topMargin = Ui.dp(this, 4);
-        mediaSettingsGroup.addView(clusterReassertBurstLabel, crblParams);
+        tuning.addView(clusterReassertBurstLabel, crblParams);
 
         clusterReassertBurstSeekBar = sizeSeekBar(5, 50); // 50..500 ms
         clusterReassertBurstSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1939,23 +1940,36 @@ public final class MainActivity extends ScaledActivity {
                 commitReassertBurstInterval(bar.getProgress() * 10L);
             }
         });
-        mediaSettingsGroup.addView(clusterReassertBurstSeekBar, fullWrap());
+        tuning.addView(clusterReassertBurstSeekBar, fullWrap());
+        page.addView(broadcastCard);
+    }
 
-        TextView radioCatalogSectionTitle = text("Каталог радио", 15, Ui.SECONDARY, Typeface.BOLD);
-        LinearLayout.LayoutParams rcsParams = fullWrap();
-        rcsParams.topMargin = Ui.dp(this, 16);
-        mediaSettingsGroup.addView(radioCatalogSectionTitle, rcsParams);
+    /** A card body that stays disabled until the Media Bridge delivers its settings. */
+    private LinearLayout mediaSettingsBody(LinearLayout card) {
+        LinearLayout body = new LinearLayout(this);
+        body.setOrientation(LinearLayout.VERTICAL);
+        card.addView(body, fullWrap());
+        mediaSettingsViews.add(body);
+        return body;
+    }
 
-        radioCatalogInfoText = text("Каталог: ...", 13, Ui.SECONDARY, Typeface.NORMAL);
-        LinearLayout.LayoutParams rciParams = fullWrap();
-        rciParams.topMargin = Ui.dp(this, 4);
-        mediaSettingsGroup.addView(radioCatalogInfoText, rciParams);
+    private Switch mediaSwitch(LinearLayout parent, String label, int topMarginDp, String key) {
+        Switch view = new Switch(this);
+        view.setText(label);
+        view.setTextColor(Ui.PRIMARY);
+        view.setTextSize(15);
+        view.setOnCheckedChangeListener((btn, checked) -> {
+            if (!btn.isPressed()) return;
+            sendMediaSettingChange(key, checked);
+        });
+        LinearLayout.LayoutParams params = fullWrap();
+        params.topMargin = Ui.dp(this, topMarginDp);
+        parent.addView(view, params);
+        return view;
+    }
 
-        restoreDefaultRadioCatalogButton = actionButton("Восстановить стандартный каталог радио");
-        restoreDefaultRadioCatalogButton.setOnClickListener(v -> restoreDefaultRadioCatalog());
-        mediaSettingsGroup.addView(restoreDefaultRadioCatalogButton, buttonParams());
-        setMediaControlsEnabled(mediaSettingsGroup, false);
-        return mediaCard;
+    private void setMediaSettingsEnabled(boolean enabled) {
+        for (View view : mediaSettingsViews) setMediaControlsEnabled(view, enabled);
     }
 
     private LinearLayout createDiagnosticCard() {
@@ -1975,16 +1989,28 @@ public final class MainActivity extends ScaledActivity {
         return diagnosticCard;
     }
 
-    private LinearLayout createRadioCatalogTransferCard() {
+    private LinearLayout createRadioCatalogCard() {
         LinearLayout radioCard = card();
-        radioCard.addView(text("Каталог радио", 20, Ui.PRIMARY, Typeface.BOLD));
+        radioCard.addView(text("Каталог станций", 20, Ui.PRIMARY, Typeface.BOLD));
+        LinearLayout catalog = mediaSettingsBody(radioCard);
+        radioWidgetBroadcastSwitch = mediaSwitch(catalog,
+                "Названия и обложки из каталога в карточке", 12,
+                MediaBridgeContract.K_RADIO_WIDGET_BROADCAST_ENABLED);
+        radioCatalogInfoText = text("Каталог: ...", 13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams rciParams = fullWrap();
+        rciParams.topMargin = Ui.dp(this, 12);
+        catalog.addView(radioCatalogInfoText, rciParams);
+        restoreDefaultRadioCatalogButton = actionButton("Восстановить стандартный каталог радио");
+        restoreDefaultRadioCatalogButton.setOnClickListener(v -> restoreDefaultRadioCatalog());
+        catalog.addView(restoreDefaultRadioCatalogButton, buttonParams());
+
         TextView hint = text(
                 "Отдельный ZIP-каталог содержит stations.csv и обложки радиостанций. "
                         + "Импорт заменяет текущий каталог после подтверждения.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         hint.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams hintParams = fullWrap();
-        hintParams.topMargin = Ui.dp(this, 8);
+        hintParams.topMargin = Ui.dp(this, 14);
         radioCard.addView(hint, hintParams);
 
         exportRadioCatalogButton = actionButton("Экспортировать каталог радио (ZIP)");
@@ -2025,7 +2051,7 @@ public final class MainActivity extends ScaledActivity {
                 || mediaSettingsBusy || settingsTransferBusy || radioCatalogBusy
                 || recoveryInProgress || importInProgress) return;
         mediaSettingsBusy = true;
-        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setMediaSettingsEnabled(false);
         setSettingsTransferEnabled(false);
         mediaBridgeClient.getSettings(new MediaBridgeClient.SettingsCallback() {
             @Override public void onSettings(MediaSettingsSnapshot snapshot) {
@@ -2040,7 +2066,7 @@ public final class MainActivity extends ScaledActivity {
                 if (isDestroyed()) return;
                 mediaStatusText.setText("Не удалось загрузить медианастройки: " + message);
                 mediaStatusText.setTextColor(Ui.ERROR);
-                setMediaControlsEnabled(mediaSettingsGroup, false);
+                setMediaSettingsEnabled(false);
                 setSettingsTransferEnabled(true);
                 AppLog.warn("Failed to load media settings: " + code + " " + message, null);
             }
@@ -2048,7 +2074,7 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void updateMediaSettingsUi(MediaSettingsSnapshot snapshot) {
-        setMediaControlsEnabled(mediaSettingsGroup, true);
+        setMediaSettingsEnabled(true);
         setRadioCatalogTransferEnabled(true);
         for (Map.Entry<String, Button> entry : sourceTileButtons.entrySet()) {
             boolean isSelected = entry.getKey().equals(snapshot.defaultAudioSource);
@@ -2289,7 +2315,7 @@ public final class MainActivity extends ScaledActivity {
                 || settingsTransferBusy || radioCatalogBusy
                 || !mediaBridgeClient.isSettingsSupported()) return;
         mediaSettingsBusy = true;
-        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setMediaSettingsEnabled(false);
         setSettingsTransferEnabled(false);
         Bundle b = new Bundle();
         if (value instanceof Boolean) {
@@ -2332,7 +2358,7 @@ public final class MainActivity extends ScaledActivity {
 
     private void applyDefaultRadioCatalog() {
         mediaSettingsBusy = true;
-        setMediaControlsEnabled(mediaSettingsGroup, false);
+        setMediaSettingsEnabled(false);
         setSettingsTransferEnabled(false);
         mediaBridgeClient.restoreDefaultCatalog(new MediaBridgeClient.RestoreCatalogCallback() {
             @Override public void onCatalogRestored(MediaSettingsSnapshot snapshot) {
@@ -2396,7 +2422,7 @@ public final class MainActivity extends ScaledActivity {
             if (currentMediaSettings != null && mediaBridgeClient.isSettingsSupported()) {
                 updateMediaSettingsUi(currentMediaSettings);
             } else {
-                setMediaControlsEnabled(mediaSettingsGroup, false);
+                setMediaSettingsEnabled(false);
             }
             setRadioCatalogTransferEnabled(true);
             setSettingsTransferEnabled(true);
@@ -2918,7 +2944,8 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void renderPreview() {
-        if (previewHost == null || widthSize == null || topInsetSetting == null) return;
+        if (previewHost == null || widthSize == null || topInsetSetting == null
+                || previewHost.getVisibility() != View.VISIBLE) return;
         if (previewHost.getWidth() <= 0) {
             previewHost.post(this::renderPreview);
             return;
@@ -2950,9 +2977,9 @@ public final class MainActivity extends ScaledActivity {
                 favoriteColumns == null ? prefs.radioFavoritesColumns()
                         : favoriteColumns.getProgress(),
                 favoriteRows == null ? prefs.radioFavoritesRows() : favoriteRows.getProgress(),
-                previewListener);
-        preview.renderSnapshot(previewSnapshot(), true);
-        preview.setArtwork(previewArtwork());
+                WidgetPreview.INERT);
+        preview.renderSnapshot(WidgetPreview.demoSnapshot(), true);
+        preview.setArtwork(WidgetPreview.demoArtwork(this));
         preview.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
 
         previewHost.removeAllViews();
@@ -2975,33 +3002,6 @@ public final class MainActivity extends ScaledActivity {
         hostParams.height = Math.min(maxContainerHeightPx,
                 Math.round(preview.cardHeight() * scale) + verticalPadding);
         previewHost.setLayoutParams(hostParams);
-    }
-
-    private MediaSnapshot previewSnapshot() {
-        long capabilities = MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_PAUSE
-                | MediaBridgeContract.CAP_TOGGLE | MediaBridgeContract.CAP_NEXT
-                | MediaBridgeContract.CAP_PREVIOUS | MediaBridgeContract.CAP_SEEK
-                | MediaBridgeContract.CAP_SET_SOURCE | MediaBridgeContract.CAP_TUNE_RADIO;
-        return new MediaSnapshot(
-                MediaBridgeContract.VERSION, 1L, System.currentTimeMillis(), true, 0, "",
-                MediaSource.Id.USB, "DEMO",
-                Arrays.asList(
-                        new MediaSource(MediaSource.Id.BT, true, true, false, capabilities),
-                        new MediaSource(MediaSource.Id.RADIO, true, true, false, capabilities),
-                        new MediaSource(MediaSource.Id.USB, true, true, true, capabilities),
-                        new MediaSource(MediaSource.Id.ONLINE, true, true, false, capabilities)),
-                "com.mmwtl.atlasmediaapi.demo.usb", "Atlas demo USB", "demo:USB:0",
-                "Liminal Hours (Extended Night Drive Version)",
-                "Northern Signal Department feat. Elena Markova", "The Roads We Leave Behind",
-                286_000L, 47_000L,
-                SystemClock.elapsedRealtime(), 1f, MediaSnapshot.STATE_PLAYING,
-                0, "", 0L, capabilities, "", 0L);
-    }
-
-    private Bitmap previewArtwork() {
-        if (previewArtwork == null) previewArtwork = BitmapFactory.decodeResource(
-                getResources(), com.mmwtl.atlasmediaapi.R.drawable.demo_neon_drive);
-        return previewArtwork;
     }
 
     private LinearLayout.LayoutParams labelParams() {

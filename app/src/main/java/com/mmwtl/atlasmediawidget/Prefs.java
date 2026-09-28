@@ -120,6 +120,8 @@ final class Prefs {
     }
 
     static final String KEY_DISPLAY_MODE = "display_mode";
+    /** Device-local AppWidget IDs confirmed in the setup dialog; not part of backups. */
+    private static final String KEY_CONFIGURED_WIDGET_IDS = "configured_widget_ids";
 
     boolean isWidgetMode() {
         return "widget".equals(getString(KEY_DISPLAY_MODE, "overlay"));
@@ -127,6 +129,21 @@ final class Prefs {
 
     void setWidgetMode(boolean widget) {
         putString(KEY_DISPLAY_MODE, widget ? "widget" : "overlay");
+    }
+
+    boolean isWidgetConfigured(int id) {
+        return preferences.getStringSet(KEY_CONFIGURED_WIDGET_IDS, java.util.Set.of())
+                .contains(Integer.toString(id));
+    }
+
+    void setWidgetsConfigured(int[] ids, boolean configured) {
+        java.util.Set<String> stored = new java.util.HashSet<>(preferences.getStringSet(
+                KEY_CONFIGURED_WIDGET_IDS, java.util.Set.of()));
+        for (int id : ids) {
+            if (configured) stored.add(Integer.toString(id));
+            else stored.remove(Integer.toString(id));
+        }
+        preferences.edit().putStringSet(KEY_CONFIGURED_WIDGET_IDS, stored).apply();
     }
 
     void observe(android.content.SharedPreferences.OnSharedPreferenceChangeListener listener) {
@@ -271,6 +288,10 @@ final class Prefs {
         return CoverDimPreset.fromPreference(getInt(
                 KEY_COVER_DIM_PRESET_PREFIX + style.preferenceValue,
                 CoverDimPreset.DEFAULT.preferenceValue));
+    }
+
+    void putCoverDimPreset(CardStyle style, CoverDimPreset preset) {
+        putInt(KEY_COVER_DIM_PRESET_PREFIX + style.preferenceValue, preset.preferenceValue);
     }
 
     private void migrateCoverDimPreset() {

@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.view.View;
 import android.view.ViewGroup;
 import android.app.AlertDialog;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -39,23 +38,39 @@ public final class MainActivityTest {
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
-    public void settingsResumeWithPermissionsFirstAndScaleLast() {
+    public void settingsTabsSeparateSectionsAndKeepSelectionAcrossRecreate() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class)
                 .create().start().resume();
         try {
-            MainActivity activity = controller.get();
-            ScrollView scroll = findScroll(activity.findViewById(android.R.id.content));
-            ViewGroup settings = (ViewGroup) scroll.getChildAt(0);
+            View root = controller.get().findViewById(android.R.id.content);
+            for (String tab : new String[]{"Карточка", "Медиа", "Радио", "Система"}) {
+                assertTrue(tab, findLabel(root, tab) != null);
+            }
+            assertTrue(shown(findLabel(root, "Режим отображения")));
+            assertFalse(shown(findLabel(root, "Медиасервис OneOS")));
+
+            findLabel(root, "Медиа").performClick();
+            assertTrue(shown(findLabel(root, "Медиасервис OneOS")));
+            assertFalse(shown(findLabel(root, "Режим отображения")));
+            assertFalse(findLabel(root, "Radio").isEnabled());
+
+            findLabel(root, "Система").performClick();
             List<String> labels = new ArrayList<>();
-            collectLabels(settings, labels);
-            assertTrue(labels.indexOf(activity.getString(R.string.permissions_title))
-                    < labels.indexOf("Медиасервис OneOS"));
-            assertTrue(labels.indexOf("Медиасервис OneOS")
-                    < labels.indexOf(activity.getString(R.string.appearance_title)));
-            List<String> lastCard = new ArrayList<>();
-            collectLabels(settings.getChildAt(settings.getChildCount() - 1), lastCard);
-            assertEquals(activity.getString(R.string.scale_title), lastCard.get(0));
-            assertFalse(findLabel(settings, "Radio").isEnabled());
+            collectShownLabels(root, labels);
+            MainActivity activity = controller.get();
+            assertTrue(labels.indexOf("Резервная копия настроек")
+                    < labels.indexOf("Диагностика OneOS"));
+            assertTrue(labels.indexOf("Диагностика OneOS")
+                    < labels.indexOf(activity.getString(R.string.scale_title)));
+
+            android.os.Bundle state = new android.os.Bundle();
+            controller.saveInstanceState(state);
+            ActivityController<MainActivity> restored =
+                    Robolectric.buildActivity(MainActivity.class).create(state);
+            root = restored.get().findViewById(android.R.id.content);
+            assertTrue(shown(findLabel(root, "Резервная копия настроек")));
+            assertFalse(shown(findLabel(root, "Режим отображения")));
+            restored.destroy();
         } finally {
             controller.pause().stop().destroy();
             ShadowLooper.runUiThreadTasks();
@@ -63,23 +78,42 @@ public final class MainActivityTest {
     }
 
     @Test
-    public void radioCatalogTransferCardIsInMediaSectionAndUnavailableUntilBridgeSettings() {
+    public void fineTuningStartsCollapsedAndExpandsFromHeader() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class)
                 .create().start().resume();
         try {
-            MainActivity activity = controller.get();
-            ScrollView scroll = findScroll(activity.findViewById(android.R.id.content));
-            ViewGroup settings = (ViewGroup) scroll.getChildAt(0);
+            View root = controller.get().findViewById(android.R.id.content);
+            assertFalse(shown(findLabel(root, "Размер названия")));
+            ((View) findLabel(root, "Текст и отступы").getParent().getParent()).performClick();
+            assertTrue(shown(findLabel(root, "Размер названия")));
+            assertFalse(shown(findLabel(root, "Высота нижней панели")));
+        } finally {
+            controller.pause().stop().destroy();
+            ShadowLooper.runUiThreadTasks();
+        }
+    }
+
+    @Test
+    public void radioTabCollectsCatalogAndStaysUnavailableUntilBridgeSettings() {
+        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class)
+                .create().start().resume();
+        try {
+            View root = controller.get().findViewById(android.R.id.content);
+            findLabel(root, "Радио").performClick();
             List<String> labels = new ArrayList<>();
-            collectLabels(settings, labels);
-            int mediaIndex = labels.indexOf("Медиасервис OneOS");
+            collectShownLabels(root, labels);
+            int navigationIndex = labels.indexOf("Переключать радио без поиска по эфиру");
+            int catalogIndex = labels.indexOf("Каталог станций");
             int exportIndex = labels.indexOf("Экспортировать каталог радио (ZIP)");
             int importIndex = labels.indexOf("Импортировать каталог радио (ZIP)");
-            assertTrue(mediaIndex >= 0);
-            assertTrue(exportIndex > mediaIndex);
+            assertTrue(navigationIndex >= 0);
+            assertTrue(catalogIndex > navigationIndex);
+            assertTrue(exportIndex > catalogIndex);
             assertTrue(importIndex > exportIndex);
-            assertFalse(findLabel(settings, "Экспортировать каталог радио (ZIP)").isEnabled());
-            assertFalse(findLabel(settings, "Импортировать каталог радио (ZIP)").isEnabled());
+            assertFalse(labels.contains("Медиасервис OneOS"));
+            assertFalse(findLabel(root, "Экспортировать каталог радио (ZIP)").isEnabled());
+            assertFalse(findLabel(root, "Импортировать каталог радио (ZIP)").isEnabled());
+            assertFalse(findLabel(root, "Названия и обложки из каталога в карточке").isEnabled());
         } finally {
             controller.pause().stop().destroy();
             ShadowLooper.runUiThreadTasks();
@@ -135,17 +169,6 @@ public final class MainActivityTest {
         }
     }
 
-    private static ScrollView findScroll(View view) {
-        if (view instanceof ScrollView scroll) return scroll;
-        if (view instanceof ViewGroup group) {
-            for (int i = 0; i < group.getChildCount(); i++) {
-                ScrollView found = findScroll(group.getChildAt(i));
-                if (found != null) return found;
-            }
-        }
-        return null;
-    }
-
     private static View findLabel(View view, String label) {
         if (view instanceof TextView text && label.contentEquals(text.getText())) return view;
         if (view instanceof ViewGroup group) {
@@ -157,10 +180,22 @@ public final class MainActivityTest {
         return null;
     }
 
-    private static void collectLabels(View view, List<String> labels) {
+    private static void collectShownLabels(View view, List<String> labels) {
+        if (view.getVisibility() != View.VISIBLE) return;
         if (view instanceof TextView text) labels.add(text.getText().toString());
         if (view instanceof ViewGroup group) {
-            for (int i = 0; i < group.getChildCount(); i++) collectLabels(group.getChildAt(i), labels);
+            for (int i = 0; i < group.getChildCount(); i++) {
+                collectShownLabels(group.getChildAt(i), labels);
+            }
         }
+    }
+
+    static boolean shown(View view) {
+        if (view == null) return false;
+        for (View current = view; current != null;
+                current = current.getParent() instanceof View parent ? parent : null) {
+            if (current.getVisibility() != View.VISIBLE) return false;
+        }
+        return true;
     }
 }

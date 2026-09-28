@@ -13,7 +13,7 @@
 - диапазон и частота (например, `FM 101.8`) передаются в `snapshot.artist`;
 - обложка станции предоставляется через `FileProvider` URI в `snapshot.artworkUri` с инкрементом `snapshot.artworkRevision`;
 - виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов;
-- в `integrated` сборке управление каталогом (информация о станциях, сброс к встроенному, импорт и экспорт) доступно прямо из единого экрана настроек `MainActivity` в секции «Медиасервис».
+- в `integrated` сборке управление каталогом (информация о станциях, сброс к встроенному, импорт и экспорт) доступно прямо из единого экрана настроек `MainActivity` на вкладке «Радио» (карточка «Каталог станций»).
 
 ### [EN] Centralized Management in AtlasMediaApi
 Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are managed centrally by the `AtlasMediaApi` service, compiled directly into the only supported integrated Widget APK (module `:media-runtime`).
@@ -23,7 +23,7 @@ Radio station catalogs (the built-in Penza catalog and custom ZIP imports) are m
 - The band and frequency (e.g., `FM 101.8`) are supplied in `snapshot.artist`;
 - Station artwork is provided via a `FileProvider` URI in `snapshot.artworkUri` with an incrementing `snapshot.artworkRevision`;
 - `AtlasMediaWidget` renders the incoming metadata and decodes the artwork URI without storing redundant local assets;
-- In `integrated` builds, catalog management (active station counts, reset to builtin, import and export) is accessible directly from the unified `MainActivity` under the "Media Service" section.
+- In `integrated` builds, catalog management (active station counts, reset to builtin, import and export) is accessible directly from the unified `MainActivity` on the Radio tab ("Station catalog" card).
 
 ---
 

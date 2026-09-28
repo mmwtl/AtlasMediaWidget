@@ -49,7 +49,10 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
         refresh(context);
     }
 
-    @Override public void onDeleted(Context context, int[] ids) { refresh(context); }
+    @Override public void onDeleted(Context context, int[] ids) {
+        new Prefs(context).setWidgetsConfigured(ids, false);
+        refresh(context);
+    }
     @Override public void onDisabled(Context context) { refresh(context); }
 
     static void refresh(Context context) {

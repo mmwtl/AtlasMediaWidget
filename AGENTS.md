@@ -42,7 +42,9 @@ migration request.
 
 ## Android AppWidget behavior
 
-- Keep MainActivity as the only settings editor, including ACTION_APPWIDGET_CONFIGURE.
+- Keep MainActivity as the only full settings editor. `WidgetSetupActivity` handles
+  ACTION_APPWIDGET_CONFIGURE as a short dialog over HOME limited to layout, artwork dimming and the
+  switch to widget mode; cancelling restores the look it changed.
 - Validate appWidgetId ownership; return the original ID with OK or CANCELED. Settings apply
   immediately and are shared across instances; the launcher owns allocation and cancellation.
 - OverlayService owns the existing MediaBridgeClient for both display modes. Do not stop it when
@@ -90,8 +92,9 @@ migration request.
 
 ## Settings and backups
 
-- `MainActivity` is the single settings entry point with five sections: System, Media, Widget,
-  Backup and Diagnostics. Keep settings ownership split as implemented: Widget preferences in the
+- `MainActivity` is the single settings entry point with four tabs: Card (display mode, placement,
+  appearance), Media, Radio and System (backup, diagnostics, app scale). Keep fine-tuning sliders
+  collapsed. Keep settings ownership split as implemented: Widget preferences in the
   app process and media/runtime settings in `:media` behind the Media Bridge settings operations.
 - Keep settings export/import and radio-catalog export/import separate. Preserve legacy JSON
   settings compatibility and the crash-recovery journal.

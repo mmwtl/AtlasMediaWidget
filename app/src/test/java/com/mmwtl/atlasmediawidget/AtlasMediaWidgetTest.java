@@ -67,36 +67,93 @@ public class AtlasMediaWidgetTest {
         foreign.provider = new ComponentName("other", "other.Provider");
         manager.addBoundWidget(92, foreign);
         for (int id : new int[]{0, 91, 92}) {
-            var controller = Robolectric.buildActivity(MainActivity.class, configure(id)).create();
+            var controller = Robolectric.buildActivity(WidgetSetupActivity.class, configure(id)).create();
             assertTrue(controller.get().isFinishing());
             assertEquals(Activity.RESULT_CANCELED, Shadows.shadowOf(controller.get()).getResultCode());
             controller.destroy();
         }
     }
 
-    @Test public void configureDoneAndBackKeepOriginalIdAndImmediateSettings() {
+    @Test public void setupCancelKeepsOriginalIdAndRestoresLook() {
+        Prefs prefs = new Prefs(context);
+        prefs.putInt(Prefs.KEY_CARD_STYLE, CardStyle.COMPACT.preferenceValue);
+        prefs.putCoverDimPreset(CardStyle.SQUARE, CoverDimPreset.WEAK);
         bind(41);
-        for (boolean done : new boolean[]{false, true}) {
-            bind(41);
-            var controller = Robolectric.buildActivity(MainActivity.class, configure(41)).create();
-            MainActivity activity = controller.get();
-            assertFalse("configure must stay open", activity.isFinishing());
-            assertTrue("provider ownership", AtlasMediaWidgetProvider.owns(activity, 41));
-            new Prefs(context).setWidgetMode(done);
-            if (done) {
-                View doneButton = find(activity.findViewById(android.R.id.content), "Готово");
-                assertNotNull("done button", doneButton);
-                doneButton.performClick();
-            }
-            else activity.onBackPressed();
-            assertEquals(done ? Activity.RESULT_OK : Activity.RESULT_CANCELED,
-                    Shadows.shadowOf(activity).getResultCode());
-            assertEquals(41, Shadows.shadowOf(activity).getResultIntent()
-                    .getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
-            assertEquals(done, new Prefs(context).isWidgetMode());
-            assertArrayEquals(new int[]{41}, AtlasMediaWidgetProvider.ids(context));
+        var controller = Robolectric.buildActivity(WidgetSetupActivity.class, configure(41)).create();
+        WidgetSetupActivity activity = controller.get();
+        View root = activity.findViewById(android.R.id.content);
+        assertFalse("setup must stay open", activity.isFinishing());
+        find(root, "Просторная").performClick();
+        find(root, "Максимум").performClick();
+        assertEquals(CoverDimPreset.MAXIMUM, prefs.coverDimPreset(CardStyle.SQUARE));
+        find(root, "✕").performClick();
+        assertTrue(activity.isFinishing());
+        controller.destroy();
+        assertEquals(Activity.RESULT_CANCELED, Shadows.shadowOf(activity).getResultCode());
+        assertEquals(41, Shadows.shadowOf(activity).getResultIntent()
+                .getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
+        assertEquals(CardStyle.COMPACT.preferenceValue,
+                prefs.getInt(Prefs.KEY_CARD_STYLE, -1));
+        assertEquals(CoverDimPreset.WEAK, prefs.coverDimPreset(CardStyle.SQUARE));
+        assertFalse(prefs.isWidgetMode());
+        assertArrayEquals(new int[]{41}, AtlasMediaWidgetProvider.ids(context));
+    }
+
+    @Test public void setupConfirmKeepsLookAndSwitchesModeOnlyWhenChecked() {
+        for (boolean switchMode : new boolean[]{false, true}) {
+            Prefs prefs = new Prefs(context);
+            prefs.setWidgetMode(false);
+            prefs.putInt(Prefs.KEY_CARD_STYLE, CardStyle.COMPACT.preferenceValue);
+            int id = switchMode ? 42 : 41;
+            bind(id);
+            var controller = Robolectric.buildActivity(WidgetSetupActivity.class,
+                    configure(id)).create();
+            WidgetSetupActivity activity = controller.get();
+            View root = activity.findViewById(android.R.id.content);
+            find(root, "Просторная").performClick();
+            if (!switchMode) find(root, "Переключить приложение в режим «Виджет»").performClick();
+            find(root, "Добавить").performClick();
+            assertTrue(activity.isFinishing());
             controller.destroy();
+            assertEquals(Activity.RESULT_OK, Shadows.shadowOf(activity).getResultCode());
+            assertEquals(id, Shadows.shadowOf(activity).getResultIntent()
+                    .getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
+            assertEquals(CardStyle.SQUARE.preferenceValue,
+                    prefs.getInt(Prefs.KEY_CARD_STYLE, -1));
+            assertEquals(switchMode, prefs.isWidgetMode());
         }
+    }
+
+    @Test public void setupRemembersConfirmedIdsForReconfigurationUntilDeleted() {
+        new Prefs(context).setWidgetMode(true);
+        bind(43);
+        var first = Robolectric.buildActivity(WidgetSetupActivity.class, configure(43)).create();
+        find(first.get().findViewById(android.R.id.content), "Добавить").performClick();
+        first.destroy();
+        var again = Robolectric.buildActivity(WidgetSetupActivity.class, configure(43)).create();
+        View root = again.get().findViewById(android.R.id.content);
+        assertNotNull(find(root, "Настройка медиавиджета"));
+        assertNull(find(root, "Добавить"));
+        find(root, "Готово").performClick();
+        assertEquals(Activity.RESULT_OK, Shadows.shadowOf(again.get()).getResultCode());
+        again.destroy();
+        new AtlasMediaWidgetProvider().onDeleted(context, new int[]{43});
+        assertFalse(new Prefs(context).isWidgetConfigured(43));
+    }
+
+    @Test public void setupInWidgetModeHidesModeSwitchAndCanOpenSettings() {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        var controller = Robolectric.buildActivity(WidgetSetupActivity.class, configure(41)).create();
+        WidgetSetupActivity activity = controller.get();
+        View root = activity.findViewById(android.R.id.content);
+        assertNull(find(root, "Переключить приложение в режим «Виджет»"));
+        find(root, "Добавить и открыть все настройки").performClick();
+        assertEquals(Activity.RESULT_OK, Shadows.shadowOf(activity).getResultCode());
+        Intent settings = Shadows.shadowOf(activity).getNextStartedActivity();
+        assertEquals(new ComponentName(context, MainActivity.class), settings.getComponent());
+        assertTrue((settings.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0);
+        controller.destroy();
     }
 
     @Test public void remoteViewsUseHostDimensionsCapabilitiesAndIndependentActions() {
@@ -134,17 +191,19 @@ public class AtlasMediaWidgetTest {
         prefs.setWidgetMode(true);
         var controller = Robolectric.buildActivity(MainActivity.class).create();
         View root = controller.get().findViewById(android.R.id.content);
-        assertEquals(View.GONE, find(root, "Разрешить поверх окон").getVisibility());
-        assertEquals(View.VISIBLE, find(root, "Разрешить доступ к уведомлениям (медиа)").getVisibility());
-        assertEquals(View.VISIBLE, find(root, "Добавить виджет").getVisibility());
-        assertEquals(View.GONE, find(root, "Размер карточки").getVisibility());
-        assertEquals(View.VISIBLE, find(root, "Затемнение обложки").getVisibility());
+        assertFalse(MainActivityTest.shown(find(root, "Разрешить поверх окон")));
+        assertFalse(MainActivityTest.shown(find(root, "Размер карточки")));
+        assertTrue(MainActivityTest.shown(find(root, "Добавить виджет")));
+        assertTrue(MainActivityTest.shown(find(root, "Затемнение обложки")));
+        find(root, "Медиа").performClick();
+        assertTrue(MainActivityTest.shown(find(root, "Разрешить доступ к уведомлениям (медиа)")));
         controller.destroy();
         prefs.setWidgetMode(false);
         controller = Robolectric.buildActivity(MainActivity.class).create();
         root = controller.get().findViewById(android.R.id.content);
-        assertEquals(View.VISIBLE, find(root, "Размер карточки").getVisibility());
-        assertEquals(View.VISIBLE, find(root, "Разрешить поверх окон").getVisibility());
+        assertTrue(MainActivityTest.shown(find(root, "Размер карточки")));
+        assertTrue(MainActivityTest.shown(find(root, "Разрешить поверх окон")));
+        assertFalse(MainActivityTest.shown(find(root, "Добавить виджет")));
         controller.destroy();
     }
 

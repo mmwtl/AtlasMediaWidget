@@ -14,9 +14,10 @@ audio sources on the home screen. State and commands use the private Media Bridg
 Android AppWidget, sized and placed by the launcher. Existing installations default to Overlay.
 Appearance is shared across instances; switching modes preserves the overlay geometry.
 
-Use **Add widget** or HOME’s widget picker. Settings open through the app or HOME’s edit mode
-when supported by the launcher. Done completes configuration; Back cancels initial placement but
-does not undo shared settings already applied. Placed widgets stay inactive when Overlay is selected.
+Add the widget from HOME’s widget picker or with **Add widget** on the Card tab. Placing it from
+HOME opens a short dialog over the screen with a preview, layout, artwork dimming and **Add**.
+✕, Back or a tap outside cancels placement and restores the previous appearance. When Overlay is
+selected, the dialog offers to switch to Widget mode; without it, placed widgets stay inactive.
 On Android 11 the launcher must explicitly support reconfiguration; widgetFeatures alone is insufficient.
 
 ## Current architecture
@@ -86,7 +87,8 @@ support gestures or a draggable SeekBar.
 - local progress interpolation without per-second IPC polling;
 - configurable card size, position, artwork dimming, typography, spacing and control panel;
 - HOME-only visibility, drag handle and configurable hiding threshold;
-- one settings screen with five sections: System, Media, Widget, Backup and Diagnostics;
+- one settings screen with four tabs: Card, Media, Radio and System; text, spacing and control
+  panel fine-tuning is collapsed by default;
 - default source, startup delay, autoplay and source-loss behavior controls;
 - Online player selection, optional switch to Online before session playback and player minimization;
 - radio catalog with station artwork, favorites grid and saved-station navigation without scanning;
@@ -116,9 +118,10 @@ on the OneOS firmware and its power-management settings.
 ## Installation and quick start
 
 1. Build or install the only supported integrated APK.
-2. Open **Atlas Media Widget**, select the display mode and grant the permissions shown in **System**.
-3. In **Media**, check the media service, default source and startup behavior.
-4. In **Widget**, configure appearance. Overlay also provides manual size and position.
+2. Open **Atlas Media Widget** and select the display mode on the **Card** tab.
+3. On the **Media** tab, check the media service, access, default source and startup behavior.
+4. On the **Card** tab, configure appearance. Overlay also provides permissions, manual size and
+   position there. Station navigation and the catalog live on the **Radio** tab.
 5. For Overlay, tap **Start** and enable launch on boot if required. For Widget, add an instance to HOME; the media service runs independently of the settings window.
 
 ## Build and checks

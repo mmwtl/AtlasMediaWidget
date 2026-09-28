@@ -2,7 +2,7 @@
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="280dp" android:minHeight="200dp"
     android:minResizeWidth="280dp" android:minResizeHeight="180dp"
-    android:configure="com.mmwtl.atlasmediawidget.MainActivity"
+    android:configure="com.mmwtl.atlasmediawidget.WidgetSetupActivity"
     android:widgetFeatures="reconfigurable|configuration_optional"
     android:initialLayout="@layout/media_widget_empty"
     android:previewImage="@drawable/atlas_media_widget_preview"
