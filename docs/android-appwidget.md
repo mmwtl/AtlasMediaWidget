@@ -142,6 +142,12 @@ CANCELED не должны вызывать завершение/отмену п
 показывал `Couldn't add widget`. Пересоздание HOME восстановило карточку с тем же ID и размером.
 Это ограничение хоста; код AtlasLauncher в этой задаче не изменялся.
 
+Миниатюра в списке виджетов задаётся только `android:previewImage`
+(`@drawable/atlas_media_widget_preview`): `previewLayout` и `description` появились в Android 12
+и на ГУ не действуют. Картинка — снимок демо-превью MainActivity (трек «Liminal Hours» из
+демо-бэкенда) в размере по умолчанию 360×264 dp, отрисованный при 320 dpi (720×528 px),
+с прозрачными скруглёнными углами. При изменении внешнего вида карточки её нужно переснять.
+
 Платформенные контракты: [конфигурация](https://developer.android.com/develop/ui/views/appwidgets/configuration),
 [обновления RemoteViews](https://developer.android.com/develop/ui/views/appwidgets/advanced),
 [AppWidgetManager и лимит bitmap](https://developer.android.com/reference/android/appwidget/AppWidgetManager).

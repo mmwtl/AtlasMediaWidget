@@ -5,6 +5,6 @@
     android:configure="com.mmwtl.atlasmediawidget.MainActivity"
     android:widgetFeatures="reconfigurable|configuration_optional"
     android:initialLayout="@layout/media_widget_empty"
-    android:previewImage="@mipmap/ic_launcher"
+    android:previewImage="@drawable/atlas_media_widget_preview"
     android:updatePeriodMillis="1800000"
     android:resizeMode="horizontal|vertical" android:widgetCategory="home_screen" />
