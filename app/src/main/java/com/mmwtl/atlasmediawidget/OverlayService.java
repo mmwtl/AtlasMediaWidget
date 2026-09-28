@@ -5,11 +5,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.appwidget.AppWidgetManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.graphics.Bitmap;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
@@ -17,6 +20,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.os.Trace;
 import android.provider.Settings;
@@ -27,10 +31,16 @@ import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.stream.Collectors;
 
 public final class OverlayService extends Service
         implements MediaBridgeClient.Listener, MediaCardView.Listener, ArtworkLoader.Listener,
@@ -39,15 +49,16 @@ public final class OverlayService extends Service
     static final String ACTION_STOP = "com.mmwtl.atlasmediawidget.action.STOP";
     static final String ACTION_REFRESH_STYLE = "com.mmwtl.atlasmediawidget.action.REFRESH_STYLE";
     static final String ACTION_WIDGET_REFRESH = "com.mmwtl.atlasmediawidget.WIDGET_REFRESH";
-    private final java.util.Map<Integer, AtlasMediaWidgetProvider.Frame> widgetFrames = new java.util.HashMap<>();
-    private final java.util.Set<Integer> openSourceWidgetIds = new java.util.HashSet<>();
-    private android.graphics.Bitmap currentArtwork;
+    private final Map<Integer, AtlasMediaWidgetProvider.Frame> widgetFrames = new HashMap<>();
+    private final Set<Integer> openSourceWidgetIds = new HashSet<>();
+    private final Map<Integer, Long> widgetProgressSeconds = new HashMap<>();
+    private Bitmap currentArtwork;
     private long lastWidgetSnapshotAt;
     private long lastWidgetReconciliationAt;
-    private java.util.List<?> widgetRenderKey;
+    private List<?> widgetRenderKey;
     private String pendingWidgetCommand;
     private long pendingWidgetCommandAt;
-    private final android.content.SharedPreferences.OnSharedPreferenceChangeListener widgetPreferences =
+    private final SharedPreferences.OnSharedPreferenceChangeListener widgetPreferences =
             (preferences, key) -> {
                 if (!Prefs.KEY_SERVICE_ENABLED.equals(key)) {
                     this.main.removeCallbacks(this.refreshWidgets);
@@ -61,7 +72,7 @@ public final class OverlayService extends Service
     private final Runnable widgetTick = new Runnable() {
         @Override public void run() {
             if (destroyed || !prefs.isWidgetMode()) return;
-            if (getSystemService(android.os.PowerManager.class).isInteractive()) {
+            if (getSystemService(PowerManager.class).isInteractive()) {
                 renderWidgets(false);
                 long now = SystemClock.elapsedRealtime();
                 if (bridgeState == MediaBridgeClient.State.CONNECTED
@@ -83,6 +94,9 @@ public final class OverlayService extends Service
     private static final int PROGRESS_TICK_MS = 250;
     private static final long WIDGET_PROGRESS_TICK_MS = 1_000L;
     private static final long SNAPSHOT_RECONCILIATION_MS = 5_000L;
+    private static final long WIDGET_SNAPSHOT_STALE_MS = 20_000L;
+    private static final long WIDGET_COMMAND_TIMEOUT_MS = 5_000L;
+    private static final long SLOW_WIDGET_RENDER_MS = 50L;
     private static volatile boolean running;
     private static volatile OverlayService instance;
 
@@ -242,15 +256,15 @@ public final class OverlayService extends Service
         }
     };
 
-    static void start(android.content.Context context) {
+    static void start(Context context) {
         context.startForegroundService(new Intent(context, OverlayService.class).setAction(ACTION_START));
     }
 
-    static void stop(android.content.Context context) {
+    static void stop(Context context) {
         context.startService(new Intent(context, OverlayService.class).setAction(ACTION_STOP));
     }
 
-    static void refreshStyle(android.content.Context context) {
+    static void refreshStyle(Context context) {
         context.startService(new Intent(context, OverlayService.class).setAction(ACTION_REFRESH_STYLE));
     }
 
@@ -295,15 +309,15 @@ public final class OverlayService extends Service
             }
         }
         if (ACTION_START.equals(action)) prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
+        if (ACTION_REFRESH_STYLE.equals(action)) hideCardImmediately();
         if (ACTION_REFRESH_STYLE.equals(action) || ACTION_WIDGET_REFRESH.equals(action)) {
-            hideCardImmediately();
             widgetRenderKey = null;
         }
         syncDisplayMode();
         if (AtlasMediaWidgetProvider.ACTION_COMMAND.equals(action) && prefs.isWidgetMode()
                 && AtlasMediaWidgetProvider.owns(this, intent.getIntExtra(
-                        android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, 0))) {
-            int id = intent.getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, 0);
+                        AppWidgetManager.EXTRA_APPWIDGET_ID, 0))) {
+            int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0);
             String control = intent.getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL);
             if ("sources".equals(control) || "dismiss_sources".equals(control)
                     || control != null && control.startsWith("source_")) {
@@ -338,6 +352,7 @@ public final class OverlayService extends Service
             updateNotification(3);
         } else {
             widgetFrames.clear();
+            widgetProgressSeconds.clear();
             openSourceWidgetIds.clear();
             AtlasMediaWidgetProvider.showInactive(this,
                     "Неактивен: выбран режим «Оверлей»\nНажмите для выбора режима");
@@ -354,10 +369,10 @@ public final class OverlayService extends Service
         if (pendingWidgetCommand == null) return;
         MediaSnapshot snapshot = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (bridgeState != MediaBridgeClient.State.CONNECTED || snapshot == null
-                || SystemClock.elapsedRealtime() - lastWidgetSnapshotAt > 20_000L) return;
+                || SystemClock.elapsedRealtime() - lastWidgetSnapshotAt > WIDGET_SNAPSHOT_STALE_MS) return;
         String command = pendingWidgetCommand;
         pendingWidgetCommand = null;
-        if (SystemClock.elapsedRealtime() - pendingWidgetCommandAt > 5_000L) return;
+        if (SystemClock.elapsedRealtime() - pendingWidgetCommandAt > WIDGET_COMMAND_TIMEOUT_MS) return;
         if ("PLAY_PAUSE".equals(command)) command = PlayPauseActionPolicy.command(
                 snapshot.audioSource, snapshot.isPlaying(), snapshot.capabilities);
         long capability = switch (command) {
@@ -380,7 +395,7 @@ public final class OverlayService extends Service
         long now = SystemClock.elapsedRealtime();
         MediaSnapshot snapshot = reducer.visibleSnapshot(now);
         if (bridgeState != MediaBridgeClient.State.CONNECTED || snapshot == null
-                || now - lastWidgetSnapshotAt > 20_000L) {
+                || now - lastWidgetSnapshotAt > WIDGET_SNAPSHOT_STALE_MS) {
             openSourceWidgetIds.remove(widgetId);
             renderWidgets(true);
             bridge.requestSnapshot();
@@ -411,48 +426,65 @@ public final class OverlayService extends Service
     private void renderWidgets(boolean force) {
         if (!prefs.isWidgetMode()) return;
         long now = SystemClock.elapsedRealtime();
-        MediaSnapshot snapshot = reducer.isConnected() && now - lastWidgetSnapshotAt <= 20_000L
+        MediaSnapshot snapshot = reducer.isConnected() && now - lastWidgetSnapshotAt <= WIDGET_SNAPSHOT_STALE_MS
                 ? reducer.visibleSnapshot(now) : null;
         boolean connected = reducer.isConnected() && (lastWidgetSnapshotAt == 0
-                || now - lastWidgetSnapshotAt <= 20_000L);
-        java.util.List<?> key = snapshot == null ? java.util.List.of("empty", connected)
-                : java.util.Arrays.asList(
+                || now - lastWidgetSnapshotAt <= WIDGET_SNAPSHOT_STALE_MS);
+        List<?> key = snapshot == null ? List.of("empty", connected)
+                : Arrays.asList(
                 snapshot.title, snapshot.artist, snapshot.album, snapshot.mediaId, snapshot.audioSource,
                 snapshot.appSource, snapshot.ownerPackage, snapshot.duration, snapshot.playbackState,
                 snapshot.capabilities, snapshot.backendConnected, snapshot.sources.stream()
-                        .map(source -> java.util.List.of(source.id, source.available, source.connected,
+                        .map(source -> List.of(source.id, source.available, source.connected,
                                 source.selected, source.capabilities))
-                        .collect(java.util.stream.Collectors.toList()),
+                        .collect(Collectors.toList()),
                 snapshot.artworkUri, snapshot.artworkRevision);
         int[] ids = AtlasMediaWidgetProvider.ids(this);
-        java.util.Set<Integer> active = new java.util.HashSet<>();
+        Set<Integer> active = new HashSet<>();
         for (int id : ids) active.add(id);
         widgetFrames.keySet().retainAll(active);
+        widgetProgressSeconds.keySet().retainAll(active);
         openSourceWidgetIds.retainAll(active);
         if (snapshot == null) openSourceWidgetIds.clear();
-        var manager = android.appwidget.AppWidgetManager.getInstance(this);
+        long progressSecond = AtlasMediaWidgetProvider.progressSecond(snapshot, now);
+        var manager = AppWidgetManager.getInstance(this);
+        int rebuilt = 0;
         for (int id : ids) {
             try {
                 if (force || !key.equals(widgetRenderKey) || !widgetFrames.containsKey(id)) {
-                    var frame = new AtlasMediaWidgetProvider.Frame(this, prefs,
-                            manager.getAppWidgetOptions(id), id, snapshot, currentArtwork, connected,
-                            openSourceWidgetIds.contains(id), this);
-                    manager.updateAppWidget(id, frame.views);
-                    widgetFrames.put(id, frame);
-                } else if (snapshot != null) {
+                    Trace.beginSection("AtlasWidgetFrame");
+                    try {
+                        var frame = new AtlasMediaWidgetProvider.Frame(this, prefs,
+                                manager.getAppWidgetOptions(id), id, snapshot, currentArtwork, connected,
+                                openSourceWidgetIds.contains(id), this);
+                        manager.updateAppWidget(id, frame.views);
+                        widgetFrames.put(id, frame);
+                        widgetProgressSeconds.put(id, progressSecond);
+                        rebuilt++;
+                    } finally {
+                        Trace.endSection();
+                    }
+                } else if (snapshot != null
+                        && !Long.valueOf(progressSecond).equals(widgetProgressSeconds.get(id))) {
                     manager.partiallyUpdateAppWidget(id, widgetFrames.get(id).progress(this, snapshot));
+                    widgetProgressSeconds.put(id, progressSecond);
                 }
             } catch (RuntimeException error) {
                 AppLog.warn("Cannot render media widget " + id, error);
             }
         }
         widgetRenderKey = key;
+        long elapsed = SystemClock.elapsedRealtime() - now;
+        if (rebuilt > 0 && elapsed >= SLOW_WIDGET_RENDER_MS) {
+            AppLog.warn("Slow media widget render: " + rebuilt + " frame(s) in " + elapsed + " ms", null);
+        }
     }
 
     @Override public void onDestroy() {
         destroyed = true;
         prefs.unobserve(widgetPreferences);
         widgetFrames.clear();
+        widgetProgressSeconds.clear();
         openSourceWidgetIds.clear();
         main.removeCallbacksAndMessages(null);
         unregisterVisibilityWakeReceiver();
@@ -800,7 +832,7 @@ public final class OverlayService extends Service
         if (radioArtworkLoader != null) radioArtworkLoader.load(station);
     }
 
-    @Override public void onRadioArtwork(String key, android.graphics.Bitmap bitmap) {
+    @Override public void onRadioArtwork(String key, Bitmap bitmap) {
         if (card != null) card.setRadioArtwork(key, bitmap);
     }
 
@@ -846,7 +878,7 @@ public final class OverlayService extends Service
         }
     }
 
-    @Override public void onArtwork(long token, android.graphics.Bitmap bitmap) {
+    @Override public void onArtwork(long token, Bitmap bitmap) {
         if (token != expectedArtworkToken) return;
         currentArtwork = bitmap;
         widgetRenderKey = null;

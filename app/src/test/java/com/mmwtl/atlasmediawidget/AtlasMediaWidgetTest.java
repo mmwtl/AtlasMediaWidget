@@ -326,6 +326,48 @@ public class AtlasMediaWidgetTest {
         }
     }
 
+    @Test public void widgetRefreshInOverlayModeKeepsVisibleOverlayCard() throws Exception {
+        Prefs prefs = new Prefs(context);
+        prefs.setWidgetMode(false);
+        prefs.putBoolean(Prefs.KEY_SERVICE_ENABLED, true);
+        bind(41);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var controller = Robolectric.buildService(OverlayService.class).create();
+        OverlayService service = controller.get();
+        try {
+            MediaCardView card = new AtlasMediaWidgetProvider.Frame(context, prefs, new Bundle(), 41,
+                    null, null, false, listener).card;
+            var cardField = OverlayService.class.getDeclaredField("card");
+            cardField.setAccessible(true);
+            cardField.set(service, card);
+            service.onStartCommand(new Intent(OverlayService.ACTION_WIDGET_REFRESH), 0, 1);
+            assertSame(card, field(service, "card"));
+            service.onStartCommand(new Intent(OverlayService.ACTION_REFRESH_STYLE), 0, 2);
+            assertNull(field(service, "card"));
+        } finally {
+            controller.destroy();
+        }
+    }
+
+    @Test public void widgetProgressChangesOnlyWhilePlaybackAdvances() {
+        long now = 100_000L;
+        MediaSnapshot paused = timedSnapshot(2, now);
+        assertEquals(10L, AtlasMediaWidgetProvider.progressSecond(paused, now));
+        assertEquals(10L, AtlasMediaWidgetProvider.progressSecond(paused, now + 5_000L));
+        MediaSnapshot playing = timedSnapshot(MediaSnapshot.STATE_PLAYING, now);
+        assertEquals(10L, AtlasMediaWidgetProvider.progressSecond(playing, now + 999L));
+        assertEquals(11L, AtlasMediaWidgetProvider.progressSecond(playing, now + 1_000L));
+        assertEquals(-1L, AtlasMediaWidgetProvider.progressSecond(null, now));
+    }
+
+    private MediaSnapshot timedSnapshot(int playbackState, long updateElapsedRealtime) {
+        return new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",
+                MediaSource.Id.ONLINE, "", List.of(), "test", "Player", "one", "Track", "Artist", "",
+                180000, 10000, updateElapsedRealtime, 1, playbackState, 0, "", 0,
+                MediaBridgeContract.CAP_PLAY, "", 0);
+    }
+
     private Object field(Object object, String name) throws Exception {
         var field = object.getClass().getDeclaredField(name);
         field.setAccessible(true);

@@ -89,6 +89,15 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300));
     }
 
+    /** The progress strip shows whole seconds; paused or position-less media never changes it. */
+    static long progressSecond(MediaSnapshot snapshot, long nowElapsedRealtime) {
+        if (snapshot == null) return -1L;
+        long position = ProgressEstimator.estimate(snapshot.position, snapshot.duration,
+                snapshot.updateElapsedRealtime, snapshot.speed, snapshot.playbackState,
+                nowElapsedRealtime);
+        return position < 0L ? -1L : position / 1_000L;
+    }
+
     static PendingIntent click(Context context, int id, String action, boolean command) {
         Intent intent = new Intent(context, command ? OverlayService.class
                 : "settings".equals(action) ? MainActivity.class : WidgetControlActivity.class)
