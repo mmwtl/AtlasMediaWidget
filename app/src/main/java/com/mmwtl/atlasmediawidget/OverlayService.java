@@ -27,6 +27,7 @@ import android.provider.Settings;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.RemoteViews;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
@@ -51,6 +52,7 @@ public final class OverlayService extends Service
     static final String ACTION_WIDGET_REFRESH = "com.mmwtl.atlasmediawidget.WIDGET_REFRESH";
     private final Map<Integer, AtlasMediaWidgetProvider.Frame> widgetFrames = new HashMap<>();
     private final Set<Integer> openSourceWidgetIds = new HashSet<>();
+    private final Set<Integer> scrubbingWidgetIds = new HashSet<>();
     private final Map<Integer, Long> widgetProgressSeconds = new HashMap<>();
     private Bitmap currentArtwork;
     private long lastWidgetSnapshotAt;
@@ -354,6 +356,7 @@ public final class OverlayService extends Service
             widgetFrames.clear();
             widgetProgressSeconds.clear();
             openSourceWidgetIds.clear();
+            scrubbingWidgetIds.clear();
             AtlasMediaWidgetProvider.showInactive(this,
                     "Неактивен: выбран режим «Оверлей»\nНажмите для выбора режима");
             if (!prefs.getBoolean(Prefs.KEY_SERVICE_ENABLED, false)) {
@@ -373,6 +376,11 @@ public final class OverlayService extends Service
         String command = pendingWidgetCommand;
         pendingWidgetCommand = null;
         if (SystemClock.elapsedRealtime() - pendingWidgetCommandAt > WIDGET_COMMAND_TIMEOUT_MS) return;
+        if (command.startsWith(AtlasMediaWidgetProvider.SEEK_ZONE_PREFIX)) {
+            long position = AtlasMediaWidgetProvider.seekZonePosition(command, snapshot.duration);
+            if (position >= 0L && snapshot.supports(MediaBridgeContract.CAP_SEEK)) seekFromWidget(position);
+            return;
+        }
         if ("PLAY_PAUSE".equals(command)) command = PlayPauseActionPolicy.command(
                 snapshot.audioSource, snapshot.isPlaying(), snapshot.capabilities);
         long capability = switch (command) {
@@ -423,6 +431,39 @@ public final class OverlayService extends Service
         }
     }
 
+    /** Seeks and shows the requested position on every widget until a snapshot confirms it. */
+    void seekFromWidget(long positionMs) {
+        onSeek(positionMs);
+        for (var frame : widgetFrames.values()) frame.card.projectWidgetSeek(positionMs);
+        widgetProgressSeconds.clear();
+        renderWidgets(false);
+    }
+
+    /** The scrubber draws the live strip over the widget, so the widget's own strip is hidden. */
+    void setWidgetScrubbing(int widgetId, boolean scrubbing) {
+        if (scrubbing ? !scrubbingWidgetIds.add(widgetId) : !scrubbingWidgetIds.remove(widgetId)) return;
+        if (scrubbing) {
+            RemoteViews hidden = new RemoteViews(getPackageName(), R.layout.media_widget);
+            hidden.setViewVisibility(R.id.widget_progress_box, View.GONE);
+            try {
+                AppWidgetManager.getInstance(this).partiallyUpdateAppWidget(widgetId, hidden);
+            } catch (RuntimeException error) {
+                AppLog.warn("Cannot hide media widget progress " + widgetId, error);
+            }
+        } else {
+            // The next progress update restores the strip without redrawing the card.
+            widgetProgressSeconds.remove(widgetId);
+            renderWidgets(false);
+        }
+    }
+
+    MediaSnapshot widgetSnapshot() {
+        long now = SystemClock.elapsedRealtime();
+        return prefs.isWidgetMode() && reducer.isConnected()
+                && now - lastWidgetSnapshotAt <= WIDGET_SNAPSHOT_STALE_MS
+                ? reducer.visibleSnapshot(now) : null;
+    }
+
     private void renderWidgets(boolean force) {
         if (!prefs.isWidgetMode()) return;
         long now = SystemClock.elapsedRealtime();
@@ -445,6 +486,7 @@ public final class OverlayService extends Service
         widgetFrames.keySet().retainAll(active);
         widgetProgressSeconds.keySet().retainAll(active);
         openSourceWidgetIds.retainAll(active);
+        scrubbingWidgetIds.retainAll(active);
         if (snapshot == null) openSourceWidgetIds.clear();
         long progressSecond = AtlasMediaWidgetProvider.progressSecond(snapshot, now);
         var manager = AppWidgetManager.getInstance(this);
@@ -457,6 +499,9 @@ public final class OverlayService extends Service
                         var frame = new AtlasMediaWidgetProvider.Frame(this, prefs,
                                 manager.getAppWidgetOptions(id), id, snapshot, currentArtwork, connected,
                                 openSourceWidgetIds.contains(id), this);
+                        if (scrubbingWidgetIds.contains(id)) {
+                            frame.views.setViewVisibility(R.id.widget_progress_box, View.GONE);
+                        }
                         manager.updateAppWidget(id, frame.views);
                         widgetFrames.put(id, frame);
                         widgetProgressSeconds.put(id, progressSecond);
@@ -464,7 +509,7 @@ public final class OverlayService extends Service
                     } finally {
                         Trace.endSection();
                     }
-                } else if (snapshot != null
+                } else if (snapshot != null && !scrubbingWidgetIds.contains(id)
                         && !Long.valueOf(progressSecond).equals(widgetProgressSeconds.get(id))) {
                     manager.partiallyUpdateAppWidget(id, widgetFrames.get(id).progress(this, snapshot));
                     widgetProgressSeconds.put(id, progressSecond);

@@ -20,6 +20,9 @@ import android.widget.RemoteViews;
 /** Lifecycle entry point only; the foreground service owns the bridge and live state. */
 public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     static final String EXTRA_CONTROL = "widget_control";
+    static final String EXTRA_TARGET_BOUNDS = "widget_target_bounds";
+    static final String EXTRA_PROGRESS_BOUNDS = "widget_progress_bounds";
+    static final String SEEK_ZONE_PREFIX = "seek_";
     static final String ACTION_COMMAND = "com.mmwtl.atlasmediawidget.WIDGET_COMMAND";
     static final String[] ACTIONS = {"open", "sources", "favorites", "seek",
             "PREVIOUS", "PLAY_PAUSE", "NEXT"};
@@ -99,6 +102,39 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 snapshot.updateElapsedRealtime, snapshot.speed, snapshot.playbackState,
                 nowElapsedRealtime);
         return position < 0L ? -1L : position / 1_000L;
+    }
+
+    /** Maps a "seek_<zone>_<count>" control to the centre of that zone, or -1 when invalid. */
+    static long seekZonePosition(String control, long durationMs) {
+        if (control == null || !control.startsWith(SEEK_ZONE_PREFIX) || durationMs <= 0L) return -1L;
+        String[] parts = control.substring(SEEK_ZONE_PREFIX.length()).split("_");
+        if (parts.length != 2) return -1L;
+        try {
+            int zone = Integer.parseInt(parts[0]);
+            int count = Integer.parseInt(parts[1]);
+            if (count <= 0 || zone < 0 || zone >= count) return -1L;
+            return durationMs * (2L * zone + 1L) / (2L * count);
+        } catch (NumberFormatException error) {
+            return -1L;
+        }
+    }
+
+    /**
+     * Opens the progress scrubber. RemoteViews supplies the tapped view's screen bounds only as a
+     * fill-in, which an immutable PendingIntent would drop; the explicit component and preset
+     * action, data and extras cannot be replaced by the host.
+     */
+    static PendingIntent scrubClick(Context context, int id, String part, Rect target, Rect progress) {
+        Intent intent = new Intent(context, WidgetControlActivity.class)
+                .setAction(Intent.ACTION_VIEW)
+                .setData(Uri.parse("atlasmediawidget://" + id + "/scrub/" + part))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .putExtra(EXTRA_CONTROL, "scrub")
+                .putExtra(EXTRA_TARGET_BOUNDS, target)
+                .putExtra(EXTRA_PROGRESS_BOUNDS, progress)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        return PendingIntent.getActivity(context, id, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
     }
 
     static PendingIntent click(Context context, int id, String action, boolean command) {
@@ -188,8 +224,13 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             for (String action : ACTIONS) {
                 View target = card.widgetTarget(action);
                 if (target.getVisibility() != View.VISIBLE || !target.isEnabled()) continue;
-                if ("seek".equals(action) && (snapshot == null
-                        || !snapshot.supports(MediaBridgeContract.CAP_SEEK))) continue;
+                if ("seek".equals(action)) {
+                    if (snapshot != null && connected
+                            && snapshot.supports(MediaBridgeContract.CAP_SEEK)) {
+                        addSeekTargets(context, id);
+                    }
+                    continue;
+                }
                 boolean command = Character.isUpperCase(action.charAt(0));
                 if (command && (!connected || snapshot == null)) continue;
                 Rect rect = card.widgetBounds(target);
@@ -205,19 +246,53 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     case "NEXT" -> "Следующий";
                     case "sources" -> "Выбрать источник";
                     case "favorites" -> "Избранные станции";
-                    case "seek" -> "Открыть перемотку";
                     default -> "Открыть источник";
                 }, rect, command || "sources".equals(action));
             }
         }
 
+        /**
+         * RemoteViews reports no touch position, so the track is split into tap zones that seek to
+         * their centre. The time labels open the live scrubber over the same strip.
+         */
+        private void addSeekTargets(Context context, int id) {
+            View bar = card.widgetTarget("seek_bar");
+            Rect barBounds = card.widgetBounds(bar);
+            int left = barBounds.left + bar.getPaddingLeft();
+            int right = barBounds.right - bar.getPaddingRight();
+            if (right <= left) return;
+            int minimumHeight = Ui.dp(context, 48);
+            int top = Math.max(0, barBounds.centerY() - minimumHeight / 2);
+            int bottom = Math.min(height, Math.max(barBounds.bottom, top + minimumHeight));
+            int count = Math.max(8, Math.min(32, (right - left) / Math.max(1, Ui.dp(context, 16))));
+            for (int zone = 0; zone < count; zone++) {
+                Rect rect = new Rect(zone == 0 ? barBounds.left : left + (right - left) * zone / count,
+                        top, zone == count - 1 ? barBounds.right
+                                : left + (right - left) * (zone + 1) / count, bottom);
+                addTarget(context, id, "Перемотать на " + (200 * zone + 100) / (2 * count) + "%", rect,
+                        click(context, id, SEEK_ZONE_PREFIX + zone + "_" + count, true));
+            }
+            for (String part : new String[]{"elapsed", "duration"}) {
+                Rect rect = card.widgetBounds(card.widgetTarget(part));
+                rect.top = Math.min(rect.top, top);
+                rect.bottom = Math.max(rect.bottom, bottom);
+                addTarget(context, id, "Точная перемотка", rect,
+                        scrubClick(context, id, part, new Rect(rect), new Rect(progressBounds)));
+            }
+        }
+
         private void addTarget(Context context, int id, String action, String description,
                 Rect rect, boolean command) {
+            addTarget(context, id, description, rect, click(context, id, action, command));
+        }
+
+        private void addTarget(Context context, int id, String description, Rect rect,
+                PendingIntent click) {
             RemoteViews hit = new RemoteViews(context.getPackageName(), R.layout.media_widget_target);
             hit.setViewPadding(R.id.widget_target_box, Math.max(0, rect.left), Math.max(0, rect.top),
                     Math.max(0, width - rect.right), Math.max(0, height - rect.bottom));
             hit.setContentDescription(R.id.widget_target, description);
-            hit.setOnClickPendingIntent(R.id.widget_target, click(context, id, action, command));
+            hit.setOnClickPendingIntent(R.id.widget_target, click);
             views.addView(R.id.widget_targets, hit);
         }
 

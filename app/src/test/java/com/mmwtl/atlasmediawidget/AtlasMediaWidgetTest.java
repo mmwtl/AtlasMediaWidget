@@ -208,7 +208,7 @@ public class AtlasMediaWidgetTest {
     }
 
     @Test public void widgetClicksKeepSettingsSeparateFromPlaybackUi() {
-        for (String action : new String[]{"open", "favorites", "seek", "settings"}) {
+        for (String action : new String[]{"open", "favorites", "settings"}) {
             Intent intent = Shadows.shadowOf(AtlasMediaWidgetProvider.click(context, 41, action, false))
                     .getSavedIntent();
             assertEquals(new ComponentName(context, "settings".equals(action)
@@ -259,19 +259,115 @@ public class AtlasMediaWidgetTest {
     @Test public void widgetDialogsShowOnlyTheCardAndRejectForeignIds() {
         new Prefs(context).setWidgetMode(true);
         bind(41);
-        for (String action : new String[]{"favorites", "seek"}) {
-            var controller = Robolectric.buildActivity(WidgetControlActivity.class,
-                    widgetControl(action)).create();
-            ViewGroup content = controller.get().findViewById(android.R.id.content);
-            assertEquals(1, content.getChildCount());
-            assertTrue(content.getChildAt(0) instanceof MediaCardView);
-            assertNull(find(content, "Добавить виджет"));
-            controller.destroy();
-        }
+        var favorites = Robolectric.buildActivity(WidgetControlActivity.class,
+                widgetControl("favorites")).create();
+        ViewGroup favoritesContent = favorites.get().findViewById(android.R.id.content);
+        assertEquals(1, favoritesContent.getChildCount());
+        assertTrue(favoritesContent.getChildAt(0) instanceof MediaCardView);
+        assertNull(find(favoritesContent, "Добавить виджет"));
+        favorites.destroy();
+        var seek = Robolectric.buildActivity(WidgetControlActivity.class, widgetControl("seek")).create();
+        assertTrue(seek.get().isFinishing());
+        seek.destroy();
         var controller = Robolectric.buildActivity(WidgetControlActivity.class,
                 widgetControl("open").putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 99)).create();
         assertTrue(controller.get().isFinishing());
         controller.destroy();
+    }
+
+    @Test public void seekZonesMapToTheirCentreAndRejectMalformedControls() {
+        assertEquals(3_750L, AtlasMediaWidgetProvider.seekZonePosition("seek_0_24", 180_000L));
+        assertEquals(176_250L, AtlasMediaWidgetProvider.seekZonePosition("seek_23_24", 180_000L));
+        assertEquals(90_000L, AtlasMediaWidgetProvider.seekZonePosition("seek_0_1", 180_000L));
+        for (String control : new String[]{null, "seek", "seek_24_24", "seek_-1_24", "seek_1_0",
+                "seek_a_24", "seek_1_2_3", "NEXT"}) {
+            assertEquals(control, -1L, AtlasMediaWidgetProvider.seekZonePosition(control, 180_000L));
+        }
+        assertEquals(-1L, AtlasMediaWidgetProvider.seekZonePosition("seek_1_24", 0L));
+    }
+
+    @Test @SuppressWarnings("deprecation")
+    public void progressStripSeeksInPlaceAndTimeLabelsOpenTheScrubber() {
+        Bundle options = new Bundle();
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 500);
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+        var readOnly = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context), options, 41,
+                snapshot(MediaBridgeContract.CAP_PLAY), null, true, listener);
+        var seekable = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context), options, 41,
+                snapshot(MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_SEEK), null, true, listener);
+        assertFalse(seekable.progressBounds.isEmpty());
+        ViewGroup targets = seekable.views.apply(context, null).findViewById(R.id.widget_targets);
+        int readOnlyTargets = ((ViewGroup) readOnly.views.apply(context, null)
+                .findViewById(R.id.widget_targets)).getChildCount();
+        int zones = 0;
+        int scrubbers = 0;
+        for (int index = 0; index < targets.getChildCount(); index++) {
+            CharSequence description = targets.getChildAt(index).findViewById(R.id.widget_target)
+                    .getContentDescription();
+            if (description.toString().startsWith("Перемотать на ")) zones++;
+            if ("Точная перемотка".contentEquals(description)) scrubbers++;
+        }
+        assertTrue(zones >= 8 && zones <= 32);
+        assertEquals(2, scrubbers);
+        assertEquals(readOnlyTargets + zones + scrubbers, targets.getChildCount());
+        assertEquals(new ComponentName(context, OverlayService.class), Shadows.shadowOf(
+                AtlasMediaWidgetProvider.click(context, 41, "seek_3_24", true)).getSavedIntent().getComponent());
+        PendingIntent scrub = AtlasMediaWidgetProvider.scrubClick(context, 41, "elapsed",
+                new android.graphics.Rect(1, 2, 3, 4), seekable.progressBounds);
+        assertTrue((Shadows.shadowOf(scrub).getFlags() & PendingIntent.FLAG_IMMUTABLE) == 0);
+        Intent intent = Shadows.shadowOf(scrub).getSavedIntent();
+        assertEquals(new ComponentName(context, WidgetControlActivity.class), intent.getComponent());
+        assertEquals("scrub", intent.getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL));
+        assertEquals(seekable.progressBounds,
+                intent.getParcelableExtra(AtlasMediaWidgetProvider.EXTRA_PROGRESS_BOUNDS));
+    }
+
+    @Test public void scrubberSitsOverTheWidgetStripAndNeedsHostBounds() {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        var row = new android.graphics.Rect(20, 300, 480, 340);
+        var label = new android.graphics.Rect(20, 290, 90, 350);
+        Intent intent = Shadows.shadowOf(AtlasMediaWidgetProvider.scrubClick(context, 41,
+                "elapsed", label, row)).getSavedIntent();
+        var missing = Robolectric.buildActivity(WidgetControlActivity.class, new Intent(intent)).create();
+        assertTrue(missing.get().isFinishing());
+        missing.destroy();
+        intent.setSourceBounds(new android.graphics.Rect(120, 1290, 190, 1350));
+        var controller = Robolectric.buildActivity(WidgetControlActivity.class, intent).create();
+        WidgetControlActivity activity = controller.get();
+        assertFalse(activity.isFinishing());
+        var attributes = activity.getWindow().getAttributes();
+        assertEquals(120, attributes.x);
+        assertEquals(1300 - Math.max(0, (Ui.dp(context, 56) - row.height()) / 2), attributes.y);
+        assertEquals(row.width(), attributes.width);
+        assertTrue((attributes.flags & android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL) != 0);
+        ViewGroup strip = (ViewGroup) ((ViewGroup) activity.findViewById(android.R.id.content)).getChildAt(0);
+        assertTrue(strip.getChildAt(0) instanceof MediaCardView);
+        activity.onSnapshot(snapshot(MediaBridgeContract.CAP_PLAY));
+        assertTrue("a source without seek closes the scrubber", activity.isFinishing());
+        controller.destroy();
+    }
+
+    @Test public void seekZoneCommandProjectsThePositionOnTheWidget() throws Exception {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var controller = Robolectric.buildService(OverlayService.class).create();
+        OverlayService service = controller.get();
+        try {
+            service.onStartCommand(new Intent(OverlayService.ACTION_WIDGET_REFRESH), 0, 1);
+            service.onBridgeState(MediaBridgeClient.State.CONNECTED, "");
+            service.onSnapshot(snapshot(MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_SEEK));
+            var frames = (java.util.Map<?, ?>) field(service, "widgetFrames");
+            assertEquals("0:10", ((TextView) ((AtlasMediaWidgetProvider.Frame) frames.get(41))
+                    .card.widgetTarget("elapsed")).getText().toString());
+            service.onStartCommand(widgetCommand(41, "seek_23_24"), 0, 2);
+            assertEquals("2:56", ((TextView) ((AtlasMediaWidgetProvider.Frame) frames.get(41))
+                    .card.widgetTarget("elapsed")).getText().toString());
+        } finally {
+            controller.destroy();
+        }
     }
 
     private Intent widgetControl(String action) {

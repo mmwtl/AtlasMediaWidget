@@ -108,6 +108,7 @@ final class MediaCardView extends FrameLayout {
     private MediaSnapshot pendingSeekSnapshot;
     private long lastElapsedSecond = Long.MIN_VALUE;
     private int lastRenderedProgress = Integer.MIN_VALUE;
+    private boolean progressOnly;
     private final Runnable chooserAutoHide = this::hideOpenChooser;
 
     MediaCardView(Context context, int requestedWidthPx, int requestedHeightPx,
@@ -434,6 +435,9 @@ final class MediaCardView extends FrameLayout {
             case "sources" -> sourcePill;
             case "favorites" -> favoritesButton;
             case "seek" -> progressRow;
+            case "seek_bar" -> progress;
+            case "elapsed" -> elapsed;
+            case "duration" -> duration;
             case "source_chooser" -> sourceChooser;
             default -> metadata;
         };
@@ -463,6 +467,25 @@ final class MediaCardView extends FrameLayout {
         artwork.setAlpha(bitmap == null ? 0f : 1f);
         // A RemoteViews progress strip is a read-only indicator, with no draggable thumb.
         progress.setThumb(null);
+    }
+
+    /** Shows the widget's tapped seek position until a newer snapshot confirms or replaces it. */
+    void projectWidgetSeek(long positionMs) {
+        if (snapshot != null) beginPendingSeek(positionMs);
+    }
+
+    /** Draws only the live progress row, so it can sit exactly over the widget's own strip. */
+    void showProgressOnly() {
+        progressOnly = true;
+        setBackground(null);
+        setClipToOutline(false);
+        invalidate();
+    }
+
+    boolean isProgressVisible() { return progressRow.getVisibility() == VISIBLE; }
+
+    @Override protected boolean drawChild(Canvas canvas, View child, long drawingTime) {
+        return (!progressOnly || child == progressRow) && super.drawChild(canvas, child, drawingTime);
     }
 
     void renderWidgetUnavailable(boolean connected) {
