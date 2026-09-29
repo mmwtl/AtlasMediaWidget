@@ -2,6 +2,7 @@ package com.mmwtl.atlasmediawidget;
 
 import android.app.Activity;
 import android.appwidget.AppWidgetManager;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
@@ -24,7 +25,9 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private MediaCardView scrubber;
     private boolean scrubbing;
-    private final Runnable scrubberIdle = this::finish;
+    private boolean scrubberShown;
+    private boolean closingScrubber;
+    private final Runnable scrubberIdle = this::closeScrubber;
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         prefs = new Prefs(this);
@@ -64,9 +67,15 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         if (!isFinishing() && !isChangingConfigurations()) finish();
     }
 
+    /** The window belongs to its own task; skip the task close slide over HOME. */
+    @Override public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
+    }
+
     @Override public boolean dispatchTouchEvent(MotionEvent event) {
         if (scrubber != null && event.getActionMasked() == MotionEvent.ACTION_OUTSIDE) {
-            finish();
+            closeScrubber();
             return true;
         }
         return super.dispatchTouchEvent(event);
@@ -165,11 +174,33 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
                 | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
-        main.postDelayed(scrubberIdle, 6_000L);
+        main.postDelayed(scrubberIdle, 4_000L);
         OverlayService service = OverlayService.current();
         MediaSnapshot snapshot = service == null ? null : service.widgetSnapshot();
         if (snapshot != null) renderScrubber(snapshot);
+        String zone = getIntent().getStringExtra(AtlasMediaWidgetProvider.EXTRA_SEEK_ZONE);
+        if (zone != null && !isFinishing()) seekZone(service, snapshot, zone);
         main.post(scrubberTick);
+    }
+
+    /** A tap on the strip seeks at once; the scrubber then stays for fine dragging. */
+    private void seekZone(OverlayService service, MediaSnapshot snapshot, String zone) {
+        if (service != null && snapshot != null) {
+            long position = AtlasMediaWidgetProvider.seekZonePosition(zone, snapshot.duration);
+            if (position < 0L || !snapshot.supports(MediaBridgeContract.CAP_SEEK)) return;
+            service.seekFromWidget(position);
+            scrubber.projectWidgetSeek(position);
+            return;
+        }
+        // The service validates freshness and capabilities once its snapshot arrives.
+        try {
+            startService(new Intent(this, OverlayService.class)
+                    .setAction(AtlasMediaWidgetProvider.ACTION_COMMAND)
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                    .putExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL, zone));
+        } catch (RuntimeException error) {
+            AppLog.warn("Cannot send widget seek", error);
+        }
     }
 
     private void renderScrubber(MediaSnapshot snapshot) {
@@ -178,7 +209,27 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
             finish();
             return;
         }
-        setScrubbing(true);
+        if (scrubberShown) return;
+        scrubberShown = true;
+        // Hide the widget's own strip only once this window's strip is on screen; until then
+        // both show the same position, so the strip never disappears while the window starts.
+        scrubber.invalidate();
+        getWindow().getDecorView().getViewTreeObserver().registerFrameCommitCallback(() -> {
+            if (!closingScrubber && !isFinishing()) setScrubbing(true);
+        });
+    }
+
+    /** Restores the widget's strip under the window first, then removes the window. */
+    private void closeScrubber() {
+        if (closingScrubber || isFinishing()) return;
+        closingScrubber = true;
+        main.removeCallbacks(scrubberIdle);
+        if (!scrubbing) {
+            finish();
+            return;
+        }
+        setScrubbing(false);
+        main.postDelayed(this::finish, 300L);
     }
 
     private void setScrubbing(boolean value) {

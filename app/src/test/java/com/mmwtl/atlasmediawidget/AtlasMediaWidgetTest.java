@@ -316,6 +316,11 @@ public class AtlasMediaWidgetTest {
         assertEquals("scrub", intent.getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL));
         assertEquals(seekable.progressBounds,
                 intent.getParcelableExtra(AtlasMediaWidgetProvider.EXTRA_PROGRESS_BOUNDS));
+        assertNull(intent.getStringExtra(AtlasMediaWidgetProvider.EXTRA_SEEK_ZONE));
+        Intent zone = Shadows.shadowOf(AtlasMediaWidgetProvider.scrubClick(context, 41, "seek_3_24",
+                new android.graphics.Rect(1, 2, 3, 4), seekable.progressBounds)).getSavedIntent();
+        assertEquals("seek_3_24", zone.getStringExtra(AtlasMediaWidgetProvider.EXTRA_SEEK_ZONE));
+        assertNotEquals(intent.getData(), zone.getData());
     }
 
     @Test public void scrubberSitsOverTheWidgetStripAndNeedsHostBounds() {
@@ -342,6 +347,22 @@ public class AtlasMediaWidgetTest {
         activity.onSnapshot(snapshot(MediaBridgeContract.CAP_PLAY));
         assertTrue("a source without seek closes the scrubber", activity.isFinishing());
         controller.destroy();
+
+        Intent zone = Shadows.shadowOf(AtlasMediaWidgetProvider.scrubClick(context, 41,
+                "seek_20_24", label, row)).getSavedIntent();
+        zone.setSourceBounds(new android.graphics.Rect(120, 1290, 190, 1350));
+        var zoneController = Robolectric.buildActivity(WidgetControlActivity.class, zone).create();
+        Intent seek = null;
+        for (Intent started; (started = Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .getNextStartedService()) != null; ) {
+            if (AtlasMediaWidgetProvider.ACTION_COMMAND.equals(started.getAction())) seek = started;
+        }
+        assertNotNull(seek);
+        assertEquals(new ComponentName(context, OverlayService.class), seek.getComponent());
+        assertEquals("seek_20_24", seek.getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL));
+        assertEquals(41, seek.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
+        assertFalse("the scrubber stays for fine dragging", zoneController.get().isFinishing());
+        zoneController.destroy();
     }
 
     @Test public void seekZoneCommandProjectsThePositionOnTheWidget() throws Exception {

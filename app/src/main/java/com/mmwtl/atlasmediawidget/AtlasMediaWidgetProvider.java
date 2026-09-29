@@ -23,6 +23,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     static final String EXTRA_CONTROL = "widget_control";
     static final String EXTRA_TARGET_BOUNDS = "widget_target_bounds";
     static final String EXTRA_PROGRESS_BOUNDS = "widget_progress_bounds";
+    static final String EXTRA_SEEK_ZONE = "widget_seek_zone";
     static final String SEEK_ZONE_PREFIX = "seek_";
     static final String ACTION_COMMAND = "com.mmwtl.atlasmediawidget.WIDGET_COMMAND";
     static final String[] ACTIONS = {"open", "sources", "favorites", "seek",
@@ -134,6 +135,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 .putExtra(EXTRA_TARGET_BOUNDS, target)
                 .putExtra(EXTRA_PROGRESS_BOUNDS, progress)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_ANIMATION);
+        if (part.startsWith(SEEK_ZONE_PREFIX)) intent.putExtra(EXTRA_SEEK_ZONE, part);
         return PendingIntent.getActivity(context, id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
     }
@@ -292,8 +294,9 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
         }
 
         /**
-         * RemoteViews reports no touch position, so the track is split into tap zones that seek to
-         * their centre. The time labels open the live scrubber over the same strip.
+         * RemoteViews reports only completed taps, never a touch position or a drag, so the track
+         * is split into tap zones. A zone seeks to its centre and opens the live scrubber over the
+         * same strip for fine dragging; the time labels open the scrubber without seeking.
          */
         private void addSeekTargets(Context context, int id) {
             View bar = card.widgetTarget("seek_bar");
@@ -310,7 +313,8 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                         top, zone == count - 1 ? barBounds.right
                                 : left + (right - left) * (zone + 1) / count, bottom);
                 addTarget(context, id, "Перемотать на " + (200 * zone + 100) / (2 * count) + "%", rect,
-                        click(context, id, SEEK_ZONE_PREFIX + zone + "_" + count, true));
+                        scrubClick(context, id, SEEK_ZONE_PREFIX + zone + "_" + count,
+                                new Rect(rect), new Rect(progressBounds)));
             }
             for (String part : new String[]{"elapsed", "duration"}) {
                 Rect rect = card.widgetBounds(card.widgetTarget(part));
