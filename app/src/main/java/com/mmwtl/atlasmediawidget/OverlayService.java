@@ -53,6 +53,14 @@ public final class OverlayService extends Service
     private final Map<Integer, AtlasMediaWidgetProvider.Frame> widgetFrames = new HashMap<>();
     private final Set<Integer> openSourceWidgetIds = new HashSet<>();
     private final Set<Integer> scrubbingWidgetIds = new HashSet<>();
+    private final Set<Integer> openFavoritesWidgetIds = new HashSet<>();
+    private String widgetFavoritesError;
+    private final Runnable notifyWidgetFavorites = () -> {
+        if (openFavoritesWidgetIds.isEmpty()) return;
+        AppWidgetManager.getInstance(this).notifyAppWidgetViewDataChanged(
+                openFavoritesWidgetIds.stream().mapToInt(Integer::intValue).toArray(),
+                R.id.widget_favorites);
+    };
     private final Map<Integer, Long> widgetProgressSeconds = new HashMap<>();
     private Bitmap currentArtwork;
     private long lastWidgetSnapshotAt;
@@ -324,6 +332,10 @@ public final class OverlayService extends Service
             if ("sources".equals(control) || "dismiss_sources".equals(control)
                     || control != null && control.startsWith("source_")) {
                 executeWidgetSourceAction(id, control);
+            } else if ("favorites".equals(control) || "dismiss_favorites".equals(control)
+                    || "favorite".equals(control)) {
+                executeWidgetFavoritesAction(id, control,
+                        intent.getStringExtra(WidgetFavoritesService.EXTRA_STATION_ID));
             } else {
                 pendingWidgetCommand = control;
                 pendingWidgetCommandAt = SystemClock.elapsedRealtime();
@@ -356,6 +368,7 @@ public final class OverlayService extends Service
             widgetFrames.clear();
             widgetProgressSeconds.clear();
             openSourceWidgetIds.clear();
+            openFavoritesWidgetIds.clear();
             scrubbingWidgetIds.clear();
             AtlasMediaWidgetProvider.showInactive(this,
                     "Неактивен: выбран режим «Оверлей»\nНажмите для выбора режима");
@@ -464,6 +477,55 @@ public final class OverlayService extends Service
                 ? reducer.visibleSnapshot(now) : null;
     }
 
+    private void executeWidgetFavoritesAction(int widgetId, String control, String stationId) {
+        if ("dismiss_favorites".equals(control)) {
+            if (openFavoritesWidgetIds.remove(widgetId)) renderWidgets(true);
+            return;
+        }
+        long now = SystemClock.elapsedRealtime();
+        MediaSnapshot snapshot = reducer.visibleSnapshot(now);
+        if (bridgeState != MediaBridgeClient.State.CONNECTED || snapshot == null
+                || now - lastWidgetSnapshotAt > WIDGET_SNAPSHOT_STALE_MS
+                || !snapshot.supports(MediaBridgeContract.CAP_TUNE_RADIO)) {
+            if (openFavoritesWidgetIds.remove(widgetId)) renderWidgets(true);
+            bridge.requestSnapshot();
+            return;
+        }
+        if ("favorites".equals(control)) {
+            if (openFavoritesWidgetIds.remove(widgetId)) {
+                renderWidgets(true);
+                return;
+            }
+            openSourceWidgetIds.remove(widgetId);
+            openFavoritesWidgetIds.add(widgetId);
+            widgetFavoritesError = null;
+            requestRadioStations();
+            renderWidgets(true);
+            return;
+        }
+        if (!openFavoritesWidgetIds.contains(widgetId) || stationId == null) return;
+        for (RadioStation station : radioStations.favorites) {
+            if (station.id.equals(stationId)) {
+                openFavoritesWidgetIds.remove(widgetId);
+                renderWidgets(true);
+                tuneRadio(station);
+                return;
+            }
+        }
+    }
+
+    List<RadioStation> widgetFavoriteStations(int widgetId) {
+        var frame = widgetFrames.get(widgetId);
+        return frame == null || !openFavoritesWidgetIds.contains(widgetId)
+                ? List.of() : frame.card.widgetFavoriteStations();
+    }
+
+    Bitmap widgetFavoriteTile(int widgetId, RadioStation station) {
+        var frame = widgetFrames.get(widgetId);
+        return frame == null || !openFavoritesWidgetIds.contains(widgetId)
+                ? null : frame.card.renderFavoriteTile(station);
+    }
+
     private void renderWidgets(boolean force) {
         if (!prefs.isWidgetMode()) return;
         long now = SystemClock.elapsedRealtime();
@@ -487,7 +549,15 @@ public final class OverlayService extends Service
         widgetProgressSeconds.keySet().retainAll(active);
         openSourceWidgetIds.retainAll(active);
         scrubbingWidgetIds.retainAll(active);
+        openFavoritesWidgetIds.retainAll(active);
         if (snapshot == null) openSourceWidgetIds.clear();
+        if (snapshot == null || !snapshot.supports(MediaBridgeContract.CAP_TUNE_RADIO)
+                || MediaSource.selectedId(snapshot.audioSource, snapshot.sources).displayId()
+                        != MediaSource.Id.RADIO) {
+            openFavoritesWidgetIds.clear();
+        }
+        var favorites = new AtlasMediaWidgetProvider.Frame.Favorites(radioStations,
+                radioStationsRequestInFlight, widgetFavoritesError);
         long progressSecond = AtlasMediaWidgetProvider.progressSecond(snapshot, now);
         var manager = AppWidgetManager.getInstance(this);
         int rebuilt = 0;
@@ -498,11 +568,17 @@ public final class OverlayService extends Service
                     try {
                         var frame = new AtlasMediaWidgetProvider.Frame(this, prefs,
                                 manager.getAppWidgetOptions(id), id, snapshot, currentArtwork, connected,
-                                openSourceWidgetIds.contains(id), this);
+                                openSourceWidgetIds.contains(id) ? "sources"
+                                        : openFavoritesWidgetIds.contains(id) ? "favorites" : null,
+                                favorites, this);
                         if (scrubbingWidgetIds.contains(id)) {
                             frame.views.setViewVisibility(R.id.widget_progress_box, View.GONE);
                         }
                         manager.updateAppWidget(id, frame.views);
+                        // The host may keep an adapter bound to the same intent; refresh its tiles.
+                        if (frame.favoritesGridShown) {
+                            manager.notifyAppWidgetViewDataChanged(id, R.id.widget_favorites);
+                        }
                         widgetFrames.put(id, frame);
                         widgetProgressSeconds.put(id, progressSecond);
                         rebuilt++;
@@ -730,6 +806,8 @@ public final class OverlayService extends Service
                 + " favorites=" + radioStations.favorites.size()
                 + " generation=" + radioStations.generation);
         if (card != null) card.setRadioStations(radioStations);
+        widgetFavoritesError = null;
+        if (!openFavoritesWidgetIds.isEmpty()) renderWidgets(true);
         int direction = pendingRadioNavigation.consume(visibleSource());
         if (direction != 0) {
             MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
@@ -759,6 +837,8 @@ public final class OverlayService extends Service
         AppLog.info("Radio station list request failed: status=" + status
                 + " message=" + detail);
         if (card != null) card.setRadioStationsError(detail);
+        widgetFavoritesError = detail;
+        if (!openFavoritesWidgetIds.isEmpty()) renderWidgets(true);
     }
 
     @Override public boolean onDragTouch(View view, MotionEvent event) {
@@ -879,6 +959,16 @@ public final class OverlayService extends Service
 
     @Override public void onRadioArtwork(String key, Bitmap bitmap) {
         if (card != null) card.setRadioArtwork(key, bitmap);
+        boolean changed = false;
+        for (int id : openFavoritesWidgetIds) {
+            var frame = widgetFrames.get(id);
+            // Only a changed tile is redrawn, otherwise cached artwork would loop through reloads.
+            if (frame != null && frame.card.setRadioArtwork(key, bitmap)) changed = true;
+        }
+        if (changed) {
+            main.removeCallbacks(notifyWidgetFavorites);
+            main.postDelayed(notifyWidgetFavorites, 150L);
+        }
     }
 
     private void requestRadioStations() {

@@ -9,6 +9,7 @@ import android.appwidget.AppWidgetProviderInfo;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -208,7 +209,7 @@ public class AtlasMediaWidgetTest {
     }
 
     @Test public void widgetClicksKeepSettingsSeparateFromPlaybackUi() {
-        for (String action : new String[]{"open", "favorites", "settings"}) {
+        for (String action : new String[]{"open", "settings"}) {
             Intent intent = Shadows.shadowOf(AtlasMediaWidgetProvider.click(context, 41, action, false))
                     .getSavedIntent();
             assertEquals(new ComponentName(context, "settings".equals(action)
@@ -216,7 +217,7 @@ public class AtlasMediaWidgetTest {
             assertEquals(41, intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
         }
         for (String action : new String[]{"PREVIOUS", "PLAY_PAUSE", "NEXT", "sources",
-                "source_RADIO", "dismiss_sources"}) {
+                "source_RADIO", "dismiss_sources", "favorites", "dismiss_favorites"}) {
             assertEquals(new ComponentName(context, OverlayService.class),
                     Shadows.shadowOf(AtlasMediaWidgetProvider.click(context, 41, action, true))
                             .getSavedIntent().getComponent());
@@ -259,16 +260,11 @@ public class AtlasMediaWidgetTest {
     @Test public void widgetDialogsShowOnlyTheCardAndRejectForeignIds() {
         new Prefs(context).setWidgetMode(true);
         bind(41);
-        var favorites = Robolectric.buildActivity(WidgetControlActivity.class,
-                widgetControl("favorites")).create();
-        ViewGroup favoritesContent = favorites.get().findViewById(android.R.id.content);
-        assertEquals(1, favoritesContent.getChildCount());
-        assertTrue(favoritesContent.getChildAt(0) instanceof MediaCardView);
-        assertNull(find(favoritesContent, "Добавить виджет"));
-        favorites.destroy();
-        var seek = Robolectric.buildActivity(WidgetControlActivity.class, widgetControl("seek")).create();
-        assertTrue(seek.get().isFinishing());
-        seek.destroy();
+        for (String action : new String[]{"favorites", "seek"}) {
+            var retired = Robolectric.buildActivity(WidgetControlActivity.class, widgetControl(action)).create();
+            assertTrue(action + " no longer opens a card dialog", retired.get().isFinishing());
+            retired.destroy();
+        }
         var controller = Robolectric.buildActivity(WidgetControlActivity.class,
                 widgetControl("open").putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 99)).create();
         assertTrue(controller.get().isFinishing());
@@ -368,6 +364,101 @@ public class AtlasMediaWidgetTest {
         } finally {
             controller.destroy();
         }
+    }
+
+    @Test public void favoritesGridOpensInsideTheWidgetAndScrollsInTheLauncher() {
+        Bundle options = new Bundle();
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 500);
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 400);
+        var lists = new RadioStationLists(1L, List.of(), favoriteStations(9));
+        var frame = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context), options, 41,
+                radioSnapshot(), null, true, "favorites",
+                new AtlasMediaWidgetProvider.Frame.Favorites(lists, false, null), listener);
+        assertTrue(frame.favoritesGridShown);
+        assertTrue(frame.progressBounds.isEmpty());
+        assertEquals(9, frame.card.widgetFavoriteStations().size());
+        Bitmap tile = frame.card.renderFavoriteTile(lists.favorites.get(8));
+        assertNotNull(tile);
+        assertTrue(tile.getWidth() > 0 && tile.getHeight() > 0);
+        View rendered = frame.views.apply(context, null);
+        assertEquals(View.VISIBLE, rendered.findViewById(R.id.widget_favorites_box).getVisibility());
+        rendered.measure(View.MeasureSpec.makeMeasureSpec(frame.width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(frame.height, View.MeasureSpec.EXACTLY));
+        android.widget.GridView grid = rendered.findViewById(R.id.widget_favorites);
+        assertEquals(frame.card.favoriteColumns(), grid.getNumColumns());
+        assertEquals(0, grid.getHorizontalSpacing());
+        ViewGroup targets = rendered.findViewById(R.id.widget_targets);
+        assertEquals("backdrop and favorites button only", 2, targets.getChildCount());
+
+        var closed = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context), options, 41,
+                radioSnapshot(), null, true, null,
+                new AtlasMediaWidgetProvider.Frame.Favorites(lists, false, null), listener);
+        assertFalse(closed.favoritesGridShown);
+        assertEquals(View.GONE, closed.views.apply(context, null)
+                .findViewById(R.id.widget_favorites_box).getVisibility());
+        var loading = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context), options, 41,
+                radioSnapshot(), null, true, "favorites", new AtlasMediaWidgetProvider.Frame.Favorites(
+                RadioStationLists.EMPTY, true, null), listener);
+        assertFalse("the loading text is part of the card picture", loading.favoritesGridShown);
+    }
+
+    @Test public void favoriteTileTuneClosesOnlyItsWidget() throws Exception {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        bind(42);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var controller = Robolectric.buildService(OverlayService.class).create();
+        OverlayService service = controller.get();
+        try {
+            service.onStartCommand(new Intent(OverlayService.ACTION_WIDGET_REFRESH), 0, 1);
+            service.onBridgeState(MediaBridgeClient.State.CONNECTED, "");
+            service.onSnapshot(radioSnapshot());
+            service.onRadioStations(new RadioStationLists(1L, List.of(), favoriteStations(3)));
+            service.onStartCommand(widgetCommand(41, "favorites"), 0, 2);
+            var frames = (java.util.Map<?, ?>) field(service, "widgetFrames");
+            assertTrue(((AtlasMediaWidgetProvider.Frame) frames.get(41)).favoritesGridShown);
+            assertFalse(((AtlasMediaWidgetProvider.Frame) frames.get(42)).favoritesGridShown);
+            assertEquals(3, service.widgetFavoriteStations(41).size());
+            assertEquals(0, service.widgetFavoriteStations(42).size());
+
+            var factory = new WidgetFavoritesService.Factory(context, 41);
+            factory.onDataSetChanged();
+            assertEquals(3, factory.getCount());
+            assertNotNull(factory.getViewAt(2));
+            assertNull(factory.getViewAt(3));
+
+            service.onStartCommand(widgetCommand(41, "favorite")
+                    .putExtra(WidgetFavoritesService.EXTRA_STATION_ID, "missing"), 0, 3);
+            assertTrue(((AtlasMediaWidgetProvider.Frame) frames.get(41)).favoritesGridShown);
+            service.onStartCommand(widgetCommand(41, "favorite")
+                    .putExtra(WidgetFavoritesService.EXTRA_STATION_ID, "s1"), 0, 4);
+            assertFalse(((AtlasMediaWidgetProvider.Frame) frames.get(41)).favoritesGridShown);
+
+            service.onStartCommand(widgetCommand(41, "favorites"), 0, 5);
+            assertTrue(((AtlasMediaWidgetProvider.Frame) frames.get(41)).favoritesGridShown);
+            service.onStartCommand(widgetCommand(41, "dismiss_favorites"), 0, 6);
+            assertFalse(((AtlasMediaWidgetProvider.Frame) frames.get(41)).favoritesGridShown);
+            assertEquals(0, service.widgetFavoriteStations(41).size());
+        } finally {
+            controller.destroy();
+        }
+    }
+
+    private List<RadioStation> favoriteStations(int count) {
+        var stations = new java.util.ArrayList<RadioStation>();
+        for (int index = 0; index < count; index++) {
+            stations.add(new RadioStation("s" + index, 87_500 + index * 100, "", 1, "FM",
+                    "Station " + index, "", "", "", 0, 0, "", true, ""));
+        }
+        return stations;
+    }
+
+    private MediaSnapshot radioSnapshot() {
+        return new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",
+                MediaSource.Id.RADIO, "", List.of(), "radio", "Radio", "", "Station 1", "", "",
+                0, 0, 0, 1, 3, 0, "", 0,
+                MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_TUNE_RADIO, "", 0);
     }
 
     private Intent widgetControl(String action) {

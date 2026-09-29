@@ -94,6 +94,11 @@
         </service>
 
         <service
+            android:name=".WidgetFavoritesService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <service
             android:name=".WidgetStartupJob"
             android:directBootAware="false"
             android:exported="true"

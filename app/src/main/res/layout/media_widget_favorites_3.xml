@@ -1,0 +1,5 @@
+<!-- Android 11 cannot set the column count through RemoteViews; tiles include their own gaps. -->
+<GridView xmlns:android="http://schemas.android.com/apk/res/android"
+ android:id="@+id/widget_favorites" android:layout_width="match_parent" android:layout_height="match_parent"
+ android:numColumns="3" android:stretchMode="columnWidth" android:horizontalSpacing="0dp" android:verticalSpacing="0dp"
+ android:listSelector="@android:color/transparent" android:scrollbarStyle="outsideOverlay" android:fadingEdgeLength="0dp" />

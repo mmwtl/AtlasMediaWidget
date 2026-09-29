@@ -41,7 +41,8 @@ a preview using the same rendering path as the selected mode. AppWidget previews
 instance’s size; before placement a labeled sample size with demo media is shown. Progress on HOME
 updates every second. Tapping the progress bar seeks to that point directly; tapping the time
 shows a draggable bar over the widget's own bar for precise seeking. Source selection stays inside
-the AppWidget, while favorites open the existing media card controls.
+the AppWidget; source selection and favorite radio stations open directly inside the AppWidget, and
+the favorites list scrolls.
 
 <p align="center">
   <a href="docs/images/home-overview.webp">

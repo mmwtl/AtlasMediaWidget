@@ -497,7 +497,54 @@ final class MediaCardView extends FrameLayout {
 
     void openWidgetChooser(String action) {
         if ("sources".equals(action)) toggleSourceChooser();
-        else if ("favorites".equals(action)) toggleFavoritesChooser();
+    }
+
+    /**
+     * Opens favorites from state the service already holds; the widget must not request stations
+     * on every redraw. {@code error} replaces the list, {@code loading} applies only while empty.
+     */
+    void openWidgetFavorites(RadioStationLists lists, boolean loading, String error) {
+        hideSourceChooser();
+        if (error != null) setRadioStationsError(error);
+        else {
+            setRadioStations(lists);
+            favoritesLoading = loading;
+            updateFavoritesEmptyState();
+        }
+        favoritesChooser.setVisibility(VISIBLE);
+        favoritesChooser.bringToFront();
+        favoritesButton.bringToFront();
+        updateContentLayout();
+    }
+
+    View widgetFavoritesGrid() { return favoritesGrid; }
+
+    List<RadioStation> widgetFavoriteStations() {
+        return favoritesChooser.getVisibility() == VISIBLE && favoritesGrid.getVisibility() == VISIBLE
+                ? List.copyOf(favoriteStations) : List.of();
+    }
+
+    int favoriteColumns() { return favoriteColumns; }
+
+    /**
+     * Draws one favorites tile exactly as the card grid does, for a RemoteViews collection,
+     * surrounded by half of the grid spacing on each side.
+     */
+    Bitmap renderFavoriteTile(RadioStation station) {
+        int position = favoriteStations.indexOf(station);
+        if (position < 0 || favoriteColumnWidth <= 0 || favoriteTileHeight <= 0) return null;
+        View tile = favoritesAdapter.getView(position, null, favoritesGrid);
+        tile.measure(MeasureSpec.makeMeasureSpec(favoriteColumnWidth, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(favoriteTileHeight, MeasureSpec.EXACTLY));
+        tile.layout(0, 0, favoriteColumnWidth, favoriteTileHeight);
+        int gapX = favoritesGrid.getHorizontalSpacing() / 2;
+        int gapY = favoritesGrid.getVerticalSpacing() / 2;
+        Bitmap bitmap = Bitmap.createBitmap(favoriteColumnWidth + 2 * gapX,
+                favoriteTileHeight + 2 * gapY, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        canvas.translate(gapX, gapY);
+        tile.draw(canvas);
+        return bitmap;
     }
 
     int cardWidth() { return cardWidth; }
@@ -611,7 +658,8 @@ final class MediaCardView extends FrameLayout {
         favoritesGrid.setVisibility(GONE);
     }
 
-    void setRadioArtwork(String key, Bitmap bitmap) {
+    /** Returns whether the artwork changed what a favorites tile shows. */
+    boolean setRadioArtwork(String key, Bitmap bitmap) {
         boolean belongsToCurrentList = false;
         for (RadioStation station : favoriteStations) {
             if (station.artworkKey().equals(key)) {
@@ -619,13 +667,15 @@ final class MediaCardView extends FrameLayout {
                 break;
             }
         }
-        if (!belongsToCurrentList) return;
-        if (bitmap == null) failedRadioArtwork.add(key);
+        if (!belongsToCurrentList) return false;
+        boolean changed;
+        if (bitmap == null) changed = failedRadioArtwork.add(key);
         else {
             failedRadioArtwork.remove(key);
-            radioArtwork.put(key, bitmap);
+            changed = radioArtwork.put(key, bitmap) != bitmap;
         }
         favoritesAdapter.notifyDataSetChanged();
+        return changed;
     }
 
     void setArtwork(Bitmap bitmap) {

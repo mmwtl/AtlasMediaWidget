@@ -15,6 +15,7 @@ import android.graphics.RectF;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.GridView;
 import android.widget.RemoteViews;
 
 /** Lifecycle entry point only; the foreground service owns the bridge and live state. */
@@ -137,6 +138,17 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
     }
 
+    /** Collection items can only add their station through a fill-in, so the template is mutable. */
+    static PendingIntent favoriteTemplate(Context context, int id) {
+        Intent intent = new Intent(context, OverlayService.class)
+                .setAction(ACTION_COMMAND)
+                .setData(Uri.parse("atlasmediawidget://" + id + "/favorite"))
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .putExtra(EXTRA_CONTROL, "favorite");
+        return PendingIntent.getForegroundService(context, id, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+    }
+
     static PendingIntent click(Context context, int id, String action, boolean command) {
         Intent intent = new Intent(context, command ? OverlayService.class
                 : "settings".equals(action) ? MainActivity.class : WidgetControlActivity.class)
@@ -158,14 +170,25 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
         final int width;
         final int height;
         final RemoteViews views;
+        final boolean favoritesGridShown;
+
+        /** Favorites state held by OverlayService; the frame never requests stations itself. */
+        record Favorites(RadioStationLists lists, boolean loading, String error) {}
 
         Frame(Context context, Prefs prefs, Bundle options, int id, MediaSnapshot snapshot,
                 Bitmap artwork, boolean connected, MediaCardView.Listener listener) {
-            this(context, prefs, options, id, snapshot, artwork, connected, false, listener);
+            this(context, prefs, options, id, snapshot, artwork, connected, null, null, listener);
         }
 
         Frame(Context context, Prefs prefs, Bundle options, int id, MediaSnapshot snapshot,
                 Bitmap artwork, boolean connected, boolean showSources, MediaCardView.Listener listener) {
+            this(context, prefs, options, id, snapshot, artwork, connected,
+                    showSources ? "sources" : null, null, listener);
+        }
+
+        Frame(Context context, Prefs prefs, Bundle options, int id, MediaSnapshot snapshot,
+                Bitmap artwork, boolean connected, String chooser, Favorites favorites,
+                MediaCardView.Listener listener) {
             width = Math.min(4096, Ui.dp(context, widthDp(context, options)));
             height = Math.min(4096, Ui.dp(context, heightDp(context, options)));
             CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE,
@@ -175,17 +198,25 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
             if (snapshot == null || !connected) card.renderWidgetUnavailable(connected);
             else card.renderSnapshot(snapshot, true);
-            if (showSources && snapshot != null && connected) card.openWidgetChooser("sources");
+            boolean showSources = "sources".equals(chooser) && snapshot != null && connected;
+            boolean showFavorites = "favorites".equals(chooser) && snapshot != null && connected
+                    && favorites != null;
+            if (showSources) card.openWidgetChooser("sources");
+            if (showFavorites) card.openWidgetFavorites(favorites.lists(), favorites.loading(), favorites.error());
             card.prepareWidgetArtwork(connected ? artwork : null);
             card.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                     View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
             card.layout(0, 0, width, height);
             View progress = card.widgetTarget("seek");
-            progressBounds = !showSources && progress.getVisibility() == View.VISIBLE
+            progressBounds = !showSources && !showFavorites && progress.getVisibility() == View.VISIBLE
                     ? card.widgetBounds(progress) : new Rect();
+            GridView grid = (GridView) card.widgetFavoritesGrid();
+            favoritesGridShown = showFavorites && grid.getVisibility() == View.VISIBLE;
             views = new RemoteViews(context.getPackageName(), R.layout.media_widget);
             int visibility = progress.getVisibility();
             progress.setVisibility(View.INVISIBLE);
+            // The launcher draws and scrolls the tiles; the card supplies only the panel behind them.
+            if (favoritesGridShown) grid.setVisibility(View.INVISIBLE);
             float scale = Math.min(1f, 800f / Math.max(width, height));
             Bitmap bitmap = Bitmap.createBitmap(Math.max(1, Math.round(width * scale)),
                     Math.max(1, Math.round(height * scale)), Bitmap.Config.ARGB_8888);
@@ -199,13 +230,22 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             canvas.clipPath(clip);
             card.draw(canvas);
             progress.setVisibility(visibility);
+            if (favoritesGridShown) grid.setVisibility(View.VISIBLE);
             views.setImageViewBitmap(R.id.widget_card, bitmap);
             views.setContentDescription(R.id.widget_card, !connected ? "Нет соединения" : snapshot == null ? "Нет данных"
                     : snapshot.title + ", " + snapshot.artist + (snapshot.isPlaying() ? ", воспроизведение" : ", пауза"));
             views.setOnClickPendingIntent(R.id.widget_card, click(context, id, "open", false));
             setProgress(views);
             views.removeAllViews(R.id.widget_targets);
-            if (showSources && snapshot != null && connected) {
+            setFavoritesGrid(context, id, grid);
+            if (showFavorites) {
+                addTarget(context, id, "dismiss_favorites", "Закрыть избранное",
+                        new Rect(0, 0, width, height), true);
+                addTarget(context, id, "favorites", "Закрыть избранное",
+                        card.widgetBounds(card.widgetTarget("favorites")), true);
+                return;
+            }
+            if (showSources) {
                 addTarget(context, id, "dismiss_sources", "Закрыть выбор источника",
                         new Rect(0, 0, width, height), true);
                 for (MediaSource.Id source : new MediaSource.Id[]{MediaSource.Id.RADIO,
@@ -247,7 +287,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     case "sources" -> "Выбрать источник";
                     case "favorites" -> "Избранные станции";
                     default -> "Открыть источник";
-                }, rect, command || "sources".equals(action));
+                }, rect, command || "sources".equals(action) || "favorites".equals(action));
             }
         }
 
@@ -279,6 +319,34 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 addTarget(context, id, "Точная перемотка", rect,
                         scrubClick(context, id, part, new Rect(rect), new Rect(progressBounds)));
             }
+        }
+
+        @SuppressWarnings("deprecation") // RemoteCollectionItems needs API 31.
+        private void setFavoritesGrid(Context context, int id, GridView grid) {
+            views.removeAllViews(R.id.widget_favorites_box);
+            views.setViewVisibility(R.id.widget_favorites_box,
+                    favoritesGridShown ? View.VISIBLE : View.GONE);
+            if (!favoritesGridShown) return;
+            // Tiles carry half of each gap on every side, so the collection grid has no spacing.
+            Rect bounds = card.widgetBounds(grid);
+            int gapX = grid.getHorizontalSpacing() / 2;
+            int gapY = grid.getVerticalSpacing() / 2;
+            views.setViewPadding(R.id.widget_favorites_box,
+                    Math.max(0, bounds.left + grid.getPaddingLeft() - gapX),
+                    Math.max(0, bounds.top + grid.getPaddingTop() - gapY),
+                    Math.max(0, width - bounds.right + grid.getPaddingRight() - gapX),
+                    Math.max(0, height - bounds.bottom + grid.getPaddingBottom() - gapY));
+            RemoteViews collection = new RemoteViews(context.getPackageName(),
+                    switch (card.favoriteColumns()) {
+                        case 3 -> R.layout.media_widget_favorites_3;
+                        case 4 -> R.layout.media_widget_favorites_4;
+                        default -> R.layout.media_widget_favorites_2;
+                    });
+            collection.setRemoteAdapter(R.id.widget_favorites, new Intent(context, WidgetFavoritesService.class)
+                    .setData(Uri.parse("atlasmediawidget://" + id + "/favorites_grid"))
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id));
+            collection.setPendingIntentTemplate(R.id.widget_favorites, favoriteTemplate(context, id));
+            views.addView(R.id.widget_favorites_box, collection);
         }
 
         private void addTarget(Context context, int id, String action, String description,
