@@ -135,6 +135,7 @@ public final class OverlayService extends Service
     private MediaBridgeClient.State bridgeState = MediaBridgeClient.State.CONNECTING;
     private long loadedArtworkRevision = Long.MIN_VALUE;
     private String loadedArtworkKey = "";
+    private String loadedTrackKey = "";
     private long expectedArtworkToken = Long.MIN_VALUE;
     private long createdAt;
     private float dragStartRawX;
@@ -536,12 +537,11 @@ public final class OverlayService extends Service
         List<?> key = snapshot == null ? List.of("empty", connected)
                 : Arrays.asList(
                 snapshot.title, snapshot.artist, snapshot.album, snapshot.mediaId, snapshot.audioSource,
-                snapshot.appSource, snapshot.ownerPackage, snapshot.duration, snapshot.playbackState,
+                snapshot.appSource, snapshot.ownerPackage, snapshot.duration, snapshot.isPlaying(),
                 snapshot.capabilities, snapshot.backendConnected, snapshot.sources.stream()
                         .map(source -> List.of(source.id, source.available, source.connected,
                                 source.selected, source.capabilities))
-                        .collect(Collectors.toList()),
-                snapshot.artworkUri, snapshot.artworkRevision);
+                        .collect(Collectors.toList()));
         int[] ids = AtlasMediaWidgetProvider.ids(this);
         Set<Integer> active = new HashSet<>();
         for (int id : ids) active.add(id);
@@ -747,6 +747,7 @@ public final class OverlayService extends Service
             reducer.onDisconnected(SystemClock.elapsedRealtime());
             loadedArtworkRevision = Long.MIN_VALUE;
             loadedArtworkKey = "";
+            loadedTrackKey = "";
             currentArtwork = null;
             radioStations = RadioStationLists.EMPTY;
             radioStationsRequestInFlight = false;
@@ -1058,6 +1059,7 @@ public final class OverlayService extends Service
         }
         loadedArtworkRevision = Long.MIN_VALUE;
         loadedArtworkKey = "";
+        loadedTrackKey = "";
         Rect bounds = availableBounds();
         CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE,
                 CardStyle.DEFAULT.preferenceValue));
@@ -1182,15 +1184,20 @@ public final class OverlayService extends Service
         ArtworkRef artwork = !snapshot.artworkUri.isBlank()
                 ? ArtworkRef.mediaUri(snapshot.artworkUri)
                 : ArtworkRef.NONE;
-        String artworkKey = snapshot.audioSource + ":" + snapshot.mediaId + ":"
-                + snapshot.title + ":" + artwork.cacheKey();
+        String trackKey = snapshot.audioSource + ":" + snapshot.mediaId + ":" + snapshot.title;
+        String artworkKey = trackKey + ":" + artwork.cacheKey();
         if (snapshot.artworkRevision == loadedArtworkRevision
                 && artworkKey.equals(loadedArtworkKey)) return;
-        currentArtwork = null;
-        widgetRenderKey = null;
-        renderWidgets(true);
+        // A new track must not show the previous cover. A new revision of the same track keeps
+        // the current cover until onArtwork replaces it, so the widget does not flash empty.
+        if (!trackKey.equals(loadedTrackKey)) {
+            currentArtwork = null;
+            widgetRenderKey = null;
+            renderWidgets(true);
+        }
         loadedArtworkRevision = snapshot.artworkRevision;
         loadedArtworkKey = artworkKey;
+        loadedTrackKey = trackKey;
         // Keep the current bitmap visible until the replacement has decoded. ArtworkLoader
         // still reports null for an empty or failed load, so genuinely unavailable art clears.
         expectedArtworkToken = artworkLoader.load(

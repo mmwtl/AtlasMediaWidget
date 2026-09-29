@@ -1,5 +1,6 @@
 package com.mmwtl.atlasmediawidget;
 
+import android.media.session.PlaybackState;
 import android.os.Bundle;
 import android.os.Build;
 
@@ -116,8 +117,19 @@ final class MediaSnapshot {
         );
     }
 
+    /**
+     * Playing, or in a transient state from which the player resumes by itself. Players report
+     * BUFFERING after a seek; treating it as paused would flip the play/pause control and redraw
+     * the widget twice. Progress extrapolation still requires STATE_PLAYING.
+     */
     boolean isPlaying() {
-        return playbackState == STATE_PLAYING;
+        return switch (playbackState) {
+            case STATE_PLAYING, PlaybackState.STATE_FAST_FORWARDING, PlaybackState.STATE_REWINDING,
+                    PlaybackState.STATE_BUFFERING, PlaybackState.STATE_CONNECTING,
+                    PlaybackState.STATE_SKIPPING_TO_PREVIOUS, PlaybackState.STATE_SKIPPING_TO_NEXT,
+                    PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> true;
+            default -> false;
+        };
     }
 
     boolean supports(long capability) {

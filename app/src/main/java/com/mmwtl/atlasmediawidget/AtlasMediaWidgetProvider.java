@@ -342,11 +342,13 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                         case 4 -> R.layout.media_widget_favorites_4;
                         default -> R.layout.media_widget_favorites_2;
                     });
-            collection.setRemoteAdapter(R.id.widget_favorites, new Intent(context, WidgetFavoritesService.class)
+            views.addView(R.id.widget_favorites_box, collection);
+            // Android 11 accepts a collection adapter only from the root RemoteViews, whose parent
+            // is the AppWidgetHostView; on the nested views the launcher drops it.
+            views.setRemoteAdapter(R.id.widget_favorites, new Intent(context, WidgetFavoritesService.class)
                     .setData(Uri.parse("atlasmediawidget://" + id + "/favorites_grid"))
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id));
-            collection.setPendingIntentTemplate(R.id.widget_favorites, favoriteTemplate(context, id));
-            views.addView(R.id.widget_favorites_box, collection);
+            views.setPendingIntentTemplate(R.id.widget_favorites, favoriteTemplate(context, id));
         }
 
         private void addTarget(Context context, int id, String action, String description,

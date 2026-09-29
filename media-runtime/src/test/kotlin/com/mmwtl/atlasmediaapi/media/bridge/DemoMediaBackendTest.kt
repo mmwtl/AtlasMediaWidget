@@ -13,10 +13,14 @@ import org.robolectric.RuntimeEnvironment
 @RunWith(RobolectricTestRunner::class)
 class DemoMediaBackendTest {
     private val repository = MediaStateRepository()
+    private var normalizations = 0
     private val backend = DemoMediaBackend(
         context = RuntimeEnvironment.getApplication(),
         repository = repository,
-        artworkRepository = ArtworkNormalizer { _, callback -> callback(NormalizedArtwork("demo", "content://demo/cover.jpg")) },
+        artworkRepository = ArtworkNormalizer { _, callback ->
+            normalizations++
+            callback(NormalizedArtwork("demo$normalizations", "content://demo/cover$normalizations.jpg"))
+        },
         resourceArtworkLoader = { Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888) },
     )
 
@@ -53,6 +57,34 @@ class DemoMediaBackendTest {
             putLong(MediaBridgeContract.Key.COMMAND_POSITION, 90_000L)
         })
         assertEquals(90_000L, repository.snapshot().position)
+    }
+
+    @Test
+    fun `commands for the same track keep its artwork like the real backends`() {
+        backend.start()
+        backend.execute(command(MediaCommand.SET_SOURCE) {
+            putString(MediaBridgeContract.Key.COMMAND_SOURCE, BridgeAudioSource.ONLINE.name)
+            putBoolean(MediaBridgeContract.Key.COMMAND_AUTOPLAY, true)
+        })
+        val before = repository.snapshot()
+        val normalized = normalizations
+        assertTrue(before.artworkUri.isNotBlank())
+
+        backend.execute(command(MediaCommand.SEEK_TO) {
+            putLong(MediaBridgeContract.Key.COMMAND_POSITION, 90_000L)
+        })
+        backend.execute(command(MediaCommand.PAUSE))
+        val after = repository.snapshot()
+        assertEquals(90_000L, after.position)
+        assertEquals(before.artworkUri, after.artworkUri)
+        assertEquals(before.artworkRevision, after.artworkRevision)
+        assertEquals(normalized, normalizations)
+
+        backend.execute(command(MediaCommand.NEXT))
+        val next = repository.snapshot()
+        assertTrue(next.artworkUri.isNotBlank())
+        assertTrue(next.artworkUri != before.artworkUri)
+        assertTrue(next.artworkRevision > before.artworkRevision)
     }
 
     @Test

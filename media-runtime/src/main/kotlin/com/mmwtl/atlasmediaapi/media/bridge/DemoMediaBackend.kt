@@ -231,7 +231,11 @@ class DemoMediaBackend(
         val mediaId = "demo:${source.name}:${if (isRadio) radioStation.id else trackIndex}"
         val actions = playbackActions(isRadio)
         val providedArtworkUri = if (isRadio) radioStation.artworkUri else ""
+        // Like the real backends, a command for the same track keeps its normalized cover.
+        var keepsArtwork = false
         repository.update { before ->
+            keepsArtwork = !isRadio && before.mediaId == mediaId && before.artworkUri.isNotBlank()
+            val artworkUri = if (keepsArtwork) before.artworkUri else providedArtworkUri
             before.copy(
                 backendConnected = true,
                 backendErrorCode = MediaBridgeContract.BackendError.NONE,
@@ -260,11 +264,11 @@ class DemoMediaBackend(
                 playbackErrorMessage = "",
                 playbackActions = actions,
                 capabilities = source.defaultCapabilities(),
-                artworkUri = providedArtworkUri,
-                artworkRevision = if (before.artworkUri != providedArtworkUri) before.artworkRevision + 1 else before.artworkRevision,
+                artworkUri = artworkUri,
+                artworkRevision = if (before.artworkUri != artworkUri) before.artworkRevision + 1 else before.artworkRevision,
             )
         }
-        if (providedArtworkUri.isNotBlank()) return
+        if (providedArtworkUri.isNotBlank() || keepsArtwork) return
         val cover = artwork(title, artist, color, track?.artworkResId)
         artworkRepository.normalize(ArtworkInput(bitmap = cover)) { normalized ->
             try {

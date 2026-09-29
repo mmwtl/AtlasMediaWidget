@@ -380,7 +380,10 @@ public class AtlasMediaWidgetTest {
         Bitmap tile = frame.card.renderFavoriteTile(lists.favorites.get(8));
         assertNotNull(tile);
         assertTrue(tile.getWidth() > 0 && tile.getHeight() > 0);
-        View rendered = frame.views.apply(context, null);
+        org.robolectric.shadows.ShadowLog.clear();
+        View rendered = frame.views.apply(context, new android.appwidget.AppWidgetHostView(context));
+        assertTrue("the launcher must accept the collection adapter",
+                org.robolectric.shadows.ShadowLog.getLogsForTag("RemoteViews").isEmpty());
         assertEquals(View.VISIBLE, rendered.findViewById(R.id.widget_favorites_box).getVisibility());
         rendered.measure(View.MeasureSpec.makeMeasureSpec(frame.width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(frame.height, View.MeasureSpec.EXACTLY));
@@ -443,6 +446,54 @@ public class AtlasMediaWidgetTest {
         } finally {
             controller.destroy();
         }
+    }
+
+    @Test public void sameTrackArtworkUpdateAndBufferingKeepTheWidgetCard() throws Exception {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var controller = Robolectric.buildService(OverlayService.class).create();
+        OverlayService service = controller.get();
+        try {
+            service.onStartCommand(new Intent(OverlayService.ACTION_WIDGET_REFRESH), 0, 1);
+            service.onBridgeState(MediaBridgeClient.State.CONNECTED, "");
+            service.onSnapshot(usbSnapshot(1, 3, "Track", "content://cover/a", 1));
+            Bitmap cover = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888);
+            service.onArtwork((long) field(service, "expectedArtworkToken"), cover);
+            var frames = (java.util.Map<?, ?>) field(service, "widgetFrames");
+            Object frame = frames.get(41);
+
+            // A seek on a real player: buffering and a re-published cover for the same track.
+            service.onSnapshot(usbSnapshot(2, android.media.session.PlaybackState.STATE_BUFFERING,
+                    "Track", "content://cover/b", 2));
+            assertSame(cover, field(service, "currentArtwork"));
+            assertSame("no full redraw while the control state is unchanged", frame, frames.get(41));
+
+            service.onSnapshot(usbSnapshot(3, 3, "Next track", "content://cover/c", 3));
+            assertNull("a new track never shows the previous cover", field(service, "currentArtwork"));
+        } finally {
+            controller.destroy();
+        }
+    }
+
+    @Test public void transientPlaybackStatesKeepThePauseControl() {
+        for (int state : new int[]{3, 4, 5, 6, 8, 9, 10, 11}) {
+            assertTrue(String.valueOf(state), usbSnapshot(1, state, "T", "", 0).isPlaying());
+        }
+        for (int state : new int[]{0, 1, 2, 7}) {
+            assertFalse(String.valueOf(state), usbSnapshot(1, state, "T", "", 0).isPlaying());
+        }
+        assertEquals(10_000L, ProgressEstimator.estimate(10_000L, 180_000L, 1L, 1f,
+                android.media.session.PlaybackState.STATE_BUFFERING, 5_000L));
+    }
+
+    private MediaSnapshot usbSnapshot(long generation, int state, String title, String artwork,
+            long revision) {
+        return new MediaSnapshot(MediaBridgeContract.VERSION, generation, generation, true, 0, "",
+                MediaSource.Id.USB, "", List.of(), "usb", "USB", title, title, "Artist", "",
+                180000, 10000, 1, 1, state, 0, "", 0,
+                MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_PAUSE, artwork, revision);
     }
 
     private List<RadioStation> favoriteStations(int count) {
