@@ -12,7 +12,7 @@ import com.geely.lib.oneosapi.mediacenter.MediaCenterManager;
 /* loaded from: classes.dex */
 public class OneOSApiManager implements ServiceConnectionListener {
     private static final String TAG = "OneOSApiManager";
-    private static final int SERVICE_MEDIA_CENTER = 3;
+    public static final int SERVICE_MEDIA_CENTER = 3;
     private static volatile OneOSApiManager sInstance;
     private final Context mContext;
     private volatile MediaCenterManager mMediaCenterManager;
@@ -58,6 +58,11 @@ public class OneOSApiManager implements ServiceConnectionListener {
     }
 
     public MediaCenterManager getMediaCenterManager() {
+        MediaCenterManager cached = this.mMediaCenterManager;
+        if (cached != null && !cached.isAlive() && this.mServiceConnectionManager.isServiceBound()) {
+            // MediaCenter may register with the ServiceManager after it was first queried.
+            updateServiceBinder(cached, SERVICE_MEDIA_CENTER);
+        }
         if (this.mMediaCenterManager == null) {
             synchronized (OneOSApiManager.class) {
                 if (this.mMediaCenterManager == null && this.mServiceConnectionManager.isServiceBound()) {

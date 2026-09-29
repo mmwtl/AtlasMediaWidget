@@ -101,6 +101,7 @@ class MediaBackendCoordinator(
     private var onlineClusterJob: Job? = null
     private var graceJob: Job? = null
     private var reconnectJob: Job? = null
+    private var mediaCenterRetryJob: Job? = null
     private var defaultSourceJob: Job? = null
     private var activeSourceLossJob: Job? = null
     private var hasAppliedDefaultSource = false
@@ -110,7 +111,13 @@ class MediaBackendCoordinator(
 
     private val serviceConnectionListener = object : ServiceConnectionListener {
         override fun onServiceBinderUpdated(binderType: Int) {
-            // No sub-service updates needed for MediaCenter.
+            // At cold boot OneOS ServiceManager can connect before MediaCenter registers its
+            // binder; this callback is the notification that it is now available.
+            if (binderType != OneOSApiManager.SERVICE_MEDIA_CENTER) return
+            scope.launch {
+                Timber.i("OneOS MediaCenter binder updated")
+                handleConnectionChanged(true)
+            }
         }
 
         override fun onServiceConnectionChanged(connected: Boolean) {
@@ -198,6 +205,8 @@ class MediaBackendCoordinator(
         Timber.i("Stopping media backend coordinator")
         reconnectJob?.cancel()
         reconnectJob = null
+        mediaCenterRetryJob?.cancel()
+        mediaCenterRetryJob = null
         defaultSourceJob?.cancel()
         defaultSourceJob = null
         activeSourceLossJob?.cancel()
@@ -246,12 +255,17 @@ class MediaBackendCoordinator(
                     }
                 } else {
                     withContext(Dispatchers.Main) {
-                        stateHub.onBackendDisconnected("OneOS MediaCenter unavailable")
+                        if (connectionGeneration == currentGen && isBackendStarted) {
+                            stateHub.onBackendDisconnected("OneOS MediaCenter unavailable")
+                            scheduleMediaCenterRetry(currentGen)
+                        }
                     }
                 }
             }
         } else {
             Timber.w("OneOS disconnected")
+            mediaCenterRetryJob?.cancel()
+            mediaCenterRetryJob = null
             if (preferences.defaultAudioSource != BridgeAudioSource.ONLINE.name) {
                 defaultSourceJob?.cancel()
                 defaultSourceJob = null
@@ -389,6 +403,27 @@ class MediaBackendCoordinator(
             } finally {
                 isApplyingDefaultSource = false
             }
+        }
+    }
+
+    private fun scheduleMediaCenterRetry(generation: Long) {
+        if (mediaCenterRetryJob?.isActive == true) return
+        mediaCenterRetryJob = scope.launch {
+            for (delayMs in RECONNECT_DELAYS_MS) {
+                Timber.i("OneOS MediaCenter unavailable; retrying in %d ms", delayMs)
+                delay(delayMs)
+                if (!isBackendStarted || connectionGeneration != generation) return@launch
+                val alive = withContext(Dispatchers.IO) {
+                    apiManager.getMediaCenterManager()?.isAlive == true
+                }
+                if (!isBackendStarted || connectionGeneration != generation) return@launch
+                if (alive) {
+                    mediaCenterRetryJob = null
+                    handleConnectionChanged(true)
+                    return@launch
+                }
+            }
+            Timber.w("OneOS MediaCenter still unavailable after %d retries", RECONNECT_DELAYS_MS.size)
         }
     }
 
