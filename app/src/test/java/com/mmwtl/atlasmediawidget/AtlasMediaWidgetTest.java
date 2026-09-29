@@ -365,6 +365,36 @@ public class AtlasMediaWidgetTest {
         zoneController.destroy();
     }
 
+    @Test public void scrubberCoversTheStripWithTheCardInsteadOfHidingIt() throws Exception {
+        new Prefs(context).setWidgetMode(true);
+        bind(41);
+        Shadows.shadowOf(RuntimeEnvironment.getApplication())
+                .declareActionUnbindable(MediaBridgeContract.SERVICE_ACTION);
+        var service = Robolectric.buildService(OverlayService.class).create();
+        try {
+            service.get().onStartCommand(new Intent(OverlayService.ACTION_WIDGET_REFRESH), 0, 1);
+            service.get().onBridgeState(MediaBridgeClient.State.CONNECTED, "");
+            service.get().onSnapshot(snapshot(MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_SEEK));
+            var frame = service.get().widgetFrame(41);
+            assertNotNull(frame.cardBitmap);
+            android.graphics.Rect row = frame.progressBounds;
+            Intent intent = Shadows.shadowOf(AtlasMediaWidgetProvider.scrubClick(context, 41,
+                    "elapsed", row, row)).getSavedIntent();
+            intent.setSourceBounds(new android.graphics.Rect(row.left + 100, row.top + 900,
+                    row.right + 100, row.bottom + 900));
+            var controller = Robolectric.buildActivity(WidgetControlActivity.class, intent).create();
+            ViewGroup strip = (ViewGroup) ((ViewGroup) controller.get()
+                    .findViewById(android.R.id.content)).getChildAt(0);
+            assertTrue(strip.getBackground() instanceof android.graphics.drawable.BitmapDrawable);
+            assertFalse(controller.get().isFinishing());
+            assertTrue("the widget strip stays; the opaque window covers it",
+                    ((java.util.Set<?>) field(service.get(), "scrubbingWidgetIds")).isEmpty());
+            controller.destroy();
+        } finally {
+            service.destroy();
+        }
+    }
+
     @Test public void seekZoneCommandProjectsThePositionOnTheWidget() throws Exception {
         new Prefs(context).setWidgetMode(true);
         bind(41);

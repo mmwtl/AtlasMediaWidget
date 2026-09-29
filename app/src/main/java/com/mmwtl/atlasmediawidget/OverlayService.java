@@ -471,6 +471,11 @@ public final class OverlayService extends Service
         }
     }
 
+    /** The widget's card picture under its progress row, for an opaque scrubber backdrop. */
+    AtlasMediaWidgetProvider.Frame widgetFrame(int widgetId) {
+        return widgetFrames.get(widgetId);
+    }
+
     MediaSnapshot widgetSnapshot() {
         long now = SystemClock.elapsedRealtime();
         return prefs.isWidgetMode() && reducer.isConnected()

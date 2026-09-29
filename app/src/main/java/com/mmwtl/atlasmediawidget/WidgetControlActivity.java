@@ -3,7 +3,9 @@ package com.mmwtl.atlasmediawidget;
 import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.graphics.Rect;
+import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -25,6 +27,7 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
     private int widgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
     private MediaCardView scrubber;
     private boolean scrubbing;
+    private boolean hidesWidgetStrip;
     private boolean scrubberShown;
     private boolean closingScrubber;
     private final Runnable scrubberIdle = this::closeScrubber;
@@ -143,8 +146,12 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
                 prefs.appearance(style), prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), scrubberListener);
         scrubber.showProgressOnly();
+        // Keep the finger-sized window inside the card so its backdrop is always card pixels.
         int margin = Math.max(0, (Ui.dp(this, 56) - row.height()) / 2);
-        int touchY = margin + row.height() / 2;
+        int topMargin = Math.min(margin, Math.max(0, row.top));
+        int bottomMargin = Math.min(margin, Math.max(0, height - row.bottom));
+        Rect area = new Rect(row.left, row.top - topMargin, row.right, row.bottom + bottomMargin);
+        int touchY = topMargin + row.height() / 2;
         FrameLayout strip = new FrameLayout(this) {
             @Override public boolean dispatchTouchEvent(MotionEvent event) {
                 if (event.getActionMasked() == MotionEvent.ACTION_DOWN) main.removeCallbacks(scrubberIdle);
@@ -158,24 +165,37 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
             }
         };
         strip.setClipChildren(true);
-        scrubber.setTranslationX(-row.left);
-        scrubber.setTranslationY(margin - row.top);
+        OverlayService service = OverlayService.current();
+        var frame = service == null ? null : service.widgetFrame(widgetId);
+        if (frame != null && frame.width == width && frame.height == height) {
+            // An opaque copy of the card under the strip hides whatever the widget's own strip
+            // shows, so it never has to be hidden or restored and is never drawn twice.
+            Rect crop = new Rect(Math.round(area.left * frame.cardScale),
+                    Math.round(area.top * frame.cardScale), Math.round(area.right * frame.cardScale),
+                    Math.round(area.bottom * frame.cardScale));
+            if (crop.intersect(0, 0, frame.cardBitmap.getWidth(), frame.cardBitmap.getHeight())) {
+                strip.setBackground(new BitmapDrawable(getResources(), Bitmap.createBitmap(
+                        frame.cardBitmap, crop.left, crop.top, crop.width(), crop.height())));
+            }
+        }
+        hidesWidgetStrip = strip.getBackground() == null;
+        scrubber.setTranslationX(-area.left);
+        scrubber.setTranslationY(-area.top);
         strip.addView(scrubber, new FrameLayout.LayoutParams(width, height));
         setContentView(strip);
         var window = getWindow();
-        window.setLayout(row.width(), row.height() + 2 * margin);
+        window.setLayout(area.width(), area.height());
         window.setGravity(Gravity.TOP | Gravity.START);
         window.setElevation(0f);
         WindowManager.LayoutParams attributes = window.getAttributes();
-        attributes.x = source.left - target.left + row.left;
-        attributes.y = source.top - target.top + row.top - margin;
+        attributes.x = source.left - target.left + area.left;
+        attributes.y = source.top - target.top + area.top;
         window.setAttributes(attributes);
         window.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                 | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
                 | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
                 | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         main.postDelayed(scrubberIdle, 4_000L);
-        OverlayService service = OverlayService.current();
         MediaSnapshot snapshot = service == null ? null : service.widgetSnapshot();
         if (snapshot != null) renderScrubber(snapshot);
         String zone = getIntent().getStringExtra(AtlasMediaWidgetProvider.EXTRA_SEEK_ZONE);
@@ -209,7 +229,7 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
             finish();
             return;
         }
-        if (scrubberShown) return;
+        if (scrubberShown || !hidesWidgetStrip) return;
         scrubberShown = true;
         // Hide the widget's own strip only once this window's strip is on screen; until then
         // both show the same position, so the strip never disappears while the window starts.

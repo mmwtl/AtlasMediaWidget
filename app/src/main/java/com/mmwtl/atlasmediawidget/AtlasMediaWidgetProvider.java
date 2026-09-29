@@ -169,6 +169,9 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     static final class Frame {
         final MediaCardView card;
         final Rect progressBounds;
+        /** The card picture without the progress row, drawn at {@link #cardScale}. */
+        final Bitmap cardBitmap;
+        final float cardScale;
         final int width;
         final int height;
         final RemoteViews views;
@@ -233,6 +236,8 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             card.draw(canvas);
             progress.setVisibility(visibility);
             if (favoritesGridShown) grid.setVisibility(View.VISIBLE);
+            cardBitmap = bitmap;
+            cardScale = scale;
             views.setImageViewBitmap(R.id.widget_card, bitmap);
             views.setContentDescription(R.id.widget_card, !connected ? "Нет соединения" : snapshot == null ? "Нет данных"
                     : snapshot.title + ", " + snapshot.artist + (snapshot.isPlaying() ? ", воспроизведение" : ", пауза"));
