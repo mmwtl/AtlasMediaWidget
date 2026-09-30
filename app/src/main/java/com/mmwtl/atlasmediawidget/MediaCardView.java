@@ -75,7 +75,7 @@ final class MediaCardView extends FrameLayout {
     private final LinearLayout sourceOptions;
     private final TextView statusPill;
     private final LinearLayout metadata;
-    private final TextView title;
+    private final PyramidTitleView title;
     private final TextView subtitle;
     private final LinearLayout progressRow;
     private final SeekBar progress;
@@ -310,8 +310,9 @@ final class MediaCardView extends FrameLayout {
         LinearLayout textColumn = new LinearLayout(context);
         textColumn.setOrientation(LinearLayout.VERTICAL);
         textColumn.setGravity(Gravity.CENTER_VERTICAL);
-        title = text(getResources().getString(R.string.unknown_track),
-                appearance.titleTextSizeSp, Ui.PRIMARY, Typeface.BOLD);
+        title = new PyramidTitleView(context);
+        styleText(title, appearance.titleTextSizeSp, Ui.PRIMARY, Typeface.BOLD);
+        title.setTitle(getResources().getString(R.string.unknown_track));
         title.setMaxLines(2);
         title.setLineSpacing(d(2), 1.06f);
         title.setShadowLayer(d(2), 0, d(1), 0xB0000000);
@@ -511,7 +512,7 @@ final class MediaCardView extends FrameLayout {
 
     void renderWidgetUnavailable(boolean connected) {
         renderDisconnected(connected ? "Нет данных" : "Нет соединения");
-        title.setText(connected ? "Нет данных" : "Нет соединения");
+        title.setTitle(connected ? "Нет данных" : "Нет соединения");
         subtitle.setText(connected ? "Ожидание медиаданных" : "Ожидание медиасервиса");
         statusPill.setVisibility(GONE);
     }
@@ -582,7 +583,7 @@ final class MediaCardView extends FrameLayout {
         hasMedia = MediaPresentation.hasContent(activeSource, bridgeConnected,
                 value.backendConnected, value.title, value.artist, value.album, value.duration);
         String displayTitle = MediaPresentation.title(activeSource, value.title);
-        title.setText(hasMedia && !displayTitle.isBlank()
+        title.setTitle(hasMedia && !displayTitle.isBlank()
                 ? displayTitle : getResources().getString(R.string.unknown_track));
         String detail = MediaPresentation.subtitle(activeSource, value.artist, value.album);
         subtitle.setText(hasMedia && !detail.isBlank()
@@ -626,7 +627,7 @@ final class MediaCardView extends FrameLayout {
         favoritesButton.setVisibility(GONE);
         hideFavoritesChooser();
         hasMedia = false;
-        title.setText(R.string.unknown_track);
+        title.setTitle(getResources().getString(R.string.unknown_track));
         subtitle.setText(R.string.empty_hint);
         setStatusPill(detail.contains("Подключение")
                 ? "Подключение к медиасервису" : "Медиасервис недоступен", true);
@@ -1266,11 +1267,15 @@ final class MediaCardView extends FrameLayout {
     private TextView text(String value, float sizeSp, int color, int textStyle) {
         TextView view = new TextView(getContext());
         view.setText(value);
+        styleText(view, sizeSp, color, textStyle);
+        return view;
+    }
+
+    private void styleText(TextView view, float sizeSp, int color, int textStyle) {
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp * uiScale);
         view.setTextColor(color);
         view.setTypeface(Typeface.DEFAULT, textStyle);
         view.setEllipsize(TextUtils.TruncateAt.END);
-        return view;
     }
 
     private int d(float baseDp) { return Math.max(1, Math.round(Ui.dp(getContext(), baseDp) * uiScale)); }
@@ -1288,5 +1293,28 @@ final class MediaCardView extends FrameLayout {
         return hours > 0L
                 ? String.format(Locale.US, "%d:%02d:%02d", hours, minutes, remainder)
                 : String.format(Locale.US, "%d:%02d", minutes, remainder);
+    }
+
+    /** Title that breaks a two-line text into a pyramid for the measured width. */
+    private static final class PyramidTitleView extends TextView {
+        private String source = "";
+
+        PyramidTitleView(Context context) { super(context); }
+
+        void setTitle(String value) {
+            if (value.equals(source)) return;
+            source = value;
+            setText(value);
+        }
+
+        @Override protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            if (MeasureSpec.getMode(widthMeasureSpec) != MeasureSpec.UNSPECIFIED) {
+                float available = MeasureSpec.getSize(widthMeasureSpec)
+                        - getCompoundPaddingLeft() - getCompoundPaddingRight();
+                String wrapped = TitleWrap.pyramid(source, available, getPaint()::measureText);
+                if (!wrapped.contentEquals(getText())) setText(wrapped);
+            }
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
     }
 }
