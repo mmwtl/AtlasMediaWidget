@@ -183,7 +183,9 @@ final class MediaCardView extends FrameLayout {
         GradientDrawable borderDrawable = new GradientDrawable();
         borderDrawable.setColor(Color.TRANSPARENT);
         borderDrawable.setCornerRadius(d(26));
-        borderDrawable.setStroke(Math.max(1, d(1)), 0x334F5E68);
+        // The outline fades with a solid backdrop, so a clear card leaves no frame behind.
+        int borderAlpha = solidBackdrop ? 0x33 * appearance.backdrop.alpha / 255 : 0x33;
+        borderDrawable.setStroke(Math.max(1, d(1)), borderAlpha << 24 | 0x4F5E68);
         border.setBackground(borderDrawable);
         addView(border, match());
 
