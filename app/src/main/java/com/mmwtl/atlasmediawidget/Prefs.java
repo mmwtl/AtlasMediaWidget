@@ -43,6 +43,9 @@ final class Prefs {
     private static final String KEY_PROGRESS_THICKNESS_PREFIX = "progress_thickness_";
     private static final String KEY_COVER_DIM_PRESET_PREFIX = "cover_dim_preset_";
     private static final String KEY_THUMBNAIL_SIZE_PREFIX = "thumbnail_size_";
+    private static final String KEY_BACKDROP_SOLID_PREFIX = "backdrop_solid_";
+    private static final String KEY_BACKDROP_COLOR_PREFIX = "backdrop_color_";
+    private static final String KEY_BACKDROP_ALPHA_PREFIX = "backdrop_alpha_";
     private static final String KEY_COVER_DIM_PRESET_MIGRATED = "cover_dim_preset_migrated";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int MIN_CARD_WIDTH_DP = 360;
@@ -294,6 +297,22 @@ final class Prefs {
         putInt(KEY_COVER_DIM_PRESET_PREFIX + style.preferenceValue, preset.preferenceValue);
     }
 
+    CardBackdrop backdrop(CardStyle style) {
+        return new CardBackdrop(
+                getBoolean(KEY_BACKDROP_SOLID_PREFIX + style.preferenceValue, false),
+                getInt(KEY_BACKDROP_COLOR_PREFIX + style.preferenceValue,
+                        CardBackdrop.DEFAULT_COLOR),
+                getInt(KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue,
+                        CardBackdrop.DEFAULT_ALPHA));
+    }
+
+    private static void putBackdrop(SharedPreferences.Editor editor, CardStyle style,
+            CardBackdrop value) {
+        editor.putBoolean(KEY_BACKDROP_SOLID_PREFIX + style.preferenceValue, value.solid)
+                .putInt(KEY_BACKDROP_COLOR_PREFIX + style.preferenceValue, value.color)
+                .putInt(KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue, value.alpha);
+    }
+
     private void migrateCoverDimPreset() {
         if (preferences.contains(KEY_COVER_DIM_PRESET_MIGRATED)) return;
         boolean existingInstallation = !preferences.getAll().isEmpty();
@@ -357,11 +376,14 @@ final class Prefs {
                         MIN_PROGRESS_THICKNESS_DP, MAX_PROGRESS_THICKNESS_DP),
                 coverDimPreset(style),
                 ranged(KEY_THUMBNAIL_SIZE_PREFIX, style, defaults.thumbnailSizeDp,
-                        MIN_THUMBNAIL_SIZE_DP, MAX_THUMBNAIL_SIZE_DP));
+                        MIN_THUMBNAIL_SIZE_DP, MAX_THUMBNAIL_SIZE_DP),
+                backdrop(style));
     }
 
     void putAppearance(CardStyle style, WidgetAppearance value) {
-        preferences.edit()
+        SharedPreferences.Editor editor = preferences.edit();
+        putBackdrop(editor, style, value.backdrop);
+        editor
                 .putInt(KEY_METADATA_PROGRESS_GAP_PREFIX + style.preferenceValue,
                         clamp(value.metadataProgressGapDp,
                                 MIN_METADATA_PROGRESS_GAP_DP,
@@ -473,6 +495,7 @@ final class Prefs {
                 .putInt(KEY_COVER_DIM_PRESET_PREFIX + suffix,
                         value.coverDimPreset.preferenceValue)
                 .putInt(KEY_THUMBNAIL_SIZE_PREFIX + suffix, value.thumbnailSizeDp);
+        putBackdrop(editor, style, value.backdrop);
     }
 
     private int ranged(String prefix, CardStyle style, int fallback, int min, int max) {

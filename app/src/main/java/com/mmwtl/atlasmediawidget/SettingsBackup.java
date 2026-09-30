@@ -12,11 +12,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Locale;
 
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 12;
+    private static final int SCHEMA_VERSION = 13;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
@@ -448,7 +449,24 @@ final class SettingsBackup {
                 .put("progressGapDp", value.progressGapDp)
                 .put("progressThicknessDp", value.progressThicknessDp)
                 .put("thumbnailSizeDp", value.thumbnailSizeDp)
-                .put("coverDimPreset", value.coverDimPreset.backupName);
+                .put("coverDimPreset", value.coverDimPreset.backupName)
+                .put("backdrop", new JSONObject()
+                        .put("solid", value.backdrop.solid)
+                        .put("color", String.format(Locale.ROOT, "#%06X", value.backdrop.color))
+                        .put("alpha", value.backdrop.alpha));
+    }
+
+    private static CardBackdrop decodeBackdrop(JSONObject object, String path)
+            throws IOException {
+        String color = requireString(object, "color", path + ".color");
+        if (!color.matches("#[0-9A-Fa-f]{6}")) {
+            throw invalid("Поле " + path + ".color должно быть цветом #RRGGBB");
+        }
+        return new CardBackdrop(
+                requireBoolean(object, "solid", path + ".solid"),
+                Integer.parseInt(color.substring(1), 16),
+                requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
+                        0, 255));
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,
@@ -490,7 +508,11 @@ final class SettingsBackup {
                         coverDimPreset,
                         schemaVersion >= 12
                                 ? requireInt(object, "thumbnailSizeDp", path + ".thumbnailSizeDp")
-                                : Prefs.DEFAULT_THUMBNAIL_SIZE_DP));
+                                : Prefs.DEFAULT_THUMBNAIL_SIZE_DP,
+                        schemaVersion >= 13
+                                ? decodeBackdrop(requireObject(object, "backdrop",
+                                        path + ".backdrop"), path + ".backdrop")
+                                : CardBackdrop.ARTWORK));
     }
 
     private static CardStyle parseStyleName(String value) throws IOException {

@@ -142,8 +142,9 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         int width = Math.min(4096, Ui.dp(context, AtlasMediaWidgetProvider.widthDp(context, options)));
         int height = Math.min(4096, Ui.dp(context, AtlasMediaWidgetProvider.heightDp(context, options)));
         CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
+        WidgetAppearance appearance = prefs.appearance(style);
         scrubber = new MediaCardView(context, width, height, width, height, style,
-                prefs.appearance(style), prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
+                appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), scrubberListener);
         scrubber.showProgressOnly();
         // Keep the finger-sized window inside the card so its backdrop is always card pixels.
@@ -167,7 +168,9 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         strip.setClipChildren(true);
         OverlayService service = OverlayService.current();
         var frame = service == null ? null : service.widgetFrame(widgetId);
-        if (frame != null && frame.width == width && frame.height == height) {
+        // A translucent backdrop would let the widget's own strip show through the copy.
+        if (frame != null && frame.width == width && frame.height == height
+                && !appearance.backdrop.translucentFor(style)) {
             // An opaque copy of the card under the strip hides whatever the widget's own strip
             // shows, so it never has to be hidden or restored and is never drawn twice.
             Rect crop = new Rect(Math.round(area.left * frame.cardScale),

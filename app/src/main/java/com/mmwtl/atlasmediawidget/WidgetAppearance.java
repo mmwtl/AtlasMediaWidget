@@ -17,6 +17,7 @@ final class WidgetAppearance {
     final int progressThicknessDp;
     final CoverDimPreset coverDimPreset;
     final int thumbnailSizeDp;
+    final CardBackdrop backdrop;
 
     WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
             int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
@@ -47,6 +48,19 @@ final class WidgetAppearance {
             int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
             int progressGapDp, int progressThicknessDp, CoverDimPreset coverDimPreset,
             int thumbnailSizeDp) {
+        this(metadataProgressGapDp, controlPanelHeightDp, controlIconScalePercent,
+                controlSpreadPercent, controlBottomInsetDp, topInsetDp, contentInsetDp,
+                topRowTextSizeSp, titleTextSizeSp, subtitleTextSizeSp, subtitleGapDp,
+                timeTextSizeSp, progressGapDp, progressThicknessDp, coverDimPreset,
+                thumbnailSizeDp, CardBackdrop.ARTWORK);
+    }
+
+    WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
+            int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
+            int topInsetDp, int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
+            int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
+            int progressGapDp, int progressThicknessDp, CoverDimPreset coverDimPreset,
+            int thumbnailSizeDp, CardBackdrop backdrop) {
         this.metadataProgressGapDp = metadataProgressGapDp;
         this.controlPanelHeightDp = controlPanelHeightDp;
         this.controlIconScalePercent = controlIconScalePercent;
@@ -63,6 +77,15 @@ final class WidgetAppearance {
         this.progressThicknessDp = progressThicknessDp;
         this.coverDimPreset = coverDimPreset == null ? CoverDimPreset.DEFAULT : coverDimPreset;
         this.thumbnailSizeDp = thumbnailSizeDp;
+        this.backdrop = backdrop == null ? CardBackdrop.ARTWORK : backdrop;
+    }
+
+    WidgetAppearance withBackdrop(CardBackdrop value) {
+        return new WidgetAppearance(metadataProgressGapDp, controlPanelHeightDp,
+                controlIconScalePercent, controlSpreadPercent, controlBottomInsetDp,
+                topInsetDp, contentInsetDp, topRowTextSizeSp, titleTextSizeSp,
+                subtitleTextSizeSp, subtitleGapDp, timeTextSizeSp, progressGapDp,
+                progressThicknessDp, coverDimPreset, thumbnailSizeDp, value);
     }
 
     static WidgetAppearance defaults(CardStyle style) {

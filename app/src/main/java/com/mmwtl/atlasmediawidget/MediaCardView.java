@@ -143,13 +143,17 @@ final class MediaCardView extends FrameLayout {
         uiScale = Math.max(0.72f, Math.min(1.75f, Math.min(widthScale, heightScale)));
         setMinimumWidth(cardWidth);
         setMinimumHeight(cardHeight);
-        setBackground(Ui.background(Ui.BACKGROUND, 26 * uiScale, context));
+        // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
+        boolean solidBackdrop = appearance.backdrop.solidFor(style);
+        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb() : Ui.BACKGROUND,
+                26 * uiScale, context));
         setClipToOutline(true);
         setClickable(true);
 
         artwork = new ImageView(context);
         artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
         artwork.setBackgroundColor(Ui.BACKGROUND);
+        artwork.setVisibility(solidBackdrop ? GONE : VISIBLE);
         addView(artwork, match());
 
         placeholder = new ImageView(context);
@@ -165,6 +169,7 @@ final class MediaCardView extends FrameLayout {
         scrim.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 appearance.coverDimPreset.colors(style)));
+        scrim.setVisibility(solidBackdrop ? GONE : VISIBLE);
         addView(scrim, match());
 
         View border = new View(context);

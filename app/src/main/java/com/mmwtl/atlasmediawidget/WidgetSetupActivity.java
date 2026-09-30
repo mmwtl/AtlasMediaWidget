@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -30,6 +31,8 @@ public final class WidgetSetupActivity extends ScaledActivity {
     private final Map<CardStyle, CoverDimPreset> originalDim = new EnumMap<>(CardStyle.class);
     private FrameLayout previewHost;
     private final Map<CardStyle, TextView> styleSegments = new EnumMap<>(CardStyle.class);
+    private TextView dimTitle;
+    private LinearLayout dims;
     private final Map<CoverDimPreset, TextView> dimSegments = new EnumMap<>(CoverDimPreset.class);
     private Switch widgetModeSwitch;
 
@@ -112,8 +115,9 @@ public final class WidgetSetupActivity extends ScaledActivity {
         }
         card.addView(styles, fullWrap(8));
 
-        card.addView(text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD), fullWrap(16));
-        LinearLayout dims = segmentRow();
+        dimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
+        card.addView(dimTitle, fullWrap(16));
+        dims = segmentRow();
         for (CoverDimPreset preset : CoverDimPreset.values()) {
             TextView segment = Ui.segment(this, preset.label);
             segment.setTextSize(12);
@@ -184,6 +188,10 @@ public final class WidgetSetupActivity extends ScaledActivity {
         for (Map.Entry<CardStyle, TextView> entry : styleSegments.entrySet()) {
             Ui.setSegmentSelected(this, entry.getValue(), entry.getKey() == style);
         }
+        // A single-colour backdrop has no artwork to dim.
+        int dimVisibility = prefs.backdrop(style).solidFor(style) ? View.GONE : View.VISIBLE;
+        dimTitle.setVisibility(dimVisibility);
+        dims.setVisibility(dimVisibility);
         CoverDimPreset dim = prefs.coverDimPreset(style);
         for (Map.Entry<CoverDimPreset, TextView> entry : dimSegments.entrySet()) {
             Ui.setSegmentSelected(this, entry.getValue(), entry.getKey() == dim);

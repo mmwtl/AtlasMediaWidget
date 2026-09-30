@@ -36,7 +36,7 @@ public final class SettingsBackupTest {
         assertEquals(76, restored.compact.appearance.thumbnailSizeDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(12, root.getInt("schemaVersion"));
+        assertEquals(13, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -77,6 +77,32 @@ public final class SettingsBackupTest {
         compact.remove("thumbnailSizeDp");
         assertEquals(76, SettingsBackup.decode(root.toString())
                 .compact.appearance.thumbnailSizeDp);
+    }
+
+    @Test public void backdropRoundTripAndLegacyDefault() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.COMPACT, null, null), "test"));
+        JSONObject compact = root.getJSONObject("settings").getJSONObject("cardStyles")
+                .getJSONObject("compact");
+        assertFalse(compact.getJSONObject("backdrop").getBoolean("solid"));
+        compact.put("backdrop", new JSONObject()
+                .put("solid", true).put("color", "#12a0FF").put("alpha", 128));
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+        CardBackdrop backdrop = SettingsBackup.decode(SettingsBackup.encode(restored, "test"))
+                .compact.appearance.backdrop;
+        assertTrue(backdrop.solid);
+        assertEquals(0x12A0FF, backdrop.color);
+        assertEquals(128, backdrop.alpha);
+        assertEquals(0x8012A0FF, backdrop.argb());
+        assertFalse(backdrop.solidFor(CardStyle.SQUARE));
+        compact.getJSONObject("backdrop").put("alpha", 256);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        compact.getJSONObject("backdrop").put("alpha", 0).put("color", "red");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        compact.remove("backdrop");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.put("schemaVersion", 12);
+        assertFalse(SettingsBackup.decode(root.toString()).compact.appearance.backdrop.solid);
     }
 
     @Test public void jsonRoundTripPreservesFavoriteGrid() throws Exception {
@@ -202,7 +228,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 13);
+        root.put("schemaVersion", 14);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));

@@ -131,7 +131,15 @@ public final class MainActivity extends ScaledActivity {
     private Button importSettingsButton;
     private Button exportRadioCatalogButton;
     private Button importRadioCatalogButton;
+    private TextView coverDimTitle;
     private RadioGroup coverDimPresetGroup;
+    private LinearLayout backdropSection;
+    private RadioButton backdropArtworkButton;
+    private RadioButton backdropSolidButton;
+    private LinearLayout backdropSolidOptions;
+    private LabeledSeek backdropAlphaSetting;
+    private View backdropSwatch;
+    private int backdropColor = CardBackdrop.DEFAULT_COLOR;
     private RadioButton[] coverDimPresetButtons;
     private LinearLayout thumbnailSizeSection;
     private LabeledSeek thumbnailSizeSetting;
@@ -683,7 +691,49 @@ public final class MainActivity extends ScaledActivity {
         lookCard.addView(styles);
         lookCard.addView(text("Компактная подходит для широкой невысокой карточки; просторная — для квадратной или высокой. Выбор не меняет размер карточки.",
                 13, Ui.SECONDARY, Typeface.NORMAL));
-        TextView coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
+        backdropSection = new LinearLayout(this);
+        backdropSection.setOrientation(LinearLayout.VERTICAL);
+        backdropSection.addView(text("Подложка", 15, Ui.SECONDARY, Typeface.BOLD),
+                labelParams());
+        RadioGroup backdropGroup = new RadioGroup(this);
+        backdropGroup.setOrientation(RadioGroup.HORIZONTAL);
+        backdropArtworkButton = styleButton("Обложка");
+        backdropSolidButton = styleButton("Один цвет");
+        backdropGroup.addView(backdropArtworkButton);
+        backdropGroup.addView(backdropSolidButton);
+        backdropGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            updateBackdropControls();
+            if (!refreshingStyle) saveAppearance();
+        });
+        backdropSection.addView(backdropGroup, fullWrap());
+        backdropSolidOptions = new LinearLayout(this);
+        backdropSolidOptions.setOrientation(LinearLayout.VERTICAL);
+        backdropAlphaSetting = addLabeledSeek(backdropSolidOptions,
+                "Непрозрачность подложки", 0, 255);
+        LinearLayout colorRow = new LinearLayout(this);
+        colorRow.setOrientation(LinearLayout.HORIZONTAL);
+        colorRow.setGravity(Gravity.CENTER_VERTICAL);
+        backdropSwatch = new View(this);
+        LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(
+                Ui.dp(this, 44), Ui.dp(this, 44));
+        swatchParams.rightMargin = Ui.dp(this, 12);
+        colorRow.addView(backdropSwatch, swatchParams);
+        Button backdropColorButton = actionButton("Изменить цвет подложки");
+        backdropColorButton.setOnClickListener(v -> ColorPickerDialog.show(this,
+                "Цвет подложки", backdropColor, color -> {
+                    backdropColor = color;
+                    updateBackdropControls();
+                    saveAppearance();
+                }));
+        colorRow.addView(backdropColorButton, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        LinearLayout.LayoutParams colorRowParams = fullWrap();
+        colorRowParams.topMargin = Ui.dp(this, 12);
+        backdropSolidOptions.addView(colorRow, colorRowParams);
+        backdropSection.addView(backdropSolidOptions, fullWrap());
+        lookCard.addView(backdropSection, fullWrap());
+
+        coverDimTitle = text("Затемнение обложки", 15, Ui.SECONDARY, Typeface.BOLD);
         LinearLayout.LayoutParams coverDimTitleParams = fullWrap();
         coverDimTitleParams.topMargin = Ui.dp(this, 14);
         lookCard.addView(coverDimTitle, coverDimTitleParams);
@@ -770,7 +820,8 @@ public final class MainActivity extends ScaledActivity {
                 };
         bind(appearanceListener, topInsetSetting, contentInsetSetting, topRowTextSetting,
                 titleTextSetting, subtitleTextSetting, subtitleGapSetting, timeTextSetting,
-                progressGapSetting, progressThicknessSetting, thumbnailSizeSetting);
+                progressGapSetting, progressThicknessSetting, thumbnailSizeSetting,
+                backdropAlphaSetting);
 
         Button resetAppearance = actionButton("Вернуть текст и отступы по умолчанию");
         resetAppearance.setOnClickListener(v -> {
@@ -793,7 +844,8 @@ public final class MainActivity extends ScaledActivity {
                     defaults.progressGapDp,
                     defaults.progressThicknessDp,
                     existing.coverDimPreset,
-                    existing.thumbnailSizeDp));
+                    existing.thumbnailSizeDp,
+                    existing.backdrop));
             refreshSizeControls(current);
             refreshOverlayIfRunning();
         });
@@ -2656,7 +2708,7 @@ public final class MainActivity extends ScaledActivity {
                 || controlPanelHeight == null || controlIconScale == null
                 || controlSpread == null || controlBottomInset == null
                 || topInsetSetting == null || coverDimPresetButtons == null
-                || thumbnailSizeSetting == null) return;
+                || thumbnailSizeSetting == null || backdropSection == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
@@ -2681,6 +2733,12 @@ public final class MainActivity extends ScaledActivity {
         thumbnailSizeSetting.seek.setProgress(appearance.thumbnailSizeDp);
         thumbnailSizeSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
+        backdropSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
+        backdropColor = appearance.backdrop.color;
+        backdropAlphaSetting.seek.setProgress(appearance.backdrop.alpha);
+        (appearance.backdrop.solid ? backdropSolidButton : backdropArtworkButton)
+                .setChecked(true);
+        updateBackdropControls();
         updateMetadataProgressGapLabel();
         updateControlLabels();
         updateAppearanceLabels();
@@ -2770,6 +2828,26 @@ public final class MainActivity extends ScaledActivity {
         progressThicknessSetting.value.setText(
                 progressThicknessSetting.seek.getProgress() + " dp");
         thumbnailSizeSetting.value.setText(thumbnailSizeSetting.seek.getProgress() + " dp");
+        backdropAlphaSetting.value.setText(
+                Math.round(backdropAlphaSetting.seek.getProgress() * 100f / 255f) + " %");
+        updateBackdropControls();
+    }
+
+    private void updateBackdropControls() {
+        if (backdropSolidButton == null || coverDimTitle == null) return;
+        boolean solid = selectedBackdrop().solidFor(currentStyle());
+        backdropSolidOptions.setVisibility(backdropSolidButton.isChecked()
+                ? View.VISIBLE : View.GONE);
+        // Dimming applies only to the artwork backdrop.
+        coverDimTitle.setVisibility(solid ? View.GONE : View.VISIBLE);
+        coverDimPresetGroup.setVisibility(solid ? View.GONE : View.VISIBLE);
+        backdropSwatch.setBackground(Ui.background(selectedBackdrop().argb(), 8, this));
+    }
+
+    private CardBackdrop selectedBackdrop() {
+        if (backdropSolidButton == null) return prefs.backdrop(currentStyle());
+        return new CardBackdrop(backdropSolidButton.isChecked(), backdropColor,
+                backdropAlphaSetting.seek.getProgress());
     }
 
     private void refreshPositionControls() {
@@ -2902,7 +2980,8 @@ public final class MainActivity extends ScaledActivity {
                 progressGapSetting.seek.getProgress(),
                 progressThicknessSetting.seek.getProgress(),
                 selectedCoverDimPreset(),
-                thumbnailSizeSetting.seek.getProgress());
+                thumbnailSizeSetting.seek.getProgress(),
+                selectedBackdrop());
     }
 
     private CoverDimPreset selectedCoverDimPreset() {
