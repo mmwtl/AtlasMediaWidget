@@ -2,8 +2,8 @@ package com.mmwtl.atlasmediawidget;
 
 /** What fills the compact card behind its content: the artwork or one translucent colour. */
 final class CardBackdrop {
-    /** The graphite of {@link Ui#BACKGROUND}. */
-    static final int DEFAULT_COLOR = 0x1D2228;
+    /** The graphite of {@link Ui#CARD}. */
+    static final int DEFAULT_COLOR = 0x262626;
     static final int DEFAULT_ALPHA = 235;
     static final CardBackdrop ARTWORK =
             new CardBackdrop(false, DEFAULT_COLOR, DEFAULT_ALPHA, false, false);
