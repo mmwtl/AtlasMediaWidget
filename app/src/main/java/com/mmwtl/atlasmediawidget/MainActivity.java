@@ -140,6 +140,7 @@ public final class MainActivity extends ScaledActivity {
     private LabeledSeek backdropAlphaSetting;
     private View backdropSwatch;
     private Switch backdropOpaqueControls;
+    private Switch backdropOpaqueTopRow;
     private int backdropColor = CardBackdrop.DEFAULT_COLOR;
     private RadioButton[] coverDimPresetButtons;
     private LinearLayout thumbnailSizeSection;
@@ -731,14 +732,11 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams colorRowParams = fullWrap();
         colorRowParams.topMargin = Ui.dp(this, 12);
         backdropSolidOptions.addView(colorRow, colorRowParams);
-        backdropOpaqueControls = new Switch(this);
-        backdropOpaqueControls.setText("Непрозрачная панель управления");
-        backdropOpaqueControls.setTextColor(Ui.PRIMARY);
-        backdropOpaqueControls.setTextSize(15);
-        backdropOpaqueControls.setOnCheckedChangeListener((button, checked) -> {
-            if (!refreshingStyle) saveAppearance();
-        });
-        backdropSolidOptions.addView(backdropOpaqueControls, labelParams());
+        backdropSolidOptions.addView(text("Выключено — панель прозрачна, как подложка; "
+                + "включено — всегда непрозрачна.", 13, Ui.SECONDARY, Typeface.NORMAL),
+                labelParams());
+        backdropOpaqueTopRow = backdropPanelSwitch("Непрозрачная верхняя панель");
+        backdropOpaqueControls = backdropPanelSwitch("Непрозрачная панель управления");
         backdropSection.addView(backdropSolidOptions, fullWrap());
         lookCard.addView(backdropSection, fullWrap());
 
@@ -2746,6 +2744,7 @@ public final class MainActivity extends ScaledActivity {
         backdropColor = appearance.backdrop.color;
         backdropAlphaSetting.seek.setProgress(appearance.backdrop.alpha);
         backdropOpaqueControls.setChecked(appearance.backdrop.opaqueControls);
+        backdropOpaqueTopRow.setChecked(appearance.backdrop.opaqueTopRow);
         (appearance.backdrop.solid ? backdropSolidButton : backdropArtworkButton)
                 .setChecked(true);
         updateBackdropControls();
@@ -2858,7 +2857,20 @@ public final class MainActivity extends ScaledActivity {
     private CardBackdrop selectedBackdrop() {
         if (backdropSolidButton == null) return prefs.backdrop(currentStyle());
         return new CardBackdrop(backdropSolidButton.isChecked(), backdropColor,
-                backdropAlphaSetting.seek.getProgress(), backdropOpaqueControls.isChecked());
+                backdropAlphaSetting.seek.getProgress(), backdropOpaqueControls.isChecked(),
+                backdropOpaqueTopRow.isChecked());
+    }
+
+    private Switch backdropPanelSwitch(String label) {
+        Switch view = new Switch(this);
+        view.setText(label);
+        view.setTextColor(Ui.PRIMARY);
+        view.setTextSize(15);
+        view.setOnCheckedChangeListener((button, checked) -> {
+            if (!refreshingStyle) saveAppearance();
+        });
+        backdropSolidOptions.addView(view, labelParams());
+        return view;
     }
 
     private void refreshPositionControls() {

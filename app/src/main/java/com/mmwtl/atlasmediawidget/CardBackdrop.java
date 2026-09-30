@@ -6,7 +6,7 @@ final class CardBackdrop {
     static final int DEFAULT_COLOR = 0x1D2228;
     static final int DEFAULT_ALPHA = 235;
     static final CardBackdrop ARTWORK =
-            new CardBackdrop(false, DEFAULT_COLOR, DEFAULT_ALPHA, false);
+            new CardBackdrop(false, DEFAULT_COLOR, DEFAULT_ALPHA, false, false);
 
     /** Whether a single colour replaces the artwork backdrop. */
     final boolean solid;
@@ -16,12 +16,16 @@ final class CardBackdrop {
     final int alpha;
     /** Whether the control panel keeps {@link #color} at full opacity. */
     final boolean opaqueControls;
+    /** Whether the source and favorites row keeps {@link #color} at full opacity. */
+    final boolean opaqueTopRow;
 
-    CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls) {
+    CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
+            boolean opaqueTopRow) {
         this.solid = solid;
         this.color = color & 0x00FFFFFF;
         this.alpha = Math.max(0, Math.min(255, alpha));
         this.opaqueControls = opaqueControls;
+        this.opaqueTopRow = opaqueTopRow;
     }
 
     /** Only the compact layout offers the single-colour backdrop. */
@@ -37,6 +41,11 @@ final class CardBackdrop {
     /** Whether the control panel needs its own opaque band over the translucent backdrop. */
     boolean opaqueControlsFor(CardStyle style) {
         return opaqueControls && translucentFor(style);
+    }
+
+    /** Whether the top row needs its own opaque band over the translucent backdrop. */
+    boolean opaqueTopRowFor(CardStyle style) {
+        return opaqueTopRow && translucentFor(style);
     }
 
     int argb() {

@@ -87,7 +87,7 @@ public final class SettingsBackupTest {
         assertFalse(compact.getJSONObject("backdrop").getBoolean("solid"));
         compact.put("backdrop", new JSONObject()
                 .put("solid", true).put("color", "#12a0FF").put("alpha", 128)
-                .put("opaqueControls", true));
+                .put("opaqueControls", true).put("opaqueTopRow", true));
         SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
         CardBackdrop backdrop = SettingsBackup.decode(SettingsBackup.encode(restored, "test"))
                 .compact.appearance.backdrop;
@@ -96,11 +96,14 @@ public final class SettingsBackupTest {
         assertEquals(128, backdrop.alpha);
         assertEquals(0x8012A0FF, backdrop.argb());
         assertTrue(backdrop.opaqueControlsFor(CardStyle.COMPACT));
+        assertTrue(backdrop.opaqueTopRowFor(CardStyle.COMPACT));
         assertFalse(backdrop.solidFor(CardStyle.SQUARE));
         assertFalse(backdrop.opaqueControlsFor(CardStyle.SQUARE));
         compact.getJSONObject("backdrop").remove("opaqueControls");
-        assertFalse(SettingsBackup.decode(root.toString())
-                .compact.appearance.backdrop.opaqueControls);
+        compact.getJSONObject("backdrop").remove("opaqueTopRow");
+        CardBackdrop legacy = SettingsBackup.decode(root.toString()).compact.appearance.backdrop;
+        assertFalse(legacy.opaqueControls);
+        assertFalse(legacy.opaqueTopRow);
         compact.getJSONObject("backdrop").put("alpha", 256);
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
         compact.getJSONObject("backdrop").put("alpha", 0).put("color", "red");

@@ -454,7 +454,8 @@ final class SettingsBackup {
                         .put("solid", value.backdrop.solid)
                         .put("color", String.format(Locale.ROOT, "#%06X", value.backdrop.color))
                         .put("alpha", value.backdrop.alpha)
-                        .put("opaqueControls", value.backdrop.opaqueControls));
+                        .put("opaqueControls", value.backdrop.opaqueControls)
+                        .put("opaqueTopRow", value.backdrop.opaqueTopRow));
     }
 
     private static CardBackdrop decodeBackdrop(JSONObject object, String path)
@@ -469,7 +470,9 @@ final class SettingsBackup {
                 requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
                         0, 255),
                 object.has("opaqueControls") && requireBoolean(object, "opaqueControls",
-                        path + ".opaqueControls"));
+                        path + ".opaqueControls"),
+                object.has("opaqueTopRow") && requireBoolean(object, "opaqueTopRow",
+                        path + ".opaqueTopRow"));
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,

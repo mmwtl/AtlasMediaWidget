@@ -179,6 +179,14 @@ final class MediaCardView extends FrameLayout {
         controlsBand.setVisibility(GONE);
         addView(controlsBand);
 
+        int topPillHeightDp = Math.max(38, appearance.topRowTextSizeSp + 24);
+        // The top row gets the same kind of strip, as deep below the pills as above them.
+        View topRowBand = new View(context);
+        topRowBand.setBackgroundColor(0xFF000000 | appearance.backdrop.color);
+        topRowBand.setVisibility(appearance.backdrop.opaqueTopRowFor(style) ? VISIBLE : GONE);
+        addView(topRowBand, new LayoutParams(LayoutParams.MATCH_PARENT,
+                by(appearance.topInsetDp) * 2 + d(topPillHeightDp), Gravity.TOP));
+
         View border = new View(context);
         GradientDrawable borderDrawable = new GradientDrawable();
         borderDrawable.setColor(Color.TRANSPARENT);
@@ -189,7 +197,6 @@ final class MediaCardView extends FrameLayout {
         border.setBackground(borderDrawable);
         addView(border, match());
 
-        int topPillHeightDp = Math.max(38, appearance.topRowTextSizeSp + 24);
         int topPillIconDp = Math.max(21, appearance.topRowTextSizeSp + 12);
         int topEndInsetDp = dragHandleVisible ? 47 : Math.max(8,
                 appearance.contentInsetDp - (style == CardStyle.COMPACT ? 4 : 8));
