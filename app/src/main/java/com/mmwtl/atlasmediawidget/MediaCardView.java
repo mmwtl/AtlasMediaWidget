@@ -83,6 +83,7 @@ final class MediaCardView extends FrameLayout {
     private final TextView duration;
     private final View divider;
     private final FrameLayout controls;
+    private final View controlsBand;
     private final TransportButton previous;
     private final TransportButton playPause;
     private final TransportButton next;
@@ -171,6 +172,12 @@ final class MediaCardView extends FrameLayout {
                 appearance.coverDimPreset.colors(style)));
         scrim.setVisibility(solidBackdrop ? GONE : VISIBLE);
         addView(scrim, match());
+
+        // Keeps the transport buttons on an opaque strip over a translucent backdrop.
+        controlsBand = new View(context);
+        controlsBand.setBackgroundColor(0xFF000000 | appearance.backdrop.color);
+        controlsBand.setVisibility(GONE);
+        addView(controlsBand);
 
         View border = new View(context);
         GradientDrawable borderDrawable = new GradientDrawable();
@@ -828,6 +835,13 @@ final class MediaCardView extends FrameLayout {
         controlsParams.topMargin = controlsTop - controlBottomInset;
         controls.setLayoutParams(controlsParams);
         controls.setVisibility(chooserVisible ? GONE : VISIBLE);
+        LayoutParams bandParams = new LayoutParams(LayoutParams.MATCH_PARENT,
+                Math.max(0, cardHeight - controlsParams.topMargin));
+        bandParams.gravity = Gravity.TOP;
+        bandParams.topMargin = controlsParams.topMargin;
+        controlsBand.setLayoutParams(bandParams);
+        controlsBand.setVisibility(!chooserVisible
+                && appearance.backdrop.opaqueControlsFor(style) ? VISIBLE : GONE);
         updateControlLayout(compact, panelHeight);
 
         LayoutParams chooserParams = new LayoutParams(LayoutParams.MATCH_PARENT,

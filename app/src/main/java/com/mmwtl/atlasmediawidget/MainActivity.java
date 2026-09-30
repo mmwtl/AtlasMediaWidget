@@ -139,6 +139,7 @@ public final class MainActivity extends ScaledActivity {
     private LinearLayout backdropSolidOptions;
     private LabeledSeek backdropAlphaSetting;
     private View backdropSwatch;
+    private Switch backdropOpaqueControls;
     private int backdropColor = CardBackdrop.DEFAULT_COLOR;
     private RadioButton[] coverDimPresetButtons;
     private LinearLayout thumbnailSizeSection;
@@ -730,6 +731,14 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams colorRowParams = fullWrap();
         colorRowParams.topMargin = Ui.dp(this, 12);
         backdropSolidOptions.addView(colorRow, colorRowParams);
+        backdropOpaqueControls = new Switch(this);
+        backdropOpaqueControls.setText("Непрозрачная панель управления");
+        backdropOpaqueControls.setTextColor(Ui.PRIMARY);
+        backdropOpaqueControls.setTextSize(15);
+        backdropOpaqueControls.setOnCheckedChangeListener((button, checked) -> {
+            if (!refreshingStyle) saveAppearance();
+        });
+        backdropSolidOptions.addView(backdropOpaqueControls, labelParams());
         backdropSection.addView(backdropSolidOptions, fullWrap());
         lookCard.addView(backdropSection, fullWrap());
 
@@ -2736,6 +2745,7 @@ public final class MainActivity extends ScaledActivity {
         backdropSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         backdropColor = appearance.backdrop.color;
         backdropAlphaSetting.seek.setProgress(appearance.backdrop.alpha);
+        backdropOpaqueControls.setChecked(appearance.backdrop.opaqueControls);
         (appearance.backdrop.solid ? backdropSolidButton : backdropArtworkButton)
                 .setChecked(true);
         updateBackdropControls();
@@ -2847,7 +2857,7 @@ public final class MainActivity extends ScaledActivity {
     private CardBackdrop selectedBackdrop() {
         if (backdropSolidButton == null) return prefs.backdrop(currentStyle());
         return new CardBackdrop(backdropSolidButton.isChecked(), backdropColor,
-                backdropAlphaSetting.seek.getProgress());
+                backdropAlphaSetting.seek.getProgress(), backdropOpaqueControls.isChecked());
     }
 
     private void refreshPositionControls() {

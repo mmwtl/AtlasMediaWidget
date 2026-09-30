@@ -5,7 +5,8 @@ final class CardBackdrop {
     /** The graphite of {@link Ui#BACKGROUND}. */
     static final int DEFAULT_COLOR = 0x1D2228;
     static final int DEFAULT_ALPHA = 235;
-    static final CardBackdrop ARTWORK = new CardBackdrop(false, DEFAULT_COLOR, DEFAULT_ALPHA);
+    static final CardBackdrop ARTWORK =
+            new CardBackdrop(false, DEFAULT_COLOR, DEFAULT_ALPHA, false);
 
     /** Whether a single colour replaces the artwork backdrop. */
     final boolean solid;
@@ -13,11 +14,14 @@ final class CardBackdrop {
     final int color;
     /** Opacity of {@link #color}, 0…255. */
     final int alpha;
+    /** Whether the control panel keeps {@link #color} at full opacity. */
+    final boolean opaqueControls;
 
-    CardBackdrop(boolean solid, int color, int alpha) {
+    CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls) {
         this.solid = solid;
         this.color = color & 0x00FFFFFF;
         this.alpha = Math.max(0, Math.min(255, alpha));
+        this.opaqueControls = opaqueControls;
     }
 
     /** Only the compact layout offers the single-colour backdrop. */
@@ -28,6 +32,11 @@ final class CardBackdrop {
     /** Whether whatever lies under the card shows through it. */
     boolean translucentFor(CardStyle style) {
         return solidFor(style) && alpha < 255;
+    }
+
+    /** Whether the control panel needs its own opaque band over the translucent backdrop. */
+    boolean opaqueControlsFor(CardStyle style) {
+        return opaqueControls && translucentFor(style);
     }
 
     int argb() {

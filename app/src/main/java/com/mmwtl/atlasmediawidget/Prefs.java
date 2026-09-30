@@ -46,6 +46,8 @@ final class Prefs {
     private static final String KEY_BACKDROP_SOLID_PREFIX = "backdrop_solid_";
     private static final String KEY_BACKDROP_COLOR_PREFIX = "backdrop_color_";
     private static final String KEY_BACKDROP_ALPHA_PREFIX = "backdrop_alpha_";
+    private static final String KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX =
+            "backdrop_opaque_controls_";
     private static final String KEY_COVER_DIM_PRESET_MIGRATED = "cover_dim_preset_migrated";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int MIN_CARD_WIDTH_DP = 360;
@@ -303,14 +305,17 @@ final class Prefs {
                 getInt(KEY_BACKDROP_COLOR_PREFIX + style.preferenceValue,
                         CardBackdrop.DEFAULT_COLOR),
                 getInt(KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue,
-                        CardBackdrop.DEFAULT_ALPHA));
+                        CardBackdrop.DEFAULT_ALPHA),
+                getBoolean(KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX + style.preferenceValue, false));
     }
 
     private static void putBackdrop(SharedPreferences.Editor editor, CardStyle style,
             CardBackdrop value) {
         editor.putBoolean(KEY_BACKDROP_SOLID_PREFIX + style.preferenceValue, value.solid)
                 .putInt(KEY_BACKDROP_COLOR_PREFIX + style.preferenceValue, value.color)
-                .putInt(KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue, value.alpha);
+                .putInt(KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue, value.alpha)
+                .putBoolean(KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX + style.preferenceValue,
+                        value.opaqueControls);
     }
 
     private void migrateCoverDimPreset() {
