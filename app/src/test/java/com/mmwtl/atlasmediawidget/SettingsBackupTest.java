@@ -66,12 +66,13 @@ public final class SettingsBackupTest {
                 data(15, CardStyle.COMPACT, null, null), "test"));
         JSONObject compact = root.getJSONObject("settings").getJSONObject("cardStyles")
                 .getJSONObject("compact");
-        compact.put("thumbnailSizeDp", 104);
+        compact.put("thumbnailSizeDp", Prefs.MAX_THUMBNAIL_SIZE_DP);
         SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
-        assertEquals(104, restored.compact.appearance.thumbnailSizeDp);
-        assertEquals(104, SettingsBackup.decode(SettingsBackup.encode(restored, "test"))
-                .compact.appearance.thumbnailSizeDp);
-        compact.put("thumbnailSizeDp", 105);
+        assertEquals(Prefs.MAX_THUMBNAIL_SIZE_DP, restored.compact.appearance.thumbnailSizeDp);
+        assertEquals(Prefs.MAX_THUMBNAIL_SIZE_DP,
+                SettingsBackup.decode(SettingsBackup.encode(restored, "test"))
+                        .compact.appearance.thumbnailSizeDp);
+        compact.put("thumbnailSizeDp", Prefs.MAX_THUMBNAIL_SIZE_DP + 1);
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
         root.put("schemaVersion", 11);
         compact.remove("thumbnailSizeDp");

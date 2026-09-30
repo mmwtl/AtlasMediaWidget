@@ -86,7 +86,7 @@ final class Prefs {
     static final int MIN_PROGRESS_THICKNESS_DP = 2;
     static final int MAX_PROGRESS_THICKNESS_DP = 16;
     static final int MIN_THUMBNAIL_SIZE_DP = 48;
-    static final int MAX_THUMBNAIL_SIZE_DP = 104;
+    static final int MAX_THUMBNAIL_SIZE_DP = 160;
     static final int DEFAULT_THUMBNAIL_SIZE_DP = 76;
     static final int MIN_RADIO_FAVORITES_GRID_COLUMNS = 2;
     static final int MAX_RADIO_FAVORITES_GRID_COLUMNS = 4;
