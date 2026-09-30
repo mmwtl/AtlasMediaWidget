@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediawidget;
 import android.Manifest;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -45,10 +46,13 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -61,6 +65,7 @@ public final class MainActivity extends ScaledActivity {
     private static final int REQUEST_STORAGE_PERMISSION = 1001;
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
     private static final int REQUEST_IMPORT_RADIO_CATALOG = 4103;
+    static final String RADIO_ZIP_FILE_NAME = "AtlasMediaWidget-radio.zip";
     private static final long SETTINGS_READINESS_TIMEOUT_MS = 20_000L;
     private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
@@ -1013,6 +1018,7 @@ public final class MainActivity extends ScaledActivity {
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView settingsBackupHint = text(
                 "Архив ZIP содержит настройки карточки, источника звука и приборной панели. "
+                        + "Экспорт отправляет файл через «Поделиться» — например, себе в Telegram. "
                         + "Также поддерживается импорт прежних JSON-настроек. "
                         + "Каталог радио сохраняется отдельно во вкладке «Радио».",
                 13, Ui.SECONDARY, Typeface.NORMAL);
@@ -1249,7 +1255,7 @@ public final class MainActivity extends ScaledActivity {
         picker.putExtra(Intent.EXTRA_MIME_TYPES,
                 new String[]{"application/zip", "application/x-zip-compressed",
                         "application/json", "text/json", "text/plain",
-                        "application/octet-stream"});
+                        "application/octet-stream", "*/*"});
         launchFilePicker(picker, REQUEST_IMPORT_SETTINGS);
     }
 
@@ -1259,7 +1265,7 @@ public final class MainActivity extends ScaledActivity {
                 .setType("*/*");
         picker.putExtra(Intent.EXTRA_MIME_TYPES,
                 new String[]{"application/zip", "application/x-zip-compressed",
-                        "application/octet-stream"});
+                        "application/octet-stream", "*/*"});
         launchFilePicker(picker, REQUEST_IMPORT_RADIO_CATALOG);
     }
 
@@ -1268,7 +1274,7 @@ public final class MainActivity extends ScaledActivity {
         try {
             startActivityForResult(picker, requestCode);
         } catch (ActivityNotFoundException error) {
-            Toast.makeText(this, "На ГУ нет системного выбора файлов",
+            Toast.makeText(this, "В прошивке нет системного выбора файлов",
                     Toast.LENGTH_LONG).show();
         }
     }
@@ -1309,7 +1315,8 @@ public final class MainActivity extends ScaledActivity {
 
                     fullZip = FullSettingsBackup.createFullBackupZip(appContext, prefs, tempMediaZip);
                     tempMediaZip.delete();
-                    SettingsExportStore.Result result = SettingsExportStore.exportZip(appContext, fullZip);
+                    String name = datedExportName(FullSettingsBackup.ZIP_FILE_NAME);
+                    Uri uri = BackupProvider.publish(appContext, name, fullZip);
                     fullZip.delete();
 
                     main.post(() -> {
@@ -1317,8 +1324,7 @@ public final class MainActivity extends ScaledActivity {
                         if (isDestroyed()) return;
                         setSettingsTransferEnabled(true);
                         setRadioCatalogTransferEnabled(true);
-                        Toast.makeText(this, "Резервная копия сохранена: " + result.location,
-                                Toast.LENGTH_LONG).show();
+                        shareExport(uri, name, "Экспорт настроек");
                     });
                 } else {
                     throw new IOException("Медиасервис недоступен. Полная резервная копия не создана.");
@@ -1332,6 +1338,27 @@ public final class MainActivity extends ScaledActivity {
                 if (fullZip != null) fullZip.delete();
             }
         });
+    }
+
+    static String datedExportName(String fileName) {
+        return new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(new Date())
+                + "_" + fileName;
+    }
+
+    /** As GInputBridge shares .gibb: the cached export goes out through the share sheet. */
+    void shareExport(Uri uri, String name, String title) {
+        Intent send = new Intent(Intent.ACTION_SEND)
+                .setType(BackupProvider.mimeType(name))
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        send.setClipData(ClipData.newRawUri(name, uri));
+        try {
+            startActivity(Intent.createChooser(send, title)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION));
+        } catch (ActivityNotFoundException error) {
+            Toast.makeText(this, "Нет приложений, которые могут принять файл",
+                    Toast.LENGTH_LONG).show();
+        }
     }
 
     private void exportRadioCatalog() {
@@ -1376,12 +1403,11 @@ public final class MainActivity extends ScaledActivity {
                     throw new IOException("Ошибка экспорта каталога радио: "
                             + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
                 }
-                SettingsExportStore.Result result = SettingsExportStore.exportZip(
-                        appContext, exportFile, SettingsExportStore.RADIO_ZIP_FILE_NAME);
+                String name = datedExportName(RADIO_ZIP_FILE_NAME);
+                Uri uri = BackupProvider.publish(appContext, name, exportFile);
                 main.post(() -> {
                     if (isDestroyed()) return;
-                    Toast.makeText(this, "Каталог радио сохранён: " + result.location,
-                            Toast.LENGTH_LONG).show();
+                    shareExport(uri, name, "Экспорт каталога радио");
                 });
             } catch (Exception error) {
                 AppLog.warn("Cannot export radio catalog", error);

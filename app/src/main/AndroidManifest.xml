@@ -118,6 +118,12 @@
                 android:resource="@xml/window_accessibility_service" />
         </service>
 
+        <provider
+            android:name=".BackupProvider"
+            android:authorities="${applicationId}.backup"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
         <receiver
             android:name=".BootReceiver"
             android:directBootAware="true"

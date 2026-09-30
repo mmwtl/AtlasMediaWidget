@@ -98,6 +98,11 @@ migration request.
   app process and media/runtime settings in `:media` behind the Media Bridge settings operations.
 - Keep settings export/import and radio-catalog export/import separate. Preserve legacy JSON
   settings compatibility and the crash-recovery journal.
+- Export and import work as in GInputBridge, because OneOS has no `ACTION_CREATE_DOCUMENT` and
+  Downloads is not a usable target: export copies a dated ZIP
+  (`yyyy-MM-dd_HH-mm-ss_<name>.zip`) to `cacheDir/export` and sends it through the share sheet
+  from the private `BackupProvider`; import uses only `ACTION_OPEN_DOCUMENT`. The app does not
+  register SEND/VIEW targets for backups.
 - Do not add another competing settings editor or expose runtime configuration through an unrelated
   external API.
 - Do not expose raw third-party notification contents. Retain only the media fields needed for the

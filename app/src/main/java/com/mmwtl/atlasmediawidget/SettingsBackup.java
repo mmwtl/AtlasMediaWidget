@@ -10,7 +10,6 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
@@ -254,16 +253,6 @@ final class SettingsBackup {
 
     static String encode(Context context, Prefs prefs) throws IOException {
         return encode(capture(prefs), appVersion(context));
-    }
-
-    static void write(Context context, Prefs prefs, Uri uri) throws IOException {
-        if (uri == null) throw invalid("Файл не выбран");
-        byte[] contents = encode(context, prefs)
-                .getBytes(StandardCharsets.UTF_8);
-        try (OutputStream output = context.getContentResolver().openOutputStream(uri, "wt")) {
-            if (output == null) throw invalid("Не удалось открыть файл для записи");
-            output.write(contents);
-        }
     }
 
     static Data read(Context context, Uri uri) throws IOException {
