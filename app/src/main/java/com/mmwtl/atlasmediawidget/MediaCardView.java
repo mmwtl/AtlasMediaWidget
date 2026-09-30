@@ -78,6 +78,8 @@ final class MediaCardView extends FrameLayout {
     private final PyramidTitleView title;
     private final TextView subtitle;
     private final LinearLayout progressRow;
+    private final LinearLayout radioScaleRow;
+    private final RadioScaleView radioScale;
     private final SeekBar progress;
     private final TextView elapsed;
     private final TextView duration;
@@ -348,6 +350,17 @@ final class MediaCardView extends FrameLayout {
         progressRow.addView(progress, new LinearLayout.LayoutParams(0, d(30), 1f));
         progressRow.addView(duration, new LinearLayout.LayoutParams(timeWidth, LayoutParams.WRAP_CONTENT));
         addView(progressRow);
+
+        radioScaleRow = new LinearLayout(context);
+        radioScaleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView bandStart = text("", appearance.timeTextSizeSp, Ui.SECONDARY, Typeface.NORMAL);
+        radioScale = new RadioScaleView(context, uiScale, appearance.progressThicknessDp);
+        TextView bandEnd = text("", appearance.timeTextSizeSp, Ui.SECONDARY, Typeface.NORMAL);
+        bandEnd.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        radioScaleRow.addView(bandStart, new LinearLayout.LayoutParams(timeWidth, LayoutParams.WRAP_CONTENT));
+        radioScaleRow.addView(radioScale, new LinearLayout.LayoutParams(0, d(30), 1f));
+        radioScaleRow.addView(bandEnd, new LinearLayout.LayoutParams(timeWidth, LayoutParams.WRAP_CONTENT));
+        addView(radioScaleRow);
 
         divider = new View(context);
         divider.setBackgroundColor(0x553B444C);
@@ -828,6 +841,15 @@ final class MediaCardView extends FrameLayout {
         progressParams.topMargin = progressTop;
         progressRow.setLayoutParams(progressParams);
         progressRow.setVisibility(!chooserVisible && showProgress ? VISIBLE : GONE);
+        RadioBandScale bandScale = radio && hasMedia && snapshot != null
+                ? RadioBandScale.fromMediaId(snapshot.mediaId) : null;
+        radioScale.setScale(bandScale);
+        if (bandScale != null) {
+            ((TextView) radioScaleRow.getChildAt(0)).setText(bandScale.minLabel);
+            ((TextView) radioScaleRow.getChildAt(2)).setText(bandScale.maxLabel);
+        }
+        radioScaleRow.setLayoutParams(new LayoutParams(progressParams));
+        radioScaleRow.setVisibility(!chooserVisible && bandScale != null ? VISIBLE : GONE);
 
         LayoutParams dividerParams = new LayoutParams(LayoutParams.MATCH_PARENT, Math.max(1, d(1)));
         dividerParams.gravity = Gravity.TOP;
