@@ -2851,7 +2851,8 @@ public final class MainActivity extends ScaledActivity {
         // Dimming applies only to the artwork backdrop.
         coverDimTitle.setVisibility(solid ? View.GONE : View.VISIBLE);
         coverDimPresetGroup.setVisibility(solid ? View.GONE : View.VISIBLE);
-        backdropSwatch.setBackground(Ui.background(selectedBackdrop().argb(), 8, this));
+        // The swatch shows the colour itself; opacity has its own slider.
+        backdropSwatch.setBackground(Ui.background(0xFF000000 | backdropColor, 8, this));
     }
 
     private CardBackdrop selectedBackdrop() {
