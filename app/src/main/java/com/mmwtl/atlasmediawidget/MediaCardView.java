@@ -308,6 +308,7 @@ final class MediaCardView extends FrameLayout {
         artworkThumbnail.setBackground(Ui.background(Ui.NESTED, 10 * uiScale, context));
         metadata.addView(artworkThumbnail, new LinearLayout.LayoutParams(
                 d(appearance.thumbnailSizeDp), d(appearance.thumbnailSizeDp)));
+        showThumbnailPlaceholder();
 
         LinearLayout textColumn = new LinearLayout(context);
         textColumn.setOrientation(LinearLayout.VERTICAL);
@@ -720,9 +721,13 @@ final class MediaCardView extends FrameLayout {
         if (bitmap == null) {
             artwork.setImageDrawable(null);
             artwork.setAlpha(0f);
-            artworkThumbnail.setImageDrawable(null);
+            showThumbnailPlaceholder();
         } else {
             artwork.setImageBitmap(bitmap);
+            artworkThumbnail.setImageTintList(null);
+            artworkThumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            artworkThumbnail.setPadding(0, 0, 0, 0);
+            artworkThumbnail.setImageAlpha(255);
             artworkThumbnail.setImageBitmap(bitmap);
             if (replacingVisibleArtwork) {
                 artwork.setAlpha(1f);
@@ -732,6 +737,16 @@ final class MediaCardView extends FrameLayout {
             }
         }
         updateContentLayout();
+    }
+
+    /** Keeps the compact thumbnail slot occupied so the title does not shift without artwork. */
+    private void showThumbnailPlaceholder() {
+        artworkThumbnail.setImageResource(R.drawable.ic_sound_wave);
+        artworkThumbnail.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+        artworkThumbnail.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        int padding = Math.min(d(12), d(appearance.thumbnailSizeDp) / 4);
+        artworkThumbnail.setPadding(padding, padding, padding, padding);
+        artworkThumbnail.setImageAlpha(115);
     }
 
     void tick(long nowElapsedRealtime) {
@@ -796,7 +811,7 @@ final class MediaCardView extends FrameLayout {
                 || favoritesChooser.getVisibility() == VISIBLE;
         boolean radio = activeSource.displayId() == MediaSource.Id.RADIO;
         boolean showProgress = !radio && hasMedia && snapshot != null && snapshot.duration > 0L;
-        boolean showThumbnail = compact && hasMedia && hasArtwork;
+        boolean showThumbnail = compact && hasMedia;
         int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
         int controlsTop = Math.max(0, cardHeight - panelHeight);
         int progressTop = Math.max(0,
@@ -813,7 +828,8 @@ final class MediaCardView extends FrameLayout {
         placeholderParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         placeholderParams.topMargin = by(compact ? 58 : 72);
         placeholder.setLayoutParams(placeholderParams);
-        placeholder.setVisibility(!hasArtwork && !chooserVisible ? VISIBLE : GONE);
+        placeholder.setVisibility(!hasArtwork && !chooserVisible && !showThumbnail
+                ? VISIBLE : GONE);
 
         LayoutParams metadataParams;
         if (compact && !hasMedia) {
