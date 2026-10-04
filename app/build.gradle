@@ -2,8 +2,8 @@ plugins {
     id 'com.android.application'
 }
 
-def appVersionCode = 56
-def appVersionName = '3.1.6'
+def appVersionCode = 57
+def appVersionName = '4.0.0'
 def branchName = providers.exec {
     commandLine('git', 'branch', '--show-current')
 }.standardOutput.asText.get().trim()
