@@ -16,7 +16,7 @@ import java.util.Locale;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 13;
+    private static final int SCHEMA_VERSION = 14;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
@@ -28,6 +28,7 @@ final class SettingsBackup {
         final boolean radioFavoritesNavigation;
         final int favoriteColumns;
         final int favoriteRows;
+        final int playerActionsCount;
         final boolean dragHandleVisible;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
@@ -112,7 +113,22 @@ final class SettingsBackup {
                 Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
                 boolean widgetMode) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
+                    Prefs.DEFAULT_PLAYER_ACTIONS);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths, CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner, StyleData compact, StyleData square,
+                Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
+                boolean widgetMode, int playerActionsCount) throws IOException {
             this.widgetMode = widgetMode;
+            this.playerActionsCount = requireRange("settings.playerActionsCount",
+                    playerActionsCount, Prefs.MIN_PLAYER_ACTIONS, Prefs.MAX_PLAYER_ACTIONS);
             this.freeformHideThresholdPercent = requireRange(
                     "settings.freeformHideThresholdPercent", freeformHideThresholdPercent,
                     WindowVisibilityPolicy.MIN_HIDE_THRESHOLD_PERCENT,
@@ -248,7 +264,8 @@ final class SettingsBackup {
                 prefs.cardWidthPx(), prefs.cardHeightPx(),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
-                prefs.freeformHideThresholdPercent(), prefs.isWidgetMode());
+                prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
+                prefs.playerActionsCount());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -288,6 +305,7 @@ final class SettingsBackup {
             settings.put("radioFavoritesNavigation", data.radioFavoritesNavigation);
             settings.put("favoriteColumns", data.favoriteColumns);
             settings.put("favoriteRows", data.favoriteRows);
+            settings.put("playerActionsCount", data.playerActionsCount);
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
@@ -393,7 +411,9 @@ final class SettingsBackup {
                     version >= 10 ? requireInt(settings, "freeformHideThresholdPercent",
                             "settings.freeformHideThresholdPercent")
                             : WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT,
-                    version >= 11 && requireBoolean(settings, "widgetMode", "settings.widgetMode"));
+                    version >= 11 && requireBoolean(settings, "widgetMode", "settings.widgetMode"),
+                    version >= 14 ? requireInt(settings, "playerActionsCount",
+                            "settings.playerActionsCount") : Prefs.DEFAULT_PLAYER_ACTIONS);
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }

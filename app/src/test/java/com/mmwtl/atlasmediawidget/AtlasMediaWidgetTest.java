@@ -603,6 +603,17 @@ public class AtlasMediaWidgetTest {
         assertNotEquals(like.getData(), Shadows.shadowOf(AtlasMediaWidgetProvider
                 .customActionClick(context, 41, "SHUFFLE")).getSavedIntent().getData());
 
+        Prefs prefs = new Prefs(context);
+        prefs.putPlayerActionsCount(3);
+        var three = new AtlasMediaWidgetProvider.Frame(context, prefs,
+                options, 41, snapshot, null, true, listener);
+        assertEquals("REPEAT", three.card.widgetCustomAction(2).action);
+        prefs.putPlayerActionsCount(0);
+        var none = new AtlasMediaWidgetProvider.Frame(context, prefs,
+                options, 41, snapshot, null, true, listener);
+        assertNull(none.card.widgetCustomAction(0));
+        prefs.putPlayerActionsCount(Prefs.DEFAULT_PLAYER_ACTIONS);
+
         var radio = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context),
                 options, 41, customActionSnapshot(MediaSource.Id.RADIO, context.getPackageName()),
                 null, true, listener);

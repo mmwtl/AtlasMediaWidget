@@ -183,6 +183,8 @@ public final class MainActivity extends ScaledActivity {
     private LabeledSeek timeTextSetting;
     private LabeledSeek progressGapSetting;
     private LabeledSeek progressThicknessSetting;
+    private TextView playerActionsValue;
+    private SeekBar playerActions;
     private TextView favoriteColumnsValue;
     private SeekBar favoriteColumns;
     private TextView favoriteRowsValue;
@@ -458,6 +460,7 @@ public final class MainActivity extends ScaledActivity {
         overlayOnly.add(visibilityCard);
 
         page.addView(createLookCard());
+        page.addView(createPlayerActionsCard());
         createTypographySection(collapsibleCard(page, "Текст и отступы",
                 "Размеры шрифтов, отступы и линия прогресса"));
         createControlsSection(collapsibleCard(page, "Панель управления",
@@ -1213,6 +1216,7 @@ public final class MainActivity extends ScaledActivity {
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         refreshFavoriteGridControls();
+        refreshPlayerActionsControl();
         refreshingStyle = true;
         refreshSizeControls(currentStyle());
         refreshingStyle = false;
@@ -2818,6 +2822,49 @@ public final class MainActivity extends ScaledActivity {
             input.setError(message);
             return null;
         }
+    }
+
+    private LinearLayout createPlayerActionsCard() {
+        LinearLayout card = card();
+        card.addView(text("Кнопки плеера", 20, Ui.PRIMARY, Typeface.BOLD));
+        TextView hint = text("Собственные кнопки активного плеера (лайк, повтор и т. п.) "
+                        + "в правом верхнем углу карточки, в порядке, заданном плеером. "
+                        + "Если места меньше, лишние кнопки не показываются.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams hintParams = fullWrap();
+        hintParams.topMargin = Ui.dp(this, 8);
+        card.addView(hint, hintParams);
+        playerActionsValue = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        card.addView(playerActionsValue, labelParams());
+        playerActions = sizeSeekBar(Prefs.MIN_PLAYER_ACTIONS, Prefs.MAX_PLAYER_ACTIONS);
+        playerActions.setContentDescription("Количество кнопок плеера");
+        playerActions.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                    boolean fromUser) {
+                updatePlayerActionsLabel();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                prefs.putPlayerActionsCount(seekBar.getProgress());
+                refreshOverlayIfRunning();
+            }
+        });
+        card.addView(playerActions, fullWrap());
+        refreshPlayerActionsControl();
+        return card;
+    }
+
+    private void refreshPlayerActionsControl() {
+        if (playerActions == null) return;
+        playerActions.setProgress(prefs.playerActionsCount());
+        updatePlayerActionsLabel();
+    }
+
+    private void updatePlayerActionsLabel() {
+        int count = playerActions.getProgress();
+        playerActionsValue.setText(count == 0 ? "Не показывать" : "До " + count);
     }
 
     private void refreshFavoriteGridControls() {

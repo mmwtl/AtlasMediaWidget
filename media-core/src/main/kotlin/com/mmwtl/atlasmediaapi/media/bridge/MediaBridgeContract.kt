@@ -15,7 +15,7 @@ object MediaBridgeContract {
     const val MAX_REQUEST_ID_LENGTH = 128
     const val MAX_MESSAGE_LENGTH = 512
     const val MAX_RADIO_METADATA_LENGTH = 128
-    const val MAX_CUSTOM_ACTIONS = 4
+    const val MAX_CUSTOM_ACTIONS = 8
     const val MAX_CUSTOM_ACTION_LENGTH = 128
     const val MAX_CUSTOM_ACTION_NAME_LENGTH = 64
 

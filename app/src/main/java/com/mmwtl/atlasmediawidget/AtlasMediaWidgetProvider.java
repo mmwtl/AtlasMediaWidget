@@ -216,6 +216,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             card = new MediaCardView(context, width, height, width, height, style,
                     prefs.appearance(style), prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
+            card.setCustomActionLimit(prefs.playerActionsCount());
             if (snapshot == null || !connected) card.renderWidgetUnavailable(connected);
             else card.renderSnapshot(snapshot, true);
             boolean showSources = "sources".equals(chooser) && snapshot != null && connected;
@@ -316,9 +317,8 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 MediaCustomAction customAction = card.widgetCustomAction(slot);
                 if (customAction == null) break;
                 Rect rect = card.widgetBounds(card.widgetTarget("custom_" + slot));
-                int minimum = Ui.dp(context, 48);
-                rect.inset(-Math.max(0, (minimum - rect.width()) / 2),
-                        -Math.max(0, (minimum - rect.height()) / 2));
+                // Slots sit edge to edge in one pill, so only the height grows to a touch target.
+                rect.inset(0, -Math.max(0, (Ui.dp(context, 48) - rect.height()) / 2));
                 if (!rect.intersect(0, 0, width, height)) continue;
                 addTarget(context, id, customAction.label(), rect,
                         customActionClick(context, id, customAction.action));

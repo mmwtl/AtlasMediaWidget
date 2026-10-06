@@ -24,6 +24,7 @@ final class Prefs {
     static final String KEY_RADIO_FAVORITES_NAVIGATION = "radio_favorites_navigation";
     static final String KEY_RADIO_FAVORITES_COLUMNS = "radio_favorites_columns";
     static final String KEY_RADIO_FAVORITES_ROWS = "radio_favorites_rows";
+    static final String KEY_PLAYER_ACTIONS_COUNT = "player_actions_count";
     static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
@@ -94,6 +95,9 @@ final class Prefs {
     static final int MAX_RADIO_FAVORITES_GRID_ROWS = 4;
     static final int DEFAULT_RADIO_FAVORITES_GRID_COLUMNS = 2;
     static final int DEFAULT_RADIO_FAVORITES_GRID_ROWS = 2;
+    static final int MIN_PLAYER_ACTIONS = 0;
+    static final int MAX_PLAYER_ACTIONS = 5;
+    static final int DEFAULT_PLAYER_ACTIONS = 2;
 
     private final Context appContext;
     private final SharedPreferences preferences;
@@ -242,6 +246,17 @@ final class Prefs {
         return clamp(getInt(KEY_RADIO_FAVORITES_ROWS,
                         DEFAULT_RADIO_FAVORITES_GRID_ROWS),
                 MIN_RADIO_FAVORITES_GRID_ROWS, MAX_RADIO_FAVORITES_GRID_ROWS);
+    }
+
+    /** How many of the active player's own buttons the card shows; 0 hides them. */
+    int playerActionsCount() {
+        return clamp(getInt(KEY_PLAYER_ACTIONS_COUNT, DEFAULT_PLAYER_ACTIONS),
+                MIN_PLAYER_ACTIONS, MAX_PLAYER_ACTIONS);
+    }
+
+    void putPlayerActionsCount(int count) {
+        preferences.edit().putInt(KEY_PLAYER_ACTIONS_COUNT,
+                clamp(count, MIN_PLAYER_ACTIONS, MAX_PLAYER_ACTIONS)).apply();
     }
 
     void putRadioFavoritesGrid(int columns, int rows) {
@@ -450,6 +465,7 @@ final class Prefs {
                         data.radioFavoritesNavigation)
                 .putInt(KEY_RADIO_FAVORITES_COLUMNS, data.favoriteColumns)
                 .putInt(KEY_RADIO_FAVORITES_ROWS, data.favoriteRows)
+                .putInt(KEY_PLAYER_ACTIONS_COUNT, data.playerActionsCount)
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)

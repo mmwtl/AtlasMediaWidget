@@ -36,7 +36,7 @@ public final class SettingsBackupTest {
         assertEquals(76, restored.compact.appearance.thumbnailSizeDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(13, root.getInt("schemaVersion"));
+        assertEquals(14, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -238,7 +238,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 14);
+        root.put("schemaVersion", 15);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));
@@ -404,5 +404,21 @@ public final class SettingsBackupTest {
                 new SettingsBackup.StyleData(481, 302, compactAppearance),
                 new SettingsBackup.StyleData(512, 506, squareAppearance),
                 columns, rows, true);
+    }
+
+    @Test public void playerActionsCountRoundTripsAndDefaultsForOlderFiles() throws Exception {
+        SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
+        assertEquals(Prefs.DEFAULT_PLAYER_ACTIONS, base.playerActionsCount);
+        JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
+        root.getJSONObject("settings").put("playerActionsCount", 5);
+        assertEquals(5, SettingsBackup.decode(root.toString()).playerActionsCount);
+
+        root.getJSONObject("settings").put("playerActionsCount", Prefs.MAX_PLAYER_ACTIONS + 1);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+
+        root.put("schemaVersion", 13);
+        root.getJSONObject("settings").remove("playerActionsCount");
+        assertEquals(Prefs.DEFAULT_PLAYER_ACTIONS,
+                SettingsBackup.decode(root.toString()).playerActionsCount);
     }
 }

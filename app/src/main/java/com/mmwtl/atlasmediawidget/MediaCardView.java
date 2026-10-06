@@ -48,8 +48,7 @@ final class MediaCardView extends FrameLayout {
     }
 
     private static final int PROGRESS_MAX = 10_000;
-    /** Player buttons beyond this stay off the card; the top row has room for two. */
-    static final int MAX_CUSTOM_ACTIONS = 2;
+    static final int MAX_CUSTOM_ACTIONS = Prefs.MAX_PLAYER_ACTIONS;
     private static final long CHOOSER_AUTO_HIDE_MS = 10_000L;
     private static final MediaSource.Id[] WIDGET_SOURCES = {
             MediaSource.Id.RADIO, MediaSource.Id.BT,
@@ -95,6 +94,8 @@ final class MediaCardView extends FrameLayout {
     private final LinearLayout favoritesButton;
     private final LinearLayout customActionsRow;
     private final List<MediaCustomAction> shownCustomActions = new ArrayList<>();
+    private final int customActionSlotWidth;
+    private int customActionLimit = Prefs.DEFAULT_PLAYER_ACTIONS;
     private final FrameLayout favoritesChooser;
     private final TextView favoritesEmpty;
     private final GridView favoritesGrid;
@@ -277,19 +278,20 @@ final class MediaCardView extends FrameLayout {
         favoritesButton.addOnLayoutChangeListener((view, left, top, right, bottom,
                 oldLeft, oldTop, oldRight, oldBottom) -> updateStatusPillPosition());
 
-        // Player-defined buttons (like, shuffle, …) share the favorites slot outside radio.
+        // Player-defined buttons (like, shuffle, …) share one pill in the favorites slot outside
+        // radio. Icons arrive trimmed to their glyph, so they take the source glyph's size.
         customActionsRow = new LinearLayout(context);
-        customActionsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        customActionsRow.setGravity(Gravity.CENTER_VERTICAL);
+        customActionsRow.setPadding(d(6), 0, d(6), 0);
+        customActionsRow.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
         customActionsRow.setVisibility(GONE);
-        // Icons arrive trimmed to their glyph, so they take the source glyph's size exactly.
-        int customIconPadding = Math.max(0, (d(topPillHeightDp) - d(topPillIconDp)) / 2);
+        customActionSlotWidth = d(topPillIconDp) + d(12);
+        int customIconInset = Math.max(0, (d(topPillHeightDp) - d(topPillIconDp)) / 2);
         for (int index = 0; index < MAX_CUSTOM_ACTIONS; index++) {
             ImageView button = new ImageView(context);
             button.setScaleType(ImageView.ScaleType.FIT_CENTER);
             button.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
-            button.setPadding(customIconPadding, customIconPadding,
-                    customIconPadding, customIconPadding);
-            button.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
+            button.setPadding(d(6), customIconInset, d(6), customIconInset);
             button.setClickable(true);
             button.setFocusable(true);
             button.setVisibility(GONE);
@@ -299,10 +301,8 @@ final class MediaCardView extends FrameLayout {
                     listener.onCustomAction(shownCustomActions.get(slot).action);
                 }
             });
-            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                    d(topPillHeightDp), d(topPillHeightDp));
-            if (index > 0) buttonParams.leftMargin = d(8);
-            customActionsRow.addView(button, buttonParams);
+            customActionsRow.addView(button, new LinearLayout.LayoutParams(
+                    customActionSlotWidth, LayoutParams.MATCH_PARENT));
         }
         LayoutParams customActionsParams = new LayoutParams(
                 LayoutParams.WRAP_CONTENT, d(topPillHeightDp));
@@ -505,14 +505,15 @@ final class MediaCardView extends FrameLayout {
 
     // The same measured card supplies RemoteViews pixels and exact click bounds.
     View widgetTarget(String action) {
+        if (action.startsWith("custom_")) {
+            return customActionsRow.getChildAt(Integer.parseInt(action.substring(7)));
+        }
         return switch (action) {
             case "PREVIOUS" -> previous;
             case "PLAY_PAUSE" -> playPause;
             case "NEXT" -> next;
             case "sources" -> sourcePill;
             case "favorites" -> favoritesButton;
-            case "custom_0" -> customActionsRow.getChildAt(0);
-            case "custom_1" -> customActionsRow.getChildAt(1);
             case "seek" -> progressRow;
             case "seek_bar" -> progress;
             case "elapsed" -> elapsed;
@@ -1302,10 +1303,35 @@ final class MediaCardView extends FrameLayout {
         return slot < shownCustomActions.size() ? shownCustomActions.get(slot) : null;
     }
 
+    /** Sets how many player buttons the card may show; the top row may fit fewer. */
+    void setCustomActionLimit(int limit) {
+        int value = Math.max(0, Math.min(MAX_CUSTOM_ACTIONS, limit));
+        if (value == customActionLimit) return;
+        customActionLimit = value;
+        if (snapshot == null) return;
+        renderCustomActions(activeSource.displayId() == MediaSource.Id.RADIO
+                ? List.of() : snapshot.customActions);
+        updateStatusPillPosition();
+    }
+
+    /** Slots that fit beside the source pill without covering it. */
+    private int customActionsThatFit() {
+        sourcePill.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                MeasureSpec.makeMeasureSpec(sourcePill.getLayoutParams().height,
+                        MeasureSpec.EXACTLY));
+        LayoutParams sourceParams = (LayoutParams) sourcePill.getLayoutParams();
+        LayoutParams actionsParams = (LayoutParams) customActionsRow.getLayoutParams();
+        int available = cardWidth - sourceParams.leftMargin - sourcePill.getMeasuredWidth()
+                - d(12) - actionsParams.rightMargin
+                - customActionsRow.getPaddingLeft() - customActionsRow.getPaddingRight();
+        return Math.max(0, available / customActionSlotWidth);
+    }
+
     private void renderCustomActions(List<MediaCustomAction> actions) {
         shownCustomActions.clear();
+        int limit = actions.isEmpty() ? 0 : Math.min(customActionLimit, customActionsThatFit());
         for (MediaCustomAction action : actions) {
-            if (shownCustomActions.size() == MAX_CUSTOM_ACTIONS) break;
+            if (shownCustomActions.size() >= limit) break;
             android.graphics.drawable.Drawable icon = CustomActionIcons.load(getContext(), action);
             if (icon == null) continue;
             ImageView button = (ImageView) customActionsRow.getChildAt(shownCustomActions.size());
@@ -1331,9 +1357,8 @@ final class MediaCardView extends FrameLayout {
                     + Math.max(favoritesButton.getWidth(), fallbackWidth) + d(8);
         } else if (customActionsRow != null && customActionsRow.getVisibility() == VISIBLE) {
             LayoutParams actionsParams = (LayoutParams) customActionsRow.getLayoutParams();
-            int buttonSize = actionsParams.height;
-            int fallbackWidth = shownCustomActions.size() * buttonSize
-                    + Math.max(0, shownCustomActions.size() - 1) * d(8);
+            int fallbackWidth = shownCustomActions.size() * customActionSlotWidth
+                    + customActionsRow.getPaddingLeft() + customActionsRow.getPaddingRight();
             params.rightMargin = actionsParams.rightMargin
                     + Math.max(customActionsRow.getWidth(), fallbackWidth) + d(8);
         } else {

@@ -143,7 +143,7 @@ Binding is established via explicit Intent (`bindService`):
 | `capabilities` | `int` | Битовая маска доступных действий источника |
 | `artworkUri` | `String` | `FileProvider` URI обложки (`content://...`) |
 | `artworkRevision` | `long` | Монотонный счетчик ревизии обложки |
-| `customActions` | `ArrayList<Bundle>` | Кнопки `PlaybackState.CustomAction` активной Android-сессии (до 4): `customActionId`, `customActionName`, `customActionIcon` (ресурс в пакете плеера), `customActionPackage`. Пусто для штатных источников и при смене владельца |
+| `customActions` | `ArrayList<Bundle>` | Кнопки `PlaybackState.CustomAction` активной Android-сессии (до 8): `customActionId`, `customActionName`, `customActionIcon` (ресурс в пакете плеера), `customActionPackage`. Пусто для штатных источников и при смене владельца |
 
 ---
 
