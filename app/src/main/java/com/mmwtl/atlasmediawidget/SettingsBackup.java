@@ -31,7 +31,7 @@ final class SettingsBackup {
         final int favoriteColumns;
         final int favoriteRows;
         final int playerActionsCount;
-        final Map<String, List<String>> playerActionSelections;
+        final Map<String, List<String>> hiddenPlayerActions;
         final boolean dragHandleVisible;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
@@ -129,10 +129,10 @@ final class SettingsBackup {
                 Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
                 boolean widgetMode, int playerActionsCount,
-                Map<String, List<String>> playerActionSelections) throws IOException {
+                Map<String, List<String>> hiddenPlayerActions) throws IOException {
             this.widgetMode = widgetMode;
-            if (playerActionSelections == null) throw invalid("Не указан выбор кнопок плеера");
-            this.playerActionSelections = playerActionSelections;
+            if (hiddenPlayerActions == null) throw invalid("Не указаны скрытые кнопки плеера");
+            this.hiddenPlayerActions = hiddenPlayerActions;
             this.playerActionsCount = requireRange("settings.playerActionsCount",
                     playerActionsCount, Prefs.MIN_PLAYER_ACTIONS, Prefs.MAX_PLAYER_ACTIONS);
             this.freeformHideThresholdPercent = requireRange(
@@ -271,7 +271,7 @@ final class SettingsBackup {
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
-                prefs.playerActionsCount(), prefs.playerActionSelections());
+                prefs.playerActionsCount(), prefs.hiddenPlayerActions());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -312,8 +312,8 @@ final class SettingsBackup {
             settings.put("favoriteColumns", data.favoriteColumns);
             settings.put("favoriteRows", data.favoriteRows);
             settings.put("playerActionsCount", data.playerActionsCount);
-            settings.put("playerActionSelections",
-                    PlayerActionSelection.toJson(data.playerActionSelections));
+            settings.put("hiddenPlayerActions",
+                    PlayerActionFilter.toJson(data.hiddenPlayerActions));
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
@@ -422,20 +422,20 @@ final class SettingsBackup {
                     version >= 11 && requireBoolean(settings, "widgetMode", "settings.widgetMode"),
                     version >= 14 ? requireInt(settings, "playerActionsCount",
                             "settings.playerActionsCount") : Prefs.DEFAULT_PLAYER_ACTIONS,
-                    version >= 14 ? playerActionSelections(settings) : Map.of());
+                    version >= 14 ? hiddenPlayerActions(settings) : Map.of());
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
     }
 
-    private static Map<String, List<String>> playerActionSelections(JSONObject settings)
+    private static Map<String, List<String>> hiddenPlayerActions(JSONObject settings)
             throws IOException {
-        JSONObject value = requireObject(settings, "playerActionSelections",
-                "settings.playerActionSelections");
+        JSONObject value = requireObject(settings, "hiddenPlayerActions",
+                "settings.hiddenPlayerActions");
         try {
-            return PlayerActionSelection.fromJson(value, true);
+            return PlayerActionFilter.fromJson(value, true);
         } catch (JSONException error) {
-            throw invalid("Недопустимый выбор кнопок плеера", error);
+            throw invalid("Недопустимый список скрытых кнопок плеера", error);
         }
     }
 

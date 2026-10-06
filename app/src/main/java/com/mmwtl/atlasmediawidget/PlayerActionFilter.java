@@ -12,28 +12,27 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Which player buttons the card shows. A player the user configured shows exactly the chosen
- * action ids, in the player's own order; any other player shows its first {@code limit} actions.
+ * Which player buttons the card shows: the player's own order without the action ids the user
+ * hid for that player, then the first {@code limit}. New or renamed actions stay visible.
  */
-final class PlayerActionSelection {
+final class PlayerActionFilter {
     static final int MAX_PLAYERS = 32;
-    static final int MAX_ACTIONS_PER_PLAYER = 8;
+    static final int MAX_ACTIONS_PER_PLAYER = 16;
     static final int MAX_ID_LENGTH = 128;
 
-    private PlayerActionSelection() {}
+    private PlayerActionFilter() {}
 
     static List<MediaCustomAction> choose(List<MediaCustomAction> actions, int limit,
-            List<String> selected) {
+            List<String> hidden) {
         List<MediaCustomAction> result = new ArrayList<>();
         for (MediaCustomAction action : actions) {
-            if (selected != null ? selected.contains(action.action) : result.size() < limit) {
-                result.add(action);
-            }
+            if (result.size() >= limit) break;
+            if (hidden == null || !hidden.contains(action.action)) result.add(action);
         }
         return result;
     }
 
-    /** Parses stored selections; malformed entries are dropped rather than failing the card. */
+    /** Parses stored hidden ids; malformed entries are dropped rather than failing the card. */
     static Map<String, List<String>> decode(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {
@@ -43,14 +42,14 @@ final class PlayerActionSelection {
         }
     }
 
-    static String encode(Map<String, List<String>> selections) {
-        return toJson(selections).toString();
+    static String encode(Map<String, List<String>> hidden) {
+        return toJson(hidden).toString();
     }
 
-    static JSONObject toJson(Map<String, List<String>> selections) {
+    static JSONObject toJson(Map<String, List<String>> hidden) {
         JSONObject root = new JSONObject();
         try {
-            for (Map.Entry<String, List<String>> entry : selections.entrySet()) {
+            for (Map.Entry<String, List<String>> entry : hidden.entrySet()) {
                 root.put(entry.getKey(), new JSONArray(entry.getValue()));
             }
         } catch (JSONException error) {
@@ -71,7 +70,7 @@ final class PlayerActionSelection {
                     && values != null && values.size() <= MAX_ACTIONS_PER_PLAYER
                     && result.size() < MAX_PLAYERS;
             if (!valid) {
-                if (strict) throw new JSONException("invalid player action selection");
+                if (strict) throw new JSONException("invalid hidden player actions");
                 continue;
             }
             result.put(packageName, Collections.unmodifiableList(values));

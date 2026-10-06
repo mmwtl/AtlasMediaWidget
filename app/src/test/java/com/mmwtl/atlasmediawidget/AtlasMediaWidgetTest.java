@@ -612,12 +612,14 @@ public class AtlasMediaWidgetTest {
         var none = new AtlasMediaWidgetProvider.Frame(context, prefs,
                 options, 41, snapshot, null, true, listener);
         assertNull(none.card.widgetCustomAction(0));
-        prefs.putPlayerActionSelection(context.getPackageName(), List.of("REPEAT"));
-        var chosen = new AtlasMediaWidgetProvider.Frame(context, prefs,
+        prefs.putPlayerActionsCount(2);
+        prefs.putHiddenPlayerActions(context.getPackageName(), List.of("LIKE"));
+        var filtered = new AtlasMediaWidgetProvider.Frame(context, prefs,
                 options, 41, snapshot, null, true, listener);
-        assertEquals("REPEAT", chosen.card.widgetCustomAction(0).action);
-        assertNull(chosen.card.widgetCustomAction(1));
-        prefs.putPlayerActionSelection(context.getPackageName(), null);
+        assertEquals("SHUFFLE", filtered.card.widgetCustomAction(0).action);
+        assertEquals("REPEAT", filtered.card.widgetCustomAction(1).action);
+        assertNull(filtered.card.widgetCustomAction(2));
+        prefs.putHiddenPlayerActions(context.getPackageName(), null);
         prefs.putPlayerActionsCount(Prefs.DEFAULT_PLAYER_ACTIONS);
 
         var radio = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context),
