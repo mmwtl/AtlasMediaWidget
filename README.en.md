@@ -85,6 +85,8 @@ open directly inside the AppWidget, and the favorites list scrolls.
 
 - Bluetooth, radio, USB, Online and CarPlay/Android Auto sources;
 - artwork, metadata, progress and capability-aware transport controls;
+- Android players' own buttons (like, repeat and so on) with a count limit and per-app hiding —
+  [guide](docs/player-buttons.en.md);
 - local progress interpolation without per-second IPC polling;
 - configurable card size, position, artwork dimming or a translucent solid-colour backdrop, typography, spacing and control panel;
 - HOME-only visibility, drag handle and configurable hiding threshold;
@@ -152,6 +154,7 @@ production release.
 
 ## Documentation
 
+- [Player buttons](docs/player-buttons.en.md) — showing, limiting and hiding player buttons;
 - [Media Bridge protocol v1](docs/full-media-bridge.md) — IPC contract, models and commands;
 - [Radio catalog](docs/radio-catalog.md) — CSV/ZIP format and station artwork;
 - [Architecture options](docs/architecture-options.md) — rationale for the integrated runtime;
