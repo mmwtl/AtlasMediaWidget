@@ -37,21 +37,18 @@ class CarPlayNativeBridge(
         private const val TRANSACTION_START_NOW_PLAYING_UPDATES = 9
         private const val TRANSACTION_STOP_NOW_PLAYING_UPDATES = 10
         private const val TRANSACTION_SEND_HID_EVENT_OVER_IAP = 27
-        private const val TRANSACTION_SEND_HID_EVENT_OVER_CARPLAY = 28
 
-        // CarPlayHidKeyCode
-        const val CARPLAY_KEY_PLAY = 32
-        const val CARPLAY_KEY_PAUSE = 33
-        const val CARPLAY_KEY_PLAYPAUSE = 34
-        const val CARPLAY_KEY_NEXTTRACK = 35
-        const val CARPLAY_KEY_PREVTRACK = 36
-
-        // IapHidKeyCode
+        // Bits of the iAP2 media HID report (CarPlayService MediaHidReport). The firmware's
+        // sendHidEventOverCarPlay only logs, and the report has no play/pause bit, so
+        // IapHidKeyCode.IAP_HID_PLAYBACK_PLAY_PAUSE (64) is never delivered to the phone.
         const val IAP_HID_PLAYBACK_PLAY = 1
         const val IAP_HID_PLAYBACK_PAUSE = 2
         const val IAP_HID_PLAYBACK_NEXT = 4
         const val IAP_HID_PLAYBACK_PREV = 8
-        const val IAP_HID_PLAYBACK_PLAY_PAUSE = 64
+
+        /** OneOS CPAAMusicService toggles the same way: explicit play or pause from known state. */
+        fun toggleHidKey(isPlaying: Boolean): Int =
+            if (isPlaying) IAP_HID_PLAYBACK_PAUSE else IAP_HID_PLAYBACK_PLAY
     }
 
     private val isStarted = AtomicBoolean(false)
@@ -73,28 +70,26 @@ class CarPlayNativeBridge(
 
     fun getCachedArtwork(): NormalizedArtwork? = currentArtwork.takeIf { it.uri.isNotBlank() }
 
-    fun play(): Boolean = sendMediaCommand(CARPLAY_KEY_PLAY, IAP_HID_PLAYBACK_PLAY)
+    fun play(): Boolean = sendMediaCommand(IAP_HID_PLAYBACK_PLAY)
 
-    fun pause(): Boolean = sendMediaCommand(CARPLAY_KEY_PAUSE, IAP_HID_PLAYBACK_PAUSE)
+    fun pause(): Boolean = sendMediaCommand(IAP_HID_PLAYBACK_PAUSE)
 
-    fun toggle(): Boolean = sendMediaCommand(CARPLAY_KEY_PLAYPAUSE, IAP_HID_PLAYBACK_PLAY_PAUSE)
+    fun toggle(): Boolean = sendMediaCommand(toggleHidKey(isPlaying))
 
-    fun next(): Boolean = sendMediaCommand(CARPLAY_KEY_NEXTTRACK, IAP_HID_PLAYBACK_NEXT)
+    fun next(): Boolean = sendMediaCommand(IAP_HID_PLAYBACK_NEXT)
 
-    fun previous(): Boolean = sendMediaCommand(CARPLAY_KEY_PREVTRACK, IAP_HID_PLAYBACK_PREV)
+    fun previous(): Boolean = sendMediaCommand(IAP_HID_PLAYBACK_PREV)
 
-    fun sendMediaCommand(carPlayKeyCode: Int, iapKeyCode: Int): Boolean {
+    fun sendMediaCommand(iapKeyCode: Int): Boolean {
         val binder = remoteBinder ?: return false
         return runCatching {
-            // Send Key Down (action 0) and Key Up (action 1) over both CarPlay and IAP channels
-            sendHidEventTransaction(binder, TRANSACTION_SEND_HID_EVENT_OVER_CARPLAY, carPlayKeyCode, 0)
-            sendHidEventTransaction(binder, TRANSACTION_SEND_HID_EVENT_OVER_CARPLAY, carPlayKeyCode, 1)
+            // Key down (action 0) reports the key bit; key up (action 1) reports an empty state.
             sendHidEventTransaction(binder, TRANSACTION_SEND_HID_EVENT_OVER_IAP, iapKeyCode, 0)
             sendHidEventTransaction(binder, TRANSACTION_SEND_HID_EVENT_OVER_IAP, iapKeyCode, 1)
-            Timber.tag("CarPlayNativeBridge").i("sendMediaCommand succeeded for carPlayKey=%d, iapKey=%d", carPlayKeyCode, iapKeyCode)
+            Timber.tag("CarPlayNativeBridge").i("sendMediaCommand succeeded for iapKey=%d", iapKeyCode)
             true
         }.onFailure { e ->
-            Timber.tag("CarPlayNativeBridge").e(e, "sendMediaCommand failed for carPlayKey=%d", carPlayKeyCode)
+            Timber.tag("CarPlayNativeBridge").e(e, "sendMediaCommand failed for iapKey=%d", iapKeyCode)
         }.getOrDefault(false)
     }
 

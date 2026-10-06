@@ -50,16 +50,21 @@ class MediaCoverParcelableTest {
 
     @Test
     fun carPlayConstants_matchExpectedProtocolValues() {
-        assertEquals(32, CarPlayNativeBridge.CARPLAY_KEY_PLAY)
-        assertEquals(33, CarPlayNativeBridge.CARPLAY_KEY_PAUSE)
-        assertEquals(34, CarPlayNativeBridge.CARPLAY_KEY_PLAYPAUSE)
-        assertEquals(35, CarPlayNativeBridge.CARPLAY_KEY_NEXTTRACK)
-        assertEquals(36, CarPlayNativeBridge.CARPLAY_KEY_PREVTRACK)
-
         assertEquals(1, CarPlayNativeBridge.IAP_HID_PLAYBACK_PLAY)
         assertEquals(2, CarPlayNativeBridge.IAP_HID_PLAYBACK_PAUSE)
         assertEquals(4, CarPlayNativeBridge.IAP_HID_PLAYBACK_NEXT)
         assertEquals(8, CarPlayNativeBridge.IAP_HID_PLAYBACK_PREV)
-        assertEquals(64, CarPlayNativeBridge.IAP_HID_PLAYBACK_PLAY_PAUSE)
+    }
+
+    @Test
+    fun toggle_sendsExplicitPauseOrPlayFromKnownState() {
+        assertEquals(
+            CarPlayNativeBridge.IAP_HID_PLAYBACK_PAUSE,
+            CarPlayNativeBridge.toggleHidKey(isPlaying = true),
+        )
+        assertEquals(
+            CarPlayNativeBridge.IAP_HID_PLAYBACK_PLAY,
+            CarPlayNativeBridge.toggleHidKey(isPlaying = false),
+        )
     }
 }
