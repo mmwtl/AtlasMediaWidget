@@ -37,7 +37,7 @@ playback in the player you want to configure: the list always shows the player t
 
 <p align="center">
   <img src="images/player-buttons-settings.webp" width="660"
-       alt="Player buttons block: «До 2» slider and the AIMP button list with arrows, favorites moved to the top, group buttons hidden">
+       alt="Player buttons block: «До 2» slider and the AIMP button list with «≡» handles, favorites moved to the top, group buttons hidden">
 </p>
 
 ### How many buttons
@@ -56,8 +56,9 @@ they will appear on the card:
 
 - **checked**: the button is shown;
 - **unchecked**: the button is hidden for this player;
-- **▲ ▼ arrows** on the right move the button up or down. The top button of the list comes first
-  on the card, that is, leftmost.
+- **the «≡» handle** on the right: drag the row up or down by it and release it in the new place.
+  The top button of the list comes first on the card, that is, leftmost. With TalkBack the handle
+  offers «Выше» (Up) and «Ниже» (Down) actions.
 
 Hiding and order are remembered per app: hiding repeat for AIMP does not affect Yandex Music. New
 buttons a player adds after an update appear right away at the end of the list and can be moved or
@@ -102,7 +103,7 @@ The full list of any player's buttons with their ids is in the diagnostics:
 - **No buttons at all.** Check that the slider is not at 0 and the source is Online, then check in
   the diagnostics whether the player publishes buttons. If the list is empty, the player does not.
 - **A button is missing from the card.** It is either hidden (unchecked) or beyond the limit; the
-  settings list shows which. Move it up, raise the limit or hide the unwanted buttons before it.
+  settings list shows which. Drag it higher, raise the limit or hide the unwanted buttons before it.
 - **A button moved or reappeared after a tap.** The player replaced it with a button that has a
   different id in a different position. Move or hide it again; the setting then applies to the new
   button.

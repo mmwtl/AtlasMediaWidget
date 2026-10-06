@@ -2958,31 +2958,134 @@ public final class MainActivity extends ScaledActivity {
             row.addView(box, new LinearLayout.LayoutParams(0,
                     ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             final int index = position;
-            row.addView(playerActionMoveButton("▲", "Выше", index > 0,
-                    () -> movePlayerAction(owner, actions, hidden, arranged, index, index - 1)));
-            row.addView(playerActionMoveButton("▼", "Ниже", index < arranged.size() - 1,
-                    () -> movePlayerAction(owner, actions, hidden, arranged, index, index + 1)));
+            row.addView(playerActionDragHandle(row, action.label(), index, arranged.size(),
+                    to -> movePlayerAction(owner, actions, hidden, arranged, index, to)));
+            row.setTag(index);
             playerActionsList.addView(row, fullWrap());
         }
         playerActionsList.addView(playerActionsNote(
-                "Снятая галочка скрывает кнопку у этого плеера, стрелки меняют порядок. "
-                        + "Новые кнопки плеера показываются в конце, пока их не скрыть."));
+                "Снятая галочка скрывает кнопку у этого плеера. Чтобы изменить порядок, "
+                        + "перетащите строку за «≡». Новые кнопки плеера показываются в конце, "
+                        + "пока их не скрыть."));
     }
 
-    private TextView playerActionMoveButton(String glyph, String description, boolean enabled,
-            Runnable action) {
-        TextView button = text(glyph, 16, Ui.PRIMARY, Typeface.NORMAL);
-        button.setGravity(Gravity.CENTER);
-        button.setContentDescription(description);
-        button.setEnabled(enabled);
-        button.setAlpha(enabled ? 1f : 0.25f);
-        button.setBackground(Ui.background(Ui.NESTED, 8, this));
-        if (enabled) button.setOnClickListener(v -> action.run());
-        int size = Ui.dp(this, 44);
+    /**
+     * A handle that drags its row within the player button list. The lifted row follows the
+     * finger, the rows it passes slide aside, and the order is saved on release. TalkBack gets
+     * «Выше» and «Ниже» actions instead of the gesture.
+     */
+    private TextView playerActionDragHandle(LinearLayout row, String label, int index, int count,
+            java.util.function.IntConsumer moveTo) {
+        TextView handle = text("≡", 24, Ui.SECONDARY, Typeface.NORMAL);
+        handle.setGravity(Gravity.CENTER);
+        handle.setContentDescription("Переместить «" + label + "»");
+        int size = Ui.dp(this, 48);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
         params.leftMargin = Ui.dp(this, 8);
-        button.setLayoutParams(params);
-        return button;
+        handle.setLayoutParams(params);
+        if (count < 2) {
+            handle.setAlpha(0.25f);
+            return handle;
+        }
+        int up = View.generateViewId();
+        int down = View.generateViewId();
+        handle.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+            @Override public void onInitializeAccessibilityNodeInfo(View host,
+                    android.view.accessibility.AccessibilityNodeInfo info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                if (index > 0) info.addAction(new android.view.accessibility
+                        .AccessibilityNodeInfo.AccessibilityAction(up, "Выше"));
+                if (index < count - 1) info.addAction(new android.view.accessibility
+                        .AccessibilityNodeInfo.AccessibilityAction(down, "Ниже"));
+            }
+
+            @Override public boolean performAccessibilityAction(View host, int action,
+                    Bundle arguments) {
+                if (action == up && index > 0) {
+                    moveTo.accept(index - 1);
+                    return true;
+                }
+                if (action == down && index < count - 1) {
+                    moveTo.accept(index + 1);
+                    return true;
+                }
+                return super.performAccessibilityAction(host, action, arguments);
+            }
+        });
+        float[] startY = new float[1];
+        int[] target = {index};
+        handle.setOnTouchListener((view, event) -> {
+            int step = row.getHeight();
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN -> {
+                    view.getParent().requestDisallowInterceptTouchEvent(true);
+                    startY[0] = event.getRawY();
+                    target[0] = index;
+                    row.setBackground(Ui.background(Ui.NESTED, 8, this));
+                    // Elevation draws the lifted row above its neighbours without reordering them.
+                    row.setElevation(Ui.dp(this, 8));
+                    return true;
+                }
+                case MotionEvent.ACTION_MOVE -> {
+                    float offset = Math.max(-index * step,
+                            Math.min((count - 1 - index) * step, event.getRawY() - startY[0]));
+                    row.setTranslationY(offset);
+                    int next = playerActionDragTarget(index, offset, step, count);
+                    if (next != target[0]) {
+                        target[0] = next;
+                        for (int other = 0; other < count; other++) {
+                            View sibling = playerActionRow(other);
+                            if (sibling == null || sibling == row) continue;
+                            sibling.animate().translationY(playerActionShift(other, index, next)
+                                    * step).setDuration(120L).start();
+                        }
+                    }
+                    return true;
+                }
+                case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.getParent().requestDisallowInterceptTouchEvent(false);
+                    for (int other = 0; other < count; other++) {
+                        View sibling = playerActionRow(other);
+                        if (sibling == null) continue;
+                        sibling.animate().cancel();
+                        sibling.setTranslationY(0f);
+                    }
+                    row.setElevation(0f);
+                    row.setBackground(null);
+                    row.setTranslationY(0f);
+                    if (event.getActionMasked() == MotionEvent.ACTION_UP && target[0] != index) {
+                        moveTo.accept(target[0]);
+                    }
+                    return true;
+                }
+                default -> {
+                    return false;
+                }
+            }
+        });
+        return handle;
+    }
+
+    /** The row for list position {@code index}; rows carry their position as a tag. */
+    private View playerActionRow(int index) {
+        for (int child = 0; child < playerActionsList.getChildCount(); child++) {
+            View view = playerActionsList.getChildAt(child);
+            if (Integer.valueOf(index).equals(view.getTag())) return view;
+        }
+        return null;
+    }
+
+    /** The position a dragged row lands on after moving {@code offset} pixels. */
+    static int playerActionDragTarget(int from, float offset, int step, int count) {
+        if (step <= 0) return from;
+        return Math.max(0, Math.min(count - 1, from + Math.round(offset / step)));
+    }
+
+    /** How many rows the row at {@code position} shifts while {@code from} hovers at {@code to}. */
+    static int playerActionShift(int position, int from, int to) {
+        if (from < to && position > from && position <= to) return -1;
+        if (to < from && position >= to && position < from) return 1;
+        return 0;
     }
 
     private void movePlayerAction(String owner, List<MediaCustomAction> actions,

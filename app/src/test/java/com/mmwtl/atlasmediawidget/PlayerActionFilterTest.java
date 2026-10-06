@@ -109,4 +109,23 @@ public final class PlayerActionFilterTest {
                 !prefs.playerActionRules().configured("com.aimp.player"));
         assertTrue(prefs.playerActionRules().configured("ru.yandex.music"));
     }
+
+    @Test public void draggedRowLandsOnTheNearestPositionWithinTheList() {
+        assertEquals(0, MainActivity.playerActionDragTarget(2, -130f, 60, 5));
+        assertEquals(3, MainActivity.playerActionDragTarget(2, 70f, 60, 5));
+        assertEquals(2, MainActivity.playerActionDragTarget(2, 29f, 60, 5));
+        assertEquals(4, MainActivity.playerActionDragTarget(2, 900f, 60, 5));
+        assertEquals(2, MainActivity.playerActionDragTarget(2, 50f, 0, 5));
+    }
+
+    @Test public void rowsBetweenTheDragOriginAndTargetSlideAside() {
+        assertEquals(List.of(0, -1, -1, 0, 0), List.of(
+                MainActivity.playerActionShift(0, 0, 2), MainActivity.playerActionShift(1, 0, 2),
+                MainActivity.playerActionShift(2, 0, 2), MainActivity.playerActionShift(3, 0, 2),
+                MainActivity.playerActionShift(4, 0, 2)));
+        assertEquals(List.of(0, 1, 1, 0, 0), List.of(
+                MainActivity.playerActionShift(0, 3, 1), MainActivity.playerActionShift(1, 3, 1),
+                MainActivity.playerActionShift(2, 3, 1), MainActivity.playerActionShift(3, 3, 1),
+                MainActivity.playerActionShift(4, 3, 1)));
+    }
 }
