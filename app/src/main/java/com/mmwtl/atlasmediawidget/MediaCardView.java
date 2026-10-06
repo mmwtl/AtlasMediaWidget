@@ -281,7 +281,9 @@ final class MediaCardView extends FrameLayout {
         customActionsRow = new LinearLayout(context);
         customActionsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
         customActionsRow.setVisibility(GONE);
-        int customIconPadding = Math.max(0, (d(topPillHeightDp) - d(topPillIconDp)) / 2);
+        // Player icons carry their own margins (a 24dp material glyph is ~20dp), so they get a
+        // larger box than the source glyph to look the same size; transport buttons use 15% too.
+        int customIconPadding = Math.round(d(topPillHeightDp) * 0.15f);
         for (int index = 0; index < MAX_CUSTOM_ACTIONS; index++) {
             ImageView button = new ImageView(context);
             button.setScaleType(ImageView.ScaleType.FIT_CENTER);
