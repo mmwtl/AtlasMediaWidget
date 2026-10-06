@@ -63,6 +63,19 @@ public class WidgetRenderingTest {
         }
     }
 
+    @Test public void customActionIconsAreTrimmedToTheirGlyph() {
+        var glyph = new android.graphics.drawable.InsetDrawable(
+                new android.graphics.drawable.ColorDrawable(0xFFFFFFFF), 30, 40, 30, 40) {
+            @Override public int getIntrinsicWidth() { return 96; }
+            @Override public int getIntrinsicHeight() { return 96; }
+        };
+        Bitmap trimmed = CustomActionIcons.trimmed(glyph);
+        assertEquals(trimmed.getWidth(), trimmed.getHeight());
+        assertTrue("transparent margins are cropped", trimmed.getWidth() < 192);
+        assertNull(CustomActionIcons.trimmed(
+                new android.graphics.drawable.ColorDrawable(0x00000000)));
+    }
+
     private WidgetAppearance appearance(int[] a, CoverDimPreset preset) {
         return appearance(a, preset, Prefs.DEFAULT_THUMBNAIL_SIZE_DP);
     }

@@ -575,6 +575,8 @@ public class AtlasMediaWidgetTest {
                         new MediaCustomAction("FOREIGN", "", R.drawable.ic_transport_play, "other")));
     }
 
+    // Icons are trimmed to their painted pixels, which needs real drawing.
+    @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
     @Test public void playerCustomActionsBecomeCardButtonsAndWidgetTargets() {
         Bundle options = new Bundle();
         options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 400);
