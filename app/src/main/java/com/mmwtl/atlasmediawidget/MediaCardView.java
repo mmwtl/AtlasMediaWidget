@@ -96,7 +96,7 @@ final class MediaCardView extends FrameLayout {
     private final List<MediaCustomAction> shownCustomActions = new ArrayList<>();
     private final int customActionSlotWidth;
     private int customActionLimit = Prefs.DEFAULT_PLAYER_ACTIONS;
-    private Map<String, List<String>> hiddenCustomActions = Map.of();
+    private PlayerActionFilter.Rules customActionRules = PlayerActionFilter.Rules.NONE;
     private final FrameLayout favoritesChooser;
     private final TextView favoritesEmpty;
     private final GridView favoritesGrid;
@@ -283,16 +283,17 @@ final class MediaCardView extends FrameLayout {
         // radio. Icons arrive trimmed to their glyph, so they take the source glyph's size.
         customActionsRow = new LinearLayout(context);
         customActionsRow.setGravity(Gravity.CENTER_VERTICAL);
-        customActionsRow.setPadding(d(6), 0, d(6), 0);
+        // Edges stay 12dp from the glyphs (2 + 10) while neighbours sit 20dp apart.
+        customActionsRow.setPadding(d(2), 0, d(2), 0);
         customActionsRow.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
         customActionsRow.setVisibility(GONE);
-        customActionSlotWidth = d(topPillIconDp) + d(12);
+        customActionSlotWidth = d(topPillIconDp) + d(20);
         int customIconInset = Math.max(0, (d(topPillHeightDp) - d(topPillIconDp)) / 2);
         for (int index = 0; index < MAX_CUSTOM_ACTIONS; index++) {
             ImageView button = new ImageView(context);
             button.setScaleType(ImageView.ScaleType.FIT_CENTER);
             button.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
-            button.setPadding(d(6), customIconInset, d(6), customIconInset);
+            button.setPadding(d(10), customIconInset, d(10), customIconInset);
             button.setClickable(true);
             button.setFocusable(true);
             button.setVisibility(GONE);
@@ -1306,11 +1307,11 @@ final class MediaCardView extends FrameLayout {
 
     /**
      * Sets which player buttons the card shows: the first {@code limit} the user did not hide
-     * for that player. The top row may fit fewer.
+     * for that player, in the user's order. The top row may fit fewer.
      */
-    void setCustomActionPolicy(int limit, Map<String, List<String>> hidden) {
+    void setCustomActionPolicy(int limit, PlayerActionFilter.Rules rules) {
         customActionLimit = Math.max(0, Math.min(MAX_CUSTOM_ACTIONS, limit));
-        hiddenCustomActions = hidden == null ? Map.of() : hidden;
+        customActionRules = rules == null ? PlayerActionFilter.Rules.NONE : rules;
         if (snapshot == null) return;
         renderCustomActions(activeSource.displayId() == MediaSource.Id.RADIO
                 ? List.of() : snapshot.customActions);
@@ -1332,9 +1333,7 @@ final class MediaCardView extends FrameLayout {
 
     private void renderCustomActions(List<MediaCustomAction> actions) {
         shownCustomActions.clear();
-        List<MediaCustomAction> chosen = actions.isEmpty() ? actions
-                : PlayerActionFilter.choose(actions, customActionLimit,
-                        hiddenCustomActions.get(actions.get(0).ownerPackage));
+        List<MediaCustomAction> chosen = customActionRules.choose(actions, customActionLimit);
         int limit = chosen.isEmpty() ? 0 : customActionsThatFit();
         for (MediaCustomAction action : chosen) {
             if (shownCustomActions.size() >= limit) break;

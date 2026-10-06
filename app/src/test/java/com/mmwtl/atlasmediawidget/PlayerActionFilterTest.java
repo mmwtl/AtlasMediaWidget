@@ -28,17 +28,60 @@ public final class PlayerActionFilterTest {
         return actions.stream().map(action -> action.action).toList();
     }
 
-    @Test public void playerWithoutHiddenActionsShowsItsFirstActions() {
+    private static PlayerActionFilter.Rules rules(List<String> published, List<String> hidden,
+            List<String> order) {
+        String aimp = "com.aimp.player";
+        return new PlayerActionFilter.Rules(Map.of(aimp, hidden), Map.of(aimp, order),
+                Map.of(aimp, published));
+    }
+
+    private static final List<String> AIMP_IDS = List.of(
+            "repeat", "prevGroup", "toggleLiked", "nextGroup", "shuffle");
+
+    @Test public void playerWithoutRulesShowsItsFirstActions() {
         assertEquals(List.of("repeat", "prevGroup"),
-                ids(PlayerActionFilter.choose(AIMP, 2, null)));
-        assertTrue(PlayerActionFilter.choose(AIMP, 0, null).isEmpty());
+                ids(PlayerActionFilter.Rules.NONE.choose(AIMP, 2)));
+        assertTrue(PlayerActionFilter.Rules.NONE.choose(AIMP, 0).isEmpty());
     }
 
     @Test public void hiddenActionsAreSkippedBeforeTheLimitApplies() {
-        assertEquals(List.of("toggleLiked", "shuffle"), ids(PlayerActionFilter.choose(AIMP, 2,
-                List.of("repeat", "prevGroup", "nextGroup"))));
-        assertEquals(List.of("prevGroup", "toggleLiked", "nextGroup", "shuffle"),
-                ids(PlayerActionFilter.choose(AIMP, 5, List.of("repeat", "gone"))));
+        var rules = rules(AIMP_IDS, List.of("repeat", "prevGroup", "nextGroup"), AIMP_IDS);
+        assertEquals(List.of("toggleLiked", "shuffle"), ids(rules.choose(AIMP, 2)));
+    }
+
+    @Test public void userOrderWinsAndNewActionsFollowIt() {
+        var rules = rules(AIMP_IDS, List.of(),
+                List.of("toggleLiked", "shuffle", "repeat", "prevGroup", "nextGroup"));
+        assertEquals(List.of("toggleLiked", "shuffle", "repeat"), ids(rules.choose(AIMP, 3)));
+
+        List<MediaCustomAction> grown = new java.util.ArrayList<>(AIMP);
+        grown.add(1, action("newOne"));
+        assertEquals("a new button keeps its place after the arranged ones",
+                List.of("toggleLiked", "shuffle", "repeat", "prevGroup", "nextGroup", "newOne"),
+                ids(rules.arrange(grown)));
+    }
+
+    @Test public void replacedIdInheritsPlaceAndHiddenFlag() {
+        var yandex = List.of(new MediaCustomAction("actionDislike", "Dislike", 1, "ru.yandex.music"),
+                new MediaCustomAction("actionLike", "Like", 2, "ru.yandex.music"));
+        var rules = new PlayerActionFilter.Rules(Map.of(), Map.of("ru.yandex.music",
+                List.of("actionLike", "actionDislike")), Map.of("ru.yandex.music",
+                List.of("actionDislike", "actionLike")));
+        assertEquals(List.of("actionLike", "actionDislike"), ids(rules.arrange(yandex)));
+
+        var liked = List.of(new MediaCustomAction("actionDislike", "Dislike", 1, "ru.yandex.music"),
+                new MediaCustomAction("actionUnlike", "Liked", 3, "ru.yandex.music"));
+        assertEquals("the like button that changed its id stays first",
+                List.of("actionUnlike", "actionDislike"), ids(rules.arrange(liked)));
+
+        var hidesDislike = new PlayerActionFilter.Rules(Map.of("ru.yandex.music",
+                List.of("actionDislike")), Map.of(), Map.of("ru.yandex.music",
+                List.of("actionDislike", "actionLike")));
+        var undisliked = List.of(new MediaCustomAction("actionUndislike", "Disliked", 4,
+                        "ru.yandex.music"),
+                new MediaCustomAction("actionLike", "Like", 2, "ru.yandex.music"));
+        assertEquals("a hidden button stays hidden after changing its id",
+                List.of("actionLike"), ids(hidesDislike.choose(undisliked, 5)));
     }
 
     @Test public void storedHiddenActionsRoundTripAndSkipMalformedEntries() throws Exception {
@@ -51,13 +94,19 @@ public final class PlayerActionFilterTest {
                 new JSONObject("{\"bad\":[1]}"), true));
     }
 
-    @Test public void prefsKeepHiddenActionsPerPlayer() {
+    @Test public void prefsKeepRulesPerPlayerAndClearUnchangedOnes() {
         Prefs prefs = new Prefs(org.robolectric.RuntimeEnvironment.getApplication());
-        prefs.putHiddenPlayerActions("com.aimp.player", List.of("repeat"));
-        prefs.putHiddenPlayerActions("ru.yandex.music", List.of("actionDislike"));
-        assertEquals(List.of("repeat"), prefs.hiddenPlayerActions().get("com.aimp.player"));
-        prefs.putHiddenPlayerActions("com.aimp.player", List.of());
-        assertEquals("nothing hidden removes the player entry",
-                Map.of("ru.yandex.music", List.of("actionDislike")), prefs.hiddenPlayerActions());
+        prefs.putPlayerActionRules("com.aimp.player", AIMP_IDS, List.of("repeat"), AIMP_IDS);
+        prefs.putPlayerActionRules("ru.yandex.music", List.of("a", "b"), List.of(),
+                List.of("b", "a"));
+        var rules = prefs.playerActionRules();
+        assertEquals(List.of("repeat"), rules.hidden.get("com.aimp.player"));
+        assertEquals(List.of("b", "a"), rules.order.get("ru.yandex.music"));
+        assertTrue(rules.configured("ru.yandex.music"));
+
+        prefs.putPlayerActionRules("com.aimp.player", AIMP_IDS, List.of(), AIMP_IDS);
+        assertTrue("nothing hidden in player order clears the player",
+                !prefs.playerActionRules().configured("com.aimp.player"));
+        assertTrue(prefs.playerActionRules().configured("ru.yandex.music"));
     }
 }

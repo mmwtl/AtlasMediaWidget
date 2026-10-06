@@ -417,11 +417,24 @@ public final class SettingsBackupTest {
                         new org.json.JSONArray().put("com.aimp.service.action.toggleRepeatMode")));
         assertEquals(java.util.Map.of("com.aimp.player",
                         java.util.List.of("com.aimp.service.action.toggleRepeatMode")),
-                SettingsBackup.decode(root.toString()).hiddenPlayerActions);
+                SettingsBackup.decode(root.toString()).playerActionRules.hidden);
         root.getJSONObject("settings").put("hiddenPlayerActions",
                 new JSONObject().put("com.aimp.player", new org.json.JSONArray().put(7)));
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
         root.getJSONObject("settings").put("hiddenPlayerActions", new JSONObject());
+        root.getJSONObject("settings").put("playerActionOrder", new JSONObject().put(
+                "ru.yandex.music", new org.json.JSONArray().put("actionLike").put("actionDislike")));
+        root.getJSONObject("settings").put("playerActionIds", new JSONObject().put(
+                "ru.yandex.music", new org.json.JSONArray().put("actionDislike").put("actionLike")));
+        var ordered = SettingsBackup.decode(root.toString()).playerActionRules;
+        assertEquals(java.util.List.of("actionLike", "actionDislike"),
+                ordered.order.get("ru.yandex.music"));
+        assertEquals(java.util.List.of("actionDislike", "actionLike"),
+                ordered.published.get("ru.yandex.music"));
+        root.getJSONObject("settings").remove("playerActionOrder");
+        root.getJSONObject("settings").remove("playerActionIds");
+        assertTrue("early schema 14 files without order still import",
+                SettingsBackup.decode(root.toString()).playerActionRules.order.isEmpty());
 
         root.getJSONObject("settings").put("playerActionsCount", Prefs.MAX_PLAYER_ACTIONS + 1);
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
@@ -431,6 +444,6 @@ public final class SettingsBackupTest {
         root.getJSONObject("settings").remove("hiddenPlayerActions");
         assertEquals(Prefs.DEFAULT_PLAYER_ACTIONS,
                 SettingsBackup.decode(root.toString()).playerActionsCount);
-        assertTrue(SettingsBackup.decode(root.toString()).hiddenPlayerActions.isEmpty());
+        assertTrue(SettingsBackup.decode(root.toString()).playerActionRules.hidden.isEmpty());
     }
 }

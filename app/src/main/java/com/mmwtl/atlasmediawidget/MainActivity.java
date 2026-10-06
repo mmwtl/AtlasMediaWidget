@@ -2839,9 +2839,9 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout card = card();
         card.addView(text("Кнопки плеера", 20, Ui.PRIMARY, Typeface.BOLD));
         TextView hint = text("Собственные кнопки активного плеера (лайк, повтор и т. п.) "
-                        + "в правом верхнем углу карточки, в порядке, заданном плеером. "
-                        + "Ползунок задаёт, сколько кнопок помещать на карточку. Ненужные "
-                        + "кнопки играющего плеера можно скрыть ниже — для каждого "
+                        + "в правом верхнем углу карточки. "
+                        + "Ползунок задаёт, сколько кнопок помещать на карточку. Ниже можно "
+                        + "скрыть и переставить кнопки играющего плеера — для каждого "
                         + "приложения отдельно. Если места меньше, лишние кнопки не "
                         + "показываются.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
@@ -2875,11 +2875,12 @@ public final class MainActivity extends ScaledActivity {
         playerActionsList = new LinearLayout(this);
         playerActionsList.setOrientation(LinearLayout.VERTICAL);
         card.addView(playerActionsList, fullWrap());
-        playerActionsReset = actionButton("Показать все кнопки этого плеера");
+        playerActionsReset = actionButton("Сбросить кнопки этого плеера");
         playerActionsReset.setOnClickListener(v -> {
             MediaSnapshot snapshot = playerActionsSnapshot;
             if (snapshot == null || snapshot.ownerPackage.isBlank()) return;
-            prefs.putHiddenPlayerActions(snapshot.ownerPackage, null);
+            List<String> ids = actionIds(snapshot.customActions);
+            prefs.putPlayerActionRules(snapshot.ownerPackage, ids, List.of(), ids);
             refreshPlayerActionChoices(true);
             refreshOverlayIfRunning();
         });
@@ -2891,30 +2892,32 @@ public final class MainActivity extends ScaledActivity {
     }
 
     /**
-     * Lists the playing player's own buttons; unchecking one hides it for that player. Rows are
-     * rebuilt only when the player or its buttons change.
+     * Lists the playing player's own buttons in the card's order: unchecking one hides it for that
+     * player, the arrows move it. Rows are rebuilt only when the player, its buttons or the rules
+     * change.
      */
     private void refreshPlayerActionChoices(boolean force) {
         if (playerActionsList == null) return;
         MediaSnapshot snapshot = playerActionsSnapshot;
         List<MediaCustomAction> actions = snapshot == null ? List.of() : snapshot.customActions;
         String owner = actions.isEmpty() ? "" : snapshot.ownerPackage;
-        List<String> hidden = owner.isEmpty() ? List.of()
-                : prefs.hiddenPlayerActions().getOrDefault(owner, List.of());
+        PlayerActionFilter.Rules rules = prefs.playerActionRules();
+        List<MediaCustomAction> arranged = rules.arrange(actions);
+        List<MediaCustomAction> hidden = rules.hiddenOf(actions);
         int limit = prefs.playerActionsCount();
         List<Object> key = new ArrayList<>();
         key.add(owner);
-        key.add(hidden);
         key.add(limit);
-        for (MediaCustomAction action : actions) {
-            key.add(List.of(action.action, action.label(), action.iconResId));
+        for (MediaCustomAction action : arranged) {
+            key.add(List.of(action.action, action.label(), action.iconResId,
+                    hidden.contains(action)));
         }
         if (!force && key.equals(playerActionsKey)) return;
         playerActionsKey = key;
         playerActionsList.removeAllViews();
-        playerActionsReset.setVisibility(hidden.isEmpty() ? View.GONE : View.VISIBLE);
+        playerActionsReset.setVisibility(rules.configured(owner) ? View.VISIBLE : View.GONE);
         if (actions.isEmpty()) {
-            playerActionsPlayer.setText("Скрытие кнопок");
+            playerActionsPlayer.setText("Настройка кнопок");
             playerActionsList.addView(playerActionsNote(snapshot == null
                     || snapshot.ownerPackage.isBlank()
                     ? "Включите музыку в плеере, чтобы настроить его кнопки."
@@ -2923,40 +2926,84 @@ public final class MainActivity extends ScaledActivity {
             return;
         }
         playerActionsPlayer.setText(snapshot.ownerApp.isBlank() ? owner : snapshot.ownerApp);
-        List<MediaCustomAction> shown = PlayerActionFilter.choose(actions, limit, hidden);
+        List<MediaCustomAction> shown = rules.choose(actions, limit);
         int iconSize = Ui.dp(this, 24);
-        for (MediaCustomAction action : actions) {
-            boolean visible = !hidden.contains(action.action);
-            CheckBox row = new CheckBox(this);
-            row.setText(visible && !shown.contains(action)
+        for (int position = 0; position < arranged.size(); position++) {
+            MediaCustomAction action = arranged.get(position);
+            boolean visible = !hidden.contains(action);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            CheckBox box = new CheckBox(this);
+            box.setText(visible && !shown.contains(action)
                     ? action.label() + " — не помещается" : action.label());
-            row.setTextSize(15);
-            row.setTextColor(visible && shown.contains(action) ? Ui.PRIMARY : Ui.SECONDARY);
-            row.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
-            row.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), 0, Ui.dp(this, 6));
-            row.setCompoundDrawablePadding(Ui.dp(this, 12));
+            box.setTextSize(15);
+            box.setTextColor(visible && shown.contains(action) ? Ui.PRIMARY : Ui.SECONDARY);
+            box.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+            box.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), 0, Ui.dp(this, 6));
+            box.setCompoundDrawablePadding(Ui.dp(this, 12));
             android.graphics.drawable.Drawable icon = CustomActionIcons.load(this, action);
             if (icon != null) {
                 icon.setBounds(0, 0, iconSize, iconSize);
                 icon.setTint(visible ? Ui.PRIMARY : Ui.SECONDARY);
-                row.setCompoundDrawablesRelative(icon, null, null, null);
+                box.setCompoundDrawablesRelative(icon, null, null, null);
             }
-            row.setTag(action.action);
-            row.setChecked(visible);
-            row.setOnCheckedChangeListener((button, checked) -> {
+            box.setChecked(visible);
+            box.setOnCheckedChangeListener((button, checked) -> {
                 if (!button.isPressed()) return;
-                List<String> nextHidden = new ArrayList<>(hidden);
-                nextHidden.remove(action.action);
-                if (!checked) nextHidden.add(action.action);
-                prefs.putHiddenPlayerActions(owner, nextHidden);
-                refreshPlayerActionChoices(false);
-                refreshOverlayIfRunning();
+                List<MediaCustomAction> nextHidden = new ArrayList<>(hidden);
+                nextHidden.remove(action);
+                if (!checked) nextHidden.add(action);
+                savePlayerActionRules(owner, actions, nextHidden, arranged);
             });
+            row.addView(box, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            final int index = position;
+            row.addView(playerActionMoveButton("▲", "Выше", index > 0,
+                    () -> movePlayerAction(owner, actions, hidden, arranged, index, index - 1)));
+            row.addView(playerActionMoveButton("▼", "Ниже", index < arranged.size() - 1,
+                    () -> movePlayerAction(owner, actions, hidden, arranged, index, index + 1)));
             playerActionsList.addView(row, fullWrap());
         }
         playerActionsList.addView(playerActionsNote(
-                "Снятая галочка скрывает кнопку у этого плеера. Новые кнопки плеера "
-                        + "показываются, пока их не скрыть."));
+                "Снятая галочка скрывает кнопку у этого плеера, стрелки меняют порядок. "
+                        + "Новые кнопки плеера показываются в конце, пока их не скрыть."));
+    }
+
+    private TextView playerActionMoveButton(String glyph, String description, boolean enabled,
+            Runnable action) {
+        TextView button = text(glyph, 16, Ui.PRIMARY, Typeface.NORMAL);
+        button.setGravity(Gravity.CENTER);
+        button.setContentDescription(description);
+        button.setEnabled(enabled);
+        button.setAlpha(enabled ? 1f : 0.25f);
+        button.setBackground(Ui.background(Ui.NESTED, 8, this));
+        if (enabled) button.setOnClickListener(v -> action.run());
+        int size = Ui.dp(this, 44);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(size, size);
+        params.leftMargin = Ui.dp(this, 8);
+        button.setLayoutParams(params);
+        return button;
+    }
+
+    private void movePlayerAction(String owner, List<MediaCustomAction> actions,
+            List<MediaCustomAction> hidden, List<MediaCustomAction> arranged, int from, int to) {
+        List<MediaCustomAction> order = new ArrayList<>(arranged);
+        order.add(to, order.remove(from));
+        savePlayerActionRules(owner, actions, hidden, order);
+    }
+
+    /** Stores the rules against the ids the player publishes right now. */
+    private void savePlayerActionRules(String owner, List<MediaCustomAction> actions,
+            List<MediaCustomAction> hidden, List<MediaCustomAction> order) {
+        prefs.putPlayerActionRules(owner, actionIds(actions), actionIds(hidden), actionIds(order));
+        refreshPlayerActionChoices(false);
+        refreshOverlayIfRunning();
+    }
+
+    private static List<String> actionIds(List<MediaCustomAction> actions) {
+        List<String> ids = new ArrayList<>();
+        for (MediaCustomAction action : actions) ids.add(action.action);
+        return ids;
     }
 
     private TextView playerActionsNote(String message) {

@@ -31,7 +31,7 @@ final class SettingsBackup {
         final int favoriteColumns;
         final int favoriteRows;
         final int playerActionsCount;
-        final Map<String, List<String>> hiddenPlayerActions;
+        final PlayerActionFilter.Rules playerActionRules;
         final boolean dragHandleVisible;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
@@ -120,7 +120,7 @@ final class SettingsBackup {
                     selectedStyle, positionX, positionY, positionCorner, compact, square,
                     cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
                     radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
-                    Prefs.DEFAULT_PLAYER_ACTIONS, Map.of());
+                    Prefs.DEFAULT_PLAYER_ACTIONS, PlayerActionFilter.Rules.NONE);
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -129,10 +129,10 @@ final class SettingsBackup {
                 Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
                 boolean widgetMode, int playerActionsCount,
-                Map<String, List<String>> hiddenPlayerActions) throws IOException {
+                PlayerActionFilter.Rules playerActionRules) throws IOException {
             this.widgetMode = widgetMode;
-            if (hiddenPlayerActions == null) throw invalid("Не указаны скрытые кнопки плеера");
-            this.hiddenPlayerActions = hiddenPlayerActions;
+            if (playerActionRules == null) throw invalid("Не указаны настройки кнопок плеера");
+            this.playerActionRules = playerActionRules;
             this.playerActionsCount = requireRange("settings.playerActionsCount",
                     playerActionsCount, Prefs.MIN_PLAYER_ACTIONS, Prefs.MAX_PLAYER_ACTIONS);
             this.freeformHideThresholdPercent = requireRange(
@@ -271,7 +271,7 @@ final class SettingsBackup {
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
-                prefs.playerActionsCount(), prefs.hiddenPlayerActions());
+                prefs.playerActionsCount(), prefs.playerActionRules());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -313,7 +313,11 @@ final class SettingsBackup {
             settings.put("favoriteRows", data.favoriteRows);
             settings.put("playerActionsCount", data.playerActionsCount);
             settings.put("hiddenPlayerActions",
-                    PlayerActionFilter.toJson(data.hiddenPlayerActions));
+                    PlayerActionFilter.toJson(data.playerActionRules.hidden));
+            settings.put("playerActionOrder",
+                    PlayerActionFilter.toJson(data.playerActionRules.order));
+            settings.put("playerActionIds",
+                    PlayerActionFilter.toJson(data.playerActionRules.published));
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
@@ -422,20 +426,26 @@ final class SettingsBackup {
                     version >= 11 && requireBoolean(settings, "widgetMode", "settings.widgetMode"),
                     version >= 14 ? requireInt(settings, "playerActionsCount",
                             "settings.playerActionsCount") : Prefs.DEFAULT_PLAYER_ACTIONS,
-                    version >= 14 ? hiddenPlayerActions(settings) : Map.of());
+                    new PlayerActionFilter.Rules(
+                            version >= 14 ? playerActionLists(settings, "hiddenPlayerActions")
+                                    : Map.of(),
+                            // Added within schema 14 after its first builds; older files omit them.
+                            settings.has("playerActionOrder")
+                                    ? playerActionLists(settings, "playerActionOrder") : Map.of(),
+                            settings.has("playerActionIds")
+                                    ? playerActionLists(settings, "playerActionIds") : Map.of()));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
     }
 
-    private static Map<String, List<String>> hiddenPlayerActions(JSONObject settings)
+    private static Map<String, List<String>> playerActionLists(JSONObject settings, String key)
             throws IOException {
-        JSONObject value = requireObject(settings, "hiddenPlayerActions",
-                "settings.hiddenPlayerActions");
+        JSONObject value = requireObject(settings, key, "settings." + key);
         try {
             return PlayerActionFilter.fromJson(value, true);
         } catch (JSONException error) {
-            throw invalid("Недопустимый список скрытых кнопок плеера", error);
+            throw invalid("Недопустимое поле settings." + key, error);
         }
     }
 

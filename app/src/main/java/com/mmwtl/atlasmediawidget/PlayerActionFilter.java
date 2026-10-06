@@ -12,8 +12,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Which player buttons the card shows: the player's own order without the action ids the user
- * hid for that player, then the first {@code limit}. New or renamed actions stay visible.
+ * Which player buttons the card shows and in what order. Per player the user may hide buttons and
+ * reorder them; the card shows the first {@code limit} visible ones.
+ *
+ * <p>Some players replace a button's id when its state changes (like / remove like). The ids the
+ * player published when the rules were saved are kept, so an unknown id that takes the position of
+ * a vanished one is treated as the same button: it keeps that button's place and hidden flag.
+ * Genuinely new buttons follow the arranged ones in the player's order and stay visible.
  */
 final class PlayerActionFilter {
     static final int MAX_PLAYERS = 32;
@@ -22,17 +27,81 @@ final class PlayerActionFilter {
 
     private PlayerActionFilter() {}
 
-    static List<MediaCustomAction> choose(List<MediaCustomAction> actions, int limit,
-            List<String> hidden) {
-        List<MediaCustomAction> result = new ArrayList<>();
-        for (MediaCustomAction action : actions) {
-            if (result.size() >= limit) break;
-            if (hidden == null || !hidden.contains(action.action)) result.add(action);
+    static final class Rules {
+        static final Rules NONE = new Rules(Map.of(), Map.of(), Map.of());
+
+        final Map<String, List<String>> hidden;
+        final Map<String, List<String>> order;
+        final Map<String, List<String>> published;
+
+        Rules(Map<String, List<String>> hidden, Map<String, List<String>> order,
+                Map<String, List<String>> published) {
+            this.hidden = hidden == null ? Map.of() : hidden;
+            this.order = order == null ? Map.of() : order;
+            this.published = published == null ? Map.of() : published;
         }
-        return result;
+
+        boolean configured(String packageName) {
+            return hidden.containsKey(packageName) || order.containsKey(packageName);
+        }
+
+        /** The first {@code limit} visible actions in the user's order. */
+        List<MediaCustomAction> choose(List<MediaCustomAction> actions, int limit) {
+            List<MediaCustomAction> hiddenActions = hiddenOf(actions);
+            List<MediaCustomAction> result = new ArrayList<>();
+            for (MediaCustomAction action : arrange(actions)) {
+                if (result.size() >= limit) break;
+                if (!hiddenActions.contains(action)) result.add(action);
+            }
+            return result;
+        }
+
+        /** All actions in the user's order; the sort is stable, so the rest keep player order. */
+        List<MediaCustomAction> arrange(List<MediaCustomAction> actions) {
+            List<String> keys = savedIds(actions);
+            List<String> saved = order.getOrDefault(owner(actions), List.of());
+            List<Integer> indices = new ArrayList<>();
+            for (int index = 0; index < actions.size(); index++) indices.add(index);
+            indices.sort(java.util.Comparator.comparingInt(index -> {
+                int rank = saved.indexOf(keys.get(index));
+                return rank < 0 ? Integer.MAX_VALUE : rank;
+            }));
+            List<MediaCustomAction> result = new ArrayList<>();
+            for (int index : indices) result.add(actions.get(index));
+            return result;
+        }
+
+        List<MediaCustomAction> hiddenOf(List<MediaCustomAction> actions) {
+            List<String> keys = savedIds(actions);
+            List<String> saved = hidden.getOrDefault(owner(actions), List.of());
+            List<MediaCustomAction> result = new ArrayList<>();
+            for (int index = 0; index < actions.size(); index++) {
+                if (saved.contains(keys.get(index))) result.add(actions.get(index));
+            }
+            return result;
+        }
+
+        /** The saved id each current action stands for, matching replaced ids by position. */
+        List<String> savedIds(List<MediaCustomAction> actions) {
+            List<String> before = published.getOrDefault(owner(actions), List.of());
+            List<String> current = new ArrayList<>();
+            for (MediaCustomAction action : actions) current.add(action.action);
+            List<String> result = new ArrayList<>();
+            for (int index = 0; index < current.size(); index++) {
+                String id = current.get(index);
+                boolean replaced = !before.contains(id) && index < before.size()
+                        && !current.contains(before.get(index));
+                result.add(replaced ? before.get(index) : id);
+            }
+            return result;
+        }
+
+        private static String owner(List<MediaCustomAction> actions) {
+            return actions.isEmpty() ? "" : actions.get(0).ownerPackage;
+        }
     }
 
-    /** Parses stored hidden ids; malformed entries are dropped rather than failing the card. */
+    /** Parses stored per-player id lists; malformed entries are dropped rather than failing the card. */
     static Map<String, List<String>> decode(String json) {
         if (json == null || json.isBlank()) return Map.of();
         try {

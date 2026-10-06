@@ -30,6 +30,8 @@ final class Prefs {
     static final String KEY_RADIO_FAVORITES_ROWS = "radio_favorites_rows";
     static final String KEY_PLAYER_ACTIONS_COUNT = "player_actions_count";
     static final String KEY_HIDDEN_PLAYER_ACTIONS = "hidden_player_actions";
+    static final String KEY_PLAYER_ACTION_ORDER = "player_action_order";
+    static final String KEY_PLAYER_ACTION_IDS = "player_action_ids";
     static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
@@ -264,22 +266,43 @@ final class Prefs {
                 clamp(count, MIN_PLAYER_ACTIONS, MAX_PLAYER_ACTIONS)).apply();
     }
 
-    /** Player buttons the user hid, per package; everything else stays visible. */
-    Map<String, List<String>> hiddenPlayerActions() {
-        return PlayerActionFilter.decode(getString(KEY_HIDDEN_PLAYER_ACTIONS, null));
+    /** Per-player hidden buttons, their order and the ids the player published at the time. */
+    PlayerActionFilter.Rules playerActionRules() {
+        return new PlayerActionFilter.Rules(
+                PlayerActionFilter.decode(getString(KEY_HIDDEN_PLAYER_ACTIONS, null)),
+                PlayerActionFilter.decode(getString(KEY_PLAYER_ACTION_ORDER, null)),
+                PlayerActionFilter.decode(getString(KEY_PLAYER_ACTION_IDS, null)));
     }
 
-    void putHiddenPlayerActions(String packageName, List<String> actionIds) {
-        Map<String, List<String>> hidden = new LinkedHashMap<>(hiddenPlayerActions());
-        hidden.remove(packageName);
-        if (actionIds != null && !actionIds.isEmpty()) {
-            if (hidden.size() >= PlayerActionFilter.MAX_PLAYERS) {
-                hidden.remove(hidden.keySet().iterator().next());
+    /**
+     * Saves one player's rules against the ids it publishes now. Nothing hidden and the player's
+     * own order clear the player instead.
+     */
+    void putPlayerActionRules(String packageName, List<String> published, List<String> hidden,
+            List<String> order) {
+        PlayerActionFilter.Rules rules = playerActionRules();
+        boolean configured = !hidden.isEmpty() || !order.equals(published);
+        preferences.edit()
+                .putString(KEY_HIDDEN_PLAYER_ACTIONS, PlayerActionFilter.encode(
+                        withPlayer(rules.hidden, packageName, configured ? hidden : null)))
+                .putString(KEY_PLAYER_ACTION_ORDER, PlayerActionFilter.encode(
+                        withPlayer(rules.order, packageName, configured ? order : null)))
+                .putString(KEY_PLAYER_ACTION_IDS, PlayerActionFilter.encode(
+                        withPlayer(rules.published, packageName, configured ? published : null)))
+                .apply();
+    }
+
+    private static Map<String, List<String>> withPlayer(Map<String, List<String>> current,
+            String packageName, List<String> ids) {
+        Map<String, List<String>> lists = new LinkedHashMap<>(current);
+        lists.remove(packageName);
+        if (ids != null) {
+            if (lists.size() >= PlayerActionFilter.MAX_PLAYERS) {
+                lists.remove(lists.keySet().iterator().next());
             }
-            hidden.put(packageName, List.copyOf(actionIds));
+            lists.put(packageName, List.copyOf(ids));
         }
-        preferences.edit().putString(KEY_HIDDEN_PLAYER_ACTIONS,
-                PlayerActionFilter.encode(hidden)).apply();
+        return lists;
     }
 
     void putRadioFavoritesGrid(int columns, int rows) {
@@ -490,7 +513,11 @@ final class Prefs {
                 .putInt(KEY_RADIO_FAVORITES_ROWS, data.favoriteRows)
                 .putInt(KEY_PLAYER_ACTIONS_COUNT, data.playerActionsCount)
                 .putString(KEY_HIDDEN_PLAYER_ACTIONS,
-                        PlayerActionFilter.encode(data.hiddenPlayerActions))
+                        PlayerActionFilter.encode(data.playerActionRules.hidden))
+                .putString(KEY_PLAYER_ACTION_ORDER,
+                        PlayerActionFilter.encode(data.playerActionRules.order))
+                .putString(KEY_PLAYER_ACTION_IDS,
+                        PlayerActionFilter.encode(data.playerActionRules.published))
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
