@@ -412,13 +412,25 @@ public final class SettingsBackupTest {
         JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
         root.getJSONObject("settings").put("playerActionsCount", 5);
         assertEquals(5, SettingsBackup.decode(root.toString()).playerActionsCount);
+        root.getJSONObject("settings").put("playerActionSelections",
+                new JSONObject().put("com.aimp.player",
+                        new org.json.JSONArray().put("com.aimp.service.action.toggleLiked")));
+        assertEquals(java.util.Map.of("com.aimp.player",
+                        java.util.List.of("com.aimp.service.action.toggleLiked")),
+                SettingsBackup.decode(root.toString()).playerActionSelections);
+        root.getJSONObject("settings").put("playerActionSelections",
+                new JSONObject().put("com.aimp.player", new org.json.JSONArray().put(7)));
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").put("playerActionSelections", new JSONObject());
 
         root.getJSONObject("settings").put("playerActionsCount", Prefs.MAX_PLAYER_ACTIONS + 1);
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
 
         root.put("schemaVersion", 13);
         root.getJSONObject("settings").remove("playerActionsCount");
+        root.getJSONObject("settings").remove("playerActionSelections");
         assertEquals(Prefs.DEFAULT_PLAYER_ACTIONS,
                 SettingsBackup.decode(root.toString()).playerActionsCount);
+        assertTrue(SettingsBackup.decode(root.toString()).playerActionSelections.isEmpty());
     }
 }

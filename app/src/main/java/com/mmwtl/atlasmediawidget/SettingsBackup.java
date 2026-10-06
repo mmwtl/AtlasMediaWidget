@@ -11,7 +11,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
@@ -29,6 +31,7 @@ final class SettingsBackup {
         final int favoriteColumns;
         final int favoriteRows;
         final int playerActionsCount;
+        final Map<String, List<String>> playerActionSelections;
         final boolean dragHandleVisible;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
@@ -117,7 +120,7 @@ final class SettingsBackup {
                     selectedStyle, positionX, positionY, positionCorner, compact, square,
                     cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
                     radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
-                    Prefs.DEFAULT_PLAYER_ACTIONS);
+                    Prefs.DEFAULT_PLAYER_ACTIONS, Map.of());
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -125,8 +128,11 @@ final class SettingsBackup {
                 OverlayCorner positionCorner, StyleData compact, StyleData square,
                 Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
-                boolean widgetMode, int playerActionsCount) throws IOException {
+                boolean widgetMode, int playerActionsCount,
+                Map<String, List<String>> playerActionSelections) throws IOException {
             this.widgetMode = widgetMode;
+            if (playerActionSelections == null) throw invalid("Не указан выбор кнопок плеера");
+            this.playerActionSelections = playerActionSelections;
             this.playerActionsCount = requireRange("settings.playerActionsCount",
                     playerActionsCount, Prefs.MIN_PLAYER_ACTIONS, Prefs.MAX_PLAYER_ACTIONS);
             this.freeformHideThresholdPercent = requireRange(
@@ -265,7 +271,7 @@ final class SettingsBackup {
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
-                prefs.playerActionsCount());
+                prefs.playerActionsCount(), prefs.playerActionSelections());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -306,6 +312,8 @@ final class SettingsBackup {
             settings.put("favoriteColumns", data.favoriteColumns);
             settings.put("favoriteRows", data.favoriteRows);
             settings.put("playerActionsCount", data.playerActionsCount);
+            settings.put("playerActionSelections",
+                    PlayerActionSelection.toJson(data.playerActionSelections));
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
@@ -413,9 +421,21 @@ final class SettingsBackup {
                             : WindowVisibilityPolicy.DEFAULT_HIDE_THRESHOLD_PERCENT,
                     version >= 11 && requireBoolean(settings, "widgetMode", "settings.widgetMode"),
                     version >= 14 ? requireInt(settings, "playerActionsCount",
-                            "settings.playerActionsCount") : Prefs.DEFAULT_PLAYER_ACTIONS);
+                            "settings.playerActionsCount") : Prefs.DEFAULT_PLAYER_ACTIONS,
+                    version >= 14 ? playerActionSelections(settings) : Map.of());
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
+        }
+    }
+
+    private static Map<String, List<String>> playerActionSelections(JSONObject settings)
+            throws IOException {
+        JSONObject value = requireObject(settings, "playerActionSelections",
+                "settings.playerActionSelections");
+        try {
+            return PlayerActionSelection.fromJson(value, true);
+        } catch (JSONException error) {
+            throw invalid("Недопустимый выбор кнопок плеера", error);
         }
     }
 

@@ -96,6 +96,7 @@ final class MediaCardView extends FrameLayout {
     private final List<MediaCustomAction> shownCustomActions = new ArrayList<>();
     private final int customActionSlotWidth;
     private int customActionLimit = Prefs.DEFAULT_PLAYER_ACTIONS;
+    private Map<String, List<String>> customActionSelections = Map.of();
     private final FrameLayout favoritesChooser;
     private final TextView favoritesEmpty;
     private final GridView favoritesGrid;
@@ -1303,11 +1304,13 @@ final class MediaCardView extends FrameLayout {
         return slot < shownCustomActions.size() ? shownCustomActions.get(slot) : null;
     }
 
-    /** Sets how many player buttons the card may show; the top row may fit fewer. */
-    void setCustomActionLimit(int limit) {
-        int value = Math.max(0, Math.min(MAX_CUSTOM_ACTIONS, limit));
-        if (value == customActionLimit) return;
-        customActionLimit = value;
+    /**
+     * Sets which player buttons the card shows: the chosen ids for a configured player, otherwise
+     * the first {@code limit}. The top row may fit fewer.
+     */
+    void setCustomActionPolicy(int limit, Map<String, List<String>> selections) {
+        customActionLimit = Math.max(0, Math.min(MAX_CUSTOM_ACTIONS, limit));
+        customActionSelections = selections == null ? Map.of() : selections;
         if (snapshot == null) return;
         renderCustomActions(activeSource.displayId() == MediaSource.Id.RADIO
                 ? List.of() : snapshot.customActions);
@@ -1329,8 +1332,11 @@ final class MediaCardView extends FrameLayout {
 
     private void renderCustomActions(List<MediaCustomAction> actions) {
         shownCustomActions.clear();
-        int limit = actions.isEmpty() ? 0 : Math.min(customActionLimit, customActionsThatFit());
-        for (MediaCustomAction action : actions) {
+        List<MediaCustomAction> chosen = actions.isEmpty() ? actions
+                : PlayerActionSelection.choose(actions, customActionLimit,
+                        customActionSelections.get(actions.get(0).ownerPackage));
+        int limit = chosen.isEmpty() ? 0 : Math.min(MAX_CUSTOM_ACTIONS, customActionsThatFit());
+        for (MediaCustomAction action : chosen) {
             if (shownCustomActions.size() >= limit) break;
             android.graphics.drawable.Drawable icon = CustomActionIcons.load(getContext(), action);
             if (icon == null) continue;

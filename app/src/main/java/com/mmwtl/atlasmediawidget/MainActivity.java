@@ -31,6 +31,7 @@ import android.view.WindowMetrics;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -184,6 +185,11 @@ public final class MainActivity extends ScaledActivity {
     private LabeledSeek progressGapSetting;
     private LabeledSeek progressThicknessSetting;
     private TextView playerActionsValue;
+    private TextView playerActionsPlayer;
+    private LinearLayout playerActionsList;
+    private Button playerActionsReset;
+    private MediaSnapshot playerActionsSnapshot;
+    private List<?> playerActionsKey;
     private SeekBar playerActions;
     private TextView favoriteColumnsValue;
     private SeekBar favoriteColumns;
@@ -218,7 +224,11 @@ public final class MainActivity extends ScaledActivity {
             }
         }
 
-        @Override public void onSnapshot(MediaSnapshot snapshot) {}
+        @Override public void onSnapshot(MediaSnapshot snapshot) {
+            if (isDestroyed()) return;
+            playerActionsSnapshot = snapshot;
+            refreshPlayerActionChoices(false);
+        }
         @Override public void onCommandResult(String requestId, int status, String message, long generation) {}
         @Override public void onRadioStations(RadioStationLists lists) {}
         @Override public void onRadioStationsError(int status, String message) {}
@@ -1217,6 +1227,7 @@ public final class MainActivity extends ScaledActivity {
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         refreshFavoriteGridControls();
         refreshPlayerActionsControl();
+        refreshPlayerActionChoices(true);
         refreshingStyle = true;
         refreshSizeControls(currentStyle());
         refreshingStyle = false;
@@ -2829,7 +2840,9 @@ public final class MainActivity extends ScaledActivity {
         card.addView(text("Кнопки плеера", 20, Ui.PRIMARY, Typeface.BOLD));
         TextView hint = text("Собственные кнопки активного плеера (лайк, повтор и т. п.) "
                         + "в правом верхнем углу карточки, в порядке, заданном плеером. "
-                        + "Если места меньше, лишние кнопки не показываются.",
+                        + "Ползунок задаёт, сколько первых кнопок показывать у плееров, "
+                        + "для которых кнопки не выбраны вручную. Если места меньше, "
+                        + "лишние кнопки не показываются.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams hintParams = fullWrap();
         hintParams.topMargin = Ui.dp(this, 8);
@@ -2848,12 +2861,104 @@ public final class MainActivity extends ScaledActivity {
 
             @Override public void onStopTrackingTouch(SeekBar seekBar) {
                 prefs.putPlayerActionsCount(seekBar.getProgress());
+                refreshPlayerActionChoices(true);
                 refreshOverlayIfRunning();
             }
         });
         card.addView(playerActions, fullWrap());
+
+        playerActionsPlayer = text("", 16, Ui.PRIMARY, Typeface.BOLD);
+        LinearLayout.LayoutParams playerParams = fullWrap();
+        playerParams.topMargin = Ui.dp(this, 16);
+        card.addView(playerActionsPlayer, playerParams);
+        playerActionsList = new LinearLayout(this);
+        playerActionsList.setOrientation(LinearLayout.VERTICAL);
+        card.addView(playerActionsList, fullWrap());
+        playerActionsReset = actionButton("Сбросить выбор для этого плеера");
+        playerActionsReset.setOnClickListener(v -> {
+            MediaSnapshot snapshot = playerActionsSnapshot;
+            if (snapshot == null || snapshot.ownerPackage.isBlank()) return;
+            prefs.putPlayerActionSelection(snapshot.ownerPackage, null);
+            refreshPlayerActionChoices(true);
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams resetParams = fullWrap();
+        resetParams.topMargin = Ui.dp(this, 8);
+        card.addView(playerActionsReset, resetParams);
         refreshPlayerActionsControl();
         return card;
+    }
+
+    /**
+     * Lists the playing player's own buttons for choosing. Rows are rebuilt only when the player
+     * or its buttons change, so a player renaming «Like» after a tap does not reset scrolling.
+     */
+    private void refreshPlayerActionChoices(boolean force) {
+        if (playerActionsList == null) return;
+        MediaSnapshot snapshot = playerActionsSnapshot;
+        List<MediaCustomAction> actions = snapshot == null ? List.of() : snapshot.customActions;
+        String owner = actions.isEmpty() ? "" : snapshot.ownerPackage;
+        List<String> selection = owner.isEmpty() ? null
+                : prefs.playerActionSelections().get(owner);
+        List<Object> key = new ArrayList<>();
+        key.add(owner);
+        key.add(selection == null ? prefs.playerActionsCount() : selection);
+        for (MediaCustomAction action : actions) {
+            key.add(List.of(action.action, action.label(), action.iconResId));
+        }
+        if (!force && key.equals(playerActionsKey)) return;
+        playerActionsKey = key;
+        playerActionsList.removeAllViews();
+        playerActionsReset.setVisibility(selection == null ? View.GONE : View.VISIBLE);
+        if (actions.isEmpty()) {
+            playerActionsPlayer.setText("Выбор кнопок");
+            TextView empty = text(snapshot == null || snapshot.ownerPackage.isBlank()
+                            ? "Включите музыку в плеере, чтобы выбрать его кнопки."
+                            : (snapshot.ownerApp.isBlank() ? snapshot.ownerPackage
+                                    : snapshot.ownerApp) + " не публикует своих кнопок.",
+                    13, Ui.SECONDARY, Typeface.NORMAL);
+            LinearLayout.LayoutParams emptyParams = fullWrap();
+            emptyParams.topMargin = Ui.dp(this, 6);
+            playerActionsList.addView(empty, emptyParams);
+            return;
+        }
+        String app = snapshot.ownerApp.isBlank() ? owner : snapshot.ownerApp;
+        playerActionsPlayer.setText(app
+                + (selection == null ? " · первые " + prefs.playerActionsCount() : " · выбраны вручную"));
+        int iconSize = Ui.dp(this, 24);
+        for (int index = 0; index < actions.size(); index++) {
+            MediaCustomAction action = actions.get(index);
+            CheckBox row = new CheckBox(this);
+            row.setText(action.label());
+            row.setTextSize(15);
+            row.setTextColor(Ui.PRIMARY);
+            row.setButtonTintList(android.content.res.ColorStateList.valueOf(Ui.ACCENT));
+            row.setPadding(Ui.dp(this, 8), Ui.dp(this, 6), 0, Ui.dp(this, 6));
+            row.setCompoundDrawablePadding(Ui.dp(this, 12));
+            android.graphics.drawable.Drawable icon = CustomActionIcons.load(this, action);
+            if (icon != null) {
+                icon.setBounds(0, 0, iconSize, iconSize);
+                icon.setTint(Ui.PRIMARY);
+                row.setCompoundDrawablesRelative(icon, null, null, null);
+            }
+            row.setTag(action.action);
+            row.setChecked(selection != null ? selection.contains(action.action)
+                    : index < prefs.playerActionsCount());
+            row.setOnCheckedChangeListener((button, checked) -> {
+                if (!button.isPressed()) return;
+                List<String> chosen = new ArrayList<>();
+                for (int child = 0; child < playerActionsList.getChildCount(); child++) {
+                    View view = playerActionsList.getChildAt(child);
+                    if (view instanceof CheckBox box && box.isChecked()) {
+                        chosen.add((String) box.getTag());
+                    }
+                }
+                prefs.putPlayerActionSelection(owner, chosen);
+                refreshPlayerActionChoices(false);
+                refreshOverlayIfRunning();
+            });
+            playerActionsList.addView(row, fullWrap());
+        }
     }
 
     private void refreshPlayerActionsControl() {

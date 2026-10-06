@@ -4,6 +4,10 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.UserManager;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 final class Prefs {
     private static final String NAME = "atlas_media_widget";
     private static final Object MIGRATION_LOCK = new Object();
@@ -25,6 +29,7 @@ final class Prefs {
     static final String KEY_RADIO_FAVORITES_COLUMNS = "radio_favorites_columns";
     static final String KEY_RADIO_FAVORITES_ROWS = "radio_favorites_rows";
     static final String KEY_PLAYER_ACTIONS_COUNT = "player_actions_count";
+    static final String KEY_PLAYER_ACTION_SELECTIONS = "player_action_selections";
     static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
@@ -259,6 +264,27 @@ final class Prefs {
                 clamp(count, MIN_PLAYER_ACTIONS, MAX_PLAYER_ACTIONS)).apply();
     }
 
+    /** Player buttons chosen per package; a missing package falls back to the count above. */
+    Map<String, List<String>> playerActionSelections() {
+        return PlayerActionSelection.decode(getString(KEY_PLAYER_ACTION_SELECTIONS, null));
+    }
+
+    void putPlayerActionSelection(String packageName, List<String> actionIds) {
+        Map<String, List<String>> selections =
+                new LinkedHashMap<>(playerActionSelections());
+        if (actionIds == null) {
+            selections.remove(packageName);
+        } else {
+            selections.remove(packageName);
+            if (selections.size() >= PlayerActionSelection.MAX_PLAYERS) {
+                selections.remove(selections.keySet().iterator().next());
+            }
+            selections.put(packageName, List.copyOf(actionIds));
+        }
+        preferences.edit().putString(KEY_PLAYER_ACTION_SELECTIONS,
+                PlayerActionSelection.encode(selections)).apply();
+    }
+
     void putRadioFavoritesGrid(int columns, int rows) {
         preferences.edit()
                 .putInt(KEY_RADIO_FAVORITES_COLUMNS, clamp(columns,
@@ -466,6 +492,8 @@ final class Prefs {
                 .putInt(KEY_RADIO_FAVORITES_COLUMNS, data.favoriteColumns)
                 .putInt(KEY_RADIO_FAVORITES_ROWS, data.favoriteRows)
                 .putInt(KEY_PLAYER_ACTIONS_COUNT, data.playerActionsCount)
+                .putString(KEY_PLAYER_ACTION_SELECTIONS,
+                        PlayerActionSelection.encode(data.playerActionSelections))
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
