@@ -37,6 +37,8 @@ class MediaCommandRouterTest {
         var selectedSource: BridgeAudioSource? = null
         var tunedStation: RadioStationTarget? = null
         var tuneAutoplay: Boolean? = null
+        var customActions = mutableListOf<String>()
+        var customActionResult = true
 
         override fun backendAvailable(): Boolean = available
         override fun blocksMediaCommands(): Boolean = blocked
@@ -75,6 +77,11 @@ class MediaCommandRouterTest {
             tunedStation = target
             tuneAutoplay = autoplay
             return sourceResult
+        }
+
+        override suspend fun sendCustomAction(action: String): Boolean {
+            customActions += action
+            return customActionResult
         }
     }
 
@@ -334,5 +341,28 @@ class MediaCommandRouterTest {
 
         assertTrue(result.succeeded)
         assertTrue(customToggleCalled)
+    }
+
+    @Test
+    fun `custom action goes to the publishing session, never to native transport`() = runBlocking {
+        val session = FakeSession("player", SessionPlaybackState.PLAYING)
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
+            preferred = session
+        }
+        val router = MediaCommandRouter(host)
+
+        val sent = router.execute(
+            MediaCommandRequest("req", MediaCommand.CUSTOM_ACTION, customAction = "LIKE"),
+        )
+        assertEquals(MediaBridgeContract.Status.OK, sent.status)
+        assertEquals(listOf("LIKE"), host.customActions)
+        assertTrue(session.calls.isEmpty())
+
+        host.customActionResult = false
+        val missing = router.execute(
+            MediaCommandRequest("req", MediaCommand.CUSTOM_ACTION, customAction = "GONE"),
+        )
+        assertEquals(MediaBridgeContract.Status.NOT_SUPPORTED, missing.status)
     }
 }

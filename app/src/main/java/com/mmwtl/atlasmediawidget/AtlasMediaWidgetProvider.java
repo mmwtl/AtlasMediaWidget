@@ -24,6 +24,8 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     static final String EXTRA_TARGET_BOUNDS = "widget_target_bounds";
     static final String EXTRA_PROGRESS_BOUNDS = "widget_progress_bounds";
     static final String EXTRA_SEEK_ZONE = "widget_seek_zone";
+    static final String EXTRA_CUSTOM_ACTION = "widget_custom_action";
+    static final String CUSTOM_ACTION_PREFIX = "custom_action:";
     static final String SEEK_ZONE_PREFIX = "seek_";
     static final String ACTION_COMMAND = "com.mmwtl.atlasmediawidget.WIDGET_COMMAND";
     static final String[] ACTIONS = {"open", "sources", "favorites", "seek",
@@ -149,6 +151,19 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 .putExtra(EXTRA_CONTROL, "favorite");
         return PendingIntent.getForegroundService(context, id, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
+    }
+
+    /** The player's action id is part of the data URI, so each published action keeps its own intent. */
+    static PendingIntent customActionClick(Context context, int id, String customAction) {
+        Intent intent = new Intent(context, OverlayService.class)
+                .setAction(ACTION_COMMAND)
+                .setData(new Uri.Builder().scheme("atlasmediawidget").authority(String.valueOf(id))
+                        .appendPath("custom").appendPath(customAction).build())
+                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                .putExtra(EXTRA_CONTROL, "custom")
+                .putExtra(EXTRA_CUSTOM_ACTION, customAction);
+        return PendingIntent.getForegroundService(context, id, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
     static PendingIntent click(Context context, int id, String action, boolean command) {
@@ -295,6 +310,18 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     case "favorites" -> "Избранные станции";
                     default -> "Открыть источник";
                 }, rect, command || "sources".equals(action) || "favorites".equals(action));
+            }
+            if (!connected || snapshot == null) return;
+            for (int slot = 0; slot < MediaCardView.MAX_CUSTOM_ACTIONS; slot++) {
+                MediaCustomAction customAction = card.widgetCustomAction(slot);
+                if (customAction == null) break;
+                Rect rect = card.widgetBounds(card.widgetTarget("custom_" + slot));
+                int minimum = Ui.dp(context, 48);
+                rect.inset(-Math.max(0, (minimum - rect.width()) / 2),
+                        -Math.max(0, (minimum - rect.height()) / 2));
+                if (!rect.intersect(0, 0, width, height)) continue;
+                addTarget(context, id, customAction.label(), rect,
+                        customActionClick(context, id, customAction.action));
             }
         }
 

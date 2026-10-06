@@ -1080,6 +1080,7 @@ class DiagnosticActivity : Activity() {
             appendLine("capabilities: 0x${snapshot.capabilities.toString(16)}")
             appendLine("artworkRevision: ${snapshot.artworkRevision}")
             appendLine("artworkUri: ${if (snapshot.artworkUri.isNotBlank()) "present" else "none"}")
+            appendLine("customActions: ${snapshot.customActions.joinToString { it.name.ifBlank { it.action } }.ifBlank { "none" }}")
             appendLine()
             val activeSessions = coordinator.sessionObserver.getActiveControllers()
             appendLine("--- Active Media Sessions (${activeSessions.size}) ---")
@@ -1088,6 +1089,9 @@ class DiagnosticActivity : Activity() {
             } else {
                 activeSessions.forEach { ctrl ->
                     appendLine("  package: ${ctrl.packageName} (playbackState: ${ctrl.playbackState?.state ?: 0})")
+                    ctrl.playbackState?.customActions.orEmpty().forEach { action ->
+                        appendLine("    customAction: ${action.action} \"${action.name}\" icon=0x${action.icon.toString(16)}")
+                    }
                 }
             }
             appendLine()

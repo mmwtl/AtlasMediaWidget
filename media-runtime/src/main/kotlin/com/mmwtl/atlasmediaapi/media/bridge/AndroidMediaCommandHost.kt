@@ -159,6 +159,7 @@ class AndroidMediaCommandHost(
                 MediaCommand.SEEK_TO -> false
                 MediaCommand.SET_SOURCE -> false
                 MediaCommand.TUNE_RADIO -> false
+                MediaCommand.CUSTOM_ACTION -> false
             }
         }
         return false
@@ -542,6 +543,21 @@ class AndroidMediaCommandHost(
         if (packageName.isNotBlank()) lastOnlineMediaPackageRef.set(packageName)
     }
 
+    override suspend fun sendCustomAction(action: String): Boolean {
+        onUserAction?.invoke()
+        val publishers = sessionObserver.getActiveControllers().filter { controller ->
+            controller.playbackState?.customActions.orEmpty().any { it.action == action }
+        }
+        val controller = publishers.firstOrNull { it.packageName == currentMediaPackage() }
+            ?: publishers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
+            ?: publishers.firstOrNull()
+            ?: return false
+        return runCatching {
+            controller.transportControls.sendCustomAction(action, null)
+            true
+        }.onFailure(Timber::e).getOrDefault(false)
+    }
+
     override suspend fun tuneRadio(target: RadioStationTarget, autoplay: Boolean): Boolean {
         onUserAction?.invoke()
         val center = mediaCenter() ?: return false
@@ -696,6 +712,7 @@ class AndroidMediaCommandHost(
             MediaCommand.SEEK_TO,
             MediaCommand.SET_SOURCE -> false
             MediaCommand.TUNE_RADIO -> false
+            MediaCommand.CUSTOM_ACTION -> false
         }
     }
 
@@ -721,6 +738,7 @@ class AndroidMediaCommandHost(
                 MediaCommand.PAUSE,
                 MediaCommand.TOGGLE -> false
                 MediaCommand.TUNE_RADIO -> false
+                MediaCommand.CUSTOM_ACTION -> false
             }
         }
     }
@@ -742,6 +760,7 @@ class AndroidMediaCommandHost(
             MediaCommand.SEEK_TO -> adapter.seekTo(request.position ?: return false)
             MediaCommand.SET_SOURCE -> return false
             MediaCommand.TUNE_RADIO -> return false
+            MediaCommand.CUSTOM_ACTION -> return false
         }
         return result == 1
     }

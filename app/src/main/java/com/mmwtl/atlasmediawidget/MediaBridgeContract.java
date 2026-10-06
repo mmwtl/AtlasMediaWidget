@@ -96,6 +96,11 @@ final class MediaBridgeContract {
     static final String K_CAPABILITIES = "capabilities";
     static final String K_ARTWORK_URI = "artworkUri";
     static final String K_ARTWORK_REVISION = "artworkRevision";
+    static final String K_CUSTOM_ACTIONS = "customActions";
+    static final String K_CUSTOM_ACTION_ID = "customActionId";
+    static final String K_CUSTOM_ACTION_NAME = "customActionName";
+    static final String K_CUSTOM_ACTION_ICON = "customActionIcon";
+    static final String K_CUSTOM_ACTION_PACKAGE = "customActionPackage";
     static final String K_RADIO_SAVED_STATIONS = "radioSavedStations";
     static final String K_RADIO_FAVORITE_STATIONS = "radioFavoriteStations";
     static final String K_RADIO_STATION_ID = "radioStationId";
@@ -117,6 +122,7 @@ final class MediaBridgeContract {
     static final String K_COMMAND_SOURCE = "source";
     static final String K_COMMAND_APP_SOURCE = "appSource";
     static final String K_COMMAND_AUTOPLAY = "autoplay";
+    static final String K_COMMAND_CUSTOM_ACTION = "customAction";
     static final String K_UI_SCALE_TENTHS = "uiScaleTenths";
 
     static final String K_SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion";

@@ -44,9 +44,12 @@ final class MediaCardView extends FrameLayout {
         void onRadioStationsRequested();
         void onRadioStation(RadioStation station);
         void onRadioArtworkRequested(RadioStation station);
+        void onCustomAction(String action);
     }
 
     private static final int PROGRESS_MAX = 10_000;
+    /** Player buttons beyond this stay off the card; the top row has room for two. */
+    static final int MAX_CUSTOM_ACTIONS = 2;
     private static final long CHOOSER_AUTO_HIDE_MS = 10_000L;
     private static final MediaSource.Id[] WIDGET_SOURCES = {
             MediaSource.Id.RADIO, MediaSource.Id.BT,
@@ -90,6 +93,8 @@ final class MediaCardView extends FrameLayout {
     private final TransportButton playPause;
     private final TransportButton next;
     private final LinearLayout favoritesButton;
+    private final LinearLayout customActionsRow;
+    private final List<MediaCustomAction> shownCustomActions = new ArrayList<>();
     private final FrameLayout favoritesChooser;
     private final TextView favoritesEmpty;
     private final GridView favoritesGrid;
@@ -270,6 +275,41 @@ final class MediaCardView extends FrameLayout {
         favoriteButtonParams.rightMargin = bx(topEndInsetDp);
         addView(favoritesButton, favoriteButtonParams);
         favoritesButton.addOnLayoutChangeListener((view, left, top, right, bottom,
+                oldLeft, oldTop, oldRight, oldBottom) -> updateStatusPillPosition());
+
+        // Player-defined buttons (like, shuffle, …) share the favorites slot outside radio.
+        customActionsRow = new LinearLayout(context);
+        customActionsRow.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+        customActionsRow.setVisibility(GONE);
+        int customIconPadding = Math.max(0, (d(topPillHeightDp) - d(topPillIconDp)) / 2);
+        for (int index = 0; index < MAX_CUSTOM_ACTIONS; index++) {
+            ImageView button = new ImageView(context);
+            button.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            button.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
+            button.setPadding(customIconPadding, customIconPadding,
+                    customIconPadding, customIconPadding);
+            button.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
+            button.setClickable(true);
+            button.setFocusable(true);
+            button.setVisibility(GONE);
+            final int slot = index;
+            button.setOnClickListener(v -> {
+                if (slot < shownCustomActions.size()) {
+                    listener.onCustomAction(shownCustomActions.get(slot).action);
+                }
+            });
+            LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                    d(topPillHeightDp), d(topPillHeightDp));
+            if (index > 0) buttonParams.leftMargin = d(8);
+            customActionsRow.addView(button, buttonParams);
+        }
+        LayoutParams customActionsParams = new LayoutParams(
+                LayoutParams.WRAP_CONTENT, d(topPillHeightDp));
+        customActionsParams.gravity = Gravity.TOP | Gravity.END;
+        customActionsParams.topMargin = by(appearance.topInsetDp);
+        customActionsParams.rightMargin = bx(topEndInsetDp);
+        addView(customActionsRow, customActionsParams);
+        customActionsRow.addOnLayoutChangeListener((view, left, top, right, bottom,
                 oldLeft, oldTop, oldRight, oldBottom) -> updateStatusPillPosition());
 
         TextView dragHandle = text("⋮", style == CardStyle.COMPACT ? 27 : 29,
@@ -470,6 +510,8 @@ final class MediaCardView extends FrameLayout {
             case "NEXT" -> next;
             case "sources" -> sourcePill;
             case "favorites" -> favoritesButton;
+            case "custom_0" -> customActionsRow.getChildAt(0);
+            case "custom_1" -> customActionsRow.getChildAt(1);
             case "seek" -> progressRow;
             case "seek_bar" -> progress;
             case "elapsed" -> elapsed;
@@ -617,6 +659,8 @@ final class MediaCardView extends FrameLayout {
                 ? VISIBLE : GONE);
         favoritesButton.setEnabled(value.supports(MediaBridgeContract.CAP_TUNE_RADIO));
         favoritesButton.setAlpha(favoritesButton.isEnabled() ? 1f : 0.45f);
+        renderCustomActions(activeSource.displayId() == MediaSource.Id.RADIO
+                ? List.of() : value.customActions);
         updateStatusPillPosition();
         if (activeSource.displayId() != MediaSource.Id.RADIO) hideFavoritesChooser();
         boolean currentlyPlaying = PlayPauseActionPolicy.isCurrentlyPlaying(
@@ -639,6 +683,7 @@ final class MediaCardView extends FrameLayout {
         snapshot = null;
         activeSource = MediaSource.Id.UNKNOWN;
         favoritesButton.setVisibility(GONE);
+        renderCustomActions(List.of());
         hideFavoritesChooser();
         hasMedia = false;
         title.setTitle(getResources().getString(R.string.unknown_track));
@@ -1251,6 +1296,31 @@ final class MediaCardView extends FrameLayout {
         updateStatusPillPosition();
     }
 
+    /** The custom action currently drawn in {@code slot}, as the widget reads it for its targets. */
+    MediaCustomAction widgetCustomAction(int slot) {
+        return slot < shownCustomActions.size() ? shownCustomActions.get(slot) : null;
+    }
+
+    private void renderCustomActions(List<MediaCustomAction> actions) {
+        shownCustomActions.clear();
+        for (MediaCustomAction action : actions) {
+            if (shownCustomActions.size() == MAX_CUSTOM_ACTIONS) break;
+            android.graphics.drawable.Drawable icon = CustomActionIcons.load(getContext(), action);
+            if (icon == null) continue;
+            ImageView button = (ImageView) customActionsRow.getChildAt(shownCustomActions.size());
+            button.setImageDrawable(icon);
+            button.setContentDescription(action.label());
+            button.setVisibility(VISIBLE);
+            shownCustomActions.add(action);
+        }
+        for (int index = shownCustomActions.size(); index < MAX_CUSTOM_ACTIONS; index++) {
+            ImageView button = (ImageView) customActionsRow.getChildAt(index);
+            button.setImageDrawable(null);
+            button.setVisibility(GONE);
+        }
+        customActionsRow.setVisibility(shownCustomActions.isEmpty() ? GONE : VISIBLE);
+    }
+
     private void updateStatusPillPosition() {
         LayoutParams params = (LayoutParams) statusPill.getLayoutParams();
         if (favoritesButton != null && favoritesButton.getVisibility() == VISIBLE) {
@@ -1258,6 +1328,13 @@ final class MediaCardView extends FrameLayout {
             int fallbackWidth = d(Math.max(128, appearance.topRowTextSizeSp * 8 + 55));
             params.rightMargin = favoritesParams.rightMargin
                     + Math.max(favoritesButton.getWidth(), fallbackWidth) + d(8);
+        } else if (customActionsRow != null && customActionsRow.getVisibility() == VISIBLE) {
+            LayoutParams actionsParams = (LayoutParams) customActionsRow.getLayoutParams();
+            int buttonSize = actionsParams.height;
+            int fallbackWidth = shownCustomActions.size() * buttonSize
+                    + Math.max(0, shownCustomActions.size() - 1) * d(8);
+            params.rightMargin = actionsParams.rightMargin
+                    + Math.max(customActionsRow.getWidth(), fallbackWidth) + d(8);
         } else {
             params.rightMargin = bx(dragHandleVisible ? 49 : Math.max(8,
                     appearance.contentInsetDp - (style == CardStyle.COMPACT ? 4 : 8)));

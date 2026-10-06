@@ -338,6 +338,12 @@ public final class OverlayService extends Service
                 executeWidgetFavoritesAction(id, control,
                         intent.getStringExtra(WidgetFavoritesService.EXTRA_STATION_ID));
             } else {
+                if ("custom".equals(control)) {
+                    String customAction = intent.getStringExtra(
+                            AtlasMediaWidgetProvider.EXTRA_CUSTOM_ACTION);
+                    if (customAction == null) return START_STICKY;
+                    control = AtlasMediaWidgetProvider.CUSTOM_ACTION_PREFIX + customAction;
+                }
                 pendingWidgetCommand = control;
                 pendingWidgetCommandAt = SystemClock.elapsedRealtime();
                 executeWidgetCommand();
@@ -393,6 +399,10 @@ public final class OverlayService extends Service
         if (command.startsWith(AtlasMediaWidgetProvider.SEEK_ZONE_PREFIX)) {
             long position = AtlasMediaWidgetProvider.seekZonePosition(command, snapshot.duration);
             if (position >= 0L && snapshot.supports(MediaBridgeContract.CAP_SEEK)) seekFromWidget(position);
+            return;
+        }
+        if (command.startsWith(AtlasMediaWidgetProvider.CUSTOM_ACTION_PREFIX)) {
+            onCustomAction(command.substring(AtlasMediaWidgetProvider.CUSTOM_ACTION_PREFIX.length()));
             return;
         }
         if ("PLAY_PAUSE".equals(command)) command = PlayPauseActionPolicy.command(
@@ -546,6 +556,9 @@ public final class OverlayService extends Service
                 snapshot.capabilities, snapshot.backendConnected, snapshot.sources.stream()
                         .map(source -> List.of(source.id, source.available, source.connected,
                                 source.selected, source.capabilities))
+                        .collect(Collectors.toList()),
+                snapshot.customActions.stream()
+                        .map(action -> List.of(action.action, action.name, action.iconResId))
                         .collect(Collectors.toList()));
         int[] ids = AtlasMediaWidgetProvider.ids(this);
         Set<Integer> active = new HashSet<>();
@@ -957,6 +970,14 @@ public final class OverlayService extends Service
 
     @Override public void onRadioStation(RadioStation station) {
         tuneRadio(station);
+    }
+
+    @Override public void onCustomAction(String action) {
+        MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        if (visible == null || visible.customAction(action) == null) return;
+        String requestId = bridge.sendCustomAction(action);
+        AppLog.info("Sending media command request=" + requestId + " command=CUSTOM_ACTION"
+                + " action=" + action + " owner=" + visible.ownerPackage);
     }
 
     @Override public void onRadioArtworkRequested(RadioStation station) {

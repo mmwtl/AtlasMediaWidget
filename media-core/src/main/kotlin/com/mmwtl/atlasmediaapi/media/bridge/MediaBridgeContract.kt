@@ -15,6 +15,9 @@ object MediaBridgeContract {
     const val MAX_REQUEST_ID_LENGTH = 128
     const val MAX_MESSAGE_LENGTH = 512
     const val MAX_RADIO_METADATA_LENGTH = 128
+    const val MAX_CUSTOM_ACTIONS = 4
+    const val MAX_CUSTOM_ACTION_LENGTH = 128
+    const val MAX_CUSTOM_ACTION_NAME_LENGTH = 64
 
     object ClientMessage {
         const val REGISTER = 1
@@ -91,6 +94,11 @@ object MediaBridgeContract {
         const val CAPABILITIES = "capabilities"
         const val ARTWORK_URI = "artworkUri"
         const val ARTWORK_REVISION = "artworkRevision"
+        const val CUSTOM_ACTIONS = "customActions"
+        const val CUSTOM_ACTION_ID = "customActionId"
+        const val CUSTOM_ACTION_NAME = "customActionName"
+        const val CUSTOM_ACTION_ICON = "customActionIcon"
+        const val CUSTOM_ACTION_PACKAGE = "customActionPackage"
 
         const val RADIO_SAVED_STATIONS = "radioSavedStations"
         const val RADIO_FAVORITE_STATIONS = "radioFavoriteStations"
@@ -114,6 +122,7 @@ object MediaBridgeContract {
         const val COMMAND_SOURCE = "source"
         const val COMMAND_APP_SOURCE = "appSource"
         const val COMMAND_AUTOPLAY = "autoplay"
+        const val COMMAND_CUSTOM_ACTION = "customAction"
         const val UI_SCALE_TENTHS = "uiScaleTenths"
 
         const val SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion"
@@ -203,6 +212,17 @@ fun MediaSnapshot.toBundle(): Bundle = Bundle().apply {
     putLong(MediaBridgeContract.Key.CAPABILITIES, capabilities)
     putString(MediaBridgeContract.Key.ARTWORK_URI, artworkUri)
     putLong(MediaBridgeContract.Key.ARTWORK_REVISION, artworkRevision)
+    putParcelableArrayList(
+        MediaBridgeContract.Key.CUSTOM_ACTIONS,
+        ArrayList(customActions.map(MediaCustomAction::toBundle)),
+    )
+}
+
+private fun MediaCustomAction.toBundle(): Bundle = Bundle().apply {
+    putString(MediaBridgeContract.Key.CUSTOM_ACTION_ID, action)
+    putString(MediaBridgeContract.Key.CUSTOM_ACTION_NAME, name)
+    putInt(MediaBridgeContract.Key.CUSTOM_ACTION_ICON, iconResId)
+    putString(MediaBridgeContract.Key.CUSTOM_ACTION_PACKAGE, ownerPackage)
 }
 
 private fun MediaSourceSnapshot.toBundle(): Bundle = Bundle().apply {
@@ -268,6 +288,13 @@ fun Bundle.toMediaCommandRequest(): MediaCommandRequest? {
                 autoplay = getBoolean(MediaBridgeContract.Key.COMMAND_AUTOPLAY, true),
                 radioStation = target,
             )
+        }
+
+        MediaCommand.CUSTOM_ACTION -> {
+            val action = getString(MediaBridgeContract.Key.COMMAND_CUSTOM_ACTION)
+                ?.takeIf { it.isNotBlank() && it.length <= MediaBridgeContract.MAX_CUSTOM_ACTION_LENGTH }
+                ?: return null
+            MediaCommandRequest(rawRequestId, command, customAction = action)
         }
 
         else -> MediaCommandRequest(rawRequestId, command)

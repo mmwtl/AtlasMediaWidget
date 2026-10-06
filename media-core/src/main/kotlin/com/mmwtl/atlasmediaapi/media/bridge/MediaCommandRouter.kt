@@ -38,6 +38,8 @@ interface MediaCommandHost {
         autoplay: Boolean,
     ): Boolean
     suspend fun tuneRadio(target: RadioStationTarget, autoplay: Boolean): Boolean = false
+    /** Sends a player-defined action to the session that currently publishes it. */
+    suspend fun sendCustomAction(action: String): Boolean = false
 }
 
 /** Standalone command arbitration for Media Bridge IPC requests. */
@@ -61,6 +63,16 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
                 result(MediaBridgeContract.Status.OK)
             } else {
                 result(MediaBridgeContract.Status.FAILED, "radio tune failed")
+            }
+        }
+
+        if (request.command == MediaCommand.CUSTOM_ACTION) {
+            val action = request.customAction
+                ?: return result(MediaBridgeContract.Status.INVALID_REQUEST)
+            return if (host.sendCustomAction(action)) {
+                result(MediaBridgeContract.Status.OK)
+            } else {
+                result(MediaBridgeContract.Status.NOT_SUPPORTED, "no session publishes this action")
             }
         }
 
@@ -148,6 +160,7 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
         MediaCommand.SEEK_TO -> MediaCapabilities.SEEK_TO
         MediaCommand.SET_SOURCE -> MediaCapabilities.SET_SOURCE
         MediaCommand.TUNE_RADIO -> MediaCapabilities.TUNE_RADIO
+        MediaCommand.CUSTOM_ACTION -> 0L
     }
 
     private fun MediaSessionCommandTarget.supports(capability: Long): Boolean =
@@ -176,6 +189,7 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
 
             MediaCommand.SET_SOURCE -> false
             MediaCommand.TUNE_RADIO -> false
+            MediaCommand.CUSTOM_ACTION -> false
         }
         if (succeeded) host.setCurrentMediaPackage(target.packageName)
         return if (succeeded) result(MediaBridgeContract.Status.OK) else {

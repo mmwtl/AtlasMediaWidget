@@ -181,6 +181,7 @@ class DemoMediaBackend(
                 positionMs = 0L
                 playing = request.autoplay
             }
+            MediaCommand.CUSTOM_ACTION -> return notSupported(request.command)
             MediaCommand.TUNE_RADIO -> {
                 val target = request.radioStation ?: return MediaCommandResult(MediaBridgeContract.Status.INVALID_REQUEST, "station is required")
                 source = BridgeAudioSource.RADIO

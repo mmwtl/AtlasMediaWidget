@@ -23,6 +23,7 @@ final class WidgetPreview {
         @Override public void onRadioStationsRequested() {}
         @Override public void onRadioStation(RadioStation station) {}
         @Override public void onRadioArtworkRequested(RadioStation station) {}
+        @Override public void onCustomAction(String action) {}
     };
 
     private static Bitmap demoArtwork;

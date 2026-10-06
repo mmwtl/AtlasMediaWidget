@@ -367,6 +367,7 @@ class MediaStateHub(
                 artworkRevision = if (!sameMedia && before.artworkUri.isNotBlank()) {
                     before.artworkRevision + 1L
                 } else before.artworkRevision,
+                customActions = state.bridgeCustomActions(ownerPackage),
             )
         }
         markPlayingIfActive(state?.state == PlaybackState.STATE_PLAYING)

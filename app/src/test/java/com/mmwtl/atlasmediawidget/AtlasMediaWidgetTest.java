@@ -37,6 +37,7 @@ public class AtlasMediaWidgetTest {
         public void onRadioStationsRequested() {}
         public void onRadioStation(RadioStation station) {}
         public void onRadioArtworkRequested(RadioStation station) {}
+        public void onCustomAction(String action) {}
     };
 
     @Test public void modeRoundTripAndLegacyBackupPreserveOverlayGeometry() throws Exception {
@@ -561,6 +562,53 @@ public class AtlasMediaWidgetTest {
                 MediaSource.Id.RADIO, "", List.of(), "radio", "Radio", "", "Station 1", "", "",
                 0, 0, 0, 1, 3, 0, "", 0,
                 MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_TUNE_RADIO, "", 0);
+    }
+
+    private MediaSnapshot customActionSnapshot(MediaSource.Id source, String owner) {
+        String self = context.getPackageName();
+        return new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",
+                source, "", List.of(), owner, "Player", "one", "Track", "Artist", "",
+                180000, 0, 0, 1, 3, 0, "", 0, MediaBridgeContract.CAP_PLAY, "", 0,
+                List.of(new MediaCustomAction("LIKE", "Нравится", R.drawable.ic_transport_play, self),
+                        new MediaCustomAction("SHUFFLE", "", R.drawable.ic_transport_previous, self),
+                        new MediaCustomAction("REPEAT", "", R.drawable.ic_transport_pause, self),
+                        new MediaCustomAction("FOREIGN", "", R.drawable.ic_transport_play, "other")));
+    }
+
+    @Test public void playerCustomActionsBecomeCardButtonsAndWidgetTargets() {
+        Bundle options = new Bundle();
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 400);
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+        MediaSnapshot snapshot = customActionSnapshot(MediaSource.Id.ONLINE, context.getPackageName());
+        assertEquals(List.of("LIKE", "SHUFFLE", "REPEAT"),
+                snapshot.customActions.stream().map(a -> a.action).toList());
+
+        var frame = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context),
+                options, 41, snapshot, null, true, listener);
+        assertEquals("LIKE", frame.card.widgetCustomAction(0).action);
+        assertEquals("SHUFFLE", frame.card.widgetCustomAction(1).action);
+        assertNull(frame.card.widgetCustomAction(2));
+        assertEquals(View.VISIBLE, frame.card.widgetTarget("custom_0").getVisibility());
+        assertEquals("Нравится", frame.card.widgetTarget("custom_0").getContentDescription());
+        assertTrue(frame.card.widgetBounds(frame.card.widgetTarget("custom_0")).centerX()
+                > frame.card.widgetBounds(frame.card.widgetTarget("sources")).centerX());
+
+        Intent like = Shadows.shadowOf(
+                AtlasMediaWidgetProvider.customActionClick(context, 41, "LIKE")).getSavedIntent();
+        assertEquals(new ComponentName(context, OverlayService.class), like.getComponent());
+        assertEquals("custom", like.getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL));
+        assertEquals("LIKE", like.getStringExtra(AtlasMediaWidgetProvider.EXTRA_CUSTOM_ACTION));
+        assertNotEquals(like.getData(), Shadows.shadowOf(AtlasMediaWidgetProvider
+                .customActionClick(context, 41, "SHUFFLE")).getSavedIntent().getData());
+
+        var radio = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context),
+                options, 41, customActionSnapshot(MediaSource.Id.RADIO, context.getPackageName()),
+                null, true, listener);
+        assertNull(radio.card.widgetCustomAction(0));
+        assertEquals(View.GONE, radio.card.widgetTarget("custom_0").getVisibility());
+
+        MediaSnapshot foreign = customActionSnapshot(MediaSource.Id.ONLINE, "other");
+        assertEquals(List.of("FOREIGN"), foreign.customActions.stream().map(a -> a.action).toList());
     }
 
     private Intent widgetControl(String action) {

@@ -143,6 +143,7 @@ Binding is established via explicit Intent (`bindService`):
 | `capabilities` | `int` | Битовая маска доступных действий источника |
 | `artworkUri` | `String` | `FileProvider` URI обложки (`content://...`) |
 | `artworkRevision` | `long` | Монотонный счетчик ревизии обложки |
+| `customActions` | `ArrayList<Bundle>` | Кнопки `PlaybackState.CustomAction` активной Android-сессии (до 4): `customActionId`, `customActionName`, `customActionIcon` (ресурс в пакете плеера), `customActionPackage`. Пусто для штатных источников и при смене владельца |
 
 ---
 
@@ -157,6 +158,11 @@ Binding is established via explicit Intent (`bindService`):
 - `0x20` (`SEEK_TO`) — перемотка по таймлайну (требует аргумент `position: Long >= 0`)
 - `0x40` (`SET_SOURCE`) — переключение источника (`source: String`, `autoplay: Boolean`)
 - `0x80` (`TUNE_RADIO`) — прямая настройка частоты радио (`radioFrequencyKHz: Int`, `radioBand: String`)
+
+Команда `CUSTOM_ACTION` (`customAction: String`) не входит в маску: она доступна, пока действие
+есть в `customActions`. Сервис отправляет его через `TransportControls.sendCustomAction` той
+сессии, которая сейчас его публикует, иначе отвечает `NOT_SUPPORTED`. Смысл действия (лайк,
+перемешивание и т. п.) определяет плеер; Bridge и клиент его не интерпретируют.
 
 ### Локальный расчет прогресса (Local Progress Estimation):
 Вместо ежесекундного Binder-опроса клиент вычисляет прогресс локально, если `playbackState == 3` (`PLAYING`):

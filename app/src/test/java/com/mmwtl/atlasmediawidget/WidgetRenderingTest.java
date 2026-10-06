@@ -89,6 +89,7 @@ public class WidgetRenderingTest {
                     public void onRadioStationsRequested() {}
                     public void onRadioStation(RadioStation station) {}
                     public void onRadioArtworkRequested(RadioStation station) {}
+                    public void onCustomAction(String action) {}
                 });
         View view = frame.views.apply(context, null);
         Bitmap card = ((BitmapDrawable)((ImageView)view.findViewById(R.id.widget_card)).getDrawable()).getBitmap();

@@ -37,6 +37,8 @@ final class MediaSnapshot {
     final long capabilities;
     final String artworkUri;
     final long artworkRevision;
+    /** Buttons published by {@link #ownerPackage}'s session; empty for native sources. */
+    final List<MediaCustomAction> customActions;
 
     MediaSnapshot(int protocolVersion, long generation, long timestamp,
             boolean backendConnected, int backendErrorCode, String backendErrorMessage,
@@ -45,6 +47,21 @@ final class MediaSnapshot {
             String album, long duration, long position, long updateElapsedRealtime, float speed,
             int playbackState, int playbackErrorCode, String playbackErrorMessage,
             long playbackActions, long capabilities, String artworkUri, long artworkRevision) {
+        this(protocolVersion, generation, timestamp, backendConnected, backendErrorCode,
+                backendErrorMessage, audioSource, appSource, sources, ownerPackage, ownerApp,
+                mediaId, title, artist, album, duration, position, updateElapsedRealtime, speed,
+                playbackState, playbackErrorCode, playbackErrorMessage, playbackActions,
+                capabilities, artworkUri, artworkRevision, List.of());
+    }
+
+    MediaSnapshot(int protocolVersion, long generation, long timestamp,
+            boolean backendConnected, int backendErrorCode, String backendErrorMessage,
+            MediaSource.Id audioSource, String appSource, List<MediaSource> sources,
+            String ownerPackage, String ownerApp, String mediaId, String title, String artist,
+            String album, long duration, long position, long updateElapsedRealtime, float speed,
+            int playbackState, int playbackErrorCode, String playbackErrorMessage,
+            long playbackActions, long capabilities, String artworkUri, long artworkRevision,
+            List<MediaCustomAction> customActions) {
         this.protocolVersion = protocolVersion;
         this.generation = generation;
         this.timestamp = timestamp;
@@ -71,6 +88,11 @@ final class MediaSnapshot {
         this.capabilities = capabilities;
         this.artworkUri = nonNull(artworkUri);
         this.artworkRevision = artworkRevision;
+        List<MediaCustomAction> owned = new ArrayList<>();
+        for (MediaCustomAction action : customActions) {
+            if (action.isUsable() && action.ownerPackage.equals(this.ownerPackage)) owned.add(action);
+        }
+        this.customActions = Collections.unmodifiableList(owned);
     }
 
     static MediaSnapshot fromBundle(Bundle bundle) {
@@ -85,6 +107,15 @@ final class MediaSnapshot {
         if (rawSources != null) {
             for (Bundle source : rawSources) {
                 if (source != null) sources.add(MediaSource.fromBundle(source));
+            }
+        }
+        ArrayList<Bundle> rawActions = Build.VERSION.SDK_INT >= 33
+                ? bundle.getParcelableArrayList(MediaBridgeContract.K_CUSTOM_ACTIONS, Bundle.class)
+                : legacyBundles(bundle, MediaBridgeContract.K_CUSTOM_ACTIONS);
+        List<MediaCustomAction> customActions = new ArrayList<>();
+        if (rawActions != null) {
+            for (Bundle action : rawActions) {
+                if (action != null) customActions.add(MediaCustomAction.fromBundle(action));
             }
         }
         return new MediaSnapshot(
@@ -113,7 +144,8 @@ final class MediaSnapshot {
                 bundle.getLong(MediaBridgeContract.K_PLAYBACK_ACTIONS),
                 bundle.getLong(MediaBridgeContract.K_CAPABILITIES),
                 bundle.getString(MediaBridgeContract.K_ARTWORK_URI),
-                bundle.getLong(MediaBridgeContract.K_ARTWORK_REVISION)
+                bundle.getLong(MediaBridgeContract.K_ARTWORK_REVISION),
+                customActions
         );
     }
 
@@ -155,7 +187,8 @@ final class MediaSnapshot {
                 playbackActions != 0L ? playbackActions : fallback.playbackActions,
                 playbackState == 0 ? fallback.capabilities : capabilities,
                 artworkUri.isBlank() ? fallback.artworkUri : artworkUri,
-                artworkUri.isBlank() ? fallback.artworkRevision : artworkRevision
+                artworkUri.isBlank() ? fallback.artworkRevision : artworkRevision,
+                customActions
         );
     }
 
@@ -163,8 +196,19 @@ final class MediaSnapshot {
         return value == null ? "" : value;
     }
 
-    @SuppressWarnings("deprecation")
+    MediaCustomAction customAction(String action) {
+        for (MediaCustomAction candidate : customActions) {
+            if (candidate.action.equals(action)) return candidate;
+        }
+        return null;
+    }
+
     private static ArrayList<Bundle> legacySources(Bundle bundle) {
-        return bundle.getParcelableArrayList(MediaBridgeContract.K_SOURCES);
+        return legacyBundles(bundle, MediaBridgeContract.K_SOURCES);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static ArrayList<Bundle> legacyBundles(Bundle bundle, String key) {
+        return bundle.getParcelableArrayList(key);
     }
 }

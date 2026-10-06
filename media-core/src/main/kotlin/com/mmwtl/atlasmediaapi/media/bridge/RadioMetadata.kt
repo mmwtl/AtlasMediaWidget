@@ -35,7 +35,8 @@ fun radioPlaybackAction(
     MediaCommand.PREVIOUS,
     MediaCommand.SEEK_TO,
     MediaCommand.SET_SOURCE -> null
-    MediaCommand.TUNE_RADIO -> null
+    MediaCommand.TUNE_RADIO,
+    MediaCommand.CUSTOM_ACTION -> null
 }
 
 fun oneOsPlayPauseCommand(function: Int, forceToggle: Boolean): MediaCommand = when {

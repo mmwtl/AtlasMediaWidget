@@ -253,6 +253,15 @@ final class MediaBridgeClient {
         return sendCommand("SET_SOURCE", -1L, source.name(), null, true);
     }
 
+    String sendCustomAction(String action) {
+        String requestId = requestId("command");
+        Bundle extra = new Bundle();
+        extra.putString(MediaBridgeContract.K_COMMAND, "CUSTOM_ACTION");
+        extra.putString(MediaBridgeContract.K_COMMAND_CUSTOM_ACTION, action);
+        sendSimple(MediaBridgeContract.COMMAND, requestId, extra);
+        return requestId;
+    }
+
     String tuneRadio(RadioStation station) {
         String requestId = requestId("command-radio");
         Bundle extra = new Bundle();

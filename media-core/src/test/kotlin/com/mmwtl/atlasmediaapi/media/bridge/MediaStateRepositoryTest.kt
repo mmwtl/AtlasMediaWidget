@@ -74,4 +74,18 @@ class MediaStateRepositoryTest {
         assertEquals(42_000L, published.position)
         assertFalse(published.title.isBlank())
     }
+
+    @Test
+    fun `custom actions are dropped once another owner takes the snapshot`() {
+        val repository = MediaStateRepository(FakeClock())
+        val like = MediaCustomAction("LIKE", "Like", 0x7f010001, "com.player")
+
+        val published = repository.update {
+            it.copy(ownerPackage = "com.player", customActions = listOf(like))
+        }
+        assertEquals(listOf(like), published.customActions)
+
+        val switched = repository.update { it.copy(ownerPackage = "com.geely.usb") }
+        assertEquals(emptyList<MediaCustomAction>(), switched.customActions)
+    }
 }

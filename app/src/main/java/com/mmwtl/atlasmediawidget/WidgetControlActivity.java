@@ -282,5 +282,6 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         @Override public void onRadioStationsRequested() {}
         @Override public void onRadioStation(RadioStation station) {}
         @Override public void onRadioArtworkRequested(RadioStation station) {}
+        @Override public void onCustomAction(String action) {}
     };
 }

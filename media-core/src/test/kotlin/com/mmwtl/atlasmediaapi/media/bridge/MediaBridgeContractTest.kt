@@ -114,4 +114,68 @@ class MediaBridgeContractTest {
             BridgeAudioSource.RADIO.defaultCapabilities(),
         )
     }
+
+    @Test
+    fun `custom action command carries the player action id`() {
+        val bundle = android.os.Bundle().apply {
+            putString(MediaBridgeContract.Key.REQUEST_ID, "req")
+            putString(MediaBridgeContract.Key.COMMAND, MediaCommand.CUSTOM_ACTION.name)
+            putString(MediaBridgeContract.Key.COMMAND_CUSTOM_ACTION, "com.player.LIKE")
+        }
+        val request = bundle.toMediaCommandRequest()
+        assertNotNull(request)
+        assertEquals(MediaCommand.CUSTOM_ACTION, request!!.command)
+        assertEquals("com.player.LIKE", request.customAction)
+
+        bundle.remove(MediaBridgeContract.Key.COMMAND_CUSTOM_ACTION)
+        assertNull(bundle.toMediaCommandRequest())
+        bundle.putString(
+            MediaBridgeContract.Key.COMMAND_CUSTOM_ACTION,
+            "x".repeat(MediaBridgeContract.MAX_CUSTOM_ACTION_LENGTH + 1),
+        )
+        assertNull(bundle.toMediaCommandRequest())
+    }
+
+    @Test
+    fun `snapshot bundle lists custom actions in order`() {
+        val bundle = MediaSnapshot(
+            ownerPackage = "com.player",
+            customActions = listOf(
+                MediaCustomAction("LIKE", "Like", 0x7f010001, "com.player"),
+                MediaCustomAction("SHUFFLE", "", 0x7f010002, "com.player"),
+            ),
+        ).toBundle()
+
+        @Suppress("DEPRECATION")
+        val actions = bundle.getParcelableArrayList<android.os.Bundle>(
+            MediaBridgeContract.Key.CUSTOM_ACTIONS,
+        )!!
+        assertEquals(listOf("LIKE", "SHUFFLE"),
+            actions.map { it.getString(MediaBridgeContract.Key.CUSTOM_ACTION_ID) })
+        assertEquals("Like", actions[0].getString(MediaBridgeContract.Key.CUSTOM_ACTION_NAME))
+        assertEquals(0x7f010002, actions[1].getInt(MediaBridgeContract.Key.CUSTOM_ACTION_ICON))
+        assertEquals("com.player",
+            actions[1].getString(MediaBridgeContract.Key.CUSTOM_ACTION_PACKAGE))
+    }
+
+    @Test
+    fun `session custom actions skip entries without id or icon and are bounded`() {
+        val state = android.media.session.PlaybackState.Builder()
+            .addCustomAction("LIKE", "Like", 0x7f010001)
+            .addCustomAction(
+                android.media.session.PlaybackState.CustomAction.Builder("NO_ICON", "No icon", 1)
+                    .build(),
+            )
+            .apply {
+                (1..6).forEach { addCustomAction("EXTRA_$it", "Extra $it", 0x7f010010 + it) }
+            }
+            .build()
+
+        val actions = state.bridgeCustomActions("com.player")
+
+        assertEquals(MediaBridgeContract.MAX_CUSTOM_ACTIONS, actions.size)
+        assertEquals(MediaCustomAction("LIKE", "Like", 0x7f010001, "com.player"), actions.first())
+        assertEquals(emptyList<MediaCustomAction>(), state.bridgeCustomActions(""))
+        assertEquals(emptyList<MediaCustomAction>(), null.bridgeCustomActions("com.player"))
+    }
 }

@@ -37,7 +37,7 @@ class MediaStateRepository(
 
     fun update(transform: (MediaSnapshot) -> MediaSnapshot): MediaSnapshot = synchronized(lock) {
         val before = current.get()
-        val candidate = transform(before)
+        val candidate = transform(before).withOwnedCustomActions()
         if (candidate.contentEquals(before)) return before
 
         val next = candidate.copy(
@@ -61,6 +61,11 @@ class MediaStateRepository(
             )
         )
     }
+
+    /** Custom actions belong to one player; any owner change makes them stale. */
+    private fun MediaSnapshot.withOwnedCustomActions(): MediaSnapshot =
+        if (customActions.all { it.ownerPackage == ownerPackage }) this
+        else copy(customActions = customActions.filter { it.ownerPackage == ownerPackage })
 
     private fun MediaSnapshot.contentEquals(other: MediaSnapshot): Boolean =
         copy(generation = 0L, timestamp = 0L) == other.copy(generation = 0L, timestamp = 0L)

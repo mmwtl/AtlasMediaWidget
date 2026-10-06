@@ -50,6 +50,39 @@ data class MediaSourceSnapshot(
     val capabilities: Long = MediaCapabilities.SET_SOURCE,
 )
 
+/**
+ * A player-defined button from [PlaybackState.CustomAction]. Its meaning (like, shuffle, …) is
+ * private to [ownerPackage]; clients show the app's own icon and send [action] back unchanged.
+ */
+data class MediaCustomAction(
+    val action: String,
+    val name: String,
+    val iconResId: Int,
+    val ownerPackage: String,
+)
+
+/** Publishable custom actions of a session; entries without an action id or icon are skipped. */
+fun PlaybackState?.bridgeCustomActions(ownerPackage: String): List<MediaCustomAction> {
+    if (this == null || ownerPackage.isBlank()) return emptyList()
+    return customActions.orEmpty()
+        .asSequence()
+        .filter { action ->
+            !action.action.isNullOrBlank() && action.icon != 0 &&
+                action.action.length <= MediaBridgeContract.MAX_CUSTOM_ACTION_LENGTH
+        }
+        .map { action ->
+            MediaCustomAction(
+                action = action.action,
+                name = action.name?.toString().orEmpty()
+                    .take(MediaBridgeContract.MAX_CUSTOM_ACTION_NAME_LENGTH),
+                iconResId = action.icon,
+                ownerPackage = ownerPackage,
+            )
+        }
+        .take(MediaBridgeContract.MAX_CUSTOM_ACTIONS)
+        .toList()
+}
+
 data class MediaSnapshot(
     val protocolVersion: Int = MediaBridgeContract.PROTOCOL_VERSION,
     val generation: Long = 0L,
@@ -77,6 +110,7 @@ data class MediaSnapshot(
     val capabilities: Long = MediaCapabilities.SET_SOURCE,
     val artworkUri: String = "",
     val artworkRevision: Long = 0L,
+    val customActions: List<MediaCustomAction> = emptyList(),
 )
 
 fun defaultMediaSources(): List<MediaSourceSnapshot> =
@@ -121,6 +155,7 @@ enum class MediaCommand {
     SEEK_TO,
     SET_SOURCE,
     TUNE_RADIO,
+    CUSTOM_ACTION,
 }
 
 data class RadioStationTarget(
@@ -164,6 +199,7 @@ data class MediaCommandRequest(
     val appSource: String? = null,
     val autoplay: Boolean = true,
     val radioStation: RadioStationTarget? = null,
+    val customAction: String? = null,
 )
 
 data class MediaCommandResult(
