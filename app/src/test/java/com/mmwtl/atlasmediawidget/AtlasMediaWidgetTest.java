@@ -780,6 +780,44 @@ public class AtlasMediaWidgetTest {
         assertEquals(-1L, AtlasMediaWidgetProvider.progressSecond(null, now));
     }
 
+    @Test public void liveStreamKeepsTheProgressRowWithoutSeeking() {
+        Bundle options = new Bundle();
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 500);
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+        MediaSnapshot live = new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",
+                MediaSource.Id.ONLINE, "", List.of(), "test", "Player", "", "Song", "Station", "",
+                0, -1, 0, 1, MediaSnapshot.STATE_PLAYING, 0, "", 0,
+                MediaBridgeContract.CAP_PLAY | MediaBridgeContract.CAP_SEEK, "", 0);
+        var frame = new AtlasMediaWidgetProvider.Frame(context, new Prefs(context), options, 41,
+                live, null, true, listener);
+        assertFalse(frame.progressBounds.isEmpty());
+        assertEquals("∞", ((TextView) frame.card.widgetTarget("duration")).getText().toString());
+        assertEquals("0:00", ((TextView) frame.card.widgetTarget("elapsed")).getText().toString());
+        ViewGroup targets = frame.views.apply(context, null).findViewById(R.id.widget_targets);
+        for (int index = 0; index < targets.getChildCount(); index++) {
+            CharSequence description = targets.getChildAt(index)
+                    .findViewById(R.id.widget_target).getContentDescription();
+            assertFalse(String.valueOf(description).startsWith("Перемотать"));
+            assertNotEquals("Точная перемотка", String.valueOf(description));
+        }
+    }
+
+    @Test public void compactCardWithoutMediaKeepsThePlaceholderInTheThumbnailSlot() throws Exception {
+        Prefs prefs = new Prefs(context);
+        prefs.putInt(Prefs.KEY_CARD_STYLE, CardStyle.COMPACT.preferenceValue);
+        Bundle options = new Bundle();
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 500);
+        options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+        MediaSnapshot empty = new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",
+                MediaSource.Id.CPAA, "", List.of(), "", "", "", "", "", "",
+                0, -1, 0, 0, 0, 0, "", 0, 0, "", 0);
+        var frame = new AtlasMediaWidgetProvider.Frame(context, prefs, options, 41,
+                empty, null, true, listener);
+        assertEquals(View.GONE, ((View) field(frame.card, "placeholder")).getVisibility());
+        assertEquals(View.VISIBLE, ((View) field(frame.card, "artworkThumbnail")).getVisibility());
+        assertTrue(frame.progressBounds.isEmpty());
+    }
+
     private MediaSnapshot timedSnapshot(int playbackState, long updateElapsedRealtime) {
         return new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",
                 MediaSource.Id.ONLINE, "", List.of(), "test", "Player", "one", "Track", "Artist", "",

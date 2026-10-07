@@ -45,6 +45,8 @@ final class MediaCardView extends FrameLayout {
         void onRadioStation(RadioStation station);
         void onRadioArtworkRequested(RadioStation station);
         void onCustomAction(String action);
+        /** Shares one live-stream clock between redraws; null gives the card its own. */
+        default LiveListeningClock liveClock() { return null; }
     }
 
     private static final int PROGRESS_MAX = 10_000;
@@ -56,6 +58,7 @@ final class MediaCardView extends FrameLayout {
     };
 
     private final Listener listener;
+    private final LiveListeningClock liveClock;
     private final CardStyle style;
     private final int cardWidth;
     private final int cardHeight;
@@ -113,6 +116,7 @@ final class MediaCardView extends FrameLayout {
     private boolean seeking;
     private boolean hasArtwork;
     private boolean hasMedia;
+    private boolean liveStream;
     private long pendingSeekPosition = -1L;
     private long pendingSeekAtElapsedRealtime = -1L;
     private MediaSnapshot pendingSeekSnapshot;
@@ -138,6 +142,8 @@ final class MediaCardView extends FrameLayout {
             Listener listener) {
         super(context);
         this.listener = listener;
+        LiveListeningClock sharedClock = listener.liveClock();
+        this.liveClock = sharedClock != null ? sharedClock : new LiveListeningClock();
         this.style = style;
         this.appearance = appearance;
         this.radioSavedNavigation = radioSavedNavigation;
@@ -642,6 +648,7 @@ final class MediaCardView extends FrameLayout {
         activeSource = selectedSource(value);
         hasMedia = MediaPresentation.hasContent(activeSource, bridgeConnected,
                 value.backendConnected, value.title, value.artist, value.album, value.duration);
+        liveStream = MediaPresentation.isLiveStream(activeSource, hasMedia, value.duration);
         String displayTitle = MediaPresentation.title(activeSource, value.title);
         title.setTitle(hasMedia && !displayTitle.isBlank()
                 ? displayTitle : getResources().getString(R.string.unknown_track));
@@ -676,7 +683,7 @@ final class MediaCardView extends FrameLayout {
         playPause.setPlaying(currentlyPlaying);
         progress.setEnabled(value.duration > 0L && value.supports(MediaBridgeContract.CAP_SEEK));
         progress.setAlpha(progress.isEnabled() ? 1f : 0.55f);
-        duration.setText(formatTime(value.duration));
+        duration.setText(liveStream ? "∞" : formatTime(value.duration));
         renderSources(value);
         updateContentLayout();
         tick(SystemClock.elapsedRealtime());
@@ -690,6 +697,7 @@ final class MediaCardView extends FrameLayout {
         renderCustomActions(List.of());
         hideFavoritesChooser();
         hasMedia = false;
+        liveStream = false;
         title.setTitle(getResources().getString(R.string.unknown_track));
         subtitle.setText(R.string.empty_hint);
         setStatusPill(detail.contains("Подключение")
@@ -803,6 +811,11 @@ final class MediaCardView extends FrameLayout {
         if (SeekProjection.isTimedOut(pendingSeekAtElapsedRealtime, nowElapsedRealtime)) {
             clearPendingSeek();
         }
+        if (liveStream) {
+            setElapsed(liveClock.elapsed(snapshot, nowElapsedRealtime));
+            setRenderedProgress(0);
+            return;
+        }
         long value = pendingSeekPosition >= 0L
                 ? SeekProjection.estimate(snapshot, pendingSeekPosition,
                         pendingSeekAtElapsedRealtime, nowElapsedRealtime)
@@ -859,8 +872,11 @@ final class MediaCardView extends FrameLayout {
         boolean chooserVisible = sourceChooser.getVisibility() == VISIBLE
                 || favoritesChooser.getVisibility() == VISIBLE;
         boolean radio = activeSource.displayId() == MediaSource.Id.RADIO;
-        boolean showProgress = !radio && hasMedia && snapshot != null && snapshot.duration > 0L;
-        boolean showThumbnail = compact && hasMedia;
+        // Live streams keep the row too, with listening time and ∞, so the text never shifts.
+        boolean showProgress = !radio && hasMedia && snapshot != null;
+        // The compact thumbnail slot stays even without media; its placeholder replaces the
+        // large centred one, which would cover the whole compact card.
+        boolean showThumbnail = compact;
         int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
         int controlsTop = Math.max(0, cardHeight - panelHeight);
         int progressTop = Math.max(0,
@@ -880,20 +896,12 @@ final class MediaCardView extends FrameLayout {
         placeholder.setVisibility(!hasArtwork && !chooserVisible && !showThumbnail
                 ? VISIBLE : GONE);
 
-        LayoutParams metadataParams;
-        if (compact && !hasMedia) {
-            int left = bx(appearance.contentInsetDp + 10);
-            int width = Math.max(bx(180), cardWidth - left - bx(121));
-            metadataParams = new LayoutParams(width, LayoutParams.WRAP_CONTENT);
-            metadataParams.leftMargin = left;
-        } else {
-            metadataParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
-            metadataParams.leftMargin = bx(appearance.contentInsetDp);
-            metadataParams.rightMargin = bx(appearance.contentInsetDp);
-        }
-        metadataParams.height = LayoutParams.WRAP_CONTENT;
-        int metadataBottom = showProgress || radio
-                ? progressTop - d(appearance.metadataProgressGapDp) : controlsTop - d(4);
+        LayoutParams metadataParams = new LayoutParams(LayoutParams.MATCH_PARENT,
+                LayoutParams.WRAP_CONTENT);
+        metadataParams.leftMargin = bx(appearance.contentInsetDp);
+        metadataParams.rightMargin = bx(appearance.contentInsetDp);
+        // Text keeps the same baseline with or without a progress row, so it never jumps.
+        int metadataBottom = progressTop - d(appearance.metadataProgressGapDp);
         metadataParams.gravity = Gravity.BOTTOM | Gravity.START;
         metadataParams.bottomMargin = Math.max(0, cardHeight - metadataBottom);
         metadata.setLayoutParams(metadataParams);

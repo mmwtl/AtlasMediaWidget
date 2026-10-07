@@ -101,7 +101,16 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
 
     /** The progress strip shows whole seconds; paused or position-less media never changes it. */
     static long progressSecond(MediaSnapshot snapshot, long nowElapsedRealtime) {
+        return progressSecond(snapshot, null, nowElapsedRealtime);
+    }
+
+    /** Like {@link #progressSecond(MediaSnapshot, long)}; a live stream counts listening time. */
+    static long progressSecond(MediaSnapshot snapshot, LiveListeningClock liveClock,
+            long nowElapsedRealtime) {
         if (snapshot == null) return -1L;
+        if (liveClock != null && LiveListeningClock.streamKey(snapshot) != null) {
+            return liveClock.elapsed(snapshot, nowElapsedRealtime) / 1_000L;
+        }
         long position = ProgressEstimator.estimate(snapshot.position, snapshot.duration,
                 snapshot.updateElapsedRealtime, snapshot.speed, snapshot.playbackState,
                 nowElapsedRealtime);
@@ -288,7 +297,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                 View target = card.widgetTarget(action);
                 if (target.getVisibility() != View.VISIBLE || !target.isEnabled()) continue;
                 if ("seek".equals(action)) {
-                    if (snapshot != null && connected
+                    if (snapshot != null && connected && snapshot.duration > 0L
                             && snapshot.supports(MediaBridgeContract.CAP_SEEK)) {
                         addSeekTargets(context, id);
                     }

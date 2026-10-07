@@ -228,7 +228,8 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
 
     private void renderScrubber(MediaSnapshot snapshot) {
         scrubber.renderSnapshot(snapshot, true);
-        if (!scrubber.isProgressVisible() || !snapshot.supports(MediaBridgeContract.CAP_SEEK)) {
+        if (!scrubber.isProgressVisible() || snapshot.duration <= 0L
+                || !snapshot.supports(MediaBridgeContract.CAP_SEEK)) {
             finish();
             return;
         }

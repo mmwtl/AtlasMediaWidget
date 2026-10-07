@@ -11,6 +11,14 @@ final class MediaPresentation {
                 && bridgeConnected && backendConnected;
     }
 
+    /**
+     * Media without a duration is a live stream; it keeps the progress row in place so the text
+     * above does not shift. The native radio shows its tuning scale there instead.
+     */
+    static boolean isLiveStream(MediaSource.Id source, boolean hasMedia, long duration) {
+        return hasMedia && duration <= 0L && source.displayId() != MediaSource.Id.RADIO;
+    }
+
     static boolean isBackendAvailable(MediaSource.Id source, boolean backendConnected,
             boolean hasMedia) {
         if (backendConnected) return true;

@@ -117,6 +117,8 @@ public final class OverlayService extends Service
         return thread;
     });
     private final SnapshotReducer reducer = new SnapshotReducer();
+    /** Overlay and widget redraws build new cards, so the live-stream count lives here. */
+    private final LiveListeningClock liveClock = new LiveListeningClock();
     private final TransportSnapshotGuard transportSnapshotGuard = new TransportSnapshotGuard();
     private final OnlineSnapshotStabilizer onlineSnapshotStabilizer =
             new OnlineSnapshotStabilizer();
@@ -576,7 +578,7 @@ public final class OverlayService extends Service
         }
         var favorites = new AtlasMediaWidgetProvider.Frame.Favorites(radioStations,
                 radioStationsRequestInFlight, widgetFavoritesError);
-        long progressSecond = AtlasMediaWidgetProvider.progressSecond(snapshot, now);
+        long progressSecond = AtlasMediaWidgetProvider.progressSecond(snapshot, liveClock, now);
         var manager = AppWidgetManager.getInstance(this);
         int rebuilt = 0;
         for (int id : ids) {
@@ -790,6 +792,8 @@ public final class OverlayService extends Service
         }
         if (!reducer.accept(snapshot)) return;
         lastWidgetSnapshotAt = now;
+        // Pauses and stream changes count even while no card is drawn.
+        liveClock.elapsed(reducer.visibleSnapshot(now), now);
         executeWidgetCommand();
         pendingRadioNavigation.cancelIfSourceChanged(visibleSource());
         loadArtwork(snapshot);
@@ -979,6 +983,8 @@ public final class OverlayService extends Service
         AppLog.info("Sending media command request=" + requestId + " command=CUSTOM_ACTION"
                 + " action=" + action + " owner=" + visible.ownerPackage);
     }
+
+    @Override public LiveListeningClock liveClock() { return liveClock; }
 
     @Override public void onRadioArtworkRequested(RadioStation station) {
         if (radioArtworkLoader != null) radioArtworkLoader.load(station);
