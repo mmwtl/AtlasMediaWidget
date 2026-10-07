@@ -71,7 +71,8 @@ public final class OverlayService extends Service
     private long pendingWidgetCommandAt;
     private final SharedPreferences.OnSharedPreferenceChangeListener widgetPreferences =
             (preferences, key) -> {
-                if (Prefs.KEY_STATUS_BAR_MEDIA.equals(key)) {
+                if (Prefs.KEY_STATUS_BAR_MEDIA.equals(key)
+                        || Prefs.KEY_STATUS_BAR_FORMAT.equals(key)) {
                     updateStatusBar();
                 } else if (!Prefs.KEY_SERVICE_ENABLED.equals(key)) {
                     this.main.removeCallbacks(this.refreshWidgets);
@@ -1210,7 +1211,8 @@ public final class OverlayService extends Service
             return;
         }
         statusBarScene.update(StatusBarScene.text(reducer.isConnected()
-                ? reducer.visibleSnapshot(SystemClock.elapsedRealtime()) : null));
+                        ? reducer.visibleSnapshot(SystemClock.elapsedRealtime()) : null,
+                prefs.statusBarFormat(), OneOsStatusBarScene::fitToPill));
     }
 
     private void scheduleSnapshotReconcile() {

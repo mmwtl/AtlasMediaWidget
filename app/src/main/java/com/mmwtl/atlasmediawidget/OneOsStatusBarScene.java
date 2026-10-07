@@ -4,12 +4,18 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.res.Resources;
+import android.graphics.Typeface;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import android.os.Parcel;
 import android.os.RemoteException;
+import android.text.TextPaint;
+import android.text.TextUtils;
+import android.util.DisplayMetrics;
+import android.util.TypedValue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,6 +45,11 @@ final class OneOsStatusBarScene {
     private static final int ON_OPEN_STATE_CHANGED = 1;
     // Track changes arrive as several snapshots; one reopen per change avoids a double blink.
     private static final long SETTLE_MS = 500L;
+    // Plugin layout_temp_state_text_common in a 352dp container: 48dp icon, three 16dp margins.
+    private static final float PILL_TEXT_WIDTH_DP = 352f - 48f - 3 * 16f;
+    private static final float PILL_TEXT_SIZE_SP = 32f;
+    // HmiTextView sets no typeface; the margin covers font and rounding differences.
+    private static final float PILL_SAFETY_DP = 12f;
 
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -79,6 +90,21 @@ final class OneOsStatusBarScene {
     OneOsStatusBarScene(Context context) {
         this.context = context.getApplicationContext();
         service.attachInterface(null, SCENE_SERVICE);
+    }
+
+    /**
+     * Shortens text with an ellipsis so that the plugin's marquee has nothing to scroll. Measured
+     * with system metrics: the status bar is not affected by this app's UI scale.
+     */
+    static String fitToPill(String text) {
+        DisplayMetrics metrics = Resources.getSystem().getDisplayMetrics();
+        TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
+        paint.setTypeface(Typeface.DEFAULT);
+        paint.setTextSize(TypedValue.applyDimension(
+                TypedValue.COMPLEX_UNIT_SP, PILL_TEXT_SIZE_SP, metrics));
+        float width = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP,
+                PILL_TEXT_WIDTH_DP - PILL_SAFETY_DP, metrics);
+        return TextUtils.ellipsize(text, paint, width, TextUtils.TruncateAt.END).toString();
     }
 
     /** Main thread. Shows this text, or closes the scene for null, once the media settles. */

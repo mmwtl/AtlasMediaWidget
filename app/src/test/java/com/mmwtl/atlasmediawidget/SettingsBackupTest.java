@@ -458,5 +458,16 @@ public final class SettingsBackupTest {
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
         root.getJSONObject("settings").remove("statusBarMedia");
         assertFalse(SettingsBackup.decode(root.toString()).statusBarMedia);
+
+        assertEquals(StatusBarScene.Format.DEFAULT, base.statusBarFormat);
+        root.getJSONObject("settings").put("statusBarFormat",
+                StatusBarScene.Format.ARTIST_TITLE.preferenceValue);
+        assertEquals(StatusBarScene.Format.ARTIST_TITLE,
+                SettingsBackup.decode(root.toString()).statusBarFormat);
+        root.getJSONObject("settings").put("statusBarFormat", 9);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("statusBarFormat");
+        assertEquals(StatusBarScene.Format.DEFAULT,
+                SettingsBackup.decode(root.toString()).statusBarFormat);
     }
 }

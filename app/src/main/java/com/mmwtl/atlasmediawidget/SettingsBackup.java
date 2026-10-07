@@ -34,6 +34,7 @@ final class SettingsBackup {
         final PlayerActionFilter.Rules playerActionRules;
         final boolean dragHandleVisible;
         final boolean statusBarMedia;
+        final StatusBarScene.Format statusBarFormat;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
         final Integer positionX;
@@ -135,7 +136,8 @@ final class SettingsBackup {
                     selectedStyle, positionX, positionY, positionCorner, compact, square,
                     cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
                     radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
-                    playerActionsCount, playerActionRules, false);
+                    playerActionsCount, playerActionRules, false,
+                    StatusBarScene.Format.DEFAULT);
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -144,10 +146,12 @@ final class SettingsBackup {
                 Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
                 boolean widgetMode, int playerActionsCount,
-                PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia)
-                throws IOException {
+                PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
+                StatusBarScene.Format statusBarFormat) throws IOException {
             this.widgetMode = widgetMode;
             this.statusBarMedia = statusBarMedia;
+            if (statusBarFormat == null) throw invalid("Не указан формат строки состояния");
+            this.statusBarFormat = statusBarFormat;
             if (playerActionRules == null) throw invalid("Не указаны настройки кнопок плеера");
             this.playerActionRules = playerActionRules;
             this.playerActionsCount = requireRange("settings.playerActionsCount",
@@ -289,7 +293,7 @@ final class SettingsBackup {
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
                 prefs.playerActionsCount(), prefs.playerActionRules(),
-                prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false));
+                prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -338,6 +342,7 @@ final class SettingsBackup {
                     PlayerActionFilter.toJson(data.playerActionRules.published));
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("statusBarMedia", data.statusBarMedia);
+            settings.put("statusBarFormat", data.statusBarFormat.preferenceValue);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -455,10 +460,20 @@ final class SettingsBackup {
                                     ? playerActionLists(settings, "playerActionIds") : Map.of()),
                     // Added within schema 14; older files leave the status bar output off.
                     settings.has("statusBarMedia") && requireBoolean(settings, "statusBarMedia",
-                            "settings.statusBarMedia"));
+                            "settings.statusBarMedia"),
+                    settings.has("statusBarFormat") ? statusBarFormat(settings)
+                            : StatusBarScene.Format.DEFAULT);
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
+    }
+
+    private static StatusBarScene.Format statusBarFormat(JSONObject settings) throws IOException {
+        int value = requireInt(settings, "statusBarFormat", "settings.statusBarFormat");
+        for (StatusBarScene.Format format : StatusBarScene.Format.values()) {
+            if (format.preferenceValue == value) return format;
+        }
+        throw invalid("Неизвестный формат строки состояния: " + value);
     }
 
     private static Map<String, List<String>> playerActionLists(JSONObject settings, String key)

@@ -134,6 +134,8 @@ public final class MainActivity extends ScaledActivity {
     private Switch radioFavoritesNavigation;
     private Switch dragHandleVisible;
     private Switch statusBarMedia;
+    private RadioGroup statusBarFormatGroup;
+    private RadioButton[] statusBarFormatButtons;
     private Button exportSettingsButton;
     private Button importSettingsButton;
     private Button exportRadioCatalogButton;
@@ -1227,6 +1229,8 @@ public final class MainActivity extends ScaledActivity {
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         statusBarMedia.setChecked(prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false));
+        statusBarFormatButtons[prefs.statusBarFormat().preferenceValue].setChecked(true);
+        updateStatusBarFormatControls();
         refreshFavoriteGridControls();
         refreshPlayerActionsControl();
         refreshPlayerActionChoices(true);
@@ -2053,6 +2057,7 @@ public final class MainActivity extends ScaledActivity {
         statusBarMedia.setTextColor(Ui.PRIMARY);
         statusBarMedia.setTextSize(15);
         statusBarMedia.setOnCheckedChangeListener((button, checked) -> {
+            updateStatusBarFormatControls();
             if (!button.isPressed()) return;
             prefs.putBoolean(Prefs.KEY_STATUS_BAR_MEDIA, checked);
         });
@@ -2060,14 +2065,40 @@ public final class MainActivity extends ScaledActivity {
         statusBarParams.topMargin = Ui.dp(this, 12);
         statusBarCard.addView(statusBarMedia, statusBarParams);
         TextView statusBarHint = text(
-                "Во время воспроизведения слева в строке состояния OneOS появляется "
-                        + "«Исполнитель — Трек», для радио — станция или частота. Работает, пока "
-                        + "запущен оверлей или используется системный виджет.",
+                "Во время воспроизведения в плашке строки состояния OneOS появляется трек, "
+                        + "для радио — станция или частота. Работает, пока запущен сервис "
+                        + "оверлея или на HOME размещён системный виджет.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams statusBarHintParams = fullWrap();
         statusBarHintParams.topMargin = Ui.dp(this, 5);
         statusBarCard.addView(statusBarHint, statusBarHintParams);
+        statusBarFormatGroup = new RadioGroup(this);
+        statusBarFormatGroup.setOrientation(RadioGroup.VERTICAL);
+        statusBarFormatButtons = new RadioButton[StatusBarScene.Format.values().length];
+        for (StatusBarScene.Format format : StatusBarScene.Format.values()) {
+            RadioButton button = styleButton(format.label);
+            button.setOnClickListener(v ->
+                    prefs.putInt(Prefs.KEY_STATUS_BAR_FORMAT, format.preferenceValue));
+            statusBarFormatButtons[format.preferenceValue] = button;
+            statusBarFormatGroup.addView(button, fullWrap());
+        }
+        LinearLayout.LayoutParams statusBarFormatParams = fullWrap();
+        statusBarFormatParams.topMargin = Ui.dp(this, 8);
+        statusBarCard.addView(statusBarFormatGroup, statusBarFormatParams);
+        TextView statusBarFormatHint = text(
+                "Плашка вмещает около 10–12 символов; более длинный текст прокручивается "
+                        + "бегущей строкой. Обрезанное название не прокручивается.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams statusBarFormatHintParams = fullWrap();
+        statusBarFormatHintParams.topMargin = Ui.dp(this, 5);
+        statusBarCard.addView(statusBarFormatHint, statusBarFormatHintParams);
         page.addView(statusBarCard);
+    }
+
+    private void updateStatusBarFormatControls() {
+        boolean enabled = statusBarMedia.isChecked();
+        statusBarFormatGroup.setAlpha(enabled ? 1f : 0.45f);
+        for (RadioButton button : statusBarFormatButtons) button.setEnabled(enabled);
     }
 
     /** A card body that stays disabled until the Media Bridge delivers its settings. */
