@@ -133,6 +133,7 @@ public final class MainActivity extends ScaledActivity {
     private Switch radioSavedNavigation;
     private Switch radioFavoritesNavigation;
     private Switch dragHandleVisible;
+    private Switch statusBarMedia;
     private Button exportSettingsButton;
     private Button importSettingsButton;
     private Button exportRadioCatalogButton;
@@ -1225,6 +1226,7 @@ public final class MainActivity extends ScaledActivity {
         updateRadioNavigationControls();
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
+        statusBarMedia.setChecked(prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false));
         refreshFavoriteGridControls();
         refreshPlayerActionsControl();
         refreshPlayerActionChoices(true);
@@ -2042,6 +2044,30 @@ public final class MainActivity extends ScaledActivity {
         });
         tuning.addView(clusterReassertBurstSeekBar, fullWrap());
         page.addView(broadcastCard);
+
+        // A Widget preference: the foreground service process owns the status bar output.
+        LinearLayout statusBarCard = card();
+        statusBarCard.addView(text("Строка состояния", 20, Ui.PRIMARY, Typeface.BOLD));
+        statusBarMedia = new Switch(this);
+        statusBarMedia.setText("Текущее воспроизведение в строке состояния");
+        statusBarMedia.setTextColor(Ui.PRIMARY);
+        statusBarMedia.setTextSize(15);
+        statusBarMedia.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_STATUS_BAR_MEDIA, checked);
+        });
+        LinearLayout.LayoutParams statusBarParams = fullWrap();
+        statusBarParams.topMargin = Ui.dp(this, 12);
+        statusBarCard.addView(statusBarMedia, statusBarParams);
+        TextView statusBarHint = text(
+                "Во время воспроизведения слева в строке состояния OneOS появляется "
+                        + "«Исполнитель — Трек», для радио — станция или частота. Работает, пока "
+                        + "запущен оверлей или используется системный виджет.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams statusBarHintParams = fullWrap();
+        statusBarHintParams.topMargin = Ui.dp(this, 5);
+        statusBarCard.addView(statusBarHint, statusBarHintParams);
+        page.addView(statusBarCard);
     }
 
     /** A card body that stays disabled until the Media Bridge delivers its settings. */

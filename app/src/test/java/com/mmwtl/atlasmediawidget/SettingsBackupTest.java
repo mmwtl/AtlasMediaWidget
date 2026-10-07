@@ -446,4 +446,17 @@ public final class SettingsBackupTest {
                 SettingsBackup.decode(root.toString()).playerActionsCount);
         assertTrue(SettingsBackup.decode(root.toString()).playerActionRules.hidden.isEmpty());
     }
+
+    @Test public void statusBarMediaRoundTripsAndDefaultsToOff() throws Exception {
+        SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
+        assertFalse(base.statusBarMedia);
+        JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
+        assertFalse(root.getJSONObject("settings").getBoolean("statusBarMedia"));
+        root.getJSONObject("settings").put("statusBarMedia", true);
+        assertTrue(SettingsBackup.decode(root.toString()).statusBarMedia);
+        root.getJSONObject("settings").put("statusBarMedia", "true");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("statusBarMedia");
+        assertFalse(SettingsBackup.decode(root.toString()).statusBarMedia);
+    }
 }

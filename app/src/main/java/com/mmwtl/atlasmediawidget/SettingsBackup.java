@@ -33,6 +33,7 @@ final class SettingsBackup {
         final int playerActionsCount;
         final PlayerActionFilter.Rules playerActionRules;
         final boolean dragHandleVisible;
+        final boolean statusBarMedia;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
         final Integer positionX;
@@ -130,7 +131,23 @@ final class SettingsBackup {
                 boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
                 boolean widgetMode, int playerActionsCount,
                 PlayerActionFilter.Rules playerActionRules) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
+                    playerActionsCount, playerActionRules, false);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths, CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner, StyleData compact, StyleData square,
+                Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
+                boolean widgetMode, int playerActionsCount,
+                PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia)
+                throws IOException {
             this.widgetMode = widgetMode;
+            this.statusBarMedia = statusBarMedia;
             if (playerActionRules == null) throw invalid("Не указаны настройки кнопок плеера");
             this.playerActionRules = playerActionRules;
             this.playerActionsCount = requireRange("settings.playerActionsCount",
@@ -271,7 +288,8 @@ final class SettingsBackup {
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(),
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
-                prefs.playerActionsCount(), prefs.playerActionRules());
+                prefs.playerActionsCount(), prefs.playerActionRules(),
+                prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false));
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -319,6 +337,7 @@ final class SettingsBackup {
             settings.put("playerActionIds",
                     PlayerActionFilter.toJson(data.playerActionRules.published));
             settings.put("dragHandleVisible", data.dragHandleVisible);
+            settings.put("statusBarMedia", data.statusBarMedia);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -433,7 +452,10 @@ final class SettingsBackup {
                             settings.has("playerActionOrder")
                                     ? playerActionLists(settings, "playerActionOrder") : Map.of(),
                             settings.has("playerActionIds")
-                                    ? playerActionLists(settings, "playerActionIds") : Map.of()));
+                                    ? playerActionLists(settings, "playerActionIds") : Map.of()),
+                    // Added within schema 14; older files leave the status bar output off.
+                    settings.has("statusBarMedia") && requireBoolean(settings, "statusBarMedia",
+                            "settings.statusBarMedia"));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }

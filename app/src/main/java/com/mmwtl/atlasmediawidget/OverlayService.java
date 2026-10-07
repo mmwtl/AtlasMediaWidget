@@ -63,6 +63,7 @@ public final class OverlayService extends Service
     };
     private final Map<Integer, Long> widgetProgressSeconds = new HashMap<>();
     private Bitmap currentArtwork;
+    private OneOsStatusBarScene statusBarScene;
     private long lastWidgetSnapshotAt;
     private long lastWidgetReconciliationAt;
     private List<?> widgetRenderKey;
@@ -70,7 +71,9 @@ public final class OverlayService extends Service
     private long pendingWidgetCommandAt;
     private final SharedPreferences.OnSharedPreferenceChangeListener widgetPreferences =
             (preferences, key) -> {
-                if (!Prefs.KEY_SERVICE_ENABLED.equals(key)) {
+                if (Prefs.KEY_STATUS_BAR_MEDIA.equals(key)) {
+                    updateStatusBar();
+                } else if (!Prefs.KEY_SERVICE_ENABLED.equals(key)) {
                     this.main.removeCallbacks(this.refreshWidgets);
                     this.main.postDelayed(this.refreshWidgets, 100L);
                 }
@@ -294,6 +297,7 @@ public final class OverlayService extends Service
         radioArtworkLoader = new RadioArtworkLoader(this, this);
         mediaSourceLauncher = new MediaSourceLauncher(this);
         bridge = new MediaBridgeClient(this, this);
+        statusBarScene = new OneOsStatusBarScene(this);
         createNotificationChannel();
         Notification notification = buildNotification(0);
         if (Build.VERSION.SDK_INT >= 34) {
@@ -632,6 +636,7 @@ public final class OverlayService extends Service
         foregroundExecutor.shutdownNow();
         hideCardImmediately();
         if (bridge != null) bridge.stop();
+        if (statusBarScene != null) statusBarScene.shutdown();
         if (artworkLoader != null) {
             expectedArtworkToken = artworkLoader.shutdown();
         }
@@ -776,6 +781,7 @@ public final class OverlayService extends Service
             if (card != null) card.setRadioStations(RadioStationLists.EMPTY);
         }
         renderCurrent();
+        updateStatusBar();
         scheduleSnapshotReconcile();
         if (card != null && !detail.isBlank()) {
             card.showTransientStatus(detail, state != MediaBridgeClient.State.CONNECTED);
@@ -798,6 +804,7 @@ public final class OverlayService extends Service
         pendingRadioNavigation.cancelIfSourceChanged(visibleSource());
         loadArtwork(snapshot);
         renderCurrent();
+        updateStatusBar();
         scheduleSnapshotReconcile();
     }
 
@@ -1193,6 +1200,17 @@ public final class OverlayService extends Service
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (visible == null) card.renderDisconnected(stateDetail());
         else card.renderSnapshot(visible, reducer.isConnected());
+    }
+
+    /** The status bar shows only live playback; a disconnected bridge closes it at once. */
+    private void updateStatusBar() {
+        if (statusBarScene == null) return;
+        if (!prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false)) {
+            statusBarScene.close();
+            return;
+        }
+        statusBarScene.update(StatusBarScene.text(reducer.isConnected()
+                ? reducer.visibleSnapshot(SystemClock.elapsedRealtime()) : null));
     }
 
     private void scheduleSnapshotReconcile() {

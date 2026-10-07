@@ -97,6 +97,8 @@ open directly inside the AppWidget, and the favorites list scrolls.
 - radio catalog with station artwork, favorites grid and saved-station navigation without scanning;
 - radio title and artwork broadcast to the Geely OneOS DIM; optional separate Online progress
   updates;
+- optional now-playing text in the left pill of the OneOS status bar ("Artist — Title", station or
+  frequency for radio) — [details and limitations](docs/statusbar-media.md) (in Russian);
 - shortcuts to the active media app or stock Radio, Bluetooth and USB screens;
 - ZIP settings backup/restore, legacy JSON import and separate radio-catalog transfer
   (`stations.csv` and `covers/`);
