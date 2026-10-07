@@ -2086,8 +2086,10 @@ public final class MainActivity extends ScaledActivity {
         statusBarFormatParams.topMargin = Ui.dp(this, 8);
         statusBarCard.addView(statusBarFormatGroup, statusBarFormatParams);
         TextView statusBarFormatHint = text(
-                "Плашка вмещает около 10–12 символов; более длинный текст прокручивается "
-                        + "бегущей строкой. Обрезанное название не прокручивается.",
+                "Плашка — системное поле OneOS: шрифт, размер, ширину и прокрутку задаёт "
+                        + "прошивка, приложение передаёт только текст. Плашка вмещает около "
+                        + "10–12 символов; более длинный текст прокручивается бегущей строкой. "
+                        + "Обрезанное название не прокручивается.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams statusBarFormatHintParams = fullWrap();
         statusBarFormatHintParams.topMargin = Ui.dp(this, 5);
