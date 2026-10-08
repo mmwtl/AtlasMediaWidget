@@ -7,6 +7,7 @@ import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import com.geely.lib.oneosapi.OneOSApiManager
+import com.mmwtl.atlasmediaapi.media.session.BackgroundPlayerStarter
 import com.mmwtl.atlasmediaapi.media.session.MediaSessionObserver
 import com.mmwtl.atlasmediaapi.settings.AtlasPreferences
 import kotlinx.coroutines.CoroutineScope
@@ -308,6 +309,39 @@ class AndroidMediaCommandHostTest {
             assertTrue(launched.isEmpty())
         }
 
+    @Test
+    fun `play without a session starts the player through its media browser`() = runBlocking {
+        val (host, starter, launched, session) =
+            backgroundStartFixture("com.example.browser", browserStarts = true)
+
+        assertTrue(host.startDefaultAndPlay("com.example.browser"))
+        assertEquals(listOf("browser:com.example.browser", "close:com.example.browser"), starter.calls)
+        assertTrue(launched.isEmpty())
+        assertEquals("com.example.browser", host.currentMediaPackage())
+        session.release()
+    }
+
+    @Test
+    fun `refused media browser falls back to the media button receiver`() = runBlocking {
+        val (host, starter, launched, session) =
+            backgroundStartFixture("com.example.button", mediaButtonStarts = true)
+
+        assertTrue(host.startDefaultAndPlay("com.example.button"))
+        assertEquals(listOf("browser:com.example.button", "button:com.example.button"), starter.calls)
+        assertTrue(launched.isEmpty())
+        session.release()
+    }
+
+    @Test
+    fun `player without background entry points is launched through its activity`() = runBlocking {
+        val (host, starter, launched, session) = backgroundStartFixture("com.example.activity")
+
+        assertFalse(host.startDefaultAndPlay("com.example.activity"))
+        assertEquals(listOf("browser:com.example.activity", "button:com.example.activity"), starter.calls)
+        assertEquals(listOf("com.example.activity"), launched)
+        session.release()
+    }
+
     private data class Fixture(
         val context: android.app.Application,
         val repository: MediaStateRepository,
@@ -370,6 +404,7 @@ class AndroidMediaCommandHostTest {
         sessionPollDelaysMs: List<Long>,
         autoplayConfirmDelaysMs: List<Long> = AndroidMediaCommandHost.AUTOPLAY_CONFIRM_DELAYS_MS,
         autoplayMediaKeyConfirmDelayMs: Long = AndroidMediaCommandHost.AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
+        backgroundPlayerStarter: BackgroundPlayerStarter? = null,
     ): AndroidMediaCommandHost = AndroidMediaCommandHost(
         context = context,
         apiManager = OneOSApiManager.getInstance(context),
@@ -382,7 +417,79 @@ class AndroidMediaCommandHostTest {
         sessionPollDelaysMs = sessionPollDelaysMs,
         autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
         autoplayMediaKeyConfirmDelayMs = autoplayMediaKeyConfirmDelayMs,
+        backgroundSessionWaitTimeoutMs = sessionWaitTimeoutMs,
+        backgroundPlayerStarter = backgroundPlayerStarter,
     )
+
+    private class FakeBackgroundStarter(
+        private val onBrowserPlay: (() -> Unit)? = null,
+        private val onMediaButton: (() -> Unit)? = null,
+    ) : BackgroundPlayerStarter {
+        val calls = mutableListOf<String>()
+
+        override suspend fun connectAndPlay(packageName: String): AutoCloseable? {
+            calls += "browser:$packageName"
+            val play = onBrowserPlay ?: return null
+            play()
+            return AutoCloseable { calls += "close:$packageName" }
+        }
+
+        override fun sendMediaButtonPlay(packageName: String): Boolean {
+            calls += "button:$packageName"
+            val press = onMediaButton ?: return false
+            press()
+            return true
+        }
+    }
+
+    private data class BackgroundStartFixture(
+        val host: AndroidMediaCommandHost,
+        val starter: FakeBackgroundStarter,
+        val launched: List<String>,
+        val session: MediaSession,
+    )
+
+    /** The player publishes a playing session only through the entry points that are enabled. */
+    private fun backgroundStartFixture(
+        packageName: String,
+        browserStarts: Boolean = false,
+        mediaButtonStarts: Boolean = false,
+    ): BackgroundStartFixture {
+        val context = RuntimeEnvironment.getApplication()
+        val hub = hub(context, MediaStateRepository())
+        val observer = MediaSessionObserver(context, hub)
+        val playingState = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+            .build()
+        val session = MediaSession(context, "background-$packageName").apply {
+            isActive = true
+            setPlaybackState(playingState)
+        }
+        val controller = controller(context, session, packageName)
+        shadowOf(controller).setPlaybackState(playingState)
+        val publishSession: () -> Unit = { activeControllers(observer) += controller }
+        val starter = FakeBackgroundStarter(
+            onBrowserPlay = publishSession.takeIf { browserStarts },
+            onMediaButton = publishSession.takeIf { mediaButtonStarts },
+        )
+        val launched = mutableListOf<String>()
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply { defaultMediaPackage = packageName },
+            hub = hub,
+            launchPackage = {
+                launched += it
+                false
+            },
+            sessionWaitTimeoutMs = 50L,
+            sessionPollDelaysMs = listOf(1L),
+            autoplayConfirmDelaysMs = listOf(1L),
+            autoplayMediaKeyConfirmDelayMs = 1L,
+            backgroundPlayerStarter = starter,
+        )
+        return BackgroundStartFixture(host, starter, launched, session)
+    }
 
     private fun pausedState(lastUpdateTime: Long): PlaybackState = PlaybackState.Builder()
         .setState(PlaybackState.STATE_PAUSED, 0L, 0f, lastUpdateTime)

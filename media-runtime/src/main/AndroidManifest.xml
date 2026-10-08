@@ -13,6 +13,12 @@
         <package android:name="com.android.launcher3" />
         <package android:name="com.android.systemui" />
         <package android:name="com.tencent.wecarflow" />
+        <intent>
+            <action android:name="android.media.browse.MediaBrowserService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MEDIA_BUTTON" />
+        </intent>
     </queries>
 
     <application>
