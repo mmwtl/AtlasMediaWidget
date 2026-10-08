@@ -315,7 +315,10 @@ class AndroidMediaCommandHostTest {
             backgroundStartFixture("com.example.browser", browserStarts = true)
 
         assertTrue(host.startDefaultAndPlay("com.example.browser"))
-        assertEquals(listOf("browser:com.example.browser", "close:com.example.browser"), starter.calls)
+        // The connection that started playback stays open for players bound to their client.
+        assertEquals(listOf("browser:com.example.browser"), starter.calls)
+        assertTrue(host.startDefaultAndPlay("com.example.browser"))
+        assertEquals("close:com.example.browser", starter.calls.last())
         assertTrue(launched.isEmpty())
         assertEquals("com.example.browser", host.currentMediaPackage())
         session.release()

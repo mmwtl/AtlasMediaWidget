@@ -54,6 +54,10 @@ class AndroidMediaCommandHost(
     private val currentMediaPackageRef = AtomicReference("")
     private val lastOnlineMediaPackageRef = AtomicReference("")
 
+    // Some players (Murglar) keep their service only while a browser client is bound, so the
+    // connection that started playback stays open until another background start replaces it.
+    private val retainedBrowserConnection = AtomicReference<AutoCloseable?>(null)
+
     private fun mediaCenter(): MediaCenterManager? =
         apiManager.getMediaCenterManager()?.takeIf { it.isAlive }
 
@@ -242,10 +246,19 @@ class AndroidMediaCommandHost(
      */
     private suspend fun startInBackgroundAndPlay(packageName: String): Boolean? {
         val starter = backgroundPlayerStarter ?: return null
-        starter.connectAndPlay(packageName)?.use {
-            awaitSession(packageName, backgroundSessionWaitTimeoutMs)?.let { controller ->
+        starter.connectAndPlay(packageName)?.let { connection ->
+            val controller = awaitSession(packageName, backgroundSessionWaitTimeoutMs)
+            if (controller == null) {
+                connection.close()
+            } else {
                 Timber.i("Started %s through its media browser", packageName)
-                return playAndConfirm(packageName, controller)
+                val playing = playAndConfirm(packageName, controller)
+                if (playing) {
+                    retainedBrowserConnection.getAndSet(connection)?.close()
+                } else {
+                    connection.close()
+                }
+                return playing
             }
         }
         if (starter.sendMediaButtonPlay(packageName)) {
