@@ -32,6 +32,7 @@ class MediaCommandRouterTest {
         var currentPackage = ""
         var defaultPackage = ""
         var startDefaultCalls = 0
+        var startedPackages = mutableListOf<String>()
         var fallbackCalls = mutableListOf<Pair<String, MediaCommand>>()
         var sourceResult = true
         var selectedSource: BridgeAudioSource? = null
@@ -62,6 +63,7 @@ class MediaCommandRouterTest {
 
         override suspend fun startDefaultAndPlay(packageName: String): Boolean = true.also {
             startDefaultCalls++
+            startedPackages += packageName
         }
 
         override suspend fun setSource(
@@ -263,6 +265,31 @@ class MediaCommandRouterTest {
         assertEquals(MediaBridgeContract.Status.NOT_SUPPORTED, result.status)
         assertTrue(carPlay.calls.isEmpty())
         assertTrue(host.fallbackCalls.isEmpty())
+    }
+
+    @Test
+    fun `play without a session starts the configured player instead of the last used one`() =
+        runBlocking {
+            val host = FakeHost().apply {
+                currentPackage = "last.player"
+                defaultPackage = "configured.player"
+            }
+
+            val result = MediaCommandRouter(host).execute(request(MediaCommand.TOGGLE))
+
+            assertTrue(result.succeeded)
+            assertEquals(listOf("configured.player"), host.startedPackages)
+            assertTrue(host.fallbackCalls.isEmpty())
+        }
+
+    @Test
+    fun `play without a session or configured player starts the last used player`() = runBlocking {
+        val host = FakeHost().apply { currentPackage = "last.player" }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.PLAY))
+
+        assertTrue(result.succeeded)
+        assertEquals(listOf("last.player"), host.startedPackages)
     }
 
     @Test

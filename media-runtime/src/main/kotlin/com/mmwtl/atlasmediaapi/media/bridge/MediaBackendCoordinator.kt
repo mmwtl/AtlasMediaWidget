@@ -44,6 +44,7 @@ class MediaBackendCoordinator(
         clusterMediaBridge = clusterMediaBridge,
         carPlayArtworkProvider = { if (::carPlayBridge.isInitialized) carPlayBridge.getCachedArtwork() else null },
         onActiveSourceLost = ::handleActiveSourceLost,
+        canStartOnlinePlayer = { preferences.defaultMediaPackage.isNotBlank() },
     )
     val sessionObserver: MediaSessionObserver = MediaSessionObserver(context, stateHub)
     val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(

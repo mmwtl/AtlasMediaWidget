@@ -87,6 +87,32 @@ class MediaStateHubDisconnectTest {
     }
 
     @Test
+    fun `session removal keeps play available when a configured player can be started`() {
+        val fixture = fixture(canStartOnlinePlayer = true)
+        val session = createAndroidOnlineSession(fixture)
+        fixture.hub.onMediaController(session.controller)
+        fixture.hub.onMediaController(null)
+
+        val capabilities = fixture.repository.snapshot().capabilities
+        assertEquals(
+            MediaCapabilities.SET_SOURCE or MediaCapabilities.PLAY or MediaCapabilities.TOGGLE,
+            capabilities,
+        )
+        session.session.release()
+    }
+
+    @Test
+    fun `session removal without a configured player leaves only source selection`() {
+        val fixture = fixture()
+        val session = createAndroidOnlineSession(fixture)
+        fixture.hub.onMediaController(session.controller)
+        fixture.hub.onMediaController(null)
+
+        assertEquals(MediaCapabilities.SET_SOURCE, fixture.repository.snapshot().capabilities)
+        session.session.release()
+    }
+
+    @Test
     fun `meaningful Android session replaces stale disconnected native source`() {
         val fixture = fixture()
         fixture.repository.update {
@@ -134,7 +160,7 @@ class MediaStateHubDisconnectTest {
         val hub: MediaStateHub,
     )
 
-    private fun fixture(): Fixture {
+    private fun fixture(canStartOnlinePlayer: Boolean = false): Fixture {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
         val hub = MediaStateHub(
@@ -144,6 +170,7 @@ class MediaStateHubDisconnectTest {
                 context,
                 CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
             ),
+            canStartOnlinePlayer = { canStartOnlinePlayer },
         )
         return Fixture(context, repository, hub)
     }
