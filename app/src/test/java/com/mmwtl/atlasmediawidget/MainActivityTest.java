@@ -38,35 +38,6 @@ public final class MainActivityTest {
     public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
     @Test
-    public void playerWithOnlyMediaButtonReceiverIsOfferedAsOnlinePlayer() {
-        android.content.ComponentName activity = new android.content.ComponentName(
-                "com.example.keyplayer", "com.example.keyplayer.Main");
-        android.content.ComponentName receiver = new android.content.ComponentName(
-                "com.example.keyplayer", "com.example.keyplayer.MediaButtons");
-        var packageManager = Shadows.shadowOf(
-                org.robolectric.RuntimeEnvironment.getApplication().getPackageManager());
-        packageManager.addActivityIfNotPresent(activity);
-        android.content.IntentFilter launcher = new android.content.IntentFilter(Intent.ACTION_MAIN);
-        launcher.addCategory(Intent.CATEGORY_LAUNCHER);
-        packageManager.addIntentFilterForActivity(activity, launcher);
-        packageManager.addReceiverIfNotPresent(receiver);
-        packageManager.addIntentFilterForReceiver(
-                receiver, new android.content.IntentFilter(Intent.ACTION_MEDIA_BUTTON));
-
-        ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class)
-                .create().start().resume();
-        try {
-            List<String> packages = new ArrayList<>();
-            for (MainActivity.OnlinePlayerOption option : controller.get().queryOnlinePlayerOptions()) {
-                packages.add(option.packageName);
-            }
-            assertTrue(packages.toString(), packages.contains("com.example.keyplayer"));
-        } finally {
-            controller.pause().stop().destroy();
-        }
-    }
-
-    @Test
     public void settingsTabsSeparateSectionsAndKeepSelectionAcrossRecreate() {
         ActivityController<MainActivity> controller = Robolectric.buildActivity(MainActivity.class)
                 .create().start().resume();

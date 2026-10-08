@@ -2352,7 +2352,7 @@ public final class MainActivity extends ScaledActivity {
         return 0;
     }
 
-    List<OnlinePlayerOption> queryOnlinePlayerOptions() {
+    private List<OnlinePlayerOption> queryOnlinePlayerOptions() {
         List<OnlinePlayerOption> options = new ArrayList<>();
         options.add(new OnlinePlayerOption("", "Не запускать приложение"));
 
@@ -2369,8 +2369,6 @@ public final class MainActivity extends ScaledActivity {
                         .addCategory(Intent.CATEGORY_DEFAULT));
         addMediaServicePackages(
                 packageManager, mediaPackages, MEDIA_BROWSER_SERVICE_ACTION);
-        // Players without a browser service can still be started in the background by a key.
-        addMediaReceiverPackages(packageManager, mediaPackages);
 
         Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
         launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
@@ -2451,16 +2449,7 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void addMediaReceiverPackages(PackageManager packageManager, Set<String> packages) {
-        Intent buttonIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
-        for (ResolveInfo info : packageManager.queryBroadcastReceivers(buttonIntent, 0)) {
-            if (info.activityInfo != null) {
-                packages.add(info.activityInfo.packageName);
-            }
-        }
-    }
-
-    static final class OnlinePlayerOption {
+    private static final class OnlinePlayerOption {
         final String packageName;
         final String label;
         final Drawable icon;
