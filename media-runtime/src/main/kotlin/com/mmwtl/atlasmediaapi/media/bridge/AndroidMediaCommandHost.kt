@@ -34,6 +34,7 @@ class AndroidMediaCommandHost(
     internal val autoplayConfirmDelaysMs: List<Long> = AUTOPLAY_CONFIRM_DELAYS_MS,
     internal val autoplayMediaKeyConfirmDelayMs: Long = AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
     internal val backgroundSessionWaitTimeoutMs: Long = BACKGROUND_SESSION_WAIT_TIMEOUT_MS,
+    internal val browserSessionWaitTimeoutMs: Long = BROWSER_SESSION_WAIT_TIMEOUT_MS,
     private val backgroundPlayerStarter: BackgroundPlayerStarter? = null,
     private val launchPackage: ((String) -> Boolean)? = null,
     private val displayedMediaPackage: () -> String = { "" },
@@ -48,6 +49,9 @@ class AndroidMediaCommandHost(
         val AUTOPLAY_CONFIRM_DELAYS_MS = listOf(300L, 700L, 1_200L)
         const val AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS = 1_000L
         const val BACKGROUND_SESSION_WAIT_TIMEOUT_MS = 3_000L
+        // A player that accepted the browser connection is starting; on a cold head unit boot it
+        // may still be loading its process and network source when the shorter wait ends.
+        const val BROWSER_SESSION_WAIT_TIMEOUT_MS = 8_000L
         val SOURCE_STATE_REFRESH_DELAYS_MS = listOf(0L, 200L, 500L, 1_000L)
     }
 
@@ -247,7 +251,7 @@ class AndroidMediaCommandHost(
     private suspend fun startInBackgroundAndPlay(packageName: String): Boolean? {
         val starter = backgroundPlayerStarter ?: return null
         starter.connectAndPlay(packageName)?.let { connection ->
-            val controller = awaitSession(packageName, backgroundSessionWaitTimeoutMs)
+            val controller = awaitSession(packageName, browserSessionWaitTimeoutMs)
             if (controller == null) {
                 connection.close()
             } else {

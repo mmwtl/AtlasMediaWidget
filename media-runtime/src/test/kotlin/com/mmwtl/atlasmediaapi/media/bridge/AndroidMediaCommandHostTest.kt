@@ -325,6 +325,21 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
+    fun `slow player that accepted the media browser gets the longer session wait`() = runBlocking {
+        val (host, starter, launched, session) = backgroundStartFixture(
+            "com.example.slow",
+            browserStarts = true,
+            browserSessionDelayMs = 150L,
+            browserSessionWaitTimeoutMs = 2_000L,
+        )
+
+        assertTrue(host.startDefaultAndPlay("com.example.slow"))
+        assertEquals(listOf("browser:com.example.slow"), starter.calls)
+        assertTrue(launched.isEmpty())
+        session.release()
+    }
+
+    @Test
     fun `refused media browser falls back to the media button receiver`() = runBlocking {
         val (host, starter, launched, session) =
             backgroundStartFixture("com.example.button", mediaButtonStarts = true)
@@ -408,6 +423,7 @@ class AndroidMediaCommandHostTest {
         autoplayConfirmDelaysMs: List<Long> = AndroidMediaCommandHost.AUTOPLAY_CONFIRM_DELAYS_MS,
         autoplayMediaKeyConfirmDelayMs: Long = AndroidMediaCommandHost.AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
         backgroundPlayerStarter: BackgroundPlayerStarter? = null,
+        browserSessionWaitTimeoutMs: Long = sessionWaitTimeoutMs,
     ): AndroidMediaCommandHost = AndroidMediaCommandHost(
         context = context,
         apiManager = OneOSApiManager.getInstance(context),
@@ -421,6 +437,7 @@ class AndroidMediaCommandHostTest {
         autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
         autoplayMediaKeyConfirmDelayMs = autoplayMediaKeyConfirmDelayMs,
         backgroundSessionWaitTimeoutMs = sessionWaitTimeoutMs,
+        browserSessionWaitTimeoutMs = browserSessionWaitTimeoutMs,
         backgroundPlayerStarter = backgroundPlayerStarter,
     )
 
@@ -457,6 +474,8 @@ class AndroidMediaCommandHostTest {
         packageName: String,
         browserStarts: Boolean = false,
         mediaButtonStarts: Boolean = false,
+        browserSessionDelayMs: Long = 0L,
+        browserSessionWaitTimeoutMs: Long = 50L,
     ): BackgroundStartFixture {
         val context = RuntimeEnvironment.getApplication()
         val hub = hub(context, MediaStateRepository())
@@ -471,8 +490,18 @@ class AndroidMediaCommandHostTest {
         val controller = controller(context, session, packageName)
         shadowOf(controller).setPlaybackState(playingState)
         val publishSession: () -> Unit = { activeControllers(observer) += controller }
+        val publishBrowserSession: () -> Unit = {
+            if (browserSessionDelayMs == 0L) {
+                publishSession()
+            } else {
+                Thread {
+                    Thread.sleep(browserSessionDelayMs)
+                    publishSession()
+                }.start()
+            }
+        }
         val starter = FakeBackgroundStarter(
-            onBrowserPlay = publishSession.takeIf { browserStarts },
+            onBrowserPlay = publishBrowserSession.takeIf { browserStarts },
             onMediaButton = publishSession.takeIf { mediaButtonStarts },
         )
         val launched = mutableListOf<String>()
@@ -490,6 +519,7 @@ class AndroidMediaCommandHostTest {
             autoplayConfirmDelaysMs = listOf(1L),
             autoplayMediaKeyConfirmDelayMs = 1L,
             backgroundPlayerStarter = starter,
+            browserSessionWaitTimeoutMs = browserSessionWaitTimeoutMs,
         )
         return BackgroundStartFixture(host, starter, launched, session)
     }
