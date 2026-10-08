@@ -26,6 +26,7 @@ interface MediaCommandHost {
     suspend fun executeNative(request: MediaCommandRequest): MediaCommandResult?
     fun preferredSession(): MediaSessionCommandTarget? = null
     fun sessions(): List<MediaSessionCommandTarget>
+    /** Package of the session the card currently shows; commands go to it before native sources. */
     fun currentVisiblePackage(): String = ""
     fun currentMediaPackage(): String
     fun defaultMediaPackage(): String

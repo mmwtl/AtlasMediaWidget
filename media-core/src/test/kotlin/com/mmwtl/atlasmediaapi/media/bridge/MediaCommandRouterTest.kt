@@ -133,6 +133,23 @@ class MediaCommandRouterTest {
     }
 
     @Test
+    fun `paused session shown after the last player died wins over native source`() = runBlocking {
+        val radio = FakeSession("ru.yandex.radio")
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
+            preferred = radio
+            currentPackage = "ru.yandex.music"
+            visiblePackage = "ru.yandex.radio"
+        }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.TOGGLE))
+
+        assertTrue(result.succeeded)
+        assertEquals(listOf("play"), radio.calls)
+        assertEquals("ru.yandex.radio", host.currentPackage)
+    }
+
+    @Test
     fun `current media package session wins over native source even when paused`() = runBlocking {
         val session = FakeSession("player")
         val host = FakeHost().apply {

@@ -1049,9 +1049,9 @@ public final class OverlayService extends Service
     @Override public void onOpenSource() {
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         cardSuppression.suppress(SystemClock.elapsedRealtime(), 1_500L);
-        if (!mediaSourceLauncher.open(visible) && card != null) {
-            card.showTransientStatus("Не удалось открыть источник", true);
-        }
+        mediaSourceLauncher.open(visible, bridge, opened -> {
+            if (!opened && card != null) card.showTransientStatus("Не удалось открыть источник", true);
+        });
     }
 
     @Override public void onArtwork(long token, Bitmap bitmap) {

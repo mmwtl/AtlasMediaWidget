@@ -74,6 +74,7 @@ class MediaBackendCoordinator(
         stateHub = stateHub,
         oneOsPlayStateGeneration = oneOsAdapter::playStateGeneration,
         backgroundPlayerStarter = AndroidBackgroundPlayerStarter(context),
+        displayedMediaPackage = { stateRepository.snapshot().ownerPackage },
     )
     val commandRouter: MediaCommandRouter = MediaCommandRouter(commandHost)
     val demoBackend: DemoMediaBackend = DemoMediaBackend(

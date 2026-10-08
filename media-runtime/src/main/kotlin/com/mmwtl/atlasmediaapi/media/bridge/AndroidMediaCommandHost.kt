@@ -36,6 +36,7 @@ class AndroidMediaCommandHost(
     internal val backgroundSessionWaitTimeoutMs: Long = BACKGROUND_SESSION_WAIT_TIMEOUT_MS,
     private val backgroundPlayerStarter: BackgroundPlayerStarter? = null,
     private val launchPackage: ((String) -> Boolean)? = null,
+    private val displayedMediaPackage: () -> String = { "" },
     private val oneOsPlayStateGeneration: (MediaCenterConstant.AudioSource) -> Long = { 0L },
 ) : MediaCommandHost {
     companion object {
@@ -135,7 +136,7 @@ class AndroidMediaCommandHost(
     override fun sessions(): List<MediaSessionCommandTarget> =
         sessionObserver.getActiveControllers().map(::AndroidMediaSessionTarget)
 
-    override fun currentVisiblePackage(): String = ""
+    override fun currentVisiblePackage(): String = displayedMediaPackage()
 
     override fun currentMediaPackage(): String = currentMediaPackageRef.get()
 
