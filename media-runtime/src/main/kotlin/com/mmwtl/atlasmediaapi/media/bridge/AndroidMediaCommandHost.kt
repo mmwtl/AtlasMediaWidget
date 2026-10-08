@@ -856,9 +856,28 @@ class AndroidMediaSessionTarget(
         }
 
     override fun play(): Boolean = runCatching {
+        if (isIdle(controller.playbackState?.state)) {
+            // An idle player may have nothing loaded: Media3 ignores play() with an empty playlist
+            // but resumes its last queue from a MEDIA_PLAY key, as after a cold start.
+            val eventTime = android.os.SystemClock.uptimeMillis()
+            val sent = listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP).map { action ->
+                controller.dispatchMediaButtonEvent(
+                    KeyEvent(eventTime, eventTime, action, KeyEvent.KEYCODE_MEDIA_PLAY, 0),
+                )
+            }
+            if (sent.any { it }) return@runCatching true
+        }
         controller.transportControls.play()
         true
     }.getOrDefault(false)
+
+    private fun isIdle(state: Int?): Boolean = when (state) {
+        null,
+        PlaybackState.STATE_NONE,
+        PlaybackState.STATE_STOPPED,
+        PlaybackState.STATE_ERROR -> true
+        else -> false
+    }
 
     override fun pause(): Boolean = runCatching {
         controller.transportControls.pause()
