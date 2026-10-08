@@ -32,12 +32,15 @@ final class MediaPresentation {
         return source.displayId() == MediaSource.Id.RADIO ? "Радио" : "";
     }
 
-    static String subtitle(MediaSource.Id source, String artist, String album) {
+    /** Artist and album; without them, the Online player's name or the radio receiver label. */
+    static String subtitle(MediaSource.Id source, String artist, String album, String playerName) {
         String detail = artist;
         if (!album.isBlank()) detail = detail.isBlank() ? album : detail + "  •  " + album;
-        if (detail.isBlank() && source.displayId() == MediaSource.Id.RADIO) {
-            return "Штатный радиоприёмник";
-        }
-        return detail;
+        if (!detail.isBlank()) return detail;
+        return switch (source.displayId()) {
+            case RADIO -> "Штатный радиоприёмник";
+            case ONLINE -> playerName;
+            default -> "";
+        };
     }
 }

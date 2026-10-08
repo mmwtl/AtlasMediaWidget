@@ -652,9 +652,10 @@ final class MediaCardView extends FrameLayout {
         String displayTitle = MediaPresentation.title(activeSource, value.title);
         title.setTitle(hasMedia && !displayTitle.isBlank()
                 ? displayTitle : getResources().getString(R.string.unknown_track));
-        String detail = MediaPresentation.subtitle(activeSource, value.artist, value.album);
-        subtitle.setText(hasMedia && !detail.isBlank()
-                ? detail : getResources().getString(R.string.empty_hint));
+        // The empty-state hint is for no media only; a playing track without details stays quiet.
+        subtitle.setText(hasMedia
+                ? MediaPresentation.subtitle(activeSource, value.artist, value.album, value.ownerApp)
+                : getResources().getString(R.string.empty_hint));
         if (bridgeConnected && MediaPresentation.isBackendAvailable(activeSource, value.backendConnected, hasMedia)) {
             statusPill.setVisibility(GONE);
         } else {
