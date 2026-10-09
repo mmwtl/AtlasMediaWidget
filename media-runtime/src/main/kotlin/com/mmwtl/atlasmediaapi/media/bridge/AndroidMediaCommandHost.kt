@@ -218,6 +218,7 @@ class AndroidMediaCommandHost(
         returnHomeAfterLaunch: Boolean,
     ): Boolean {
         onUserAction?.invoke()
+        Timber.i("Starting configured media package %s (autoplay=%s)", packageName, autoplay)
         if (autoplay) {
             startInBackgroundAndPlay(packageName)?.let { return it }
         }
@@ -253,6 +254,7 @@ class AndroidMediaCommandHost(
         starter.connectAndPlay(packageName)?.let { connection ->
             val controller = awaitSession(packageName, browserSessionWaitTimeoutMs)
             if (controller == null) {
+                Timber.i("%s accepted its media browser but published no session", packageName)
                 connection.close()
             } else {
                 Timber.i("Started %s through its media browser", packageName)

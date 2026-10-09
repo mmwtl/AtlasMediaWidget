@@ -46,8 +46,12 @@ class AndroidBackgroundPlayerStarter(
         val service = context.packageManager.queryIntentServices(
             Intent(MediaBrowserService.SERVICE_INTERFACE).setPackage(packageName),
             0,
-        ).firstOrNull()?.serviceInfo ?: return null
+        ).firstOrNull()?.serviceInfo ?: run {
+            Timber.i("%s has no media browser service", packageName)
+            return null
+        }
         val component = ComponentName(service.packageName, service.name)
+        Timber.i("Connecting to the media browser %s", component.flattenToShortString())
 
         // MediaBrowser delivers its callbacks on the thread that connects it.
         return withContext(Dispatchers.Main) {
@@ -76,6 +80,7 @@ class AndroidBackgroundPlayerStarter(
                     Timber.w("Media browser of %s refused or timed out", packageName)
                     return@runCatching false
                 }
+                Timber.i("Media browser of %s connected; requesting playback", packageName)
                 MediaController(context, browser.sessionToken).transportControls.play()
                 true
             }.onFailure {
@@ -93,8 +98,12 @@ class AndroidBackgroundPlayerStarter(
         val receiver = context.packageManager.queryBroadcastReceivers(
             Intent(Intent.ACTION_MEDIA_BUTTON).setPackage(packageName),
             0,
-        ).firstOrNull()?.activityInfo ?: return false
+        ).firstOrNull()?.activityInfo ?: run {
+            Timber.i("%s has no media button receiver", packageName)
+            return false
+        }
         val component = ComponentName(receiver.packageName, receiver.name)
+        Timber.i("Sending MEDIA_PLAY to %s", component.flattenToShortString())
         return runCatching {
             val eventTime = SystemClock.uptimeMillis()
             listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP).forEach { action ->
