@@ -18,6 +18,7 @@ final class WidgetAppearance {
     final CoverDimPreset coverDimPreset;
     final int thumbnailSizeDp;
     final CardBackdrop backdrop;
+    final int cornerRadiusDp;
 
     WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
             int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
@@ -61,6 +62,19 @@ final class WidgetAppearance {
             int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
             int progressGapDp, int progressThicknessDp, CoverDimPreset coverDimPreset,
             int thumbnailSizeDp, CardBackdrop backdrop) {
+        this(metadataProgressGapDp, controlPanelHeightDp, controlIconScalePercent,
+                controlSpreadPercent, controlBottomInsetDp, topInsetDp, contentInsetDp,
+                topRowTextSizeSp, titleTextSizeSp, subtitleTextSizeSp, subtitleGapDp,
+                timeTextSizeSp, progressGapDp, progressThicknessDp, coverDimPreset,
+                thumbnailSizeDp, backdrop, Prefs.DEFAULT_CARD_RADIUS_DP);
+    }
+
+    WidgetAppearance(int metadataProgressGapDp, int controlPanelHeightDp,
+            int controlIconScalePercent, int controlSpreadPercent, int controlBottomInsetDp,
+            int topInsetDp, int contentInsetDp, int topRowTextSizeSp, int titleTextSizeSp,
+            int subtitleTextSizeSp, int subtitleGapDp, int timeTextSizeSp,
+            int progressGapDp, int progressThicknessDp, CoverDimPreset coverDimPreset,
+            int thumbnailSizeDp, CardBackdrop backdrop, int cornerRadiusDp) {
         this.metadataProgressGapDp = metadataProgressGapDp;
         this.controlPanelHeightDp = controlPanelHeightDp;
         this.controlIconScalePercent = controlIconScalePercent;
@@ -78,6 +92,7 @@ final class WidgetAppearance {
         this.coverDimPreset = coverDimPreset == null ? CoverDimPreset.DEFAULT : coverDimPreset;
         this.thumbnailSizeDp = thumbnailSizeDp;
         this.backdrop = backdrop == null ? CardBackdrop.ARTWORK : backdrop;
+        this.cornerRadiusDp = cornerRadiusDp;
     }
 
     WidgetAppearance withBackdrop(CardBackdrop value) {
@@ -85,7 +100,7 @@ final class WidgetAppearance {
                 controlIconScalePercent, controlSpreadPercent, controlBottomInsetDp,
                 topInsetDp, contentInsetDp, topRowTextSizeSp, titleTextSizeSp,
                 subtitleTextSizeSp, subtitleGapDp, timeTextSizeSp, progressGapDp,
-                progressThicknessDp, coverDimPreset, thumbnailSizeDp, value);
+                progressThicknessDp, coverDimPreset, thumbnailSizeDp, value, cornerRadiusDp);
     }
 
     static WidgetAppearance defaults(CardStyle style) {

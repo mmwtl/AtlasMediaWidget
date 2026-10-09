@@ -36,7 +36,7 @@ public final class SettingsBackupTest {
         assertEquals(76, restored.compact.appearance.thumbnailSizeDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(14, root.getInt("schemaVersion"));
+        assertEquals(15, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -78,6 +78,25 @@ public final class SettingsBackupTest {
         compact.remove("thumbnailSizeDp");
         assertEquals(76, SettingsBackup.decode(root.toString())
                 .compact.appearance.thumbnailSizeDp);
+    }
+
+    @Test public void cornerRadiusRoundTripAndLegacyDefault() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.COMPACT, null, null), "test"));
+        JSONObject square = root.getJSONObject("settings").getJSONObject("cardStyles")
+                .getJSONObject("square");
+        square.put("cornerRadiusDp", 0);
+        SettingsBackup.Data restored = SettingsBackup.decode(root.toString());
+        assertEquals(0, restored.square.appearance.cornerRadiusDp);
+        assertEquals(0, SettingsBackup.decode(SettingsBackup.encode(restored, "test"))
+                .square.appearance.cornerRadiusDp);
+        square.put("cornerRadiusDp", Prefs.MAX_CARD_RADIUS_DP + 1);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        square.remove("cornerRadiusDp");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.put("schemaVersion", 14);
+        assertEquals(Prefs.DEFAULT_CARD_RADIUS_DP, SettingsBackup.decode(root.toString())
+                .square.appearance.cornerRadiusDp);
     }
 
     @Test public void backdropRoundTripAndLegacyDefault() throws Exception {
@@ -238,7 +257,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 15);
+        root.put("schemaVersion", 16);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));

@@ -253,9 +253,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             Canvas canvas = new Canvas(bitmap);
             canvas.scale(scale, scale);
             Path clip = new Path();
-            float radius = Ui.dp(context, 26) * Math.max(.72f, Math.min(1.75f,
-                    Math.min(width / (float) Ui.dp(context, style.defaultWidthDp),
-                            height / (float) Ui.dp(context, style.defaultHeightDp))));
+            float radius = card.cornerRadiusPx();
             clip.addRoundRect(new RectF(0, 0, width, height), radius, radius, Path.Direction.CW);
             canvas.clipPath(clip);
             card.draw(canvas);

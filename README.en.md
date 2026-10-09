@@ -88,7 +88,7 @@ open directly inside the AppWidget, and the favorites list scrolls.
 - Android players' own buttons (like, repeat and so on) with a count limit, per-app order and hiding —
   [guide](docs/player-buttons.en.md);
 - local progress interpolation without per-second IPC polling;
-- configurable card size, position, artwork dimming or a translucent solid-colour backdrop, typography, spacing and control panel;
+- configurable card size, position, artwork dimming or a translucent solid-colour backdrop, corner radius, typography, spacing and control panel;
 - HOME-only visibility, drag handle and configurable hiding threshold;
 - one settings screen with four tabs: Card, Media, Radio and System; text, spacing and control
   panel fine-tuning is collapsed by default;
