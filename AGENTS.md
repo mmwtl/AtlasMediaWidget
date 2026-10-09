@@ -152,6 +152,8 @@ settings/import invariants.
 - Maintain the Atlas graphite palette: `#171717` background, `#262626` cards, `#333333` nested
   surfaces, `#F5F5F5` primary text, `#D4D4D4` secondary text and `#7893A0` accent.
 - Avoid new dependencies and abstractions unless they materially simplify a required behavior.
+- The card corner radius is screen dp shared with AtlasClimateWidget and AtlasAppWidget (default
+  24 dp, the stock OneOS card radius). Never scale it with the card; the content may scale.
 - Do not add hypothetical fallbacks or silently force a source at startup. Preserve the head unit's
   selected/default source unless the explicit user setting requests an automatic switch.
 

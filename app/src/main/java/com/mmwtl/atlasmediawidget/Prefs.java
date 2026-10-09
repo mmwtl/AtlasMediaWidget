@@ -100,7 +100,8 @@ final class Prefs {
     static final int MAX_THUMBNAIL_SIZE_DP = 160;
     static final int DEFAULT_THUMBNAIL_SIZE_DP = 76;
     static final int MAX_CARD_RADIUS_DP = 40;
-    static final int DEFAULT_CARD_RADIUS_DP = 26;
+    /** Matches the stock OneOS HOME cards, so the Atlas widgets share one default. */
+    static final int DEFAULT_CARD_RADIUS_DP = 24;
     static final int MIN_RADIO_FAVORITES_GRID_COLUMNS = 2;
     static final int MAX_RADIO_FAVORITES_GRID_COLUMNS = 4;
     static final int MIN_RADIO_FAVORITES_GRID_ROWS = 2;

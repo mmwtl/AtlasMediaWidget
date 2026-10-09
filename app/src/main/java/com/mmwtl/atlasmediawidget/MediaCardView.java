@@ -162,7 +162,7 @@ final class MediaCardView extends FrameLayout {
         // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
         boolean solidBackdrop = appearance.backdrop.solidFor(style);
         setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb() : Ui.BACKGROUND,
-                appearance.cornerRadiusDp * uiScale, context));
+                appearance.cornerRadiusDp, context));
         setClipToOutline(true);
         setClickable(true);
 
@@ -1433,8 +1433,11 @@ final class MediaCardView extends FrameLayout {
         view.setEllipsize(TextUtils.TruncateAt.END);
     }
 
-    /** The card's outer corner radius, scaled with the card like the rest of its layout. */
-    float cornerRadiusPx() { return Ui.dp(getContext(), appearance.cornerRadiusDp) * uiScale; }
+    /**
+     * The card's outer corner radius. Unlike the content it does not scale with the card, so one
+     * value gives the same corner as in the other Atlas widgets.
+     */
+    float cornerRadiusPx() { return Ui.dp(getContext(), appearance.cornerRadiusDp); }
 
     private int d(float baseDp) { return Math.max(1, Math.round(Ui.dp(getContext(), baseDp) * uiScale)); }
     private int bx(float baseDp) { return Math.round(Ui.dp(getContext(), baseDp) * widthScale); }

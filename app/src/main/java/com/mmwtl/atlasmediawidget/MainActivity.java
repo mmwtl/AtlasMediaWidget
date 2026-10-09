@@ -788,7 +788,7 @@ public final class MainActivity extends ScaledActivity {
                 "Размер маленькой обложки", Prefs.MIN_THUMBNAIL_SIZE_DP,
                 Prefs.MAX_THUMBNAIL_SIZE_DP);
         lookCard.addView(thumbnailSizeSection, fullWrap());
-        cornerRadiusSetting = addLabeledSeek(lookCard, "Скругление углов карточки",
+        cornerRadiusSetting = addLabeledSeek(lookCard, "Радиус карточки",
                 0, Prefs.MAX_CARD_RADIUS_DP);
         return lookCard;
     }
