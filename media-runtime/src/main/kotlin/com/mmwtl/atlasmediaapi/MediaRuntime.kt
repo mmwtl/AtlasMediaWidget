@@ -2,6 +2,7 @@ package com.mmwtl.atlasmediaapi
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.util.Log
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBackendCoordinator
 import timber.log.Timber
 
@@ -29,8 +30,14 @@ object MediaRuntime {
         }
     }
 
-    /** Sends runtime Timber messages to logcat in every build, tagged `Atlas.<class>`. */
+    /**
+     * Sends runtime Timber messages to logcat, tagged `Atlas.<class>`. Release builds keep INFO
+     * and above.
+     */
     private class RuntimeLogTree : Timber.DebugTree() {
+        override fun isLoggable(tag: String?, priority: Int): Boolean =
+            BuildConfig.DEBUG || priority >= Log.INFO
+
         override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
             super.log(priority, tag?.let { "Atlas.$it" } ?: "Atlas.MediaRuntime", message, t)
         }
