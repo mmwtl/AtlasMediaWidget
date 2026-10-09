@@ -60,6 +60,24 @@ public class WidgetRenderingTest {
                 assertFalse("compact thumbnail size must affect actual widget pixels",
                         Arrays.equals(original, pixels(context, prefs, cover)));
             }
+            prefs.putAppearance(style, withCornerRadius(defaults, 0));
+            assertFalse(style + ": corner radius must affect actual widget pixels",
+                    Arrays.equals(original, pixels(context, prefs, cover)));
+        }
+    }
+
+    @Test public void cornerRadiusStaysTheSameWhateverTheWidgetSize() {
+        Context context = RuntimeEnvironment.getApplication();
+        Prefs prefs = new Prefs(context);
+        Bitmap cover = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
+        cover.eraseColor(Color.rgb(150, 120, 80));
+        for (CardStyle style : CardStyle.values()) {
+            prefs.putInt(Prefs.KEY_CARD_STYLE, style.preferenceValue);
+            prefs.putAppearance(style, WidgetAppearance.defaults(style));
+            int[] small = cornerAlpha(card(context, prefs, cover, 360, 264));
+            int[] large = cornerAlpha(card(context, prefs, cover, 720, 528));
+            assertEquals(style + ": the corner is cut", 0, small[0]);
+            assertArrayEquals(style + ": the corner must not grow with the widget", small, large);
         }
     }
 
@@ -83,6 +101,34 @@ public class WidgetRenderingTest {
     private WidgetAppearance appearance(int[] a, CoverDimPreset preset, int thumbnailSizeDp) {
         return new WidgetAppearance(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7],
                 a[8], a[9], a[10], a[11], a[12], a[13], preset, thumbnailSizeDp);
+    }
+
+    private static WidgetAppearance withCornerRadius(WidgetAppearance a, int radiusDp) {
+        return new WidgetAppearance(a.metadataProgressGapDp, a.controlPanelHeightDp,
+                a.controlIconScalePercent, a.controlSpreadPercent, a.controlBottomInsetDp,
+                a.topInsetDp, a.contentInsetDp, a.topRowTextSizeSp, a.titleTextSizeSp,
+                a.subtitleTextSizeSp, a.subtitleGapDp, a.timeTextSizeSp, a.progressGapDp,
+                a.progressThicknessDp, a.coverDimPreset, a.thumbnailSizeDp, a.backdrop, radiusDp);
+    }
+
+    private static Bitmap card(Context context, Prefs prefs, Bitmap cover, int widthDp,
+            int heightDp) {
+        Bundle options = new Bundle();
+        options.putInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, widthDp);
+        options.putInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, heightDp);
+        var frame = new AtlasMediaWidgetProvider.Frame(context, prefs, options, 0,
+                WidgetPreview.demoSnapshot(), cover, true, WidgetPreview.INERT);
+        View view = frame.views.apply(context, null);
+        return ((BitmapDrawable) ((ImageView) view.findViewById(R.id.widget_card))
+                .getDrawable()).getBitmap();
+    }
+
+    /** Which of the top-left 40×40 px are at least half opaque; only the corner shape decides. */
+    private static int[] cornerAlpha(Bitmap card) {
+        int[] alpha = new int[40 * 40];
+        card.getPixels(alpha, 0, 40, 0, 0, 40, 40);
+        for (int i = 0; i < alpha.length; i++) alpha[i] = (alpha[i] >>> 24) >= 128 ? 1 : 0;
+        return alpha;
     }
 
     private int[] pixels(Context context, Prefs prefs, Bitmap cover) {

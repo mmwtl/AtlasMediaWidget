@@ -162,7 +162,7 @@ final class MediaCardView extends FrameLayout {
         // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
         boolean solidBackdrop = appearance.backdrop.solidFor(style);
         setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb() : Ui.BACKGROUND,
-                26 * uiScale, context));
+                appearance.cornerRadiusDp, context));
         setClipToOutline(true);
         setClickable(true);
 
@@ -205,7 +205,7 @@ final class MediaCardView extends FrameLayout {
         View border = new View(context);
         GradientDrawable borderDrawable = new GradientDrawable();
         borderDrawable.setColor(Color.TRANSPARENT);
-        borderDrawable.setCornerRadius(d(26));
+        borderDrawable.setCornerRadius(cornerRadiusPx());
         // The outline fades with a solid backdrop, so a clear card leaves no frame behind.
         int borderAlpha = solidBackdrop ? 0x33 * appearance.backdrop.alpha / 255 : 0x33;
         borderDrawable.setStroke(Math.max(1, d(1)), borderAlpha << 24 | 0x4F5E68);
@@ -652,9 +652,10 @@ final class MediaCardView extends FrameLayout {
         String displayTitle = MediaPresentation.title(activeSource, value.title);
         title.setTitle(hasMedia && !displayTitle.isBlank()
                 ? displayTitle : getResources().getString(R.string.unknown_track));
-        String detail = MediaPresentation.subtitle(activeSource, value.artist, value.album);
-        subtitle.setText(hasMedia && !detail.isBlank()
-                ? detail : getResources().getString(R.string.empty_hint));
+        // The empty-state hint is for no media only; a playing track without details stays quiet.
+        subtitle.setText(hasMedia
+                ? MediaPresentation.subtitle(activeSource, value.artist, value.album, value.ownerApp)
+                : getResources().getString(R.string.empty_hint));
         if (bridgeConnected && MediaPresentation.isBackendAvailable(activeSource, value.backendConnected, hasMedia)) {
             statusPill.setVisibility(GONE);
         } else {
@@ -1431,6 +1432,12 @@ final class MediaCardView extends FrameLayout {
         view.setTypeface(Typeface.DEFAULT, textStyle);
         view.setEllipsize(TextUtils.TruncateAt.END);
     }
+
+    /**
+     * The card's outer corner radius. Unlike the content it does not scale with the card, so one
+     * value gives the same corner as in the other Atlas widgets.
+     */
+    float cornerRadiusPx() { return Ui.dp(getContext(), appearance.cornerRadiusDp); }
 
     private int d(float baseDp) { return Math.max(1, Math.round(Ui.dp(getContext(), baseDp) * uiScale)); }
     private int bx(float baseDp) { return Math.round(Ui.dp(getContext(), baseDp) * widthScale); }

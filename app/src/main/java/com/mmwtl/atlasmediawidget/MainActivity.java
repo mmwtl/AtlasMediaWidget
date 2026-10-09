@@ -154,6 +154,7 @@ public final class MainActivity extends ScaledActivity {
     private RadioButton[] coverDimPresetButtons;
     private LinearLayout thumbnailSizeSection;
     private LabeledSeek thumbnailSizeSetting;
+    private LabeledSeek cornerRadiusSetting;
     private EditText widthSize;
     private EditText heightSize;
     private SeekBar hideThreshold;
@@ -787,6 +788,8 @@ public final class MainActivity extends ScaledActivity {
                 "Размер маленькой обложки", Prefs.MIN_THUMBNAIL_SIZE_DP,
                 Prefs.MAX_THUMBNAIL_SIZE_DP);
         lookCard.addView(thumbnailSizeSection, fullWrap());
+        cornerRadiusSetting = addLabeledSeek(lookCard, "Радиус карточки",
+                0, Prefs.MAX_CARD_RADIUS_DP);
         return lookCard;
     }
 
@@ -849,7 +852,7 @@ public final class MainActivity extends ScaledActivity {
         bind(appearanceListener, topInsetSetting, contentInsetSetting, topRowTextSetting,
                 titleTextSetting, subtitleTextSetting, subtitleGapSetting, timeTextSetting,
                 progressGapSetting, progressThicknessSetting, thumbnailSizeSetting,
-                backdropAlphaSetting);
+                backdropAlphaSetting, cornerRadiusSetting);
 
         Button resetAppearance = actionButton("Вернуть текст и отступы по умолчанию");
         resetAppearance.setOnClickListener(v -> {
@@ -873,7 +876,8 @@ public final class MainActivity extends ScaledActivity {
                     defaults.progressThicknessDp,
                     existing.coverDimPreset,
                     existing.thumbnailSizeDp,
-                    existing.backdrop));
+                    existing.backdrop,
+                    existing.cornerRadiusDp));
             refreshSizeControls(current);
             refreshOverlayIfRunning();
         });
@@ -2815,7 +2819,8 @@ public final class MainActivity extends ScaledActivity {
                 || controlPanelHeight == null || controlIconScale == null
                 || controlSpread == null || controlBottomInset == null
                 || topInsetSetting == null || coverDimPresetButtons == null
-                || thumbnailSizeSetting == null || backdropSection == null) return;
+                || thumbnailSizeSetting == null || backdropSection == null
+                || cornerRadiusSetting == null) return;
         boolean previous = refreshingStyle;
         refreshingStyle = true;
         WidgetAppearance appearance = prefs.appearance(style);
@@ -2839,6 +2844,7 @@ public final class MainActivity extends ScaledActivity {
         progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
         thumbnailSizeSetting.seek.setProgress(appearance.thumbnailSizeDp);
         thumbnailSizeSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
+        cornerRadiusSetting.seek.setProgress(appearance.cornerRadiusDp);
         coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
         backdropSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         backdropColor = appearance.backdrop.color;
@@ -3230,6 +3236,7 @@ public final class MainActivity extends ScaledActivity {
         progressThicknessSetting.value.setText(
                 progressThicknessSetting.seek.getProgress() + " dp");
         thumbnailSizeSetting.value.setText(thumbnailSizeSetting.seek.getProgress() + " dp");
+        cornerRadiusSetting.value.setText(cornerRadiusSetting.seek.getProgress() + " dp");
         backdropAlphaSetting.value.setText(
                 Math.round(backdropAlphaSetting.seek.getProgress() * 100f / 255f) + " %");
         updateBackdropControls();
@@ -3397,7 +3404,8 @@ public final class MainActivity extends ScaledActivity {
                 progressThicknessSetting.seek.getProgress(),
                 selectedCoverDimPreset(),
                 thumbnailSizeSetting.seek.getProgress(),
-                selectedBackdrop());
+                selectedBackdrop(),
+                cornerRadiusSetting.seek.getProgress());
     }
 
     private CoverDimPreset selectedCoverDimPreset() {

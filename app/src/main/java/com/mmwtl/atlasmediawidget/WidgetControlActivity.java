@@ -102,12 +102,14 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         if (isFinishing() || isDestroyed()) return;
         if ("open".equals(requestedWidgetControl)) {
             requestedWidgetControl = null;
-            main.removeCallbacks(openTimeout);
-            if (!new MediaSourceLauncher(this).open(snapshot)) {
-                failOpen("Не удалось открыть текущий плеер");
-            } else {
-                finish();
-            }
+            new MediaSourceLauncher(this).open(snapshot, mediaBridgeClient, opened -> {
+                main.removeCallbacks(openTimeout);
+                if (!opened) {
+                    failOpen("Не удалось открыть текущий плеер");
+                } else if (!isFinishing() && !isDestroyed()) {
+                    finish();
+                }
+            });
             return;
         }
         if (scrubber != null) renderScrubber(snapshot);

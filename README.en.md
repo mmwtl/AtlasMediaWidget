@@ -88,12 +88,14 @@ open directly inside the AppWidget, and the favorites list scrolls.
 - Android players' own buttons (like, repeat and so on) with a count limit, per-app order and hiding —
   [guide](docs/player-buttons.en.md);
 - local progress interpolation without per-second IPC polling;
-- configurable card size, position, artwork dimming or a translucent solid-colour backdrop, typography, spacing and control panel;
+- configurable card size, position, artwork dimming or a translucent solid-colour backdrop, corner radius, typography, spacing and control panel;
 - HOME-only visibility, drag handle and configurable hiding threshold;
 - one settings screen with four tabs: Card, Media, Radio and System; text, spacing and control
   panel fine-tuning is collapsed by default;
 - default source, startup delay, autoplay and source-loss behavior controls;
-- Online player selection, optional switch to Online before session playback and player minimization;
+- Online player selection, optional switch to Online before session playback and background
+  playback start without opening the player when the player supports it; otherwise the player opens
+  and can be minimized automatically;
 - radio catalog with station artwork, favorites grid and saved-station navigation without scanning;
 - radio title and artwork broadcast to the Geely OneOS DIM; optional separate Online progress
   updates;

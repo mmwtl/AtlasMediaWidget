@@ -15,12 +15,45 @@ final class MediaSourceLauncher {
         this.context = context.getApplicationContext();
     }
 
-    boolean open(MediaSnapshot snapshot) {
+    interface OpenCallback {
+        void onOpened(boolean opened);
+    }
+
+    /**
+     * Opens the source. Online without a session owner first asks the bridge for the configured
+     * player and falls back to the system music chooser only when none is configured.
+     */
+    void open(MediaSnapshot snapshot, MediaBridgeClient bridge, OpenCallback callback) {
+        if (bridge == null || !needsConfiguredPlayer(snapshot)) {
+            callback.onOpened(open(snapshot, ""));
+            return;
+        }
+        bridge.getSettings(new MediaBridgeClient.SettingsCallback() {
+            @Override public void onSettings(MediaSettingsSnapshot settings) {
+                callback.onOpened(open(snapshot, settings.defaultMediaPackage));
+            }
+
+            @Override public void onError(int status, String message) {
+                AppLog.warn("Cannot read the configured Online player: " + message, null);
+                callback.onOpened(open(snapshot, ""));
+            }
+        });
+    }
+
+    static boolean needsConfiguredPlayer(MediaSnapshot snapshot) {
+        return snapshot != null && snapshot.audioSource.displayId() == MediaSource.Id.ONLINE
+                && snapshot.ownerPackage.isBlank();
+    }
+
+    boolean open(MediaSnapshot snapshot, String configuredOnlinePackage) {
         if (snapshot == null) return false;
         MediaSource.Id source = snapshot.audioSource.displayId();
         if (!canOpen(source)) return false;
         if (source == MediaSource.Id.ONLINE) {
             if (!snapshot.ownerPackage.isBlank() && launchPackage(snapshot.ownerPackage)) return true;
+            if (!configuredOnlinePackage.isBlank() && launchPackage(configuredOnlinePackage)) {
+                return true;
+            }
             return launchMusicSelector();
         }
         if (source == MediaSource.Id.CPAA) {

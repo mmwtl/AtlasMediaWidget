@@ -53,6 +53,7 @@ final class Prefs {
     private static final String KEY_PROGRESS_THICKNESS_PREFIX = "progress_thickness_";
     private static final String KEY_COVER_DIM_PRESET_PREFIX = "cover_dim_preset_";
     private static final String KEY_THUMBNAIL_SIZE_PREFIX = "thumbnail_size_";
+    private static final String KEY_CARD_RADIUS_PREFIX = "card_radius_";
     private static final String KEY_BACKDROP_SOLID_PREFIX = "backdrop_solid_";
     private static final String KEY_BACKDROP_COLOR_PREFIX = "backdrop_color_";
     private static final String KEY_BACKDROP_ALPHA_PREFIX = "backdrop_alpha_";
@@ -98,6 +99,9 @@ final class Prefs {
     static final int MIN_THUMBNAIL_SIZE_DP = 48;
     static final int MAX_THUMBNAIL_SIZE_DP = 160;
     static final int DEFAULT_THUMBNAIL_SIZE_DP = 76;
+    static final int MAX_CARD_RADIUS_DP = 40;
+    /** Matches the stock OneOS HOME cards, so the Atlas widgets share one default. */
+    static final int DEFAULT_CARD_RADIUS_DP = 24;
     static final int MIN_RADIO_FAVORITES_GRID_COLUMNS = 2;
     static final int MAX_RADIO_FAVORITES_GRID_COLUMNS = 4;
     static final int MIN_RADIO_FAVORITES_GRID_ROWS = 2;
@@ -455,7 +459,9 @@ final class Prefs {
                 coverDimPreset(style),
                 ranged(KEY_THUMBNAIL_SIZE_PREFIX, style, defaults.thumbnailSizeDp,
                         MIN_THUMBNAIL_SIZE_DP, MAX_THUMBNAIL_SIZE_DP),
-                backdrop(style));
+                backdrop(style),
+                ranged(KEY_CARD_RADIUS_PREFIX, style, defaults.cornerRadiusDp,
+                        0, MAX_CARD_RADIUS_DP));
     }
 
     void putAppearance(CardStyle style, WidgetAppearance value) {
@@ -506,6 +512,8 @@ final class Prefs {
                 .putInt(KEY_THUMBNAIL_SIZE_PREFIX + style.preferenceValue,
                         clamp(value.thumbnailSizeDp, MIN_THUMBNAIL_SIZE_DP,
                                 MAX_THUMBNAIL_SIZE_DP))
+                .putInt(KEY_CARD_RADIUS_PREFIX + style.preferenceValue,
+                        clamp(value.cornerRadiusDp, 0, MAX_CARD_RADIUS_DP))
                 .apply();
     }
 
@@ -581,7 +589,8 @@ final class Prefs {
                 .putInt(KEY_PROGRESS_THICKNESS_PREFIX + suffix, value.progressThicknessDp)
                 .putInt(KEY_COVER_DIM_PRESET_PREFIX + suffix,
                         value.coverDimPreset.preferenceValue)
-                .putInt(KEY_THUMBNAIL_SIZE_PREFIX + suffix, value.thumbnailSizeDp);
+                .putInt(KEY_THUMBNAIL_SIZE_PREFIX + suffix, value.thumbnailSizeDp)
+                .putInt(KEY_CARD_RADIUS_PREFIX + suffix, value.cornerRadiusDp);
         putBackdrop(editor, style, value.backdrop);
     }
 

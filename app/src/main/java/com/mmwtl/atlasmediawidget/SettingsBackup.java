@@ -18,7 +18,7 @@ import java.util.Map;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 14;
+    private static final int SCHEMA_VERSION = 15;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
@@ -260,6 +260,8 @@ final class SettingsBackup {
                     Prefs.MIN_PROGRESS_THICKNESS_DP, Prefs.MAX_PROGRESS_THICKNESS_DP);
             requireRange(path + ".thumbnailSizeDp", appearance.thumbnailSizeDp,
                     Prefs.MIN_THUMBNAIL_SIZE_DP, Prefs.MAX_THUMBNAIL_SIZE_DP);
+            requireRange(path + ".cornerRadiusDp", appearance.cornerRadiusDp,
+                    0, Prefs.MAX_CARD_RADIUS_DP);
             if (appearance.coverDimPreset == null) {
                 throw invalid("Нет пресета затемнения обложки: " + path);
             }
@@ -525,6 +527,7 @@ final class SettingsBackup {
                 .put("progressGapDp", value.progressGapDp)
                 .put("progressThicknessDp", value.progressThicknessDp)
                 .put("thumbnailSizeDp", value.thumbnailSizeDp)
+                .put("cornerRadiusDp", value.cornerRadiusDp)
                 .put("coverDimPreset", value.coverDimPreset.backupName)
                 .put("backdrop", new JSONObject()
                         .put("solid", value.backdrop.solid)
@@ -594,7 +597,10 @@ final class SettingsBackup {
                         schemaVersion >= 13
                                 ? decodeBackdrop(requireObject(object, "backdrop",
                                         path + ".backdrop"), path + ".backdrop")
-                                : CardBackdrop.ARTWORK));
+                                : CardBackdrop.ARTWORK,
+                        schemaVersion >= 15
+                                ? requireInt(object, "cornerRadiusDp", path + ".cornerRadiusDp")
+                                : Prefs.DEFAULT_CARD_RADIUS_DP));
     }
 
     private static CardStyle parseStyleName(String value) throws IOException {

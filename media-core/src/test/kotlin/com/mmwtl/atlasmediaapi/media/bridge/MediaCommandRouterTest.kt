@@ -32,6 +32,7 @@ class MediaCommandRouterTest {
         var currentPackage = ""
         var defaultPackage = ""
         var startDefaultCalls = 0
+        var startedPackages = mutableListOf<String>()
         var fallbackCalls = mutableListOf<Pair<String, MediaCommand>>()
         var sourceResult = true
         var selectedSource: BridgeAudioSource? = null
@@ -62,6 +63,7 @@ class MediaCommandRouterTest {
 
         override suspend fun startDefaultAndPlay(packageName: String): Boolean = true.also {
             startDefaultCalls++
+            startedPackages += packageName
         }
 
         override suspend fun setSource(
@@ -128,6 +130,23 @@ class MediaCommandRouterTest {
 
         assertTrue(result.succeeded)
         assertEquals(listOf("previous"), session.calls)
+    }
+
+    @Test
+    fun `paused session shown after the last player died wins over native source`() = runBlocking {
+        val radio = FakeSession("ru.yandex.radio")
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
+            preferred = radio
+            currentPackage = "ru.yandex.music"
+            visiblePackage = "ru.yandex.radio"
+        }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.TOGGLE))
+
+        assertTrue(result.succeeded)
+        assertEquals(listOf("play"), radio.calls)
+        assertEquals("ru.yandex.radio", host.currentPackage)
     }
 
     @Test
@@ -263,6 +282,31 @@ class MediaCommandRouterTest {
         assertEquals(MediaBridgeContract.Status.NOT_SUPPORTED, result.status)
         assertTrue(carPlay.calls.isEmpty())
         assertTrue(host.fallbackCalls.isEmpty())
+    }
+
+    @Test
+    fun `play without a session starts the configured player instead of the last used one`() =
+        runBlocking {
+            val host = FakeHost().apply {
+                currentPackage = "last.player"
+                defaultPackage = "configured.player"
+            }
+
+            val result = MediaCommandRouter(host).execute(request(MediaCommand.TOGGLE))
+
+            assertTrue(result.succeeded)
+            assertEquals(listOf("configured.player"), host.startedPackages)
+            assertTrue(host.fallbackCalls.isEmpty())
+        }
+
+    @Test
+    fun `play without a session or configured player starts the last used player`() = runBlocking {
+        val host = FakeHost().apply { currentPackage = "last.player" }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.PLAY))
+
+        assertTrue(result.succeeded)
+        assertEquals(listOf("last.player"), host.startedPackages)
     }
 
     @Test

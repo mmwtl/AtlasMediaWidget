@@ -25,6 +25,8 @@ class MediaStateHub(
     private val clusterMediaBridge: com.mmwtl.atlasmediaapi.media.cluster.ClusterMediaBridge? = null,
     private val carPlayArtworkProvider: () -> NormalizedArtwork? = { null },
     private val onActiveSourceLost: (lostSource: BridgeAudioSource, wasPlaying: Boolean) -> Unit = { _, _ -> },
+    /** Whether PLAY can start the configured Online player after its session is gone. */
+    private val canStartOnlinePlayer: () -> Boolean = { false },
 ) {
     private data class CachedRadioArtwork(
         val mediaId: String,
@@ -765,6 +767,11 @@ class MediaStateHub(
 
     private fun clearPlayback() {
         latestArtworkRequest.incrementAndGet()
+        val capabilities = if (canStartOnlinePlayer()) {
+            MediaCapabilities.SET_SOURCE or MediaCapabilities.PLAY or MediaCapabilities.TOGGLE
+        } else {
+            MediaCapabilities.SET_SOURCE
+        }
         repository.update { before ->
             before.copy(
                 ownerPackage = "",
@@ -781,7 +788,7 @@ class MediaStateHub(
                 playbackErrorCode = 0,
                 playbackErrorMessage = "",
                 playbackActions = 0L,
-                capabilities = MediaCapabilities.SET_SOURCE,
+                capabilities = capabilities,
                 artworkUri = "",
                 artworkRevision = if (before.artworkUri.isNotBlank()) {
                     before.artworkRevision + 1L

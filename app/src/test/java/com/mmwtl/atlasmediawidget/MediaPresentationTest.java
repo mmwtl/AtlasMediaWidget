@@ -12,7 +12,15 @@ public final class MediaPresentationTest {
                 true, true, "", "", "", -1L));
         assertEquals("Радио", MediaPresentation.title(MediaSource.Id.RADIO, ""));
         assertEquals("Штатный радиоприёмник",
-                MediaPresentation.subtitle(MediaSource.Id.RADIO, "", ""));
+                MediaPresentation.subtitle(MediaSource.Id.RADIO, "", "", ""));
+    }
+
+    @Test public void onlineTrackWithoutArtistShowsPlayerName() {
+        assertEquals("Murglar",
+                MediaPresentation.subtitle(MediaSource.Id.ONLINE, "", "", "Murglar"));
+        assertEquals("Artist  •  Album",
+                MediaPresentation.subtitle(MediaSource.Id.ONLINE, "Artist", "Album", "Murglar"));
+        assertEquals("", MediaPresentation.subtitle(MediaSource.Id.BT, "", "", "BT"));
     }
 
     @Test public void disconnectedRadioDoesNotHideBackendFailureBehindFallback() {

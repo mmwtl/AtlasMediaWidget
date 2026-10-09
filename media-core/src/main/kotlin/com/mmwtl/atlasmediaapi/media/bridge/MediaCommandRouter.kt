@@ -26,6 +26,7 @@ interface MediaCommandHost {
     suspend fun executeNative(request: MediaCommandRequest): MediaCommandResult?
     fun preferredSession(): MediaSessionCommandTarget? = null
     fun sessions(): List<MediaSessionCommandTarget>
+    /** Package of the session the card currently shows; commands go to it before native sources. */
     fun currentVisiblePackage(): String = ""
     fun currentMediaPackage(): String
     fun defaultMediaPackage(): String
@@ -98,15 +99,20 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
 
         if (target != null) return executeOnSession(target, request)
 
-        val fallbackPackage = host.currentMediaPackage().ifBlank { host.defaultMediaPackage() }
+        // Without a session, play starts the configured player; the last used one only when none
+        // is configured. Other commands can reach only a player that still has a session.
+        val startsPlayback = request.command == MediaCommand.PLAY ||
+            request.command == MediaCommand.TOGGLE
+        val fallbackPackage = if (startsPlayback) {
+            host.defaultMediaPackage().ifBlank { host.currentMediaPackage() }
+        } else {
+            host.currentMediaPackage().ifBlank { host.defaultMediaPackage() }
+        }
         if (fallbackPackage.isBlank()) {
             return result(MediaBridgeContract.Status.NOT_SUPPORTED, "no media target")
         }
 
-        val sent = if ((request.command == MediaCommand.PLAY ||
-                request.command == MediaCommand.TOGGLE) &&
-            fallbackPackage == host.defaultMediaPackage()
-        ) {
+        val sent = if (startsPlayback) {
             host.startDefaultAndPlay(fallbackPackage)
         } else if (request.command == MediaCommand.SEEK_TO) {
             false

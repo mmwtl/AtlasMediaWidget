@@ -10,6 +10,7 @@ import com.geely.lib.oneosapi.mediacenter.MediaCenterManager
 import com.geely.lib.oneosapi.mediacenter.bean.Frequency
 import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import com.mmwtl.atlasmediaapi.media.carplay.CarPlayNativeBridge
+import com.mmwtl.atlasmediaapi.media.session.BackgroundPlayerStarter
 import com.mmwtl.atlasmediaapi.media.session.MediaSessionObserver
 import com.mmwtl.atlasmediaapi.settings.AtlasPreferences
 import kotlinx.coroutines.delay
@@ -32,7 +33,11 @@ class AndroidMediaCommandHost(
     internal val sourcePollDelaysMs: List<Long> = SOURCE_POLL_DELAYS_MS,
     internal val autoplayConfirmDelaysMs: List<Long> = AUTOPLAY_CONFIRM_DELAYS_MS,
     internal val autoplayMediaKeyConfirmDelayMs: Long = AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
+    internal val backgroundSessionWaitTimeoutMs: Long = BACKGROUND_SESSION_WAIT_TIMEOUT_MS,
+    internal val browserSessionWaitTimeoutMs: Long = BROWSER_SESSION_WAIT_TIMEOUT_MS,
+    private val backgroundPlayerStarter: BackgroundPlayerStarter? = null,
     private val launchPackage: ((String) -> Boolean)? = null,
+    private val displayedMediaPackage: () -> String = { "" },
     private val oneOsPlayStateGeneration: (MediaCenterConstant.AudioSource) -> Long = { 0L },
 ) : MediaCommandHost {
     companion object {
@@ -43,11 +48,19 @@ class AndroidMediaCommandHost(
         val SOURCE_POLL_DELAYS_MS = listOf(100L, 200L, 400L, 800L, 1_000L)
         val AUTOPLAY_CONFIRM_DELAYS_MS = listOf(300L, 700L, 1_200L)
         const val AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS = 1_000L
+        const val BACKGROUND_SESSION_WAIT_TIMEOUT_MS = 3_000L
+        // A player that accepted the browser connection is starting; on a cold head unit boot it
+        // may still be loading its process and network source when the shorter wait ends.
+        const val BROWSER_SESSION_WAIT_TIMEOUT_MS = 8_000L
         val SOURCE_STATE_REFRESH_DELAYS_MS = listOf(0L, 200L, 500L, 1_000L)
     }
 
     private val currentMediaPackageRef = AtomicReference("")
     private val lastOnlineMediaPackageRef = AtomicReference("")
+
+    // Some players (Murglar) keep their service only while a browser client is bound, so the
+    // connection that started playback stays open until another background start replaces it.
+    private val retainedBrowserConnection = AtomicReference<AutoCloseable?>(null)
 
     private fun mediaCenter(): MediaCenterManager? =
         apiManager.getMediaCenterManager()?.takeIf { it.isAlive }
@@ -131,7 +144,7 @@ class AndroidMediaCommandHost(
     override fun sessions(): List<MediaSessionCommandTarget> =
         sessionObserver.getActiveControllers().map(::AndroidMediaSessionTarget)
 
-    override fun currentVisiblePackage(): String = ""
+    override fun currentVisiblePackage(): String = displayedMediaPackage()
 
     override fun currentMediaPackage(): String = currentMediaPackageRef.get()
 
@@ -205,6 +218,10 @@ class AndroidMediaCommandHost(
         returnHomeAfterLaunch: Boolean,
     ): Boolean {
         onUserAction?.invoke()
+        Timber.i("Starting configured media package %s (autoplay=%s)", packageName, autoplay)
+        if (autoplay) {
+            startInBackgroundAndPlay(packageName)?.let { return it }
+        }
         val launched = launchPackage?.let { callback ->
             runCatching { callback(packageName) }
                 .onFailure { Timber.w(it, "Could not launch configured media package $packageName") }
@@ -216,7 +233,7 @@ class AndroidMediaCommandHost(
             return true
         }
 
-        val sessionFound = awaitSession(packageName)
+        val sessionFound = awaitSession(packageName, sessionWaitTimeoutMs)
         val result = if (sessionFound != null) {
             playAndConfirm(packageName, sessionFound)
         } else {
@@ -225,6 +242,39 @@ class AndroidMediaCommandHost(
         }
         if (returnHomeAfterLaunch) returnHomeScreen()
         return result
+    }
+
+    /**
+     * Starts the player through its MediaBrowserService, then its media button receiver, without
+     * opening its activity. Returns null when neither path produced a session, so the caller falls
+     * back to the launch intent; otherwise returns whether playback was confirmed.
+     */
+    private suspend fun startInBackgroundAndPlay(packageName: String): Boolean? {
+        val starter = backgroundPlayerStarter ?: return null
+        starter.connectAndPlay(packageName)?.let { connection ->
+            val controller = awaitSession(packageName, browserSessionWaitTimeoutMs)
+            if (controller == null) {
+                Timber.i("%s accepted its media browser but published no session", packageName)
+                connection.close()
+            } else {
+                Timber.i("Started %s through its media browser", packageName)
+                val playing = playAndConfirm(packageName, controller)
+                if (playing) {
+                    retainedBrowserConnection.getAndSet(connection)?.close()
+                } else {
+                    connection.close()
+                }
+                return playing
+            }
+        }
+        if (starter.sendMediaButtonPlay(packageName)) {
+            awaitSession(packageName, backgroundSessionWaitTimeoutMs)?.let { controller ->
+                Timber.i("Started %s through its media button receiver", packageName)
+                return playAndConfirm(packageName, controller)
+            }
+        }
+        Timber.i("%s published no session after background start; launching its activity", packageName)
+        return null
     }
 
     private suspend fun playAndConfirm(
@@ -291,8 +341,8 @@ class AndroidMediaCommandHost(
             .isSuccess
     }
 
-    private suspend fun awaitSession(packageName: String): MediaController? =
-        withTimeoutOrNull(sessionWaitTimeoutMs.coerceAtLeast(1L)) {
+    private suspend fun awaitSession(packageName: String, timeoutMs: Long): MediaController? =
+        withTimeoutOrNull(timeoutMs.coerceAtLeast(1L)) {
             var poll = 0
             while (true) {
                 sessionObserver.getActiveControllers()
@@ -825,9 +875,28 @@ class AndroidMediaSessionTarget(
         }
 
     override fun play(): Boolean = runCatching {
+        if (isIdle(controller.playbackState?.state)) {
+            // An idle player may have nothing loaded: Media3 ignores play() with an empty playlist
+            // but resumes its last queue from a MEDIA_PLAY key, as after a cold start.
+            val eventTime = android.os.SystemClock.uptimeMillis()
+            val sent = listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP).map { action ->
+                controller.dispatchMediaButtonEvent(
+                    KeyEvent(eventTime, eventTime, action, KeyEvent.KEYCODE_MEDIA_PLAY, 0),
+                )
+            }
+            if (sent.any { it }) return@runCatching true
+        }
         controller.transportControls.play()
         true
     }.getOrDefault(false)
+
+    private fun isIdle(state: Int?): Boolean = when (state) {
+        null,
+        PlaybackState.STATE_NONE,
+        PlaybackState.STATE_STOPPED,
+        PlaybackState.STATE_ERROR -> true
+        else -> false
+    }
 
     override fun pause(): Boolean = runCatching {
         controller.transportControls.pause()

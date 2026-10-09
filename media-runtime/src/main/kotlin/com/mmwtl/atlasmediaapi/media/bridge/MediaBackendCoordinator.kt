@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediaapi.media.bridge
 import android.content.Context
 import com.geely.lib.oneosapi.OneOSApiManager
 import com.geely.lib.oneosapi.listener.ServiceConnectionListener
+import com.mmwtl.atlasmediaapi.media.session.AndroidBackgroundPlayerStarter
 import com.mmwtl.atlasmediaapi.media.session.MediaSessionObserver
 import com.mmwtl.atlasmediaapi.settings.AtlasPreferences
 import kotlinx.coroutines.CoroutineScope
@@ -43,6 +44,7 @@ class MediaBackendCoordinator(
         clusterMediaBridge = clusterMediaBridge,
         carPlayArtworkProvider = { if (::carPlayBridge.isInitialized) carPlayBridge.getCachedArtwork() else null },
         onActiveSourceLost = ::handleActiveSourceLost,
+        canStartOnlinePlayer = { preferences.defaultMediaPackage.isNotBlank() },
     )
     val sessionObserver: MediaSessionObserver = MediaSessionObserver(context, stateHub)
     val oneOsAdapter: OneOsMediaBridgeAdapter = OneOsMediaBridgeAdapter(
@@ -71,6 +73,8 @@ class MediaBackendCoordinator(
         onUserAction = ::cancelDefaultSourceSwitch,
         stateHub = stateHub,
         oneOsPlayStateGeneration = oneOsAdapter::playStateGeneration,
+        backgroundPlayerStarter = AndroidBackgroundPlayerStarter(context),
+        displayedMediaPackage = { stateRepository.snapshot().ownerPackage },
     )
     val commandRouter: MediaCommandRouter = MediaCommandRouter(commandHost)
     val demoBackend: DemoMediaBackend = DemoMediaBackend(
