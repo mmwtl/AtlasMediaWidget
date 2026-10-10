@@ -28,6 +28,8 @@ interface MediaCommandHost {
     fun sessions(): List<MediaSessionCommandTarget>
     /** Package of the session the card currently shows; commands go to it before native sources. */
     fun currentVisiblePackage(): String = ""
+    /** True while a head-unit source (radio, Bluetooth, USB) owns audio instead of a player app. */
+    fun nativeSourceSelected(): Boolean = false
     fun currentMediaPackage(): String
     fun defaultMediaPackage(): String
     fun setCurrentMediaPackage(packageName: String)
@@ -152,10 +154,13 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
             }
     }
 
+    // The last commanded player stays current after the head unit switches to a native source;
+    // a paused session must not take commands from that source.
     private fun shouldPreferSession(target: MediaSessionCommandTarget): Boolean =
         (host.currentVisiblePackage().isNotBlank() && target.packageName == host.currentVisiblePackage()) ||
                 target.playbackState == SessionPlaybackState.PLAYING ||
-                (host.currentMediaPackage().isNotBlank() && target.packageName == host.currentMediaPackage())
+                (!host.nativeSourceSelected() && host.currentMediaPackage().isNotBlank() &&
+                        target.packageName == host.currentMediaPackage())
 
     private fun requiredCapability(command: MediaCommand): Long = when (command) {
         MediaCommand.PLAY -> MediaCapabilities.PLAY

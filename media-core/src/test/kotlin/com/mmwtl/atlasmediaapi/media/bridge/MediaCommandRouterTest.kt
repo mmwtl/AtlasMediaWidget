@@ -29,6 +29,7 @@ class MediaCommandRouterTest {
         var owned: MediaSessionCommandTarget? = null
         var allSessions = emptyList<MediaSessionCommandTarget>()
         var visiblePackage = ""
+        var nativeSelected = false
         var currentPackage = ""
         var defaultPackage = ""
         var startDefaultCalls = 0
@@ -50,6 +51,7 @@ class MediaCommandRouterTest {
         override fun preferredSession(): MediaSessionCommandTarget? = preferred
         override fun sessions(): List<MediaSessionCommandTarget> = allSessions
         override fun currentVisiblePackage(): String = visiblePackage
+        override fun nativeSourceSelected(): Boolean = nativeSelected
         override fun currentMediaPackage(): String = currentPackage
         override fun defaultMediaPackage(): String = defaultPackage
         override fun setCurrentMediaPackage(packageName: String) {
@@ -109,6 +111,39 @@ class MediaCommandRouterTest {
         val host = FakeHost().apply {
             nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
             preferred = session
+        }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.NEXT))
+
+        assertTrue(result.succeeded)
+        assertEquals(listOf("next"), session.calls)
+    }
+
+    @Test
+    fun `paused last used player does not take commands from selected native source`() = runBlocking {
+        val session = FakeSession("player")
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
+            preferred = session
+            allSessions = listOf(session)
+            currentPackage = "player"
+            visiblePackage = "com.geely.radio.service"
+            nativeSelected = true
+        }
+
+        val result = MediaCommandRouter(host).execute(request(MediaCommand.NEXT))
+
+        assertTrue(result.succeeded)
+        assertTrue(session.calls.isEmpty())
+    }
+
+    @Test
+    fun `paused last used player keeps commands without native source`() = runBlocking {
+        val session = FakeSession("player")
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.OK)
+            preferred = session
+            currentPackage = "player"
         }
 
         val result = MediaCommandRouter(host).execute(request(MediaCommand.NEXT))

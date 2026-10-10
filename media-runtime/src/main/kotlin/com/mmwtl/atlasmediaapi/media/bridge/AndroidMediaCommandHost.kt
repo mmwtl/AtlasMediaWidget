@@ -146,6 +146,14 @@ class AndroidMediaCommandHost(
 
     override fun currentVisiblePackage(): String = displayedMediaPackage()
 
+    override fun nativeSourceSelected(): Boolean =
+        when (runCatching { mediaCenter()?.currentAudioSource }.getOrNull()) {
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO,
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB -> true
+            else -> false
+        }
+
     override fun currentMediaPackage(): String = currentMediaPackageRef.get()
 
     override fun defaultMediaPackage(): String = preferences.defaultMediaPackage
