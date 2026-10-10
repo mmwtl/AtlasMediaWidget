@@ -37,7 +37,9 @@ class AndroidBackgroundPlayerStarter(
     private val connectTimeoutMs: Long = CONNECT_TIMEOUT_MS,
 ) : BackgroundPlayerStarter {
     companion object {
-        const val CONNECT_TIMEOUT_MS = 3_000L
+        // The bind starts the player's process; on a cold head unit boot its Application and
+        // service setup can exceed 3 s, and disconnecting then unbinds the service mid-start.
+        const val CONNECT_TIMEOUT_MS = 10_000L
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
