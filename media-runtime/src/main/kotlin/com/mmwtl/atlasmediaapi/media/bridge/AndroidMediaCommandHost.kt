@@ -209,6 +209,7 @@ class AndroidMediaCommandHost(
         executeNative(request)?.let { nativeResult ->
             if (nativeResult.status == MediaBridgeContract.Status.OK) return true
             if (nativeResult.status != MediaBridgeContract.Status.NOT_SUPPORTED) return false
+            if (nativeSourceSelected()) return false
         }
 
         val session = preferredSession()

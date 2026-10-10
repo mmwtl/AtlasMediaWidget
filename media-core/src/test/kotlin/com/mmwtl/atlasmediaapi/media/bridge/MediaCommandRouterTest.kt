@@ -138,6 +138,27 @@ class MediaCommandRouterTest {
     }
 
     @Test
+    fun `rejected command on selected native source does not reach player apps`() = runBlocking {
+        val session = FakeSession("player")
+        val host = FakeHost().apply {
+            nativeResult = MediaCommandResult(MediaBridgeContract.Status.NOT_SUPPORTED)
+            preferred = session
+            allSessions = listOf(session)
+            currentPackage = "player"
+            defaultPackage = "player"
+            nativeSelected = true
+        }
+
+        for (command in listOf(MediaCommand.NEXT, MediaCommand.PLAY, MediaCommand.TOGGLE)) {
+            val result = MediaCommandRouter(host).execute(request(command))
+            assertEquals(MediaBridgeContract.Status.NOT_SUPPORTED, result.status)
+        }
+        assertTrue(session.calls.isEmpty())
+        assertTrue(host.fallbackCalls.isEmpty())
+        assertEquals(0, host.startDefaultCalls)
+    }
+
+    @Test
     fun `paused last used player keeps commands without native source`() = runBlocking {
         val session = FakeSession("player")
         val host = FakeHost().apply {

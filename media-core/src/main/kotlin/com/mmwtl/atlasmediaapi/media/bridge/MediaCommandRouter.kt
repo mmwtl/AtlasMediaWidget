@@ -94,7 +94,10 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
         }
 
         host.executeNative(request)?.let { nativeResult ->
-            if (nativeResult.status != MediaBridgeContract.Status.NOT_SUPPORTED) {
+            // A command the selected native source rejects must not wake a paused player app.
+            if (nativeResult.status != MediaBridgeContract.Status.NOT_SUPPORTED ||
+                host.nativeSourceSelected()
+            ) {
                 return nativeResult
             }
         }
