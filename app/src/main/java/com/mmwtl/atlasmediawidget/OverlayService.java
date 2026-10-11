@@ -1047,6 +1047,7 @@ public final class OverlayService extends Service
     }
 
     @Override public void onOpenSource() {
+        if (!prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true)) return;
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         cardSuppression.suppress(SystemClock.elapsedRealtime(), 1_500L);
         mediaSourceLauncher.open(visible, bridge, opened -> {

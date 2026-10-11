@@ -264,7 +264,10 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             views.setImageViewBitmap(R.id.widget_card, bitmap);
             views.setContentDescription(R.id.widget_card, !connected ? "Нет соединения" : snapshot == null ? "Нет данных"
                     : snapshot.title + ", " + snapshot.artist + (snapshot.isPlaying() ? ", воспроизведение" : ", пауза"));
-            views.setOnClickPendingIntent(R.id.widget_card, click(context, id, "open", false));
+            // Cleared explicitly: a same-layout update reapplies onto the views with the old click.
+            views.setOnClickPendingIntent(R.id.widget_card,
+                    prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true)
+                            ? click(context, id, "open", false) : null);
             setProgress(views);
             views.removeAllViews(R.id.widget_targets);
             setFavoritesGrid(context, id, grid);

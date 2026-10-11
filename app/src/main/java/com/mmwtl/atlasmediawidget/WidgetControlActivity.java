@@ -38,7 +38,9 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         int id = getIntent().getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID);
         if (!prefs.isWidgetMode() || !AtlasMediaWidgetProvider.owns(this, id)
-                || !("open".equals(requestedWidgetControl) || "scrub".equals(requestedWidgetControl))) {
+                || !("open".equals(requestedWidgetControl) || "scrub".equals(requestedWidgetControl))
+                || "open".equals(requestedWidgetControl)
+                        && !prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true)) {
             finish();
             return;
         }

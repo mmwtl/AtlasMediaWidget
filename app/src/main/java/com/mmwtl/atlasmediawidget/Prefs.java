@@ -34,6 +34,7 @@ final class Prefs {
     static final String KEY_PLAYER_ACTION_IDS = "player_action_ids";
     static final String KEY_DRAG_HANDLE_VISIBLE = "drag_handle_visible";
     static final String KEY_STATUS_BAR_MEDIA = "status_bar_media";
+    static final String KEY_CARD_OPENS_PLAYER = "card_opens_player";
     static final String KEY_STATUS_BAR_FORMAT = "status_bar_format";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
@@ -535,6 +536,7 @@ final class Prefs {
                         PlayerActionFilter.encode(data.playerActionRules.published))
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putBoolean(KEY_STATUS_BAR_MEDIA, data.statusBarMedia)
+                .putBoolean(KEY_CARD_OPENS_PLAYER, data.cardOpensPlayer)
                 .putInt(KEY_STATUS_BAR_FORMAT, data.statusBarFormat.preferenceValue)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)

@@ -466,6 +466,19 @@ public final class SettingsBackupTest {
         assertTrue(SettingsBackup.decode(root.toString()).playerActionRules.hidden.isEmpty());
     }
 
+    @Test public void cardOpensPlayerRoundTripsAndDefaultsToOn() throws Exception {
+        SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
+        assertTrue(base.cardOpensPlayer);
+        JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
+        assertTrue(root.getJSONObject("settings").getBoolean("cardOpensPlayer"));
+        root.getJSONObject("settings").put("cardOpensPlayer", false);
+        assertFalse(SettingsBackup.decode(root.toString()).cardOpensPlayer);
+        root.getJSONObject("settings").put("cardOpensPlayer", "false");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("cardOpensPlayer");
+        assertTrue(SettingsBackup.decode(root.toString()).cardOpensPlayer);
+    }
+
     @Test public void statusBarMediaRoundTripsAndDefaultsToOff() throws Exception {
         SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
         assertFalse(base.statusBarMedia);

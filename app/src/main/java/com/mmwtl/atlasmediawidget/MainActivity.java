@@ -134,6 +134,7 @@ public final class MainActivity extends ScaledActivity {
     private Switch radioFavoritesNavigation;
     private Switch dragHandleVisible;
     private Switch statusBarMedia;
+    private Switch cardOpensPlayer;
     private RadioGroup statusBarFormatGroup;
     private RadioButton[] statusBarFormatButtons;
     private Button exportSettingsButton;
@@ -506,6 +507,17 @@ public final class MainActivity extends ScaledActivity {
                         ? "Системный виджет HOME: размер и место задаёт лаунчер."
                         : "Отдельное окно поверх HOME: размер и положение задаются здесь.",
                 13, Ui.SECONDARY, Typeface.NORMAL));
+        cardOpensPlayer = new Switch(this);
+        cardOpensPlayer.setText("Открывать плеер нажатием на карточку");
+        cardOpensPlayer.setTextColor(Ui.PRIMARY);
+        cardOpensPlayer.setTextSize(15);
+        cardOpensPlayer.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_CARD_OPENS_PLAYER, checked);
+        });
+        LinearLayout.LayoutParams opensPlayerParams = fullWrap();
+        opensPlayerParams.topMargin = Ui.dp(this, 14);
+        card.addView(cardOpensPlayer, opensPlayerParams);
         return card;
     }
 
@@ -1233,6 +1245,7 @@ public final class MainActivity extends ScaledActivity {
         dragHandleVisible.setChecked(
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true));
         statusBarMedia.setChecked(prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false));
+        cardOpensPlayer.setChecked(prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true));
         statusBarFormatButtons[prefs.statusBarFormat().preferenceValue].setChecked(true);
         updateStatusBarFormatControls();
         refreshFavoriteGridControls();

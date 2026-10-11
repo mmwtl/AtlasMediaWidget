@@ -34,6 +34,7 @@ final class SettingsBackup {
         final PlayerActionFilter.Rules playerActionRules;
         final boolean dragHandleVisible;
         final boolean statusBarMedia;
+        final boolean cardOpensPlayer;
         final StatusBarScene.Format statusBarFormat;
         final int appUiScaleTenths;
         final CardStyle selectedStyle;
@@ -148,8 +149,25 @@ final class SettingsBackup {
                 boolean widgetMode, int playerActionsCount,
                 PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
                 StatusBarScene.Format statusBarFormat) throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
+                    playerActionsCount, playerActionRules, statusBarMedia, statusBarFormat, true);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths, CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner, StyleData compact, StyleData square,
+                Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
+                boolean widgetMode, int playerActionsCount,
+                PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
+                StatusBarScene.Format statusBarFormat, boolean cardOpensPlayer)
+                throws IOException {
             this.widgetMode = widgetMode;
             this.statusBarMedia = statusBarMedia;
+            this.cardOpensPlayer = cardOpensPlayer;
             if (statusBarFormat == null) throw invalid("Не указан формат строки состояния");
             this.statusBarFormat = statusBarFormat;
             if (playerActionRules == null) throw invalid("Не указаны настройки кнопок плеера");
@@ -295,7 +313,8 @@ final class SettingsBackup {
                 prefs.getBoolean(Prefs.KEY_RADIO_FAVORITES_NAVIGATION, false),
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
                 prefs.playerActionsCount(), prefs.playerActionRules(),
-                prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat());
+                prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat(),
+                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true));
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -345,6 +364,7 @@ final class SettingsBackup {
             settings.put("dragHandleVisible", data.dragHandleVisible);
             settings.put("statusBarMedia", data.statusBarMedia);
             settings.put("statusBarFormat", data.statusBarFormat.preferenceValue);
+            settings.put("cardOpensPlayer", data.cardOpensPlayer);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -464,7 +484,10 @@ final class SettingsBackup {
                     settings.has("statusBarMedia") && requireBoolean(settings, "statusBarMedia",
                             "settings.statusBarMedia"),
                     settings.has("statusBarFormat") ? statusBarFormat(settings)
-                            : StatusBarScene.Format.DEFAULT);
+                            : StatusBarScene.Format.DEFAULT,
+                    // Added within schema 15; older files keep opening the player on a tap.
+                    !settings.has("cardOpensPlayer") || requireBoolean(settings,
+                            "cardOpensPlayer", "settings.cardOpensPlayer"));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
