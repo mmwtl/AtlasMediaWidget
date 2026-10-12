@@ -17,9 +17,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 
 class MediaBridgeService : Service() {
@@ -257,8 +258,15 @@ class MediaBridgeService : Service() {
             return
         }
 
+        // A newer user command replaces a source switch that is still waiting for its player.
+        if (coordinator.commandGate.preempt()) {
+            Timber.i("Cancelled a running source switch for %s", request.command)
+        }
         scope.launch(Dispatchers.IO) {
-            val result = coordinator.commandMutex.withLock {
+            val executed = coordinator.commandGate.run(
+                interruptible = request.command == MediaCommand.SET_SOURCE ||
+                    request.command == MediaCommand.TUNE_RADIO,
+            ) {
                 runCatching {
                     if (coordinator.isDemoMode()) coordinator.demoBackend.execute(request)
                     else coordinator.commandRouter.execute(request)
@@ -267,6 +275,9 @@ class MediaBridgeService : Service() {
                     .getOrElse {
                         MediaCommandResult(MediaBridgeContract.Status.FAILED, it.message.orEmpty())
                     }
+            }
+            val result = if (currentCoroutineContext().isActive) executed else {
+                MediaCommandResult(MediaBridgeContract.Status.FAILED, "superseded by a newer command")
             }
             scope.launch {
                 clients[client.messenger.binder]?.let {

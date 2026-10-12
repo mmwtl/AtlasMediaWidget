@@ -124,6 +124,9 @@ public final class OverlayService extends Service
     /** Overlay and widget redraws build new cards, so the live-stream count lives here. */
     private final LiveListeningClock liveClock = new LiveListeningClock();
     private final TransportSnapshotGuard transportSnapshotGuard = new TransportSnapshotGuard();
+    // A newer command cancels a source switch still waiting for its player; the switch's late
+    // failure must not undo the newer command's pending state.
+    private String latestCommandRequestId = "";
     private final OnlineSnapshotStabilizer onlineSnapshotStabilizer =
             new OnlineSnapshotStabilizer();
     private final CardSuppressionPolicy cardSuppression = new CardSuppressionPolicy();
@@ -813,6 +816,10 @@ public final class OverlayService extends Service
             long generation) {
         AppLog.info("Media command result request=" + requestId + " status=" + status
                 + " generation=" + generation + " message=" + message);
+        if (status != MediaBridgeContract.STATUS_OK && !latestCommandRequestId.equals(requestId)) {
+            bridge.requestSnapshot();
+            return;
+        }
         if (status != MediaBridgeContract.STATUS_OK) {
             transportSnapshotGuard.clear();
             main.removeCallbacks(transportReconcile);
@@ -932,6 +939,7 @@ public final class OverlayService extends Service
         }
         beginTransportReconciliation();
         String requestId = bridge.sendCommand(command);
+        latestCommandRequestId = requestId;
         AppLog.info("Sending media command request=" + requestId + " command=" + command
                 + " source=" + visibleSource());
     }
@@ -963,6 +971,7 @@ public final class OverlayService extends Service
     @Override public void onSeek(long positionMs) {
         beginTransportReconciliation();
         String requestId = bridge.seekTo(positionMs);
+        latestCommandRequestId = requestId;
         AppLog.info("Sending media command request=" + requestId + " command=SEEK_TO"
                 + " position=" + positionMs + " source=" + visibleSource());
     }
@@ -972,6 +981,7 @@ public final class OverlayService extends Service
         main.removeCallbacks(transportReconcile);
         pendingRadioNavigation.cancelIfSourceChanged(source);
         String requestId = bridge.setSource(source);
+        latestCommandRequestId = requestId;
         AppLog.info("Sending media command request=" + requestId + " command=SET_SOURCE"
                 + " source=" + source);
     }
@@ -988,6 +998,7 @@ public final class OverlayService extends Service
         MediaSnapshot visible = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (visible == null || visible.customAction(action) == null) return;
         String requestId = bridge.sendCustomAction(action);
+        latestCommandRequestId = requestId;
         AppLog.info("Sending media command request=" + requestId + " command=CUSTOM_ACTION"
                 + " action=" + action + " owner=" + visible.ownerPackage);
     }
@@ -1029,6 +1040,7 @@ public final class OverlayService extends Service
         }
         beginTransportReconciliation();
         String requestId = bridge.tuneRadio(station);
+        latestCommandRequestId = requestId;
         AppLog.info("Sending radio tune request=" + requestId + " station=" + station.id
                 + " frequencyKHz=" + station.frequencyKHz + " band=" + station.band);
     }

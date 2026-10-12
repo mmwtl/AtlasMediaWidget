@@ -13,8 +13,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicInteger
@@ -103,7 +101,7 @@ class MediaBackendCoordinator(
             },
         )
     val callerAccessPolicy: CallerAccessPolicy = OpenCallerAccessPolicy()
-    val commandMutex: Mutex = Mutex()
+    val commandGate: MediaCommandGate = MediaCommandGate()
 
     private val apiManager = OneOSApiManager.getInstance(context)
     private val clientCount = AtomicInteger(0)
@@ -359,7 +357,10 @@ class MediaBackendCoordinator(
                         attempt + 1,
                     )
                     withContext(Dispatchers.IO) {
-                        commandMutex.withLock {
+                        commandGate.run(
+                            interruptible = true,
+                            onPreempted = ::onStartupActionPreempted,
+                        ) {
                             if (targetSource != null) {
                                 commandHost.setDefaultSource(
                                     source = targetSource,
@@ -396,6 +397,14 @@ class MediaBackendCoordinator(
                 )
                 delay(retryDelay)
             }
+        }
+    }
+
+    /** A user command replaced the startup action; it must not run again after a reconnect. */
+    private fun onStartupActionPreempted() {
+        scope.launch {
+            Timber.i("Startup media action cancelled by a newer user command")
+            hasAppliedDefaultSource = true
         }
     }
 
@@ -439,7 +448,7 @@ class MediaBackendCoordinator(
             isApplyingDefaultSource = true
             try {
                 withContext(Dispatchers.IO) {
-                    commandMutex.withLock {
+                    commandGate.run(interruptible = true) {
                         commandHost.setSource(
                             source = targetSource,
                             appSource = null,
