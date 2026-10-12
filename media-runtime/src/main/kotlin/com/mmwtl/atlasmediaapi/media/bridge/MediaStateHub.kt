@@ -27,6 +27,8 @@ class MediaStateHub(
     private val onActiveSourceLost: (lostSource: BridgeAudioSource, wasPlaying: Boolean) -> Unit = { _, _ -> },
     /** Whether PLAY can start the configured Online player after its session is gone. */
     private val canStartOnlinePlayer: () -> Boolean = { false },
+    /** Normalizes track artwork; the repository unless a test observes the requests. */
+    private val trackArtworkNormalizer: ArtworkNormalizer = artworkRepository,
 ) {
     private data class CachedRadioArtwork(
         val mediaId: String,
@@ -885,9 +887,15 @@ class MediaStateHub(
         val request = latestArtworkRequest.incrementAndGet()
         artworkRequestKey = "$ownerPackage\u0000$mediaId\u0000$inputKey"
         artworkRequestId = request
-        artworkRepository.normalize(input) { normalized ->
+        trackArtworkNormalizer.normalize(input) { normalized ->
+            if (normalized.uri.isBlank()) {
+                // A failed read is not a result: the next callback may retry the same input.
+                synchronized(mediaCallbackLock) {
+                    if (artworkRequestId == request) artworkRequestKey = ""
+                }
+                return@normalize
+            }
             if (latestArtworkRequest.get() != request) return@normalize
-            if (normalized.uri.isBlank()) return@normalize
             val snapshot = repository.snapshot()
             if (snapshot.ownerPackage != ownerPackage || snapshot.mediaId != mediaId) return@normalize
             repository.update {

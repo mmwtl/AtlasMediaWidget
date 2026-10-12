@@ -12,6 +12,7 @@ import android.os.Messenger
 import android.os.RemoteException
 import androidx.core.net.toUri
 import com.mmwtl.atlasmediaapi.MediaRuntime
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -258,25 +259,30 @@ class MediaBridgeService : Service() {
             return
         }
 
-        // A newer user command replaces a source switch that is still waiting for its player.
-        if (coordinator.commandGate.preempt()) {
-            Timber.i("Cancelled a running source switch for %s", request.command)
-        }
+        // A newer user command replaces a source switch that is still waiting for its player or
+        // for its turn; admit before launching so the order of arrival decides.
+        val admitted = coordinator.commandGate.admit()
         scope.launch(Dispatchers.IO) {
-            val executed = coordinator.commandGate.run(
-                interruptible = request.command == MediaCommand.SET_SOURCE ||
-                    request.command == MediaCommand.TUNE_RADIO,
-            ) {
-                runCatching {
-                    if (coordinator.isDemoMode()) coordinator.demoBackend.execute(request)
-                    else coordinator.commandRouter.execute(request)
-                }
-                    .onFailure(Timber::e)
-                    .getOrElse {
-                        MediaCommandResult(MediaBridgeContract.Status.FAILED, it.message.orEmpty())
+            val executed = try {
+                coordinator.commandGate.run(
+                    interruptible = request.command == MediaCommand.SET_SOURCE ||
+                        request.command == MediaCommand.TUNE_RADIO,
+                    admittedGeneration = admitted,
+                ) {
+                    runCatching {
+                        if (coordinator.isDemoMode()) coordinator.demoBackend.execute(request)
+                        else coordinator.commandRouter.execute(request)
                     }
+                        .onFailure(Timber::e)
+                        .getOrElse {
+                            MediaCommandResult(MediaBridgeContract.Status.FAILED, it.message.orEmpty())
+                        }
+                }
+            } catch (_: CancellationException) {
+                null
             }
-            val result = if (currentCoroutineContext().isActive) executed else {
+            val result = if (executed != null && currentCoroutineContext().isActive) executed else {
+                Timber.i("Superseded %s by a newer command", request.command)
                 MediaCommandResult(MediaBridgeContract.Status.FAILED, "superseded by a newer command")
             }
             scope.launch {
