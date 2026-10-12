@@ -78,19 +78,32 @@ class MediaStateHub(
         appSource: MediaCenterConstant.AppSource,
         availability: Map<BridgeAudioSource, Pair<Boolean, Boolean>>,
     ) {
+        synchronized(mediaCallbackLock) {
+            onBackendConnectedLocked(audioSource, appSource, availability)
+        }
+        cpaaArtworkFallback.onBridgeStateChanged()
+    }
+
+    private fun onBackendConnectedLocked(
+        audioSource: MediaCenterConstant.AudioSource,
+        appSource: MediaCenterConstant.AppSource,
+        availability: Map<BridgeAudioSource, Pair<Boolean, Boolean>>,
+    ) {
         val selected = audioSource.toBridgeSource()
-        synchronized(mediaCallbackLock) { reportedLostSources.remove(selected) }
+        reportedLostSources.remove(selected)
         clusterMediaBridge?.setActiveSource(selected)
         onlineSourcePolicy.onAudioSource(selected)
         val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
+        val sourceChanged = repository.snapshot().audioSource != selected.name
+        if (sourceChanged) latestArtworkRequest.incrementAndGet()
         repository.update { before ->
-            val sourceChanged = before.audioSource != selected.name
             val newArtworkUri = when {
                 cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
                 sourceChanged -> ""
                 else -> before.artworkUri
             }
-            before.copy(
+            // A source selected while OneOS was away starts without the previous source's track.
+            (if (sourceChanged) before.withoutMedia() else before).copy(
                 backendConnected = true,
                 backendErrorCode = MediaBridgeContract.BackendError.NONE,
                 backendErrorMessage = "",
@@ -115,7 +128,6 @@ class MediaStateHub(
                 } else before.artworkRevision,
             )
         }
-        cpaaArtworkFallback.onBridgeStateChanged()
     }
 
     fun onBackendDisconnected(message: String) {
@@ -186,7 +198,7 @@ class MediaStateHub(
                     sourceChanged -> ""
                     else -> before.artworkUri
                 }
-                before.copy(
+                (if (sourceChanged) before.withoutMedia() else before).copy(
                     audioSource = selected.name,
                     appSource = appSource.name,
                     sources = before.sources.map { source ->
@@ -194,18 +206,6 @@ class MediaStateHub(
                     },
                     ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
                     ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
-                    mediaId = if (sourceChanged) "" else before.mediaId,
-                    title = if (sourceChanged) "" else before.title,
-                    artist = if (sourceChanged) "" else before.artist,
-                    album = if (sourceChanged) "" else before.album,
-                    duration = if (sourceChanged) -1L else before.duration,
-                    position = if (sourceChanged) -1L else before.position,
-                    updateElapsedRealtime = if (sourceChanged) 0L else before.updateElapsedRealtime,
-                    speed = if (sourceChanged) 0f else before.speed,
-                    playbackState = if (sourceChanged) PlaybackState.STATE_NONE else before.playbackState,
-                    playbackErrorCode = if (sourceChanged) 0 else before.playbackErrorCode,
-                    playbackErrorMessage = if (sourceChanged) "" else before.playbackErrorMessage,
-                    playbackActions = if (sourceChanged) 0L else before.playbackActions,
                     capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
                     artworkUri = newArtworkUri,
                     artworkRevision = if (
@@ -965,6 +965,22 @@ internal fun MediaController.playerSessionFacts(): PlayerSessionFacts = PlayerSe
     playing = playbackState?.state == PlaybackState.STATE_PLAYING,
     hasContent = metadata.hasPlayerContent(),
     lastPositionUpdateTime = playbackState?.lastPositionUpdateTime ?: 0L,
+)
+
+/** Track and playback fields cleared for a newly selected source until it reports its own. */
+private fun MediaSnapshot.withoutMedia(): MediaSnapshot = copy(
+    mediaId = "",
+    title = "",
+    artist = "",
+    album = "",
+    duration = -1L,
+    position = -1L,
+    updateElapsedRealtime = 0L,
+    speed = 0f,
+    playbackState = PlaybackState.STATE_NONE,
+    playbackErrorCode = 0,
+    playbackErrorMessage = "",
+    playbackActions = 0L,
 )
 
 /** Position reached by now when the snapshot is playing; otherwise the stored position. */

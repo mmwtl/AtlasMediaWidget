@@ -154,6 +154,46 @@ class MediaStateHubDisconnectTest {
         assertTrue(snapshot.sources.none { it.selected })
     }
 
+    @Test
+    fun `reconnect on another source does not keep the previous source track`() {
+        val fixture = fixture()
+        val session = createAndroidOnlineSession(fixture)
+        fixture.hub.onMediaController(session.controller)
+        fixture.hub.onBackendDisconnected("OneOS unavailable")
+        assertEquals("VLC track", fixture.repository.snapshot().title)
+
+        fixture.hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_BT,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+
+        val snapshot = fixture.repository.snapshot()
+        assertEquals(BridgeAudioSource.BT.name, snapshot.audioSource)
+        assertEquals("", snapshot.title)
+        assertEquals("", snapshot.artist)
+        assertEquals(PlaybackState.STATE_NONE, snapshot.playbackState)
+        assertEquals(-1L, snapshot.position)
+        session.session.release()
+    }
+
+    @Test
+    fun `reconnect on the same source keeps its track`() {
+        val fixture = fixture()
+        val session = createAndroidOnlineSession(fixture)
+        fixture.hub.onMediaController(session.controller)
+        fixture.hub.onBackendDisconnected("OneOS unavailable")
+
+        fixture.hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+
+        assertEquals("VLC track", fixture.repository.snapshot().title)
+        session.session.release()
+    }
+
     private data class Fixture(
         val context: android.content.Context,
         val repository: MediaStateRepository,
