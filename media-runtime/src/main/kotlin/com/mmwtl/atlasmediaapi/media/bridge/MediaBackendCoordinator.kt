@@ -94,8 +94,10 @@ class MediaBackendCoordinator(
             clusterMediaBridge = clusterMediaBridge,
             onSettingsChanged = {
                 scope.launch {
-                    stateHub.refreshRadioState()
-                    withContext(Dispatchers.IO) { publishOnlineToCluster(stateRepository.snapshot()) }
+                    withContext(Dispatchers.IO) {
+                        stateHub.refreshRadioState()
+                        publishOnlineToCluster(stateRepository.snapshot())
+                    }
                     cancelDefaultSourceSwitch()
                 }
             },
@@ -116,6 +118,7 @@ class MediaBackendCoordinator(
     private var isBackendStarted = false
     private var activeBackendIsDemo = false
     private var connectionGeneration = 0L
+    private var oneOsConnected = false
 
     private val serviceConnectionListener = object : ServiceConnectionListener {
         override fun onServiceBinderUpdated(binderType: Int) {
@@ -268,38 +271,42 @@ class MediaBackendCoordinator(
             reconnectJob?.cancel()
             reconnectJob = null
             connectionGeneration++
+            oneOsConnected = true
             val currentGen = connectionGeneration
             Timber.i("OneOS connected, generation=%d", currentGen)
 
-            withContext(Dispatchers.IO) {
-                val center = apiManager.getMediaCenterManager()
-                if (center != null && center.isAlive) {
-                    withContext(Dispatchers.Main) {
-                        if (connectionGeneration == currentGen && isBackendStarted) {
-                            oneOsAdapter.attach(center)
-                            if (!hasAppliedDefaultSource && defaultSourceJob?.isActive != true) {
-                                scheduleDefaultSourceSwitch()
-                            }
-                        }
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        if (connectionGeneration == currentGen && isBackendStarted) {
-                            stateHub.onBackendDisconnected("OneOS MediaCenter unavailable")
-                            scheduleMediaCenterRetry(currentGen)
-                        }
-                    }
+            val center = withContext(Dispatchers.IO) {
+                apiManager.getMediaCenterManager()?.takeIf { it.isAlive }
+            }
+            if (connectionGeneration != currentGen || !isBackendStarted) return
+            if (center == null) {
+                stateHub.onBackendDisconnected("OneOS MediaCenter unavailable")
+                scheduleMediaCenterRetry(currentGen)
+                return
+            }
+            withContext(Dispatchers.IO) { oneOsAdapter.attach(center) }
+            if (connectionGeneration != currentGen || !isBackendStarted) {
+                // The backend stopped or OneOS disconnected while attaching; a newer connection
+                // attaches again by itself.
+                if (!isBackendStarted || !oneOsConnected) {
+                    withContext(Dispatchers.IO) { oneOsAdapter.detach(notify = true) }
                 }
+                return
+            }
+            if (!hasAppliedDefaultSource && defaultSourceJob?.isActive != true) {
+                scheduleDefaultSourceSwitch()
             }
         } else {
             Timber.w("OneOS disconnected")
+            connectionGeneration++
+            oneOsConnected = false
             mediaCenterRetryJob?.cancel()
             mediaCenterRetryJob = null
             if (preferences.defaultAudioSource != BridgeAudioSource.ONLINE.name) {
                 defaultSourceJob?.cancel()
                 defaultSourceJob = null
             }
-            oneOsAdapter.detach(notify = true)
+            withContext(Dispatchers.IO) { oneOsAdapter.detach(notify = true) }
             if (clientCount.get() > 0 && isBackendStarted) {
                 scheduleReconnect()
             }
@@ -351,14 +358,16 @@ class MediaBackendCoordinator(
                         autoplay,
                         attempt + 1,
                     )
-                    commandMutex.withLock {
-                        if (targetSource != null) {
-                            commandHost.setDefaultSource(
-                                source = targetSource,
-                                autoplay = autoplay,
-                            )
-                        } else {
-                            commandHost.autoplayCurrentSource()
+                    withContext(Dispatchers.IO) {
+                        commandMutex.withLock {
+                            if (targetSource != null) {
+                                commandHost.setDefaultSource(
+                                    source = targetSource,
+                                    autoplay = autoplay,
+                                )
+                            } else {
+                                commandHost.autoplayCurrentSource()
+                            }
                         }
                     }
                 } finally {
@@ -429,12 +438,14 @@ class MediaBackendCoordinator(
         activeSourceLossJob = scope.launch {
             isApplyingDefaultSource = true
             try {
-                commandMutex.withLock {
-                    commandHost.setSource(
-                        source = targetSource,
-                        appSource = null,
-                        autoplay = autoplay,
-                    )
+                withContext(Dispatchers.IO) {
+                    commandMutex.withLock {
+                        commandHost.setSource(
+                            source = targetSource,
+                            appSource = null,
+                            autoplay = autoplay,
+                        )
+                    }
                 }
             } finally {
                 isApplyingDefaultSource = false

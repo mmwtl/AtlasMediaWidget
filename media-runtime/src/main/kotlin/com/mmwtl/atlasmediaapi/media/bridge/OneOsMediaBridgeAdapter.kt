@@ -17,13 +17,24 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
 
 class OneOsMediaBridgeAdapter(
     private val hub: MediaStateHub,
     private val scope: CoroutineScope,
     private val onOnlineSourceConfirmed: () -> Unit = {},
+    /**
+     * OneOS posts listener callbacks to the main thread, and handling them reads Binder state,
+     * queries MediaStore and decodes artwork. One serial thread keeps their order off main.
+     */
+    private val callbackExecutor: Executor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "atlas-oneos-callbacks")
+    },
 ) {
+    private val attachLock = Any()
+
     @Volatile
     private var manager: MediaCenterManager? = null
     private var radioStateListener: IRadioStateListener? = null
@@ -35,13 +46,13 @@ class OneOsMediaBridgeAdapter(
         override fun onMediaDataChanged(
             source: MediaCenterConstant.AudioSource,
             mediaData: MediaData?,
-        ) = hub.onOneOsMediaData(source, mediaData)
+        ) = dispatch { hub.onOneOsMediaData(source, mediaData) }
 
         override fun onPlayPositionChanged(
             source: MediaCenterConstant.AudioSource,
             current: Long,
             total: Long,
-        ) = hub.onOneOsProgress(source, current, total)
+        ) = dispatch { hub.onOneOsProgress(source, current, total) }
 
         override fun onPlayStateChanged(
             source: MediaCenterConstant.AudioSource,
@@ -50,8 +61,10 @@ class OneOsMediaBridgeAdapter(
             if (state == MediaCenterConstant.PlayState.MUSIC_STATE_PLAY) {
                 playStateGenerations.computeIfAbsent(source) { AtomicLong() }.incrementAndGet()
             }
-            hub.onOneOsPlayState(source, state)
-            refreshCurrentMedia(expectedSource = source, includePlayState = false)
+            dispatch {
+                hub.onOneOsPlayState(source, state)
+                refreshCurrentMedia(expectedSource = source, includePlayState = false)
+            }
         }
 
         override fun onPlayListChanged(
@@ -81,18 +94,29 @@ class OneOsMediaBridgeAdapter(
             source: MediaCenterConstant.AudioSource,
             appSource: MediaCenterConstant.AppSource,
         ) {
-            this@OneOsMediaBridgeAdapter.onSourceChanged(source, appSource)
+            dispatch { this@OneOsMediaBridgeAdapter.onSourceChanged(source, appSource) }
         }
 
         override fun onWeCarFlowTabChanged(
             source: MediaCenterConstant.AudioSource,
             appSource: MediaCenterConstant.AppSource,
         ) {
-            this@OneOsMediaBridgeAdapter.onSourceChanged(source, appSource)
+            dispatch { this@OneOsMediaBridgeAdapter.onSourceChanged(source, appSource) }
         }
     }
 
-    fun attach(mediaCenterManager: MediaCenterManager) {
+    /** Runs a callback on the callback thread unless the adapter detached in the meantime. */
+    private fun dispatch(block: () -> Unit) {
+        val owner = manager ?: return
+        runCatching {
+            callbackExecutor.execute {
+                if (manager === owner) runCatching(block).onFailure(Timber::e)
+            }
+        }.onFailure(Timber::e)
+    }
+
+    /** Registers listeners and publishes the current state; performs Binder calls, call off main. */
+    fun attach(mediaCenterManager: MediaCenterManager) = synchronized(attachLock) {
         detach(notify = false)
         manager = mediaCenterManager
         val listener = createRadioStateListener(mediaCenterManager)
@@ -121,7 +145,7 @@ class OneOsMediaBridgeAdapter(
         refreshCurrentMedia()
     }
 
-    fun detach(notify: Boolean = true) {
+    fun detach(notify: Boolean = true) = synchronized(attachLock) {
         val currentManager = manager
         val currentRadioListener = radioStateListener
         // Invalidate radio callbacks before unregistering: BaseRadioManager keeps listeners in a
@@ -278,12 +302,12 @@ class OneOsMediaBridgeAdapter(
     private fun createRadioStateListener(
         owner: MediaCenterManager,
     ): IRadioStateListener = object : IRadioStateListener.Default() {
-        override fun onCurrentFrequency(frequency: Frequency?) = refreshRadio(owner, frequency)
+        override fun onCurrentFrequency(frequency: Frequency?) = dispatch { refreshRadio(owner, frequency) }
 
-        override fun onStationFrequency(frequency: Frequency?) = refreshRadio(owner, frequency)
+        override fun onStationFrequency(frequency: Frequency?) = dispatch { refreshRadio(owner, frequency) }
 
         override fun onRadioStatusChanged(status: Int) {
-            refreshRadio(owner, frequency = null, playing = isRadioPlaying(status))
+            dispatch { refreshRadio(owner, frequency = null, playing = isRadioPlaying(status)) }
         }
     }
 
@@ -356,32 +380,31 @@ class OneOsMediaBridgeAdapter(
 
                 else -> return
             }
-            hub.onSourceAvailability(source, connected = connected, available = true)
+            dispatch { hub.onSourceAvailability(source, connected = connected, available = true) }
         }
 
         override fun onDeviceError(
             source: MediaCenterConstant.AudioSource,
             error: Int,
             errorMsg: String?,
-        ) = hub.onOneOsError(source, "device error $error: ${errorMsg.orEmpty()}")
+        ) = dispatch { hub.onOneOsError(source, "device error $error: ${errorMsg.orEmpty()}") }
 
         override fun onBluetoothDeviceChange(
             source: MediaCenterConstant.AudioSource,
             deviceInfoList: MutableList<DeviceInfo>?,
-        ) = hub.onSourceAvailability(
-            source,
-            connected = !deviceInfoList.isNullOrEmpty(),
-            available = true,
-        )
+        ) {
+            val connected = !deviceInfoList.isNullOrEmpty()
+            dispatch { hub.onSourceAvailability(source, connected = connected, available = true) }
+        }
 
         override fun onAppExistStateChanged(
             source: MediaCenterConstant.AudioSource,
             appSource: MediaCenterConstant.AppSource,
             existed: Boolean,
-        ) = hub.onSourceAvailability(source, connected = existed, available = existed)
+        ) = dispatch { hub.onSourceAvailability(source, connected = existed, available = existed) }
 
         override fun onAppDied(appSource: MediaCenterConstant.AppSource) {
-            hub.onSourceAvailability(registeredSource, connected = false, available = false)
+            dispatch { hub.onSourceAvailability(registeredSource, connected = false, available = false) }
         }
 
         override fun onScanPathFinish(
