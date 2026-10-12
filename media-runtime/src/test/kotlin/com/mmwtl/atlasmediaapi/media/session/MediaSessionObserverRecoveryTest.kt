@@ -206,6 +206,48 @@ class MediaSessionObserverRecoveryTest {
         bluetoothSession.session.release()
     }
 
+    @Test
+    fun `losing session observation clears online playback without reporting source loss`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val losses = java.util.concurrent.CopyOnWriteArrayList<BridgeAudioSource>()
+        val hub = MediaStateHub(
+            context = context,
+            repository = repository,
+            artworkRepository = ArtworkRepository(
+                context,
+                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            ),
+            onActiveSourceLost = { source, _ -> losses += source },
+        )
+        hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+        val observer = MediaSessionObserver(context, hub)
+        val onlineSession = createController(context, "com.example.online", "Online title")
+        ShadowMediaSessionManager.setControllers(listOf(onlineSession.controller))
+        observer.start()
+        notifyNotificationListener(observer, true)
+        waitFor { repository.snapshot().ownerPackage == "com.example.online" }
+        assertEquals("com.example.online", repository.snapshot().ownerPackage)
+
+        notifyNotificationListener(observer, false)
+        waitFor { repository.snapshot().ownerPackage.isEmpty() }
+        assertEquals("", repository.snapshot().title)
+        assertEquals(BridgeAudioSource.ONLINE.name, repository.snapshot().audioSource)
+
+        notifyNotificationListener(observer, true)
+        waitFor { repository.snapshot().ownerPackage == "com.example.online" }
+        assertEquals("Online title", repository.snapshot().title)
+
+        observer.stop()
+        assertEquals("", repository.snapshot().ownerPackage)
+        assertTrue(losses.isEmpty())
+        onlineSession.session.release()
+    }
+
     private fun waitFor(condition: () -> Boolean) {
         repeat(20) {
             if (condition()) return

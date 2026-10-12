@@ -74,7 +74,7 @@ class MediaSessionObserver(
             cbThread = null
             cbHandler = null
 
-            hub.onMediaController(null)
+            hub.onSessionObservationLost()
             hub.onCpaaMediaController(null)
         }
     }
@@ -110,11 +110,11 @@ class MediaSessionObserver(
             android.util.Log.w("AtlasMediaSessions", "Session registration denied", e)
             unregisterSessionListenerLocked()
             Timber.w(e, "Notification access not granted for MediaSessionManager")
-            hub.onMediaController(null)
+            hub.onSessionObservationLost()
         } catch (e: Exception) {
             unregisterSessionListenerLocked()
             Timber.e(e, "Failed to initialize MediaSessionObserver")
-            hub.onMediaController(null)
+            hub.onSessionObservationLost()
         }
     }
 
@@ -133,7 +133,7 @@ class MediaSessionObserver(
                     } else {
                         clearControllersLocked()
                         unregisterSessionListenerLocked()
-                        hub.onMediaController(null)
+                        hub.onSessionObservationLost()
                         hub.onCpaaMediaController(null)
                     }
                 }

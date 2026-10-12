@@ -376,6 +376,13 @@ class MediaBackendCoordinator(
     }
 
     private fun handleActiveSourceLost(lostSource: BridgeAudioSource, wasPlaying: Boolean) {
+        // Loss callbacks arrive on session and Binder threads; job state belongs to the scope.
+        scope.launch { switchAfterSourceLoss(lostSource, wasPlaying) }
+    }
+
+    private fun switchAfterSourceLoss(lostSource: BridgeAudioSource, wasPlaying: Boolean) {
+        // Callbacks still in flight while the backend stops must not switch the head unit.
+        if (!isBackendStarted || activeBackendIsDemo) return
         if (!preferences.autoSwitchToDefaultOnSourceLost) return
         val targetSourceStr = preferences.defaultAudioSource
         if (targetSourceStr.isBlank()) return

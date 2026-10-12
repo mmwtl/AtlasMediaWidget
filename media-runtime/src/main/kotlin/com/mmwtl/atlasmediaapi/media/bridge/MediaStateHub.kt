@@ -283,6 +283,21 @@ class MediaStateHub(
         }
     }
 
+    /**
+     * Sessions can no longer be observed (backend stop, notification access lost or denied). The
+     * shown Online player cannot be tracked, but it was not reported gone, so its playback is
+     * cleared without source-loss handling.
+     */
+    fun onSessionObservationLost() {
+        synchronized(mediaCallbackLock) {
+            onlineSourcePolicy.onSessionGone()
+            val snapshot = repository.snapshot()
+            if (snapshot.audioSource == BridgeAudioSource.ONLINE.name && snapshot.ownerPackage.isNotBlank()) {
+                clearPlayback()
+            }
+        }
+    }
+
     private fun onMediaControllerLocked(controller: MediaController?): BridgeAudioSource? {
         if (controller == null) {
             val snapshot = repository.snapshot()
