@@ -135,11 +135,17 @@ class AndroidMediaCommandHost(
                 ?.let(::AndroidMediaSessionTarget)
             return session ?: carPlayBridge?.let(::CarPlayMediaSessionTarget)
         }
-        val controllers = sessionObserver.getActiveControllers()
-        val active = controllers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            ?: controllers.maxByOrNull { it.playbackState?.lastPositionUpdateTime ?: 0L }
-        return active?.let(::AndroidMediaSessionTarget)
+        return selectPlayerSession()?.let(::AndroidMediaSessionTarget)
     }
+
+    /** Commands follow the card's player rule; an idle player without metadata can still start. */
+    private fun selectPlayerSession(): MediaController? = PlayerSessionSelector.select(
+        sessions = sessionObserver.getActiveControllers(),
+        facts = MediaController::playerSessionFacts,
+        displayedPackage = displayedMediaPackage(),
+        rememberedPackage = currentMediaPackage(),
+        requireContent = false,
+    )
 
     override fun sessions(): List<MediaSessionCommandTarget> =
         sessionObserver.getActiveControllers().map(::AndroidMediaSessionTarget)
@@ -569,16 +575,7 @@ class AndroidMediaCommandHost(
         val currentSource = runCatching { center.currentAudioSource }.getOrNull()
         if (currentSource != MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) return
 
-        val controllers = sessionObserver.getActiveControllers()
-        val currentPackage = currentMediaPackage()
-        val onlineController = controllers.firstOrNull {
-            it.playbackState?.state == PlaybackState.STATE_PLAYING
-        } ?: controllers.firstOrNull {
-            currentPackage.isNotBlank() && it.packageName == currentPackage
-        } ?: controllers.maxByOrNull {
-            it.playbackState?.lastPositionUpdateTime ?: 0L
-        }
-        rememberOnlineMediaPackage(onlineController?.packageName.orEmpty())
+        rememberOnlineMediaPackage(selectPlayerSession()?.packageName.orEmpty())
     }
 
     internal fun preferredOnlineSession(): MediaSessionCommandTarget? {
@@ -607,7 +604,8 @@ class AndroidMediaCommandHost(
         val publishers = sessionObserver.getActiveControllers().filter { controller ->
             controller.playbackState?.customActions.orEmpty().any { it.action == action }
         }
-        val controller = publishers.firstOrNull { it.packageName == currentMediaPackage() }
+        val controller = publishers.firstOrNull { it.packageName == displayedMediaPackage() }
+            ?: publishers.firstOrNull { it.packageName == currentMediaPackage() }
             ?: publishers.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
             ?: publishers.firstOrNull()
             ?: return false

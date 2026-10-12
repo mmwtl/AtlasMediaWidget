@@ -241,6 +241,37 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
+    fun `commands reach the shown paused player instead of a newer session`() {
+        val context = RuntimeEnvironment.getApplication()
+        val hub = hub(context, MediaStateRepository())
+        val observer = MediaSessionObserver(context, hub)
+        val shownSession = MediaSession(context, "shown-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 100L))
+        }
+        val newerSession = MediaSession(context, "newer-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 200L))
+        }
+        activeControllers(observer) += controller(context, newerSession, "com.example.newer")
+        activeControllers(observer) += controller(context, shownSession, "com.example.shown")
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context),
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+            displayedMediaPackage = "com.example.shown",
+        )
+
+        assertEquals("com.example.shown", host.preferredSession()?.packageName)
+        shownSession.release()
+        newerSession.release()
+    }
+
+    @Test
     fun `online does not reuse an unrelated session when no online session was remembered`() {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
@@ -424,6 +455,7 @@ class AndroidMediaCommandHostTest {
         autoplayMediaKeyConfirmDelayMs: Long = AndroidMediaCommandHost.AUTOPLAY_MEDIA_KEY_CONFIRM_DELAY_MS,
         backgroundPlayerStarter: BackgroundPlayerStarter? = null,
         browserSessionWaitTimeoutMs: Long = sessionWaitTimeoutMs,
+        displayedMediaPackage: String = "",
     ): AndroidMediaCommandHost = AndroidMediaCommandHost(
         context = context,
         apiManager = OneOSApiManager.getInstance(context),
@@ -439,6 +471,7 @@ class AndroidMediaCommandHostTest {
         backgroundSessionWaitTimeoutMs = sessionWaitTimeoutMs,
         browserSessionWaitTimeoutMs = browserSessionWaitTimeoutMs,
         backgroundPlayerStarter = backgroundPlayerStarter,
+        displayedMediaPackage = { displayedMediaPackage },
     )
 
     private class FakeBackgroundStarter(

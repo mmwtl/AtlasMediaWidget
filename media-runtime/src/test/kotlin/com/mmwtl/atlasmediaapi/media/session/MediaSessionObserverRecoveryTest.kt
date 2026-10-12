@@ -248,6 +248,108 @@ class MediaSessionObserverRecoveryTest {
         onlineSession.session.release()
     }
 
+    @Test
+    fun `newer empty session does not hide updates of the shown player`() {
+        val fixture = onlineFixture()
+        val shown = createController(fixture.context, "com.example.shown", "First track")
+        val empty = createController(fixture.context, "com.example.empty", title = null)
+        ShadowMediaSessionManager.setControllers(listOf(shown.controller))
+        fixture.observer.start()
+        notifyNotificationListener(fixture.observer, true)
+        waitFor { fixture.repository.snapshot().title == "First track" }
+
+        shadowOf(shown.controller).setPlaybackState(pausedState(lastUpdateTime = 100L))
+        shadowOf(empty.controller).setPlaybackState(pausedState(lastUpdateTime = 900L))
+        ShadowMediaSessionManager.setControllers(listOf(shown.controller, empty.controller))
+        ShadowMediaSessionManager.dispatchControllers()
+        waitFor { fixture.observer.getActiveControllers().size == 2 }
+        shadowOf(shown.controller).executeOnMetadataChanged(
+            MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, "Second track").build(),
+        )
+        waitFor { fixture.repository.snapshot().title == "Second track" }
+
+        assertEquals("Second track", fixture.repository.snapshot().title)
+        assertEquals("com.example.shown", fixture.repository.snapshot().ownerPackage)
+        fixture.observer.stop()
+        shown.session.release()
+        empty.session.release()
+    }
+
+    @Test
+    fun `card is cleared without source loss when only an empty session remains`() {
+        val fixture = onlineFixture()
+        val shown = createController(fixture.context, "com.example.shown", "Shown track")
+        val empty = createController(fixture.context, "com.example.empty", title = null)
+        ShadowMediaSessionManager.setControllers(listOf(shown.controller, empty.controller))
+        fixture.observer.start()
+        notifyNotificationListener(fixture.observer, true)
+        waitFor { fixture.repository.snapshot().title == "Shown track" }
+
+        ShadowMediaSessionManager.setControllers(listOf(empty.controller))
+        ShadowMediaSessionManager.dispatchControllers()
+        waitFor { fixture.repository.snapshot().ownerPackage.isEmpty() }
+
+        assertEquals("", fixture.repository.snapshot().title)
+        assertEquals(PlaybackState.STATE_NONE, fixture.repository.snapshot().playbackState)
+        assertTrue(fixture.losses.isEmpty())
+        fixture.observer.stop()
+        shown.session.release()
+        empty.session.release()
+    }
+
+    @Test
+    fun `shown player that clears its metadata stops playing on the card`() {
+        val fixture = onlineFixture()
+        val shown = createController(fixture.context, "com.example.shown", "Shown track")
+        ShadowMediaSessionManager.setControllers(listOf(shown.controller))
+        fixture.observer.start()
+        notifyNotificationListener(fixture.observer, true)
+        waitFor { fixture.repository.snapshot().playbackState == PlaybackState.STATE_PLAYING }
+
+        shadowOf(shown.controller).setMetadata(MediaMetadata.Builder().build())
+        val stopped = PlaybackState.Builder().setState(PlaybackState.STATE_STOPPED, 0L, 0f).build()
+        shadowOf(shown.controller).setPlaybackState(stopped)
+        shadowOf(shown.controller).executeOnPlaybackStateChanged(stopped)
+        waitFor { fixture.repository.snapshot().playbackState == PlaybackState.STATE_STOPPED }
+
+        assertEquals(PlaybackState.STATE_STOPPED, fixture.repository.snapshot().playbackState)
+        assertEquals("Shown track", fixture.repository.snapshot().title)
+        fixture.observer.stop()
+        shown.session.release()
+    }
+
+    private data class OnlineFixture(
+        val context: android.content.Context,
+        val repository: MediaStateRepository,
+        val observer: MediaSessionObserver,
+        val losses: MutableList<BridgeAudioSource>,
+    )
+
+    private fun onlineFixture(): OnlineFixture {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val losses = java.util.concurrent.CopyOnWriteArrayList<BridgeAudioSource>()
+        val hub = MediaStateHub(
+            context = context,
+            repository = repository,
+            artworkRepository = ArtworkRepository(
+                context,
+                CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+            ),
+            onActiveSourceLost = { source, _ -> losses += source },
+        )
+        hub.onBackendConnected(
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            MediaCenterConstant.AppSource.UNKNOWN,
+            emptyMap(),
+        )
+        return OnlineFixture(context, repository, MediaSessionObserver(context, hub), losses)
+    }
+
+    private fun pausedState(lastUpdateTime: Long): PlaybackState = PlaybackState.Builder()
+        .setState(PlaybackState.STATE_PAUSED, 0L, 0f, lastUpdateTime)
+        .build()
+
     private fun waitFor(condition: () -> Boolean) {
         repeat(20) {
             if (condition()) return
@@ -263,11 +365,11 @@ class MediaSessionObserverRecoveryTest {
     private fun createController(
         context: android.content.Context,
         packageName: String,
-        title: String,
+        title: String?,
     ): TestController {
         val session = MediaSession(context, "observer-test-$packageName")
         val metadata = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_TITLE, title)
+            .apply { if (title != null) putString(MediaMetadata.METADATA_KEY_TITLE, title) }
             .build()
         val playback = PlaybackState.Builder()
             .setState(PlaybackState.STATE_PLAYING, 0L, 1f)

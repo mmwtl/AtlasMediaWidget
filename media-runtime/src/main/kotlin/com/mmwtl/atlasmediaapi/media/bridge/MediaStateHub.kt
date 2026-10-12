@@ -283,6 +283,29 @@ class MediaStateHub(
         }
     }
 
+    /** Package of the player the card shows; session selection keeps it ahead of other players. */
+    fun displayedOwnerPackage(): String = repository.snapshot().ownerPackage
+
+    /**
+     * Player sessions remain, but the shown player is gone and none of the others has anything to
+     * show. The card is cleared without source-loss handling: a player app is still present.
+     */
+    fun onPlayerContentGone() {
+        synchronized(mediaCallbackLock) {
+            if (pendingSourceTransition?.target?.let { it != BridgeAudioSource.ONLINE } == true) return
+            val snapshot = repository.snapshot()
+            if (snapshot.backendConnected && snapshot.audioSource !in setOf(
+                    BridgeAudioSource.ONLINE.name,
+                    BridgeAudioSource.UNKNOWN.name,
+                    BridgeAudioSource.OTHER.name,
+                )
+            ) return
+            if (snapshot.ownerPackage.isBlank()) return
+            onlineSourcePolicy.onSessionGone()
+            clearPlayback()
+        }
+    }
+
     /**
      * Sessions can no longer be observed (backend stop, notification access lost or denied). The
      * shown Online player cannot be tracked, but it was not reported gone, so its playback is
@@ -340,10 +363,28 @@ class MediaStateHub(
         val mediaId = metadata.text(MediaMetadata.METADATA_KEY_MEDIA_ID)
             .ifBlank { stableMediaId(title, artist) }
         val actions = state?.actions ?: 0L
-        val meaningful = ownerPackage.isNotBlank() &&
-            (title.isNotBlank() || artist.isNotBlank() || metadata.text(
-                MediaMetadata.METADATA_KEY_MEDIA_ID,
-            ).isNotBlank())
+        val meaningful = ownerPackage.isNotBlank() && metadata.hasPlayerContent()
+        if (!meaningful && ownerPackage.isNotBlank() && ownerPackage == bridgeState.ownerPackage) {
+            // Players clear metadata between tracks or after stopping; the shown track stays,
+            // but its playback state must not keep running.
+            repository.update { before ->
+                before.copy(
+                    position = state?.position ?: -1L,
+                    updateElapsedRealtime = state?.lastPositionUpdateTime
+                        ?.takeIf { value -> value > 0L }
+                        ?: android.os.SystemClock.elapsedRealtime(),
+                    speed = state?.playbackSpeed ?: 0f,
+                    playbackState = state?.state ?: PlaybackState.STATE_NONE,
+                    playbackErrorCode = 0,
+                    playbackErrorMessage = state?.errorMessage?.toString().orEmpty(),
+                    playbackActions = actions,
+                    capabilities = MediaCapabilities.fromPlaybackActions(actions),
+                    customActions = state.bridgeCustomActions(ownerPackage),
+                )
+            }
+            markPlayingIfActive(state?.state == PlaybackState.STATE_PLAYING)
+            return null
+        }
         if (!onlineSourcePolicy.onSession(ownerPackage, meaningful)) return null
 
         repository.update { before ->
@@ -888,6 +929,23 @@ class MediaStateHub(
     private fun ownerLabelFor(source: BridgeAudioSource): String =
         if (ownerPackageFor(source).isBlank()) "" else source.name
 }
+
+/** A session without a title, artist or media ID has nothing the card could show. */
+internal fun MediaMetadata?.hasPlayerContent(): Boolean {
+    fun text(key: String) = this?.getString(key).orEmpty()
+    return text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE).isNotBlank() ||
+        text(MediaMetadata.METADATA_KEY_TITLE).isNotBlank() ||
+        text(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE).isNotBlank() ||
+        text(MediaMetadata.METADATA_KEY_ARTIST).isNotBlank() ||
+        text(MediaMetadata.METADATA_KEY_MEDIA_ID).isNotBlank()
+}
+
+internal fun MediaController.playerSessionFacts(): PlayerSessionFacts = PlayerSessionFacts(
+    packageName = packageName.orEmpty(),
+    playing = playbackState?.state == PlaybackState.STATE_PLAYING,
+    hasContent = metadata.hasPlayerContent(),
+    lastPositionUpdateTime = playbackState?.lastPositionUpdateTime ?: 0L,
+)
 
 private val AUDIO_EXTENSIONS = setOf(
     "mp3", "flac", "m4a", "aac", "ogg", "wav", "wma", "ape", "opus", "alac",

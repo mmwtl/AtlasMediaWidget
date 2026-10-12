@@ -9,6 +9,8 @@ import android.os.Handler
 import android.os.HandlerThread
 import com.mmwtl.atlasmediaapi.media.bridge.CARPLAY_MEDIA_SESSION_PACKAGES
 import com.mmwtl.atlasmediaapi.media.bridge.MediaStateHub
+import com.mmwtl.atlasmediaapi.media.bridge.PlayerSessionSelector
+import com.mmwtl.atlasmediaapi.media.bridge.playerSessionFacts
 import timber.log.Timber
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -84,7 +86,9 @@ class MediaSessionObserver(
     fun refreshActiveController() {
         synchronized(this) {
             if (!isStarted) return
-            pickActive(activeControllers.toList())?.let(hub::onMediaController)
+            // A refresh only republishes; session removal is reported by session callbacks.
+            selectActive(activeControllers.toList().filterNot(::isNativeBluetoothController))
+                ?.let(hub::onMediaController)
         }
     }
 
@@ -188,8 +192,7 @@ class MediaSessionObserver(
         synchronized(this) {
             if (!isGenerationActiveLocked(expectedGeneration)) return
             val controllers = activeControllers.toList()
-            val active = pickActive(controllers)
-            hub.onMediaController(active)
+            publishActive(controllers)
 
             val carPlay = controllers.firstOrNull { it.packageName in CARPLAY_MEDIA_SESSION_PACKAGES }
                 ?: controllers.firstOrNull { controller ->
@@ -222,11 +225,22 @@ class MediaSessionObserver(
     private fun isGenerationActiveLocked(expectedGeneration: Long): Boolean =
         isStarted && generation == expectedGeneration
 
-    private fun pickActive(controllers: List<MediaController>): MediaController? {
+    private fun selectActive(candidates: List<MediaController>): MediaController? =
+        PlayerSessionSelector.select(
+            sessions = candidates,
+            facts = MediaController::playerSessionFacts,
+            displayedPackage = hub.displayedOwnerPackage(),
+            requireContent = true,
+        )
+
+    private fun publishActive(controllers: List<MediaController>) {
         val candidates = controllers.filterNot(::isNativeBluetoothController)
-        if (candidates.isEmpty()) return null
-        return candidates.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-            ?: candidates.maxByOrNull { it.playbackState?.lastPositionUpdateTime ?: 0L }
+        val active = selectActive(candidates)
+        when {
+            active != null -> hub.onMediaController(active)
+            candidates.isEmpty() -> hub.onMediaController(null)
+            else -> hub.onPlayerContentGone()
+        }
     }
 
     private fun isNativeBluetoothController(controller: MediaController): Boolean {
