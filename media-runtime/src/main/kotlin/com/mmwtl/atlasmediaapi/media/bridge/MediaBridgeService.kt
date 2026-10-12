@@ -226,6 +226,7 @@ class MediaBridgeService : Service() {
 
     private fun handleGetSnapshot(message: Message) {
         val client = registeredClient(message) ?: return
+        coordinator.requestReconcile()
         sendSnapshot(
             client,
             coordinator.stateRepository.snapshot(),

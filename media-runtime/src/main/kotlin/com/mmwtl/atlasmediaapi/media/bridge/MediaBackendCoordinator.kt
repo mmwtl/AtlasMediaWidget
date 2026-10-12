@@ -18,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 class MediaBackendCoordinator(
     private val context: Context,
@@ -26,6 +27,7 @@ class MediaBackendCoordinator(
 ) {
     companion object {
         const val GRACE_PERIOD_MS = 30_000L
+        const val RECONCILE_INTERVAL_MS = 10_000L
         val RECONNECT_DELAYS_MS = listOf(2_000L, 5_000L, 10_000L, 30_000L)
         val DEFAULT_SOURCE_RETRY_DELAYS_MS = listOf(1_000L, 2_000L, 4_000L, 8_000L)
     }
@@ -75,6 +77,7 @@ class MediaBackendCoordinator(
         oneOsPlayStateGeneration = oneOsAdapter::playStateGeneration,
         backgroundPlayerStarter = AndroidBackgroundPlayerStarter(context),
         displayedMediaPackage = { stateRepository.snapshot().ownerPackage },
+        onSourceSwitchFailed = ::resyncMediaState,
     )
     val commandRouter: MediaCommandRouter = MediaCommandRouter(commandHost)
     val demoBackend: DemoMediaBackend = DemoMediaBackend(
@@ -102,6 +105,7 @@ class MediaBackendCoordinator(
 
     private val apiManager = OneOSApiManager.getInstance(context)
     private val clientCount = AtomicInteger(0)
+    private val lastReconcileRealtime = AtomicLong(Long.MIN_VALUE / 2)
     private var onlineClusterJob: Job? = null
     private var graceJob: Job? = null
     private var reconnectJob: Job? = null
@@ -229,6 +233,27 @@ class MediaBackendCoordinator(
         sessionObserver.stop()
         carPlayBridge.stop()
         apiManager.release()
+    }
+
+    /**
+     * Re-reads OneOS and session state at most every [RECONCILE_INTERVAL_MS]. Clients ask for a
+     * snapshot only while the card is visible and playing, so this supplements callbacks then.
+     */
+    fun requestReconcile() {
+        val now = android.os.SystemClock.elapsedRealtime()
+        val last = lastReconcileRealtime.get()
+        if (now - last < RECONCILE_INTERVAL_MS || !lastReconcileRealtime.compareAndSet(last, now)) return
+        scope.launch {
+            if (!isBackendStarted || activeBackendIsDemo) return@launch
+            withContext(Dispatchers.IO) { resyncMediaState() }
+        }
+    }
+
+    private fun resyncMediaState() {
+        runCatching {
+            oneOsAdapter.resync()
+            sessionObserver.refreshActiveController()
+        }.onFailure { Timber.w(it, "Media state resync failed") }
     }
 
     private fun publishOnlineToCluster(snapshot: MediaSnapshot) {

@@ -39,6 +39,8 @@ class AndroidMediaCommandHost(
     private val launchPackage: ((String) -> Boolean)? = null,
     private val displayedMediaPackage: () -> String = { "" },
     private val oneOsPlayStateGeneration: (MediaCenterConstant.AudioSource) -> Long = { 0L },
+    /** Re-reads source and media state that callbacks filtered during a failed switch. */
+    private val onSourceSwitchFailed: () -> Unit = {},
 ) : MediaCommandHost {
     companion object {
         private const val MAX_RADIO_STATIONS_PER_LIST = 256
@@ -495,6 +497,7 @@ class AndroidMediaCommandHost(
             .also { succeeded ->
                 if (!succeeded && transitionGeneration != null) {
                     stateHub?.cancelSourceTransition(transitionGeneration)
+                    onSourceSwitchFailed()
                 }
             }
     }

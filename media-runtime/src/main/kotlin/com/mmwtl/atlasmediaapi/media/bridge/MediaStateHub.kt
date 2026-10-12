@@ -35,6 +35,9 @@ class MediaStateHub(
     )
 
     private val latestArtworkRequest = AtomicLong()
+    // Guarded by mediaCallbackLock: the artwork input last sent for normalization.
+    private var artworkRequestKey = ""
+    private var artworkRequestId = 0L
     private val cachedRadioArtwork = AtomicReference<CachedRadioArtwork?>()
     private val onlineSourcePolicy = OnlineMediaSourcePolicy()
     private val cpaaArtworkFallback = CpaaArtworkFallback(repository, artworkRepository)
@@ -282,6 +285,8 @@ class MediaStateHub(
             return onMediaControllerLocked(controller)
         }
     }
+
+    fun selectedSourceName(): String = repository.snapshot().audioSource
 
     /** Package of the player the card shows; session selection keeps it ahead of other players. */
     fun displayedOwnerPackage(): String = repository.snapshot().ownerPackage
@@ -551,23 +556,20 @@ class MediaStateHub(
                 } else before.artworkRevision,
             )
         }
-        val artwork: ArtworkInput = when (source) {
-            MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB -> {
-                usbArtworkResolver.resolveUsbArtwork(
-                    uriString = data.uri.orEmpty(),
-                    title = data.name.orEmpty(),
-                    artist = data.artist.orEmpty(),
-                    album = data.albumName.orEmpty(),
-                ) ?: ArtworkInput(data.albumCover, if (isAudioFilePath(data.uri)) data.uri.orEmpty() else "")
-            }
-            else -> {
-                val artworkSourceUri = when {
-                    !data.albumCoverUri.isNullOrBlank() -> data.albumCoverUri.orEmpty()
-                    else -> ""
-                }
-                ArtworkInput(data.albumCover, artworkSourceUri)
-            }
+        if (source == MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB) {
+            // The MediaStore lookup depends only on the track; repeated callbacks reuse its result.
+            val usbKey = listOf(data.uri, data.name, data.artist, data.albumName).joinToString("\u0000")
+            if (artworkUpToDate(ownerPackage, mediaId, usbKey)) return
+            val artwork = usbArtworkResolver.resolveUsbArtwork(
+                uriString = data.uri.orEmpty(),
+                title = data.name.orEmpty(),
+                artist = data.artist.orEmpty(),
+                album = data.albumName.orEmpty(),
+            ) ?: ArtworkInput(data.albumCover, if (isAudioFilePath(data.uri)) data.uri.orEmpty() else "")
+            normalizeArtwork(ownerPackage, mediaId, artwork.bitmap, artwork.sourceUri, usbKey)
+            return
         }
+        val artwork = ArtworkInput(data.albumCover, data.albumCoverUri.orEmpty())
         if (source == MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA) {
             val cachedCarPlay = carPlayArtworkProvider()
             if (cachedCarPlay != null && cachedCarPlay.uri.isNotBlank()) {
@@ -608,12 +610,17 @@ class MediaStateHub(
         }
         markPlayingIfActive(androidState == PlaybackState.STATE_PLAYING)
         repository.update {
+            val now = android.os.SystemClock.elapsedRealtime()
+            // A repeated state must not move the progress baseline: the stored position is from
+            // the last progress tick. A changed state starts from the position reached so far.
+            val changed = it.playbackState != androidState
             it.copy(
                 playbackState = androidState,
                 playbackErrorCode = 0,
                 playbackErrorMessage = "",
                 speed = if (androidState == PlaybackState.STATE_PLAYING) 1f else 0f,
-                updateElapsedRealtime = android.os.SystemClock.elapsedRealtime(),
+                position = if (changed) it.positionAt(now) else it.position,
+                updateElapsedRealtime = if (changed) now else it.updateElapsedRealtime,
                 capabilities = source.toBridgeSource().defaultCapabilities(),
             )
         }
@@ -853,15 +860,28 @@ class MediaStateHub(
         }
     }
 
+    /** The same artwork input for the shown track is already published or still normalizing. */
+    private fun artworkUpToDate(ownerPackage: String, mediaId: String, inputKey: String): Boolean {
+        val snapshot = repository.snapshot()
+        return snapshot.ownerPackage == ownerPackage && snapshot.mediaId == mediaId &&
+            artworkRequestKey == "$ownerPackage\u0000$mediaId\u0000$inputKey" &&
+            (snapshot.artworkUri.isNotBlank() || latestArtworkRequest.get() == artworkRequestId)
+    }
+
     private fun normalizeArtwork(
         ownerPackage: String,
         mediaId: String,
         bitmap: android.graphics.Bitmap?,
         sourceUri: String,
+        // Players often publish a track first and its artwork later; a new size is a new input.
+        inputKey: String = "${bitmap?.width}x${bitmap?.height}\u0000$sourceUri",
     ) {
         val input = ArtworkInput(bitmap, sourceUri)
         if (input.bitmap == null && input.sourceUri.isBlank()) return
+        if (artworkUpToDate(ownerPackage, mediaId, inputKey)) return
         val request = latestArtworkRequest.incrementAndGet()
+        artworkRequestKey = "$ownerPackage\u0000$mediaId\u0000$inputKey"
+        artworkRequestId = request
         artworkRepository.normalize(input) { normalized ->
             if (latestArtworkRequest.get() != request) return@normalize
             if (normalized.uri.isBlank()) return@normalize
@@ -946,6 +966,15 @@ internal fun MediaController.playerSessionFacts(): PlayerSessionFacts = PlayerSe
     hasContent = metadata.hasPlayerContent(),
     lastPositionUpdateTime = playbackState?.lastPositionUpdateTime ?: 0L,
 )
+
+/** Position reached by now when the snapshot is playing; otherwise the stored position. */
+internal fun MediaSnapshot.positionAt(elapsedRealtime: Long): Long {
+    if (position < 0L || playbackState != PlaybackState.STATE_PLAYING || speed <= 0f ||
+        updateElapsedRealtime <= 0L || elapsedRealtime <= updateElapsedRealtime
+    ) return position
+    val reached = position + ((elapsedRealtime - updateElapsedRealtime) * speed).toLong()
+    return if (duration > 0L) reached.coerceAtMost(duration) else reached
+}
 
 private val AUDIO_EXTENSIONS = setOf(
     "mp3", "flac", "m4a", "aac", "ogg", "wav", "wma", "ape", "opus", "alac",

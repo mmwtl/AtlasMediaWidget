@@ -200,6 +200,22 @@ class OneOsMediaBridgeAdapter(
         }
     }
 
+    /**
+     * Re-reads the current source and media. Source callbacks are filtered while a switch is
+     * pending and can be lost, so this repairs state after a failed switch and during
+     * reconciliation.
+     */
+    fun resync() {
+        val currentManager = manager ?: return
+        val source = runCatching { currentManager.currentAudioSource }.getOrNull()
+            ?.takeIf(::isKnownSource) ?: return
+        if (hub.selectedSourceName() != source.toBridgeSource().name) {
+            publishCurrentSource(currentManager)
+        } else {
+            refreshCurrentMedia(expectedSource = source)
+        }
+    }
+
     private fun publishCurrentSource(owner: MediaCenterManager) {
         val actualSource = runCatching { owner.currentAudioSource }.getOrNull()
             ?.takeIf(::isKnownSource) ?: return
@@ -399,7 +415,8 @@ private fun isKnownSource(source: MediaCenterConstant.AudioSource?): Boolean =
 
 internal suspend fun awaitKnownCurrentSource(
     currentSource: () -> MediaCenterConstant.AudioSource?,
-    pollDelaysMs: List<Long> = listOf(0L, 50L, 100L, 200L, 400L),
+    // A dropped callback leaves the card on the old source; a newer callback supersedes the wait.
+    pollDelaysMs: List<Long> = listOf(0L, 50L, 100L, 200L, 400L, 800L, 1_600L),
     wait: suspend (Long) -> Unit = { delay(it) },
 ): MediaCenterConstant.AudioSource? {
     pollDelaysMs.forEach { pollDelayMs ->
