@@ -111,6 +111,8 @@ public final class OverlayService extends Service
     private static final long WIDGET_SNAPSHOT_STALE_MS = 20_000L;
     private static final long WIDGET_COMMAND_TIMEOUT_MS = 5_000L;
     private static final long SLOW_WIDGET_RENDER_MS = 50L;
+    // Players publish a new track before its artwork; the cover usually follows within a second.
+    private static final long ARTWORK_PLACEHOLDER_DELAY_MS = 1_500L;
     private static volatile boolean running;
     private static volatile OverlayService instance;
 
@@ -146,6 +148,11 @@ public final class OverlayService extends Service
     private String loadedArtworkKey = "";
     private String loadedTrackKey = "";
     private long expectedArtworkToken = Long.MIN_VALUE;
+    private boolean trackArtworkPending;
+    private final Runnable showArtworkPlaceholder = () -> {
+        trackArtworkPending = false;
+        applyArtwork(null);
+    };
     private long createdAt;
     private float dragStartRawX;
     private float dragStartRawY;
@@ -777,6 +784,7 @@ public final class OverlayService extends Service
             loadedArtworkRevision = Long.MIN_VALUE;
             loadedArtworkKey = "";
             loadedTrackKey = "";
+            cancelArtworkPlaceholder();
             currentArtwork = null;
             radioStations = RadioStationLists.EMPTY;
             radioStationsRequestInFlight = false;
@@ -1069,10 +1077,22 @@ public final class OverlayService extends Service
 
     @Override public void onArtwork(long token, Bitmap bitmap) {
         if (token != expectedArtworkToken) return;
+        // A new track without artwork yet keeps the previous cover until the delay expires.
+        if (bitmap == null && trackArtworkPending) return;
+        cancelArtworkPlaceholder();
+        applyArtwork(bitmap);
+    }
+
+    private void applyArtwork(Bitmap bitmap) {
         currentArtwork = bitmap;
         widgetRenderKey = null;
         renderWidgets(true);
         if (card != null) card.setArtwork(bitmap);
+    }
+
+    private void cancelArtworkPlaceholder() {
+        trackArtworkPending = false;
+        main.removeCallbacks(showArtworkPlaceholder);
     }
 
     private void showCard() {
@@ -1254,12 +1274,13 @@ public final class OverlayService extends Service
         String artworkKey = trackKey + ":" + artwork.cacheKey();
         if (snapshot.artworkRevision == loadedArtworkRevision
                 && artworkKey.equals(loadedArtworkKey)) return;
-        // A new track must not show the previous cover. A new revision of the same track keeps
-        // the current cover until onArtwork replaces it, so the widget does not flash empty.
+        // A new track shows the previous cover only briefly: the placeholder appears if its own
+        // artwork has not arrived within the delay. A new revision of the same track keeps the
+        // current cover until onArtwork replaces it, so the card does not flash empty.
         if (!trackKey.equals(loadedTrackKey)) {
-            currentArtwork = null;
-            widgetRenderKey = null;
-            renderWidgets(true);
+            main.removeCallbacks(showArtworkPlaceholder);
+            trackArtworkPending = currentArtwork != null;
+            if (trackArtworkPending) main.postDelayed(showArtworkPlaceholder, ARTWORK_PLACEHOLDER_DELAY_MS);
         }
         loadedArtworkRevision = snapshot.artworkRevision;
         loadedArtworkKey = artworkKey;

@@ -522,8 +522,15 @@ public class AtlasMediaWidgetTest {
             assertSame(cover, field(service, "currentArtwork"));
             assertSame("no full redraw while the control state is unchanged", frame, frames.get(41));
 
-            service.onSnapshot(usbSnapshot(3, 3, "Next track", "content://cover/c", 3));
-            assertNull("a new track never shows the previous cover", field(service, "currentArtwork"));
+            // The next track is published before its artwork: the previous cover bridges the gap
+            // briefly instead of flashing the placeholder.
+            service.onSnapshot(usbSnapshot(3, 3, "Next track", "", 3));
+            service.onArtwork((long) field(service, "expectedArtworkToken"), null);
+            assertSame(cover, field(service, "currentArtwork"));
+            org.robolectric.shadows.ShadowLooper.idleMainLooper(
+                    1_500L, java.util.concurrent.TimeUnit.MILLISECONDS);
+            assertNull("a new track without artwork shows the placeholder after the delay",
+                    field(service, "currentArtwork"));
         } finally {
             controller.destroy();
         }
