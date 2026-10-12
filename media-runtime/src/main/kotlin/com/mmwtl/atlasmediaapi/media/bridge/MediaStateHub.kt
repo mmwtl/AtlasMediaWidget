@@ -547,6 +547,9 @@ class MediaStateHub(
                 artist = data.artist.orEmpty(),
                 album = data.albumName.orEmpty(),
                 duration = data.duration.takeIf { value -> value > 0L } ?: -1L,
+                // The previous track's position is unknown for this one until the next tick.
+                position = if (sameMedia) before.position else -1L,
+                updateElapsedRealtime = if (sameMedia) before.updateElapsedRealtime else 0L,
                 capabilities = source.toBridgeSource().defaultCapabilities(),
                 artworkUri = if (sameMedia) {
                     before.artworkUri
@@ -982,15 +985,6 @@ private fun MediaSnapshot.withoutMedia(): MediaSnapshot = copy(
     playbackErrorMessage = "",
     playbackActions = 0L,
 )
-
-/** Position reached by now when the snapshot is playing; otherwise the stored position. */
-internal fun MediaSnapshot.positionAt(elapsedRealtime: Long): Long {
-    if (position < 0L || playbackState != PlaybackState.STATE_PLAYING || speed <= 0f ||
-        updateElapsedRealtime <= 0L || elapsedRealtime <= updateElapsedRealtime
-    ) return position
-    val reached = position + ((elapsedRealtime - updateElapsedRealtime) * speed).toLong()
-    return if (duration > 0L) reached.coerceAtMost(duration) else reached
-}
 
 private val AUDIO_EXTENSIONS = setOf(
     "mp3", "flac", "m4a", "aac", "ogg", "wav", "wma", "ape", "opus", "alac",
