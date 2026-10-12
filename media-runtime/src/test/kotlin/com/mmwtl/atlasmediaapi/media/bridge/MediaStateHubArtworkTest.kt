@@ -1,5 +1,7 @@
 package com.mmwtl.atlasmediaapi.media.bridge
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.geely.lib.oneosapi.mediacenter.bean.MediaData
 import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import kotlinx.coroutines.CoroutineScope
@@ -46,12 +48,31 @@ class MediaStateHubArtworkTest {
         assertEquals("content://artwork/new.jpg", fixture.repository.snapshot().artworkUri)
     }
 
-    private fun track(cover: String) = MediaData().apply {
+    @Test
+    fun `same-size artwork with other pixels replaces the published artwork`() {
+        val fixture = fixture()
+        fixture.hub.onOneOsMediaData(bt, track(bitmap = solid(Color.BLACK)))
+        fixture.requests[0].complete("content://artwork/logo.jpg")
+
+        fixture.hub.onOneOsMediaData(bt, track(bitmap = solid(Color.BLACK)))
+        assertEquals(1, fixture.requests.size)
+
+        fixture.hub.onOneOsMediaData(bt, track(bitmap = solid(Color.RED)))
+        assertEquals(2, fixture.requests.size)
+        fixture.requests[1].complete("content://artwork/cover.jpg")
+        assertEquals("content://artwork/cover.jpg", fixture.repository.snapshot().artworkUri)
+    }
+
+    private fun track(cover: String = "", bitmap: Bitmap? = null) = MediaData().apply {
         id = "1"
         name = "Song"
         artist = "Artist"
         albumCoverUri = cover
+        albumCover = bitmap
     }
+
+    private fun solid(color: Int): Bitmap =
+        Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
 
     private class Request(val onResult: (NormalizedArtwork) -> Unit) {
         fun complete(uri: String) = onResult(NormalizedArtwork(token = uri, uri = uri))

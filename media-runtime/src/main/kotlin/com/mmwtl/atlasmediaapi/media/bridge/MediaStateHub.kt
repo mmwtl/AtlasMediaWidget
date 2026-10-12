@@ -39,6 +39,7 @@ class MediaStateHub(
     private val latestArtworkRequest = AtomicLong()
     // Guarded by mediaCallbackLock: the artwork input last sent for normalization.
     private var artworkRequestKey = ""
+    private var artworkRequestBitmap: android.graphics.Bitmap? = null
     private var artworkRequestId = 0L
     private val cachedRadioArtwork = AtomicReference<CachedRadioArtwork?>()
     private val onlineSourcePolicy = OnlineMediaSourcePolicy()
@@ -865,11 +866,21 @@ class MediaStateHub(
         }
     }
 
-    /** The same artwork input for the shown track is already published or still normalizing. */
-    private fun artworkUpToDate(ownerPackage: String, mediaId: String, inputKey: String): Boolean {
+    /**
+     * The same artwork input for the shown track is already published or still normalizing. A
+     * [bitmap] must also match the requested pixels: players such as AIMP publish their logo for
+     * a new track and replace it with the cover at the same size.
+     */
+    private fun artworkUpToDate(
+        ownerPackage: String,
+        mediaId: String,
+        inputKey: String,
+        bitmap: android.graphics.Bitmap? = null,
+    ): Boolean {
         val snapshot = repository.snapshot()
         return snapshot.ownerPackage == ownerPackage && snapshot.mediaId == mediaId &&
             artworkRequestKey == "$ownerPackage\u0000$mediaId\u0000$inputKey" &&
+            (bitmap == null || artworkRequestBitmap?.let { it === bitmap || it.sameAs(bitmap) } == true) &&
             (snapshot.artworkUri.isNotBlank() || latestArtworkRequest.get() == artworkRequestId)
     }
 
@@ -878,20 +889,24 @@ class MediaStateHub(
         mediaId: String,
         bitmap: android.graphics.Bitmap?,
         sourceUri: String,
-        // Players often publish a track first and its artwork later; a new size is a new input.
+        // Players often publish a track first and its artwork later; the pixels are compared too.
         inputKey: String = "${bitmap?.width}x${bitmap?.height}\u0000$sourceUri",
     ) {
         val input = ArtworkInput(bitmap, sourceUri)
         if (input.bitmap == null && input.sourceUri.isBlank()) return
-        if (artworkUpToDate(ownerPackage, mediaId, inputKey)) return
+        if (artworkUpToDate(ownerPackage, mediaId, inputKey, bitmap)) return
         val request = latestArtworkRequest.incrementAndGet()
         artworkRequestKey = "$ownerPackage\u0000$mediaId\u0000$inputKey"
+        artworkRequestBitmap = bitmap
         artworkRequestId = request
         trackArtworkNormalizer.normalize(input) { normalized ->
             if (normalized.uri.isBlank()) {
                 // A failed read is not a result: the next callback may retry the same input.
                 synchronized(mediaCallbackLock) {
-                    if (artworkRequestId == request) artworkRequestKey = ""
+                    if (artworkRequestId == request) {
+                        artworkRequestKey = ""
+                        artworkRequestBitmap = null
+                    }
                 }
                 return@normalize
             }
