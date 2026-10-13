@@ -1091,7 +1091,23 @@ public final class MainActivity extends ScaledActivity {
         addScaleSlider(scaleCard);
         page.addView(scaleCard);
 
+        page.addView(createGStoreCard());
         page.addView(createDonateCard());
+    }
+
+    private LinearLayout createGStoreCard() {
+        LinearLayout gstoreCard = card();
+        gstoreCard.addView(text(getString(R.string.gstore_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        TextView gstoreHint = text(getString(R.string.gstore_hint),
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams gstoreHintParams = fullWrap();
+        gstoreHintParams.topMargin = Ui.dp(this, 6);
+        gstoreCard.addView(gstoreHint, gstoreHintParams);
+        Button gstoreButton = actionButton(getString(R.string.gstore_button));
+        gstoreButton.setOnClickListener(v -> GStoreDialog.show(this));
+        gstoreCard.addView(gstoreButton, buttonParams());
+        return gstoreCard;
     }
 
     private LinearLayout createDonateCard() {
