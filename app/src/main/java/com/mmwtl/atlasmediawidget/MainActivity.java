@@ -335,6 +335,18 @@ public final class MainActivity extends ScaledActivity {
                 Ui.SECONDARY, Typeface.NORMAL);
         widgetPreviewTitle = previewTitle;
         previewTitleRow.addView(previewTitle);
+        ImageView donate = new ImageView(this);
+        donate.setImageResource(R.drawable.ic_heart);
+        donate.setColorFilter(Ui.ACCENT);
+        int heartPad = Ui.dp(this, 8);
+        donate.setPadding(heartPad, heartPad, heartPad, heartPad);
+        donate.setBackground(Ui.background(Ui.CARD, 8, this));
+        donate.setContentDescription(getString(R.string.donate_title));
+        donate.setOnClickListener(v -> DonateDialog.show(this));
+        LinearLayout.LayoutParams heartParams = new LinearLayout.LayoutParams(
+                Ui.dp(this, 40), Ui.dp(this, 40));
+        heartParams.leftMargin = Ui.dp(this, 12);
+        previewTitleRow.addView(donate, heartParams);
         stickyPreview.addView(previewTitleRow);
 
         previewHost = new FrameLayout(this);
@@ -1078,6 +1090,23 @@ public final class MainActivity extends ScaledActivity {
         scaleCard.addView(scaleHint, scaleHintParams);
         addScaleSlider(scaleCard);
         page.addView(scaleCard);
+
+        page.addView(createDonateCard());
+    }
+
+    private LinearLayout createDonateCard() {
+        LinearLayout donateCard = card();
+        donateCard.addView(text(getString(R.string.donate_title),
+                20, Ui.PRIMARY, Typeface.BOLD));
+        TextView donateHint = text(getString(R.string.donate_hint),
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams donateHintParams = fullWrap();
+        donateHintParams.topMargin = Ui.dp(this, 6);
+        donateCard.addView(donateHint, donateHintParams);
+        Button donateButton = actionButton(getString(R.string.donate_button));
+        donateButton.setOnClickListener(v -> DonateDialog.show(this));
+        donateCard.addView(donateButton, buttonParams());
+        return donateCard;
     }
 
     /** Adds a card whose body starts collapsed and returns the body for its controls. */

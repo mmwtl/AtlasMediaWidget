@@ -32,4 +32,14 @@
     <string name="tab_media">Медиа</string>
     <string name="tab_radio">Радио</string>
     <string name="tab_system">Система</string>
+
+    <string name="donate_url" translatable="false">https://pay.cloudtips.ru/p/5c3a9385</string>
+    <string name="donate_title">Поддержать проект</string>
+    <string name="donate_hint">Приложение бесплатное и останется таким. Если оно вам пригодилось, можно добровольно поддержать его развитие.</string>
+    <string name="donate_button">♥ Поддержать проект</string>
+    <string name="donate_message">Приложение бесплатное и останется таким. Добровольная поддержка помогает развивать его дальше. Спасибо!</string>
+    <string name="donate_scan">Наведите камеру телефона на QR-код</string>
+    <string name="donate_open">Открыть ссылку</string>
+    <string name="donate_close">Закрыть</string>
+    <string name="donate_no_browser">Нет браузера — отсканируйте QR-код телефоном</string>
 </resources>
