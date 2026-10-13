@@ -124,7 +124,10 @@ on the OneOS firmware and its power-management settings.
 
 ## Installation and quick start
 
-1. Build or install the only supported integrated APK.
+For installation and automatic updates, I recommend the **GStore** app store:
+[download GStore](https://disk.yandex.ru/d/bJoMhjqGw8rMtg).
+
+1. Install Atlas Media Widget from GStore or build the only supported integrated APK.
 2. Open **Atlas Media Widget** and select the display mode on the **Card** tab.
 3. On the **Media** tab, check the media service, access, default source and startup behavior.
 4. On the **Card** tab, configure appearance. Overlay also provides permissions, manual size and
