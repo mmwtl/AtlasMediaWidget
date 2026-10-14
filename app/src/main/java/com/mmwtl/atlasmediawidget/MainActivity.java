@@ -22,6 +22,7 @@ import android.provider.Settings;
 import android.text.InputType;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -328,8 +329,18 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout previewTitleRow = new LinearLayout(this);
         previewTitleRow.setOrientation(LinearLayout.HORIZONTAL);
         previewTitleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text(getString(R.string.app_name), 24, Ui.PRIMARY, Typeface.BOLD);
-        previewTitleRow.addView(title, new LinearLayout.LayoutParams(
+        LinearLayout titleBox = new LinearLayout(this);
+        titleBox.setOrientation(LinearLayout.HORIZONTAL);
+        titleBox.addView(text(getString(R.string.app_name), 24, Ui.PRIMARY, Typeface.BOLD));
+        TextView version = text("v" + BuildConfig.VERSION_NAME
+                + " (" + BuildConfig.VERSION_CODE + ")", 12, Ui.SECONDARY, Typeface.NORMAL);
+        version.setSingleLine(true);
+        version.setEllipsize(TextUtils.TruncateAt.END);
+        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        versionParams.leftMargin = Ui.dp(this, 8);
+        titleBox.addView(version, versionParams);
+        previewTitleRow.addView(titleBox, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView previewTitle = text(getString(R.string.preview_title), 13,
                 Ui.SECONDARY, Typeface.NORMAL);
