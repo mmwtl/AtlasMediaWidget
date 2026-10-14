@@ -332,7 +332,7 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout titleBox = new LinearLayout(this);
         titleBox.setOrientation(LinearLayout.HORIZONTAL);
         titleBox.addView(text(getString(R.string.app_name), 24, Ui.PRIMARY, Typeface.BOLD));
-        TextView version = text("v" + BuildConfig.VERSION_NAME
+        TextView version = text(BuildConfig.VERSION_NAME
                 + " (" + BuildConfig.VERSION_CODE + ")", 12, Ui.SECONDARY, Typeface.NORMAL);
         version.setSingleLine(true);
         version.setEllipsize(TextUtils.TruncateAt.END);
