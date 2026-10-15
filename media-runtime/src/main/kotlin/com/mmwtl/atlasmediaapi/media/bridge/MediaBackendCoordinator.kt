@@ -356,23 +356,31 @@ class MediaBackendCoordinator(
                         autoplay,
                         attempt + 1,
                     )
-                    withContext(Dispatchers.IO) {
-                        commandGate.run(
-                            interruptible = true,
-                            onPreempted = ::onStartupActionPreempted,
-                        ) {
-                            if (targetSource != null) {
-                                commandHost.setDefaultSource(
-                                    source = targetSource,
-                                    autoplay = autoplay,
-                                )
-                            } else {
-                                commandHost.autoplayCurrentSource()
+                    runAutoplay(autoplay) {
+                        withContext(Dispatchers.IO) {
+                            commandGate.run(
+                                interruptible = true,
+                                onPreempted = ::onStartupActionPreempted,
+                            ) {
+                                if (targetSource != null) {
+                                    commandHost.setDefaultSource(
+                                        source = targetSource,
+                                        autoplay = autoplay,
+                                    )
+                                } else {
+                                    commandHost.autoplayCurrentSource()
+                                }
                             }
                         }
                     }
                 } finally {
                     isApplyingDefaultSource = false
+                }
+                if (applied == null) {
+                    // Retrying would restart the player against the call's audio focus.
+                    hasAppliedDefaultSource = true
+                    Timber.i("Startup media action for %s cancelled: a call is active", targetDescription)
+                    return@launch
                 }
                 if (applied) {
                     hasAppliedDefaultSource = true
@@ -399,6 +407,14 @@ class MediaBackendCoordinator(
             }
         }
     }
+
+    /** Runs an automatic action; with [autoplay] a phone call cancels it and yields null. */
+    private suspend fun runAutoplay(autoplay: Boolean, action: suspend () -> Boolean): Boolean? =
+        if (autoplay) {
+            CallGuard.runUnlessCallActive(isCallActive = { CallGuard.isCallActive(context) }, block = action)
+        } else {
+            action()
+        }
 
     /** A user command replaced the startup action; it must not run again after a reconnect. */
     private fun onStartupActionPreempted() {
@@ -447,14 +463,19 @@ class MediaBackendCoordinator(
         activeSourceLossJob = scope.launch {
             isApplyingDefaultSource = true
             try {
-                withContext(Dispatchers.IO) {
-                    commandGate.run(interruptible = true) {
-                        commandHost.setSource(
-                            source = targetSource,
-                            appSource = null,
-                            autoplay = autoplay,
-                        )
+                val switched = runAutoplay(autoplay) {
+                    withContext(Dispatchers.IO) {
+                        commandGate.run(interruptible = true) {
+                            commandHost.setSource(
+                                source = targetSource,
+                                appSource = null,
+                                autoplay = autoplay,
+                            )
+                        }
                     }
+                }
+                if (switched == null) {
+                    Timber.i("Default source switch after losing %s cancelled: a call is active", lostSource.name)
                 }
             } finally {
                 isApplyingDefaultSource = false

@@ -86,6 +86,9 @@ migration request.
   explicit unavailable/disconnected state.
 - Send transport and source commands only through the explicit versioned service. Respect the
   capability mask and treat `OK` as delivery/pending until a newer snapshot confirms the result.
+- Automatic playback (startup autoplay, autoplay after source loss) runs through `CallGuard`: an
+  active call by audio mode skips it or cancels its play retries, which would otherwise restart
+  the player against the call's audio focus. User commands are not blocked.
 - Preserve the selected Online player when returning from native sources. For OneOS DIM, send full
   Online metadata once per change and use the isolated numeric progress facade for optional progress
   updates; do not redraw the full card on every progress tick. A card with artwork gets only the
