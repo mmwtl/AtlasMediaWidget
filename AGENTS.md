@@ -87,8 +87,13 @@ migration request.
 - Send transport and source commands only through the explicit versioned service. Respect the
   capability mask and treat `OK` as delivery/pending until a newer snapshot confirms the result.
 - Preserve the selected Online player when returning from native sources. For OneOS DIM, send full
-  Online metadata once and use the isolated numeric progress facade for optional progress updates;
-  do not redraw the full card on every progress tick.
+  Online metadata once per change and use the isolated numeric progress facade for optional progress
+  updates; do not redraw the full card on every progress tick. A card with artwork gets only the
+  bounded repeats in `ONLINE_ARTWORK_REPEAT_AT_MS`: DIM names its converted image before writing it
+  and drops its own repaint when another packet follows within 300 ms (decompiled V9.03 evidence).
+- DIM (system UID) decodes Online artwork by file path and writes the converted copy to the QNX NFS
+  share itself. Export the Online source to `Documents/.atlas_dim`, not to the share, and keep the
+  copies there and in the share bounded.
 
 ## Settings and backups
 

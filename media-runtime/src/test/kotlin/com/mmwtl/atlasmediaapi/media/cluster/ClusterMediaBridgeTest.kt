@@ -10,6 +10,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.File
+import java.nio.file.Files
 
 class ClusterMediaBridgeTest {
 
@@ -191,6 +193,48 @@ class ClusterMediaBridgeTest {
             ClusterMediaBridge.onlinePayloadDedupKey(payload) ==
                 ClusterMediaBridge.onlinePayloadDedupKey(payload.copy(title = "Other")),
         )
+    }
+
+    @Test
+    fun `online artwork repeats follow the DIM intake throttle and stay bounded`() {
+        val repeats = ClusterMediaBridge.ONLINE_ARTWORK_REPEAT_AT_MS
+
+        assertEquals(listOf(2_000L, 5_000L), repeats)
+        assertTrue(repeats.first() > 1_300L)
+        assertEquals(repeats.sorted(), repeats)
+    }
+
+    @Test
+    fun `artwork pruning keeps the newest own copies and the published file`() {
+        val directory = Files.createTempDirectory("artwork-prune").toFile()
+        try {
+            val copies = (0 until 5).map { index ->
+                File(directory, "online_cover_$index.jpg").apply {
+                    writeText("$index")
+                    setLastModified(1_000_000L + index * 1_000L)
+                }
+            }
+            val unrelated = File(directory, "radio_cover_0.jpg").apply {
+                writeText("radio")
+                setLastModified(1L)
+            }
+            val temporary = File(directory, "online_cover_tmp.tmp").apply { writeText("tmp") }
+            val published = copies.first()
+
+            val stale = ClusterMediaBridge.artworkCopiesToPrune(
+                files = directory.listFiles().orEmpty().toList(),
+                keep = published,
+                prefix = "online_cover_",
+                maxFiles = 3,
+            )
+
+            assertEquals(setOf(copies[1], copies[2]), stale.toSet())
+            assertFalse(published in stale)
+            assertFalse(unrelated in stale)
+            assertFalse(temporary in stale)
+        } finally {
+            directory.deleteRecursively()
+        }
     }
 
     @Test

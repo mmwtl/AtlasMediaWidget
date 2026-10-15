@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediaapi.media.cluster
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.os.Environment
 import android.os.SystemClock
 import android.net.Uri
 import android.media.session.PlaybackState
@@ -129,6 +130,18 @@ class ClusterMediaBridge(
         const val KEY_ADAPTIVE_WATCHDOG_BASE_INTERVAL_MS = "adaptive_watchdog_base_interval_ms"
         const val KEY_REASSERT_BURST_INTERVAL_MS = "reassert_burst_interval_ms"
         private const val NFS_SHARED_DIR = "/data/vendor/nfs/shared"
+        private const val RADIO_ARTWORK_PREFIX = "radio_cover_"
+        private const val ONLINE_ARTWORK_PREFIX = "online_cover_"
+        private const val ONLINE_ARTWORK_DIR = ".atlas_dim"
+        internal const val MAX_SHARED_ARTWORK_FILES = 16
+        internal const val MAX_ONLINE_ARTWORK_FILES = 8
+
+        /**
+         * DIM announces its converted /images name to QNX before the file is written and
+         * repaints only if no other playback packet arrives within the next 300 ms. Two
+         * bounded repeats after its 1-second intake throttle reuse the finished image.
+         */
+        internal val ONLINE_ARTWORK_REPEAT_AT_MS = listOf(2_000L, 5_000L)
 
         /**
          * The stock radio process is another DIM producer and can publish its FM-only
@@ -183,6 +196,17 @@ class ClusterMediaBridge(
                 if (durationMs > 0L) value.coerceAtMost(durationMs) else value
             }
         }
+
+        /** Oldest copies beyond [maxFiles]; the file being published is always kept. */
+        internal fun artworkCopiesToPrune(
+            files: List<File>,
+            keep: File,
+            prefix: String,
+            maxFiles: Int,
+        ): List<File> = files
+            .filter { it != keep && it.isFile && it.name.startsWith(prefix) && it.name.endsWith(".jpg") }
+            .sortedByDescending(File::lastModified)
+            .drop((maxFiles - 1).coerceAtLeast(0))
 
         internal fun onlinePayloadDedupKey(
             payload: DirectDimMediaClient.Payload,
@@ -302,6 +326,10 @@ class ClusterMediaBridge(
     @Volatile
     private var onlineProgressState: OnlineProgressState? = null
 
+    private var onlineArtworkSource: File? = null
+    private var onlineArtworkExport: File? = null
+    private var onlineArtworkExportError = ""
+
     val reassertWatchdogIntervalMs: Long
         get() = reassertWatchdogIntervalStore.value
 
@@ -354,6 +382,7 @@ class ClusterMediaBridge(
     private val reassertScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val onlineProgressScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var onlineProgressJob: Job? = null
+    private var onlineArtworkRepeatJob: Job? = null
     private val reassertLock = Any()
     private var reassertJob: Job? = null
     private var duplicateRepairJob: Job? = null
@@ -424,6 +453,7 @@ class ClusterMediaBridge(
         lastOnlineProgress = -1L
         onlineProgressState = null
         if (!confirmedOnlineActive) stopOnlineProgress()
+        cancelOnlineArtworkRepeats()
         currentRadioInfo = null
         radioActive = active
         if (!active) {
@@ -558,6 +588,7 @@ class ClusterMediaBridge(
         isClusterOnlineEnabled = enabled
         prefs.edit().putBoolean(KEY_CLUSTER_ONLINE_ENABLED, enabled).apply()
         lastOnlinePayload = null
+        cancelOnlineArtworkRepeats()
         if (!enabled) {
             lastOnlineProgress = -1L
             onlineProgressState = null
@@ -577,6 +608,7 @@ class ClusterMediaBridge(
             lastOnlineProgress = -1L
             onlineProgressState = null
             stopOnlineProgress()
+            cancelOnlineArtworkRepeats()
             return
         }
         onlineProgressState = OnlineProgressState(
@@ -586,10 +618,7 @@ class ClusterMediaBridge(
             updateElapsedRealtime = snapshot.updateElapsedRealtime,
             playing = snapshot.playbackState == PlaybackState.STATE_PLAYING,
         )
-        val artworkFile = coverFile?.takeIf { it.isFile }?.let { source ->
-            val shared = File(NFS_SHARED_DIR)
-            if (shared.isDirectory && shared.canWrite()) copyArtworkAtomically(source, shared) else source
-        }
+        val artworkFile = coverFile?.takeIf { it.isFile }?.let(::exportOnlineArtwork)
         val payload = DirectDimMediaClient.Payload(
             sourceType = IMediaInteraction.SOURCE_TYPE_ONLINE,
             uuid = "atlas-online:${snapshot.ownerPackage}:${snapshot.mediaId}",
@@ -610,10 +639,20 @@ class ClusterMediaBridge(
         )
         if (lastOnlinePayload?.let(::onlinePayloadDedupKey) != onlinePayloadDedupKey(payload)) {
             stopOnlineProgress()
+            cancelOnlineArtworkRepeats()
             val result = sendOnlineFacadePayload(payload)
             if (!result.startsWith("send-failed")) {
                 lastOnlinePayload = payload
                 lastOnlineProgress = payload.currentProgress
+                lastArtworkFilePath = artworkFile?.absolutePath.orEmpty()
+                lastArtworkWirePath = payload.artworkUri?.toString().orEmpty()
+                lastArtworkQnxPath = ""
+                lastArtworkGrantReport = when {
+                    artworkFile != null -> "online-documents"
+                    onlineArtworkExportError.isNotEmpty() -> "online-export-failed: $onlineArtworkExportError"
+                    else -> "none"
+                }
+                if (payload.artworkUri != null) scheduleOnlineArtworkRepeats(payload)
             }
             lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${snapshot.title} / $result"
             if (!result.startsWith("send-failed")) {
@@ -671,6 +710,82 @@ class ClusterMediaBridge(
         lastUpdate = "${System.currentTimeMillis()}: ONLINE progress=$progress / $result"
     }
 
+    @Synchronized
+    private fun scheduleOnlineArtworkRepeats(payload: DirectDimMediaClient.Payload) {
+        val key = onlinePayloadDedupKey(payload)
+        onlineArtworkRepeatJob = onlineProgressScope.launch {
+            var elapsedMs = 0L
+            ONLINE_ARTWORK_REPEAT_AT_MS.forEachIndexed { index, atMs ->
+                delay(atMs - elapsedMs)
+                elapsedMs = atMs
+                repeatOnlinePayload(key, index + 1)
+            }
+        }
+    }
+
+    @Synchronized
+    private fun repeatOnlinePayload(key: DirectDimMediaClient.Payload, attempt: Int) {
+        val current = lastOnlinePayload ?: return
+        if (!isClusterOnlineEnabled || !confirmedOnlineActive || onlinePayloadDedupKey(current) != key) return
+        val state = onlineProgressState
+        val progress = state?.let {
+            extrapolateOnlineProgress(
+                positionMs = it.positionMs,
+                durationMs = it.durationMs,
+                speed = if (it.playing) it.speed else 0f,
+                updateElapsedRealtime = it.updateElapsedRealtime,
+                nowElapsedRealtime = SystemClock.elapsedRealtime(),
+            )
+        } ?: current.currentProgress
+        val payload = current.copy(currentProgress = progress)
+        val result = sendOnlineFacadePayload(payload)
+        if (!result.startsWith("send-failed")) {
+            lastOnlineProgress = progress
+            lastUpdateError = ""
+        }
+        lastUpdate = "${System.currentTimeMillis()}: ONLINE / ${payload.title} / $result / artwork-repeat-$attempt"
+    }
+
+    @Synchronized
+    private fun cancelOnlineArtworkRepeats() {
+        onlineArtworkRepeatJob?.cancel()
+        onlineArtworkRepeatJob = null
+    }
+
+    /**
+     * DIM runs as the system UID and decodes ONLINE artwork with a plain file read, so the
+     * private cache is not readable. Shared storage keeps the source local; DIM itself
+     * writes the converted image to the QNX NFS share.
+     */
+    private fun exportOnlineArtwork(source: File): File? {
+        onlineArtworkExport?.takeIf { onlineArtworkSource == source && it.isFile }?.let { return it }
+        val exported = runCatching {
+            @Suppress("DEPRECATION")
+            val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
+            val directory = File(documents, ONLINE_ARTWORK_DIR)
+            check(directory.isDirectory || directory.mkdirs()) { "Unable to create $directory" }
+            val baseName = "$ONLINE_ARTWORK_PREFIX${source.nameWithoutExtension}"
+            runCatching {
+                publishArtworkCopy(source, directory, "$baseName.jpg", ONLINE_ARTWORK_PREFIX, MAX_ONLINE_ARTWORK_FILES)
+            }.getOrElse {
+                // A file left by a previous installation has another owner and cannot be replaced.
+                publishArtworkCopy(
+                    source,
+                    directory,
+                    "${baseName}_${System.currentTimeMillis()}.jpg",
+                    ONLINE_ARTWORK_PREFIX,
+                    MAX_ONLINE_ARTWORK_FILES,
+                )
+            }
+        }.onFailure {
+            Timber.w(it, "Unable to export online artwork for DIM")
+        }
+        onlineArtworkExportError = exported.exceptionOrNull()?.diagnosticMessage().orEmpty()
+        onlineArtworkSource = source
+        onlineArtworkExport = exported.getOrNull()
+        return onlineArtworkExport
+    }
+
     private fun sendOnlineFacadePayload(payload: DirectDimMediaClient.Payload): String = runCatching {
         val mediaInteraction = dimInteraction?.mediaInteraction
             ?: error("DIM mediaInteraction is unavailable")
@@ -692,6 +807,7 @@ class ClusterMediaBridge(
         mediaInteraction.updateCurrentProgress(payload.currentProgress)
         dimAvailable = true
         dimInitializationError = ""
+        sendCount.incrementAndGet()
         "facade-sent"
     }.getOrElse { error ->
         dimAvailable = false
@@ -939,13 +1055,29 @@ class ClusterMediaBridge(
             }
         }
         val suffix = digest.digest().take(8).joinToString("") { "%02x".format(it.toInt() and 0xff) }
-        val target = File(sharedDir, "radio_cover_$suffix.jpg")
+        return publishArtworkCopy(
+            source,
+            sharedDir,
+            "$RADIO_ARTWORK_PREFIX$suffix.jpg",
+            RADIO_ARTWORK_PREFIX,
+            MAX_SHARED_ARTWORK_FILES,
+        )
+    }
+
+    private fun publishArtworkCopy(
+        source: File,
+        directory: File,
+        name: String,
+        prefix: String,
+        maxFiles: Int,
+    ): File {
+        val target = File(directory, name)
         if (target.isFile && target.length() == source.length()) {
             target.setReadable(true, false)
             return target
         }
 
-        val temporary = File(sharedDir, ".radio_cover_$suffix.${android.os.Process.myPid()}.tmp")
+        val temporary = File(directory, ".${target.nameWithoutExtension}.${android.os.Process.myPid()}.tmp")
         try {
             source.copyTo(temporary, overwrite = true)
             temporary.setReadable(true, false)
@@ -964,12 +1096,16 @@ class ClusterMediaBridge(
                 )
             }
             target.setReadable(true, false)
-            return target
         } finally {
             if (temporary.exists()) {
                 temporary.delete()
             }
         }
+        artworkCopiesToPrune(directory.listFiles().orEmpty().toList(), target, prefix, maxFiles)
+            .forEach { stale ->
+                if (!stale.delete()) Timber.d("Unable to delete stale artwork copy %s", stale)
+            }
+        return target
     }
 
     private fun Throwable.diagnosticMessage(): String {
