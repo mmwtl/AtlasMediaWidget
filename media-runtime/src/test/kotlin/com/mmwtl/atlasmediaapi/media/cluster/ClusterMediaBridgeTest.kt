@@ -199,8 +199,8 @@ class ClusterMediaBridgeTest {
     fun `online artwork repeats follow the DIM intake throttle and stay bounded`() {
         val repeats = ClusterMediaBridge.ONLINE_ARTWORK_REPEAT_AT_MS
 
-        assertEquals(listOf(2_000L, 5_000L), repeats)
-        assertTrue(repeats.first() > 1_300L)
+        assertEquals(listOf(1_000L, 2_000L, 5_000L), repeats)
+        assertTrue(repeats.first() >= 1_000L)
         assertEquals(repeats.sorted(), repeats)
     }
 

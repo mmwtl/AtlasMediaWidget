@@ -138,10 +138,11 @@ class ClusterMediaBridge(
 
         /**
          * DIM announces its converted /images name to QNX before the file is written and
-         * repaints only if no other playback packet arrives within the next 300 ms. Two
-         * bounded repeats after its 1-second intake throttle reuse the finished image.
+         * repaints only if no other playback packet arrives within the next 300 ms. Bounded
+         * repeats reuse the finished image; DIM's intake delivers on 1-second ticks and merges
+         * packets inside one window, so an earlier repeat cannot arrive sooner.
          */
-        internal val ONLINE_ARTWORK_REPEAT_AT_MS = listOf(2_000L, 5_000L)
+        internal val ONLINE_ARTWORK_REPEAT_AT_MS = listOf(1_000L, 2_000L, 5_000L)
 
         /**
          * The stock radio process is another DIM producer and can publish its FM-only
