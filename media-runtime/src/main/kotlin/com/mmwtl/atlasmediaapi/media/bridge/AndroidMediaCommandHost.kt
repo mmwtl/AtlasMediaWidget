@@ -140,14 +140,30 @@ class AndroidMediaCommandHost(
         return selectPlayerSession()?.let(::AndroidMediaSessionTarget)
     }
 
-    /** Commands follow the card's player rule; an idle player without metadata can still start. */
-    private fun selectPlayerSession(): MediaController? = PlayerSessionSelector.select(
-        sessions = sessionObserver.getActiveControllers(),
-        facts = MediaController::playerSessionFacts,
-        displayedPackage = displayedMediaPackage(),
-        rememberedPackage = currentMediaPackage(),
-        requireContent = false,
-    )
+    /**
+     * Commands follow the card's player rule, including the hold of a shown player that just
+     * stopped; an idle player without metadata can still start.
+     */
+    private fun selectPlayerSession(): MediaController? {
+        val sessions = sessionObserver.getActiveControllers()
+        val facts = sessions.associateWith { it.playerSessionFacts() }
+        val shownPackage = displayedMediaPackage()
+        val selected = PlayerSessionSelector.select(
+            sessions = sessions,
+            facts = facts::getValue,
+            displayedPackage = shownPackage,
+            rememberedPackage = currentMediaPackage(),
+            requireContent = false,
+        )
+        val shown = sessions.firstOrNull { it.packageName == shownPackage }
+        val holdMs = ShownPlayerHold.remainingMs(
+            selected = selected?.packageName,
+            shown = shown?.packageName,
+            shownStoppedPlayingAt = sessionObserver.stoppedPlayingAt(shownPackage),
+            now = android.os.SystemClock.elapsedRealtime(),
+        )
+        return if (holdMs > 0L) shown else selected
+    }
 
     override fun sessions(): List<MediaSessionCommandTarget> =
         sessionObserver.getActiveControllers().map(::AndroidMediaSessionTarget)

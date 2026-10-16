@@ -86,6 +86,10 @@ class MediaSessionObserver(
 
     fun getActiveControllers(): List<MediaController> = activeControllers.toList()
 
+    /** Elapsed realtime the player stopped playing while it had a session, or null. */
+    fun stoppedPlayingAt(packageName: String): Long? =
+        synchronized(this) { stoppedPlayingAt[packageName] }
+
     fun refreshActiveController() {
         synchronized(this) {
             if (!isStarted) return

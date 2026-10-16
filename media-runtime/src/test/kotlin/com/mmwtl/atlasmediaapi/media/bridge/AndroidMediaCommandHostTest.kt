@@ -272,6 +272,58 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
+    fun `commands reach the shown player that just stopped while another player plays`() {
+        assertEquals("com.example.shown", holdFixturePreferredPackage(stoppedAgoMs = 100L))
+    }
+
+    @Test
+    fun `commands reach the playing player once the shown player hold expires`() {
+        assertEquals(
+            "com.example.playing",
+            holdFixturePreferredPackage(stoppedAgoMs = ShownPlayerHold.GRACE_MS + 100L),
+        )
+    }
+
+    private fun holdFixturePreferredPackage(stoppedAgoMs: Long): String? {
+        val context = RuntimeEnvironment.getApplication()
+        val hub = hub(context, MediaStateRepository())
+        val observer = MediaSessionObserver(context, hub)
+        val shownSession = MediaSession(context, "shown-session").apply {
+            isActive = true
+            setPlaybackState(pausedState(lastUpdateTime = 100L))
+        }
+        val playingState = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+            .setActions(PlaybackState.ACTION_PAUSE)
+            .build()
+        val playingSession = MediaSession(context, "playing-session").apply {
+            isActive = true
+            setPlaybackState(playingState)
+        }
+        activeControllers(observer) += controller(context, playingSession, "com.example.playing").also {
+            shadowOf(it).setPlaybackState(playingState)
+        }
+        activeControllers(observer) += controller(context, shownSession, "com.example.shown")
+        stoppedPlayingAt(observer)["com.example.shown"] =
+            android.os.SystemClock.elapsedRealtime() - stoppedAgoMs
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context),
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+            displayedMediaPackage = "com.example.shown",
+        )
+
+        return host.preferredSession()?.packageName.also {
+            shownSession.release()
+            playingSession.release()
+        }
+    }
+
+    @Test
     fun `online does not reuse an unrelated session when no online session was remembered`() {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
@@ -570,6 +622,13 @@ class AndroidMediaCommandHostTest {
         shadowOf(controller).setPackageName(packageName)
         shadowOf(controller).setPlaybackState(session.controller.playbackState)
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun stoppedPlayingAt(observer: MediaSessionObserver): MutableMap<String, Long> =
+        MediaSessionObserver::class.java
+            .getDeclaredField("stoppedPlayingAt")
+            .apply { isAccessible = true }
+            .get(observer) as MutableMap<String, Long>
 
     @Suppress("UNCHECKED_CAST")
     private fun activeControllers(
