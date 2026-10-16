@@ -96,7 +96,9 @@ migration request.
   and drops its own repaint when another packet follows within 300 ms (decompiled V9.03 evidence).
 - DIM (system UID) decodes Online artwork by file path and writes the converted copy to the QNX NFS
   share itself. Export the Online source to `Documents/.atlas_dim`, not to the share, and keep the
-  copies there and in the share bounded.
+  copies there and in the share bounded. Send the Online cover as both `artwork` and
+  `nextArtwork`: a head unit that showed no Atlas Online covers (GMediaHud's covers did show)
+  shows them only with both filled (device test); which field DIM reads is not in the dumps.
 
 ## Settings and backups
 

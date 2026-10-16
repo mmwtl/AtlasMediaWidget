@@ -46,6 +46,7 @@ public final class ClusterRadioPlaybackInfo implements IMediaInteraction.IPlayba
     /**
      * The framework's mapping of these artwork fields into DIM's PlayMediaInfo is not in the
      * firmware dumps; GMediaHud, which shows Online covers where Atlas did not, fills both.
+     * Confirmed on that head unit: Online covers appear once nextArtwork carries the cover too.
      */
     public ClusterRadioPlaybackInfo(
             String uuid,
