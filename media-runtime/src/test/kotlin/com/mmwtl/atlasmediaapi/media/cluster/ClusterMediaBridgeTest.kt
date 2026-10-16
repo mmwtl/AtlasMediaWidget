@@ -240,6 +240,29 @@ class ClusterMediaBridgeTest {
     }
 
     @Test
+    fun `artwork storage report counts own covers and formats sizes`() {
+        val directory = Files.createTempDirectory("artwork-storage").toFile()
+        try {
+            File(directory, "radio_cover_a.jpg").writeBytes(ByteArray(1_536))
+            File(directory, "radio_cover_b.jpg").writeBytes(ByteArray(512))
+            File(directory, "background.kzb").writeBytes(ByteArray(4_096))
+            File(directory, "images").mkdir()
+
+            assertEquals(
+                "2 files, 2 KB",
+                ClusterMediaBridge.describeArtworkFiles(directory) { it.name.startsWith("radio_cover_") },
+            )
+            assertEquals("missing", ClusterMediaBridge.describeArtworkFiles(File(directory, "absent")) { true })
+            assertTrue(ClusterMediaBridge.describeStorageSpace(directory).startsWith("free "))
+            assertEquals("512 B", ClusterMediaBridge.formatStorageBytes(512L))
+            assertEquals("1.5 MB", ClusterMediaBridge.formatStorageBytes(1_572_864L))
+            assertEquals("2.0 GB", ClusterMediaBridge.formatStorageBytes(2L shl 30))
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `cluster overwrite watchdog interval is constrained to safe range`() {
         assertEquals(1_000L, ClusterMediaBridge.normalizeReassertWatchdogInterval(0L))
         assertEquals(1_000L, ClusterMediaBridge.normalizeReassertWatchdogInterval(250L))

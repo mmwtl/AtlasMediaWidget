@@ -29,13 +29,17 @@ import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogType
 import com.mmwtl.atlasmediaapi.media.cluster.ClusterMediaBridge
 import com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 
 class DiagnosticActivity : Activity() {
@@ -43,6 +47,7 @@ class DiagnosticActivity : Activity() {
         private const val RC_IMPORT_RADIO_ZIP = 1002
         private const val RC_IMPORT_MEDIA_BACKUP_ZIP = 1003
         private const val SEEK_BAR_COMMIT_DEBOUNCE_MS = 250L
+        private const val ARTWORK_STORAGE_TIMEOUT_MS = 3_000L
     }
 
     private data class SourceOption(val label: String, val id: String)
@@ -58,6 +63,7 @@ class DiagnosticActivity : Activity() {
 
     private val activityJob = SupervisorJob()
     private val activityScope = CoroutineScope(activityJob + Dispatchers.Main.immediate)
+    private val storageReadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private lateinit var demoModeSwitch: Switch
 
@@ -71,6 +77,9 @@ class DiagnosticActivity : Activity() {
     private var delaySeekBarTracking = false
     private var pendingDelaySec: Int? = null
     private var delayCommitJob: Job? = null
+    private var artworkStorageJob: Job? = null
+    private var artworkStorageRead: Deferred<List<Pair<String, String>>>? = null
+    private var artworkStorage: List<Pair<String, String>>? = null
 
     private lateinit var radioWidgetBroadcastSwitch: Switch
     private lateinit var clusterDimCoversSwitch: Switch
@@ -642,6 +651,25 @@ class DiagnosticActivity : Activity() {
     override fun onResume() {
         super.onResume()
         render()
+        refreshArtworkStorage()
+    }
+
+    /**
+     * The NFS share can stall in a blocking read that cancellation cannot interrupt, so the read
+     * runs outside the activity and only the wait is bounded; no second read starts meanwhile.
+     */
+    private fun refreshArtworkStorage() {
+        if (artworkStorageJob?.isActive == true) return
+        val read = artworkStorageRead?.takeIf { it.isActive }
+            ?: storageReadScope.async {
+                runCatching { coordinator.clusterMediaBridge.inspectArtworkStorage() }
+                    .getOrElse { listOf("clusterArtworkStorage" to "error: ${it.message}") }
+            }.also { artworkStorageRead = it }
+        artworkStorageJob = activityScope.launch {
+            artworkStorage = withTimeoutOrNull(ARTWORK_STORAGE_TIMEOUT_MS) { read.await() }
+                ?: listOf("clusterArtworkStorage" to "timeout after $ARTWORK_STORAGE_TIMEOUT_MS ms")
+            reportView.text = generateDiagnosticText()
+        }
     }
 
     override fun onPause() {
@@ -659,6 +687,7 @@ class DiagnosticActivity : Activity() {
         radioCoverLoadJob?.cancel()
         probe?.close()
         activityJob.cancel()
+        storageReadScope.cancel()
         super.onDestroy()
     }
 
@@ -1129,6 +1158,8 @@ class DiagnosticActivity : Activity() {
             appendLine("clusterDimArtworkQnxPath: ${clusterStatus.artworkQnxPath.ifBlank { "none" }}")
             appendLine("clusterDimArtworkUriGrants: ${clusterStatus.artworkGrantReport.ifBlank { "none" }}")
             appendLine("clusterDimSendCount: ${clusterStatus.sendCount}")
+            artworkStorage?.forEach { (key, value) -> appendLine("$key: $value") }
+                ?: appendLine("clusterArtworkStorage: checking")
             appendLine("description: ${catalogInfo.description}")
             appendLine()
 

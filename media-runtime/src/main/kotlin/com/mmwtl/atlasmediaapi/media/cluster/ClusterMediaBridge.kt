@@ -133,6 +133,8 @@ class ClusterMediaBridge(
         private const val RADIO_ARTWORK_PREFIX = "radio_cover_"
         private const val ONLINE_ARTWORK_PREFIX = "online_cover_"
         private const val ONLINE_ARTWORK_DIR = ".atlas_dim"
+        /** DIM writes its converted copies to the share as /images/<millis>_*.jpg. */
+        private const val DIM_IMAGES_DIR = "images"
         internal const val MAX_SHARED_ARTWORK_FILES = 16
         internal const val MAX_ONLINE_ARTWORK_FILES = 8
 
@@ -212,6 +214,33 @@ class ClusterMediaBridge(
         internal fun onlinePayloadDedupKey(
             payload: DirectDimMediaClient.Payload,
         ): DirectDimMediaClient.Payload = payload.copy(currentProgress = 0L)
+
+        internal fun formatStorageBytes(bytes: Long): String = when {
+            bytes >= 1L shl 30 -> String.format(Locale.US, "%.1f GB", bytes / (1L shl 30).toDouble())
+            bytes >= 1L shl 20 -> String.format(Locale.US, "%.1f MB", bytes / (1L shl 20).toDouble())
+            bytes >= 1L shl 10 -> String.format(Locale.US, "%.0f KB", bytes / (1L shl 10).toDouble())
+            else -> "$bytes B"
+        }
+
+        internal fun describeStorageSpace(directory: File): String {
+            val total = directory.totalSpace
+            if (total <= 0L) return "unknown"
+            val free = directory.usableSpace
+            return "free ${formatStorageBytes(free)} of ${formatStorageBytes(total)} (${free * 100 / total}%)"
+        }
+
+        internal fun describeArtworkFiles(directory: File, include: (File) -> Boolean): String {
+            if (!directory.isDirectory) return "missing"
+            val files = directory.listFiles()?.filter { it.isFile && include(it) } ?: return "unreadable"
+            return "${files.size} files, ${formatStorageBytes(files.sumOf(File::length))}"
+        }
+
+        private fun describeAccess(directory: File): String = when {
+            !directory.isDirectory -> "missing"
+            directory.canWrite() -> "writable"
+            directory.canRead() -> "read-only"
+            else -> "unreadable"
+        }
 
         internal fun jitteredReassertWatchdogDelayMs(
             intervalMs: Long,
@@ -761,9 +790,7 @@ class ClusterMediaBridge(
     private fun exportOnlineArtwork(source: File): File? {
         onlineArtworkExport?.takeIf { onlineArtworkSource == source && it.isFile }?.let { return it }
         val exported = runCatching {
-            @Suppress("DEPRECATION")
-            val documents = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val directory = File(documents, ONLINE_ARTWORK_DIR)
+            val directory = onlineArtworkDirectory()
             check(directory.isDirectory || directory.mkdirs()) { "Unable to create $directory" }
             val baseName = "$ONLINE_ARTWORK_PREFIX${source.nameWithoutExtension}"
             runCatching {
@@ -785,6 +812,32 @@ class ClusterMediaBridge(
         onlineArtworkSource = source
         onlineArtworkExport = exported.getOrNull()
         return onlineArtworkExport
+    }
+
+    @Suppress("DEPRECATION")
+    private fun onlineArtworkDirectory(): File = File(
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+        ONLINE_ARTWORK_DIR,
+    )
+
+    /**
+     * Where cluster artwork goes and how much room is left there. Reads the QNX NFS share,
+     * which can stall, so call it off the main thread.
+     */
+    fun inspectArtworkStorage(): List<Pair<String, String>> {
+        val share = File(NFS_SHARED_DIR)
+        val dimImages = File(share, DIM_IMAGES_DIR)
+        val online = onlineArtworkDirectory()
+        return listOf(
+            "clusterArtworkRoute" to "online: $online -> DIM -> $dimImages; radio: copy in $share",
+            "clusterShare" to "$share (${describeAccess(share)})",
+            "clusterShareSpace" to describeStorageSpace(share),
+            "clusterShareRadioCovers" to describeArtworkFiles(share) { it.name.startsWith(RADIO_ARTWORK_PREFIX) },
+            "clusterShareDimImages" to describeArtworkFiles(dimImages) { true },
+            "clusterOnlineExport" to "$online (${describeAccess(online)})",
+            "clusterOnlineExportSpace" to describeStorageSpace(online.takeIf { it.isDirectory } ?: online.parentFile ?: online),
+            "clusterOnlineExportCovers" to describeArtworkFiles(online) { it.name.startsWith(ONLINE_ARTWORK_PREFIX) },
+        )
     }
 
     private fun sendOnlineFacadePayload(payload: DirectDimMediaClient.Payload): String = runCatching {
