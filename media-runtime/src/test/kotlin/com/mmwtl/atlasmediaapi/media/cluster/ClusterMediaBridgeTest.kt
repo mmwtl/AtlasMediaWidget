@@ -7,6 +7,7 @@ import ecarx.fw.api.ICreator
 import ecarx.fw.api.diminteraction.EcarxMediaInteraction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -67,6 +68,7 @@ class ClusterMediaBridgeTest {
         assertEquals("738", playInfo.radioFrequency)
         assertEquals("Вести FM", playInfo.radioStationName)
         assertEquals(IMediaInteraction.IPlaybackInfo.PLAYBACK_STATUS_PAUSED, playInfo.playbackStatus)
+        assertNull(playInfo.nextArtwork)
     }
 
     @Test

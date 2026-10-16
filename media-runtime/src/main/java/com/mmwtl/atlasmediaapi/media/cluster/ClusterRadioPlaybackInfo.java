@@ -25,6 +25,7 @@ public final class ClusterRadioPlaybackInfo implements IMediaInteraction.IPlayba
     private final int playbackStatus;
     private final int radioMode;
     private final Uri artwork;
+    private final Uri nextArtwork;
 
     public ClusterRadioPlaybackInfo(
             String uuid,
@@ -38,6 +39,27 @@ public final class ClusterRadioPlaybackInfo implements IMediaInteraction.IPlayba
             int playbackStatus,
             int radioMode,
             Uri artwork) {
+        this(uuid, sourceType, radioFrequency, radioStationName, title, artist, album,
+                duration, playbackStatus, radioMode, artwork, null);
+    }
+
+    /**
+     * The framework's mapping of these artwork fields into DIM's PlayMediaInfo is not in the
+     * firmware dumps; GMediaHud, which shows Online covers where Atlas did not, fills both.
+     */
+    public ClusterRadioPlaybackInfo(
+            String uuid,
+            int sourceType,
+            String radioFrequency,
+            String radioStationName,
+            String title,
+            String artist,
+            String album,
+            long duration,
+            int playbackStatus,
+            int radioMode,
+            Uri artwork,
+            Uri nextArtwork) {
         this.uuid = uuid;
         this.sourceType = sourceType;
         this.radioFrequency = radioFrequency;
@@ -49,6 +71,7 @@ public final class ClusterRadioPlaybackInfo implements IMediaInteraction.IPlayba
         this.playbackStatus = playbackStatus;
         this.radioMode = radioMode;
         this.artwork = artwork;
+        this.nextArtwork = nextArtwork;
     }
 
     @Override public String getUUID() { return uuid; }
@@ -67,7 +90,7 @@ public final class ClusterRadioPlaybackInfo implements IMediaInteraction.IPlayba
     @Override public String getCurrentLyricSentence() { return ""; }
     @Override public Uri getPreviousArtwork() { return null; }
     @Override public Uri getArtwork() { return artwork; }
-    @Override public Uri getNextArtwork() { return null; }
+    @Override public Uri getNextArtwork() { return nextArtwork; }
     @Override public int getLoopMode() { return IMediaInteraction.IPlaybackInfo.LOOP_MODE_ALL; }
     @Override public int getRadioMode() { return radioMode; }
     @Override public int getFavoriteState() { return 0; }

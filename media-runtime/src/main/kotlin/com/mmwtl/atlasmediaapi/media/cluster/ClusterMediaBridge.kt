@@ -803,6 +803,7 @@ class ClusterMediaBridge(
                 payload.playbackStatus,
                 payload.radioMode,
                 payload.artworkUri,
+                payload.artworkUri,
             ),
         )
         mediaInteraction.updateCurrentProgress(payload.currentProgress)
