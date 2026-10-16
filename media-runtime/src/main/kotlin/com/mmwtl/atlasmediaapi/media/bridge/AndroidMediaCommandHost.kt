@@ -863,7 +863,7 @@ class AndroidMediaSessionTarget(
         get() = controller.playbackState?.lastPositionUpdateTime ?: 0L
 
     override val playbackState: SessionPlaybackState
-        get() = if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
+        get() = if (PlayerSessionSelector.isPlaying(controller.playbackState?.state)) {
             SessionPlaybackState.PLAYING
         } else SessionPlaybackState.NOT_PLAYING
 

@@ -10,6 +10,7 @@ import android.os.HandlerThread
 import com.mmwtl.atlasmediaapi.media.bridge.CARPLAY_MEDIA_SESSION_PACKAGES
 import com.mmwtl.atlasmediaapi.media.bridge.MediaStateHub
 import com.mmwtl.atlasmediaapi.media.bridge.PlayerSessionSelector
+import com.mmwtl.atlasmediaapi.media.bridge.ShownPlayerHold
 import com.mmwtl.atlasmediaapi.media.bridge.playerSessionFacts
 import timber.log.Timber
 import java.util.concurrent.CopyOnWriteArrayList
@@ -30,6 +31,8 @@ class MediaSessionObserver(
     private var sessionListenerRegistered = false
     private var isStarted = false
     private var generation = 0L
+    private var playingPackages = emptySet<String>()
+    private val stoppedPlayingAt = mutableMapOf<String, Long>()
     private val notificationConnectionListener: (Boolean) -> Unit = ::onNotificationListenerStateChanged
 
     fun start() {
@@ -87,7 +90,7 @@ class MediaSessionObserver(
         synchronized(this) {
             if (!isStarted) return
             // A refresh only republishes; session removal is reported by session callbacks.
-            selectActive(activeControllers.toList().filterNot(::isNativeBluetoothController))
+            selectActive(activeControllers.toList().filterNot(::isNativeBluetoothController), generation)
                 ?.let(hub::onMediaController)
         }
     }
@@ -192,7 +195,7 @@ class MediaSessionObserver(
         synchronized(this) {
             if (!isGenerationActiveLocked(expectedGeneration)) return
             val controllers = activeControllers.toList()
-            publishActive(controllers)
+            publishActive(controllers, expectedGeneration)
 
             val carPlay = controllers.firstOrNull { it.packageName in CARPLAY_MEDIA_SESSION_PACKAGES }
                 ?: controllers.firstOrNull { controller ->
@@ -225,17 +228,42 @@ class MediaSessionObserver(
     private fun isGenerationActiveLocked(expectedGeneration: Long): Boolean =
         isStarted && generation == expectedGeneration
 
-    private fun selectActive(candidates: List<MediaController>): MediaController? =
-        PlayerSessionSelector.select(
+    /**
+     * Facts are read once per pass: each read is a Binder call and a player changing tracks can
+     * answer differently within one pass.
+     */
+    private fun selectActive(
+        candidates: List<MediaController>,
+        expectedGeneration: Long,
+    ): MediaController? {
+        val facts = candidates.associateWith { it.playerSessionFacts() }
+        val now = android.os.SystemClock.elapsedRealtime()
+        val playing = facts.values.filter { it.playing }.map { it.packageName }.toSet()
+        (playingPackages - playing).forEach { stoppedPlayingAt[it] = now }
+        playing.forEach(stoppedPlayingAt::remove)
+        playingPackages = playing
+        val shownPackage = hub.displayedOwnerPackage()
+        val selected = PlayerSessionSelector.select(
             sessions = candidates,
-            facts = MediaController::playerSessionFacts,
-            displayedPackage = hub.displayedOwnerPackage(),
+            facts = facts::getValue,
+            displayedPackage = shownPackage,
             requireContent = true,
         )
+        val shown = candidates.firstOrNull { it.packageName == shownPackage }
+        val holdMs = ShownPlayerHold.remainingMs(
+            selected = selected?.packageName,
+            shown = shown?.packageName,
+            shownStoppedPlayingAt = stoppedPlayingAt[shownPackage],
+            now = now,
+        )
+        if (holdMs == 0L) return selected
+        cbHandler?.postDelayed({ dispatchSessionUpdate(expectedGeneration) }, holdMs)
+        return shown
+    }
 
-    private fun publishActive(controllers: List<MediaController>) {
+    private fun publishActive(controllers: List<MediaController>, expectedGeneration: Long) {
         val candidates = controllers.filterNot(::isNativeBluetoothController)
-        val active = selectActive(candidates)
+        val active = selectActive(candidates, expectedGeneration)
         when {
             active != null -> hub.onMediaController(active)
             candidates.isEmpty() -> hub.onMediaController(null)

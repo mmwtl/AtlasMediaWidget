@@ -988,7 +988,7 @@ internal fun MediaMetadata?.hasPlayerContent(): Boolean {
 
 internal fun MediaController.playerSessionFacts(): PlayerSessionFacts = PlayerSessionFacts(
     packageName = packageName.orEmpty(),
-    playing = playbackState?.state == PlaybackState.STATE_PLAYING,
+    playing = PlayerSessionSelector.isPlaying(playbackState?.state),
     hasContent = metadata.hasPlayerContent(),
     lastPositionUpdateTime = playbackState?.lastPositionUpdateTime ?: 0L,
 )

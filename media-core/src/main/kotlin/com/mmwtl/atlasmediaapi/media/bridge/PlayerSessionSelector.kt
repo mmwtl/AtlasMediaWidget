@@ -1,5 +1,7 @@
 package com.mmwtl.atlasmediaapi.media.bridge
 
+import android.media.session.PlaybackState
+
 /** Facts about one player session that decide which player the card shows and commands reach. */
 data class PlayerSessionFacts(
     val packageName: String,
@@ -42,6 +44,23 @@ object PlayerSessionSelector {
         eligible.firstOrNull { (_, fact) -> fact.packageName.matches(rememberedPackage) }
             ?.let { return it.first }
         return eligible.maxByOrNull { (_, fact) -> fact.lastPositionUpdateTime }?.first
+    }
+
+    /**
+     * Playing, or passing through a state that a playing player reports while it changes or loads
+     * a track. Such a player keeps the card: otherwise another playing app takes the card and the
+     * next command during every track change.
+     */
+    fun isPlaying(state: Int?): Boolean = when (state) {
+        PlaybackState.STATE_PLAYING,
+        PlaybackState.STATE_FAST_FORWARDING,
+        PlaybackState.STATE_REWINDING,
+        PlaybackState.STATE_BUFFERING,
+        PlaybackState.STATE_CONNECTING,
+        PlaybackState.STATE_SKIPPING_TO_PREVIOUS,
+        PlaybackState.STATE_SKIPPING_TO_NEXT,
+        PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM -> true
+        else -> false
     }
 
     private fun String.matches(packageName: String): Boolean =

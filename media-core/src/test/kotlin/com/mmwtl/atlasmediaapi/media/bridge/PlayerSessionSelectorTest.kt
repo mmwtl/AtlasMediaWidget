@@ -1,7 +1,10 @@
 package com.mmwtl.atlasmediaapi.media.bridge
 
+import android.media.session.PlaybackState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlayerSessionSelectorTest {
@@ -83,6 +86,38 @@ class PlayerSessionSelectorTest {
         )
 
         assertEquals("com.example.newer", select(sessions, displayed = ""))
+    }
+
+    @Test
+    fun `shown player changing tracks keeps the card from another playing player`() {
+        val sessions = listOf(
+            session("com.example.other", playing = true),
+            session(
+                "com.example.shown",
+                playing = PlayerSessionSelector.isPlaying(PlaybackState.STATE_SKIPPING_TO_NEXT),
+            ),
+        )
+
+        assertEquals("com.example.shown", select(sessions, displayed = "com.example.shown"))
+    }
+
+    @Test
+    fun `track change states count as playing and stopped states do not`() {
+        listOf(
+            PlaybackState.STATE_PLAYING,
+            PlaybackState.STATE_BUFFERING,
+            PlaybackState.STATE_CONNECTING,
+            PlaybackState.STATE_SKIPPING_TO_NEXT,
+            PlaybackState.STATE_SKIPPING_TO_PREVIOUS,
+            PlaybackState.STATE_SKIPPING_TO_QUEUE_ITEM,
+        ).forEach { assertTrue(PlayerSessionSelector.isPlaying(it)) }
+        listOf(
+            null,
+            PlaybackState.STATE_NONE,
+            PlaybackState.STATE_STOPPED,
+            PlaybackState.STATE_PAUSED,
+            PlaybackState.STATE_ERROR,
+        ).forEach { assertFalse(PlayerSessionSelector.isPlaying(it)) }
     }
 
     private fun select(
