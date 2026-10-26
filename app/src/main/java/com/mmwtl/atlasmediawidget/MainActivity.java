@@ -3529,7 +3529,7 @@ public final class MainActivity extends ScaledActivity {
         widgetPreviewTitle.setText("Предпросмотр · демо");
         int configuredWidthPx = widthInput();
         int configuredHeightPx = heightInput();
-        android.content.Context widgetContext = getApplicationContext();
+        android.content.Context widgetContext = CardTheme.overlay(getApplicationContext());
         int maxWidthPx = Math.max(1, previewHost.getWidth()
                 - previewHost.getPaddingLeft() - previewHost.getPaddingRight());
         int maxContainerHeightPx = Math.max(1, Math.round(

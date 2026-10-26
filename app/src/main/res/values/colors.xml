@@ -8,4 +8,35 @@
     <color name="atlas_accent">#7893A0</color>
     <color name="atlas_error">#D98282</color>
     <color name="icon_background">#171717</color>
+
+    <!-- Media card, day: the AppWidget follows the system night mode (values-night). -->
+    <!-- Card base under the artwork; also the RGB of the cover dimming gradient. -->
+    <color name="card_background">#EDEEF0</color>
+    <color name="card_nested">#FFFFFF</color>
+    <color name="card_outline">#1F000000</color>
+    <color name="card_pill">#B3FFFFFF</color>
+    <color name="card_pill_stroke">#1F000000</color>
+    <color name="card_source_dot">#1A73E8</color>
+    <color name="card_text">#202124</color>
+    <color name="card_text_secondary">#5F6368</color>
+    <color name="card_text_subtitle">#45484D</color>
+    <color name="card_text_shadow">#99FFFFFF</color>
+    <color name="card_error">#B3261E</color>
+    <!-- Accent text of the status pill; the day tone keeps 4.5:1 on the light surface. -->
+    <color name="card_status">#4A6572</color>
+    <color name="card_divider">#1F000000</color>
+    <color name="card_panel">#F0EDEEF0</color>
+    <color name="card_panel_stroke">#33000000</color>
+    <color name="card_option">#FFFFFF</color>
+    <color name="card_option_stroke">#1F000000</color>
+    <color name="card_option_selected">#337893A0</color>
+    <color name="card_option_selected_stroke">#7893A0</color>
+    <color name="card_tile">#FFFFFF</color>
+    <color name="card_tile_stroke">#1F000000</color>
+    <color name="card_track">#26000000</color>
+    <!-- The accent tone of progress and the radio marker; the day tone keeps 3:1 on the light surface. -->
+    <color name="card_progress">#5F7C89</color>
+    <color name="card_control_disabled">#9E202124</color>
+    <color name="card_control_pressed">#5F7C89</color>
+    <color name="widget_empty_background">#EDEEF0</color>
 </resources>

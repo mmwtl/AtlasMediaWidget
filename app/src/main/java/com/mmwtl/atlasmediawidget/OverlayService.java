@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Insets;
 import android.graphics.PixelFormat;
@@ -67,6 +68,7 @@ public final class OverlayService extends Service
     private long lastWidgetSnapshotAt;
     private long lastWidgetReconciliationAt;
     private List<?> widgetRenderKey;
+    private boolean widgetNight;
     private String pendingWidgetCommand;
     private long pendingWidgetCommandAt;
     private final SharedPreferences.OnSharedPreferenceChangeListener widgetPreferences =
@@ -323,6 +325,7 @@ public final class OverlayService extends Service
         fastProbeUntil = createdAt + ForegroundPollPolicy.FAST_PROBE_DURATION_MS;
         if (!prefs.isWidgetMode()) registerVisibilityWakeReceiver();
         prefs.observe(widgetPreferences);
+        widgetNight = CardTheme.isNight(getResources().getConfiguration());
         bridge.start();
         AppLog.info("Overlay service created");
     }
@@ -368,6 +371,21 @@ public final class OverlayService extends Service
             }
         }
         return START_STICKY;
+    }
+
+    /**
+     * AppWidget pixels are drawn here, so the host's re-inflation on a night-mode change still
+     * shows the old bitmaps; the provider gets no update for it, but this service is told.
+     */
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        boolean night = CardTheme.isNight(configuration);
+        if (night == widgetNight) return;
+        widgetNight = night;
+        if (destroyed || !prefs.isWidgetMode()) return;
+        AppLog.info("Night mode " + (night ? "on" : "off") + ", redrawing widgets");
+        widgetRenderKey = null;
+        renderWidgets(true);
     }
 
     private void syncDisplayMode() {
@@ -1138,7 +1156,7 @@ public final class OverlayService extends Service
                 CardStyle.DEFAULT.preferenceValue));
         int maxWidth = Math.max(1, bounds.width() - Ui.dp(this, 32));
         int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
-        MediaCardView candidate = new MediaCardView(this,
+        MediaCardView candidate = new MediaCardView(CardTheme.overlay(this),
                 prefs.cardWidthPx(), prefs.cardHeightPx(),
                 maxWidth, maxHeight, style, prefs.appearance(style),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),

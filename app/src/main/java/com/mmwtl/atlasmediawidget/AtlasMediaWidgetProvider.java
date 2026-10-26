@@ -222,8 +222,9 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             height = Math.min(4096, Ui.dp(context, heightDp(context, options)));
             CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE,
                     CardStyle.DEFAULT.preferenceValue));
-            card = new MediaCardView(context, width, height, width, height, style,
-                    prefs.appearance(style), prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
+            WidgetAppearance appearance = prefs.appearance(style);
+            card = new MediaCardView(CardTheme.widget(context, style, appearance), width, height,
+                    width, height, style, appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
             card.setCustomActionPolicy(prefs.playerActionsCount(), prefs.playerActionRules());
             if (snapshot == null || !connected) card.renderWidgetUnavailable(connected);

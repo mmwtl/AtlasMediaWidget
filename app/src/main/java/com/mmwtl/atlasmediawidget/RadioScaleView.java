@@ -10,6 +10,7 @@ final class RadioScaleView extends View {
     private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint tick = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint marker = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final int tickColor;
     private final float trackHeight;
     private final float unit;
     private RadioBandScale scale;
@@ -18,10 +19,11 @@ final class RadioScaleView extends View {
         super(context);
         unit = Ui.dp(context, 1) * uiScale;
         trackHeight = Math.max(1f, thicknessDp * unit);
-        track.setColor(0x553C4148);
+        track.setColor(context.getColor(R.color.card_track));
         tick.setStrokeWidth(Math.max(1f, unit));
         tick.setStrokeCap(Paint.Cap.ROUND);
-        marker.setColor(0xFF83AFC2);
+        marker.setColor(context.getColor(R.color.card_progress));
+        tickColor = context.getColor(R.color.card_text_secondary) & 0xFFFFFF;
         setPadding(Math.round(6 * unit), 0, Math.round(6 * unit), 0);
     }
 
@@ -42,7 +44,7 @@ final class RadioScaleView extends View {
             boolean major = scale.isMajor(value);
             float half = (major ? 6f : 3.5f) * unit;
             float x = left + width * scale.fractionOf(value);
-            tick.setColor(major ? 0x99D4D4D4 : 0x4DD4D4D4);
+            tick.setColor((major ? 0x99000000 : 0x4D000000) | tickColor);
             canvas.drawLine(x, center - half, x, center + half, tick);
         }
         float x = left + width * scale.fraction();

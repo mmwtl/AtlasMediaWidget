@@ -44,6 +44,12 @@ the widget's own bar for fine adjustment; tapping the time shows the same bar wi
 cannot pass a drag that starts on the widget itself. Source selection and favorite radio stations
 open directly inside the AppWidget, and the favorites list scrolls.
 
+The AppWidget follows the system day/night mode (OneOS switches it with the headlights) and changes
+theme at once, without a restart and without losing the track or an open chooser. By day the card
+is light in the AtlasLauncher palette, and artwork dimming becomes a light veil of the same
+strength. A solid-colour backdrop keeps its chosen colour, with dark or light text picked by its
+brightness. The overlay stays graphite in both modes.
+
 <p align="center">
   <a href="docs/images/home-overview.webp">
     <img src="docs/images/home-overview.webp" width="520" alt="Atlas Media Widget on the automotive home screen">

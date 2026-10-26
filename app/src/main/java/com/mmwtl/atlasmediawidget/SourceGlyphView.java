@@ -15,7 +15,7 @@ final class SourceGlyphView extends View {
 
     SourceGlyphView(Context context) {
         super(context);
-        paint.setColor(Ui.PRIMARY);
+        paint.setColor(context.getColor(R.color.card_text));
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
         usbDrawable = context.getDrawable(R.drawable.ic_source_usb);
