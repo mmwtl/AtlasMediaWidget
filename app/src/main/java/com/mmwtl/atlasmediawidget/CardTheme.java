@@ -1,6 +1,7 @@
 package com.mmwtl.atlasmediawidget;
 
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.res.Configuration;
 
 /**
@@ -15,13 +16,37 @@ final class CardTheme {
         return withNight(base, true);
     }
 
+    /** A day context for previewing the light widget card at night. */
+    static Context day(Context base) {
+        return withNight(base, false);
+    }
+
     /**
      * An AppWidget follows the system night mode, as its launcher does. A single-colour backdrop
      * is the user's fixed colour, so its content takes the mode that stays readable on it.
+     * Light content takes the user's day palette.
      */
-    static Context widget(Context base, CardStyle style, WidgetAppearance appearance) {
-        return appearance.backdrop.solidFor(style)
+    static Context widget(Context base, CardStyle style, WidgetAppearance appearance,
+            DayPalette palette) {
+        Context themed = appearance.backdrop.solidFor(style)
                 ? withNight(base, isDark(appearance.backdrop.color)) : base;
+        return palette.isDefault() || isNight(themed.getResources().getConfiguration())
+                ? themed : new Palette(themed, palette);
+    }
+
+    /** The appearance an AppWidget shows in the mode of {@code base}: by day its day backdrop. */
+    static WidgetAppearance widgetAppearance(Context base, WidgetAppearance appearance) {
+        return isNight(base.getResources().getConfiguration()) ? appearance
+                : appearance.withBackdrop(appearance.backdrop.forDay());
+    }
+
+    /** A card_* colour of the context's mode, with the day palette applied to light content. */
+    static int color(Context context, int id) {
+        if (context instanceof Palette themed) {
+            Integer value = themed.palette.override(id);
+            if (value != null) return value;
+        }
+        return context.getColor(id);
     }
 
     static boolean isNight(Configuration configuration) {
@@ -49,5 +74,15 @@ final class CardTheme {
         themed.uiMode = themed.uiMode & ~Configuration.UI_MODE_NIGHT_MASK
                 | (night ? Configuration.UI_MODE_NIGHT_YES : Configuration.UI_MODE_NIGHT_NO);
         return base.createConfigurationContext(themed);
+    }
+
+    /** Carries the day palette to the card views, which read their colours through color(). */
+    private static final class Palette extends ContextWrapper {
+        final DayPalette palette;
+
+        Palette(Context base, DayPalette palette) {
+            super(base);
+            this.palette = palette;
+        }
     }
 }

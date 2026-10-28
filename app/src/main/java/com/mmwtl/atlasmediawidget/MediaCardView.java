@@ -1406,10 +1406,10 @@ final class MediaCardView extends FrameLayout {
         int trackHeight = Math.max(1, Math.round(Ui.dp(context, thicknessDp) * scale));
         float radius = trackHeight / 2f;
         GradientDrawable track = new GradientDrawable();
-        track.setColor(context.getColor(R.color.card_track));
+        track.setColor(CardTheme.color(context, R.color.card_track));
         track.setCornerRadius(radius);
         GradientDrawable fill = new GradientDrawable();
-        fill.setColor(context.getColor(R.color.card_progress));
+        fill.setColor(CardTheme.color(context, R.color.card_progress));
         fill.setCornerRadius(radius);
         ClipDrawable clippedFill = new ClipDrawable(fill, Gravity.START, ClipDrawable.HORIZONTAL);
         LayerDrawable layers = new LayerDrawable(new Drawable[]{track, clippedFill});
@@ -1422,7 +1422,7 @@ final class MediaCardView extends FrameLayout {
         seekBar.setProgressDrawable(layers);
         GradientDrawable thumb = new GradientDrawable();
         thumb.setShape(GradientDrawable.OVAL);
-        thumb.setColor(context.getColor(R.color.card_progress));
+        thumb.setColor(CardTheme.color(context, R.color.card_progress));
         int thumbSize = Math.max(trackHeight + Math.round(Ui.dp(context, 4) * scale),
                 Math.round(Ui.dp(context, 11) * scale));
         thumb.setSize(thumbSize, thumbSize);
@@ -1449,7 +1449,7 @@ final class MediaCardView extends FrameLayout {
      */
     float cornerRadiusPx() { return Ui.dp(getContext(), appearance.cornerRadiusDp); }
 
-    private int color(int id) { return getContext().getColor(id); }
+    private int color(int id) { return CardTheme.color(getContext(), id); }
     private int d(float baseDp) { return Math.max(1, Math.round(Ui.dp(getContext(), baseDp) * uiScale)); }
     private int bx(float baseDp) { return Math.round(Ui.dp(getContext(), baseDp) * widthScale); }
     private int by(float baseDp) { return Math.round(Ui.dp(getContext(), baseDp) * heightScale); }

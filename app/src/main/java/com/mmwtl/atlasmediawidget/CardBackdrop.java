@@ -18,14 +18,34 @@ final class CardBackdrop {
     final boolean opaqueControls;
     /** Whether the source and favorites row keeps {@link #color} at full opacity. */
     final boolean opaqueTopRow;
+    /** Whether the system day mode shows {@link #dayColor} instead of {@link #color}. */
+    final boolean separateDay;
+    /** RGB colour of the day mode without alpha. */
+    final int dayColor;
+    /** Opacity of {@link #dayColor}, 0…255. */
+    final int dayAlpha;
 
     CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
             boolean opaqueTopRow) {
+        this(solid, color, alpha, opaqueControls, opaqueTopRow, false, color, alpha);
+    }
+
+    CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
+            boolean opaqueTopRow, boolean separateDay, int dayColor, int dayAlpha) {
         this.solid = solid;
         this.color = color & 0x00FFFFFF;
         this.alpha = Math.max(0, Math.min(255, alpha));
         this.opaqueControls = opaqueControls;
         this.opaqueTopRow = opaqueTopRow;
+        this.separateDay = separateDay;
+        this.dayColor = dayColor & 0x00FFFFFF;
+        this.dayAlpha = Math.max(0, Math.min(255, dayAlpha));
+    }
+
+    /** The backdrop of the day mode: the day colour when set, otherwise this one. */
+    CardBackdrop forDay() {
+        return separateDay ? new CardBackdrop(solid, dayColor, dayAlpha, opaqueControls,
+                opaqueTopRow) : this;
     }
 
     /** Only the compact layout offers the single-colour backdrop. */

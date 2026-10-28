@@ -19,11 +19,11 @@ final class RadioScaleView extends View {
         super(context);
         unit = Ui.dp(context, 1) * uiScale;
         trackHeight = Math.max(1f, thicknessDp * unit);
-        track.setColor(context.getColor(R.color.card_track));
+        track.setColor(CardTheme.color(context, R.color.card_track));
         tick.setStrokeWidth(Math.max(1f, unit));
         tick.setStrokeCap(Paint.Cap.ROUND);
-        marker.setColor(context.getColor(R.color.card_progress));
-        tickColor = context.getColor(R.color.card_text_secondary) & 0xFFFFFF;
+        marker.setColor(CardTheme.color(context, R.color.card_progress));
+        tickColor = CardTheme.color(context, R.color.card_text_secondary) & 0xFFFFFF;
         setPadding(Math.round(6 * unit), 0, Math.round(6 * unit), 0);
     }
 

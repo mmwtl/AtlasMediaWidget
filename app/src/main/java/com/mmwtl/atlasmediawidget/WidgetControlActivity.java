@@ -146,8 +146,9 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         int width = Math.min(4096, Ui.dp(context, AtlasMediaWidgetProvider.widthDp(context, options)));
         int height = Math.min(4096, Ui.dp(context, AtlasMediaWidgetProvider.heightDp(context, options)));
         CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
-        WidgetAppearance appearance = prefs.appearance(style);
-        scrubber = new MediaCardView(CardTheme.widget(context, style, appearance), width, height,
+        WidgetAppearance appearance = CardTheme.widgetAppearance(context, prefs.appearance(style));
+        scrubber = new MediaCardView(CardTheme.widget(context, style, appearance,
+                prefs.dayPalette()), width, height,
                 width, height, style, appearance,
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), scrubberListener);

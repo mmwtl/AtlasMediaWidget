@@ -15,10 +15,11 @@ final class SourceGlyphView extends View {
 
     SourceGlyphView(Context context) {
         super(context);
-        paint.setColor(context.getColor(R.color.card_text));
+        paint.setColor(CardTheme.color(context, R.color.card_text));
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeJoin(Paint.Join.ROUND);
-        usbDrawable = context.getDrawable(R.drawable.ic_source_usb);
+        usbDrawable = context.getDrawable(R.drawable.ic_source_usb).mutate();
+        usbDrawable.setTint(paint.getColor());
     }
 
     void setSource(MediaSource.Id value) {

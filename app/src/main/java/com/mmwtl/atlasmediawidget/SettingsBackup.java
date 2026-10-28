@@ -45,6 +45,7 @@ final class SettingsBackup {
         final Integer cardHeightPx;
         final StyleData compact;
         final StyleData square;
+        final DayPalette dayPalette;
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
                 int appUiScaleTenths,
@@ -165,6 +166,25 @@ final class SettingsBackup {
                 PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
                 StatusBarScene.Format statusBarFormat, boolean cardOpensPlayer)
                 throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
+                    playerActionsCount, playerActionRules, statusBarMedia, statusBarFormat,
+                    cardOpensPlayer, DayPalette.DEFAULT);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths, CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner, StyleData compact, StyleData square,
+                Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
+                boolean widgetMode, int playerActionsCount,
+                PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
+                StatusBarScene.Format statusBarFormat, boolean cardOpensPlayer,
+                DayPalette dayPalette) throws IOException {
+            if (dayPalette == null) throw invalid("Не указаны цвета светлой темы");
+            this.dayPalette = dayPalette;
             this.widgetMode = widgetMode;
             this.statusBarMedia = statusBarMedia;
             this.cardOpensPlayer = cardOpensPlayer;
@@ -314,7 +334,7 @@ final class SettingsBackup {
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
                 prefs.playerActionsCount(), prefs.playerActionRules(),
                 prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat(),
-                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true));
+                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.dayPalette());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -385,6 +405,10 @@ final class SettingsBackup {
                         .put("widthPx", data.cardWidthPx)
                         .put("heightPx", data.cardHeightPx));
             }
+            settings.put("dayPalette", new JSONObject()
+                    .put("background", hex(data.dayPalette.background))
+                    .put("text", hex(data.dayPalette.text))
+                    .put("accent", hex(data.dayPalette.accent)));
             settings.put("cardStyles", new JSONObject()
                     .put("compact", encodeStyle(data.compact))
                     .put("square", encodeStyle(data.square)));
@@ -487,7 +511,11 @@ final class SettingsBackup {
                             : StatusBarScene.Format.DEFAULT,
                     // Added within schema 15; older files keep opening the player on a tap.
                     !settings.has("cardOpensPlayer") || requireBoolean(settings,
-                            "cardOpensPlayer", "settings.cardOpensPlayer"));
+                            "cardOpensPlayer", "settings.cardOpensPlayer"),
+                    // Added within schema 15; older files keep the default light palette.
+                    settings.has("dayPalette") ? decodeDayPalette(requireObject(settings,
+                            "dayPalette", "settings.dayPalette"), "settings.dayPalette")
+                            : DayPalette.DEFAULT);
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
@@ -554,27 +582,55 @@ final class SettingsBackup {
                 .put("coverDimPreset", value.coverDimPreset.backupName)
                 .put("backdrop", new JSONObject()
                         .put("solid", value.backdrop.solid)
-                        .put("color", String.format(Locale.ROOT, "#%06X", value.backdrop.color))
+                        .put("color", hex(value.backdrop.color))
                         .put("alpha", value.backdrop.alpha)
                         .put("opaqueControls", value.backdrop.opaqueControls)
-                        .put("opaqueTopRow", value.backdrop.opaqueTopRow));
+                        .put("opaqueTopRow", value.backdrop.opaqueTopRow)
+                        .put("separateDay", value.backdrop.separateDay)
+                        .put("dayColor", hex(value.backdrop.dayColor))
+                        .put("dayAlpha", value.backdrop.dayAlpha));
+    }
+
+    private static String hex(int rgb) {
+        return String.format(Locale.ROOT, "#%06X", rgb);
+    }
+
+    private static int requireColor(JSONObject object, String key, String path)
+            throws IOException {
+        String color = requireString(object, key, path);
+        if (!color.matches("#[0-9A-Fa-f]{6}")) {
+            throw invalid("Поле " + path + " должно быть цветом #RRGGBB");
+        }
+        return Integer.parseInt(color.substring(1), 16);
+    }
+
+    private static DayPalette decodeDayPalette(JSONObject object, String path)
+            throws IOException {
+        return new DayPalette(requireColor(object, "background", path + ".background"),
+                requireColor(object, "text", path + ".text"),
+                requireColor(object, "accent", path + ".accent"));
     }
 
     private static CardBackdrop decodeBackdrop(JSONObject object, String path)
             throws IOException {
-        String color = requireString(object, "color", path + ".color");
-        if (!color.matches("#[0-9A-Fa-f]{6}")) {
-            throw invalid("Поле " + path + ".color должно быть цветом #RRGGBB");
-        }
+        int color = requireColor(object, "color", path + ".color");
+        int alpha = requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
+                0, 255);
+        // The day colour was added within schema 15; older files use one colour all day.
         return new CardBackdrop(
                 requireBoolean(object, "solid", path + ".solid"),
-                Integer.parseInt(color.substring(1), 16),
-                requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
-                        0, 255),
+                color,
+                alpha,
                 object.has("opaqueControls") && requireBoolean(object, "opaqueControls",
                         path + ".opaqueControls"),
                 object.has("opaqueTopRow") && requireBoolean(object, "opaqueTopRow",
-                        path + ".opaqueTopRow"));
+                        path + ".opaqueTopRow"),
+                object.has("separateDay") && requireBoolean(object, "separateDay",
+                        path + ".separateDay"),
+                object.has("dayColor") ? requireColor(object, "dayColor", path + ".dayColor")
+                        : color,
+                object.has("dayAlpha") ? requireRange(path + ".dayAlpha",
+                        requireInt(object, "dayAlpha", path + ".dayAlpha"), 0, 255) : alpha);
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,

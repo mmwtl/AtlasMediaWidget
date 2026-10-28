@@ -50,6 +50,11 @@ is light in the AtlasLauncher palette, and artwork dimming becomes a light veil 
 strength. A solid-colour backdrop keeps its chosen colour, with dark or light text picked by its
 brightness. The overlay stays graphite in both modes.
 
+The light theme colours are set separately: the card background (also the colour of the veil over
+the artwork), the text and the accent. A solid-colour backdrop can have its own day colour and
+opacity. By default the light theme looks as before, and the backdrop keeps one colour day and
+night.
+
 <p align="center">
   <a href="docs/images/home-overview.webp">
     <img src="docs/images/home-overview.webp" width="520" alt="Atlas Media Widget on the automotive home screen">
