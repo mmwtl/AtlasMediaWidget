@@ -134,20 +134,24 @@ public final class SettingsBackupTest {
         assertFalse(SettingsBackup.decode(root.toString()).compact.appearance.backdrop.solid);
     }
 
-    @Test public void lightThemeColoursRoundTripAndDefaultForOlderFiles() throws Exception {
+    @Test public void cardColoursRoundTripAndDefaultForOlderFiles() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.COMPACT, null, null), "test"));
         JSONObject settings = root.getJSONObject("settings");
         assertEquals("#EDEEF0", settings.getJSONObject("dayPalette").getString("background"));
+        assertEquals("#1D2228", settings.getJSONObject("nightPalette").getString("background"));
         settings.put("dayPalette", new JSONObject().put("background", "#fff4e0")
                 .put("text", "#102030").put("accent", "#C04000"));
+        settings.put("nightPalette", new JSONObject().put("background", "#101830")
+                .put("text", "#E0E8FF").put("accent", "#40C0A0"));
         JSONObject backdrop = settings.getJSONObject("cardStyles").getJSONObject("compact")
                 .getJSONObject("backdrop");
         backdrop.put("solid", true).put("color", "#262626").put("alpha", 200)
                 .put("separateDay", true).put("dayColor", "#F0F0F0").put("dayAlpha", 90);
         SettingsBackup.Data restored = SettingsBackup.decode(
                 SettingsBackup.encode(SettingsBackup.decode(root.toString()), "test"));
-        assertEquals(new DayPalette(0xFFF4E0, 0x102030, 0xC04000), restored.dayPalette);
+        assertEquals(new CardColors(CardPalette.DAY.with(0xFFF4E0, 0x102030, 0xC04000),
+                CardPalette.NIGHT.with(0x101830, 0xE0E8FF, 0x40C0A0)), restored.colors);
         CardBackdrop day = restored.compact.appearance.backdrop.forDay();
         assertEquals(0x5AF0F0F0, day.argb());
         assertEquals(0xC8262626, restored.compact.appearance.backdrop.argb());
@@ -156,11 +160,12 @@ public final class SettingsBackupTest {
         backdrop.remove("dayColor");
         backdrop.remove("dayAlpha");
         settings.remove("dayPalette");
+        settings.remove("nightPalette");
         SettingsBackup.Data legacy = SettingsBackup.decode(root.toString());
-        assertEquals(DayPalette.DEFAULT, legacy.dayPalette);
+        assertEquals(CardColors.DEFAULT, legacy.colors);
         assertEquals("one colour all day", 0xC8262626,
                 legacy.compact.appearance.backdrop.forDay().argb());
-        settings.put("dayPalette", new JSONObject().put("background", "white")
+        settings.put("nightPalette", new JSONObject().put("background", "white")
                 .put("text", "#102030").put("accent", "#C04000"));
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
     }

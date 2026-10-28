@@ -148,7 +148,7 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
         WidgetAppearance appearance = CardTheme.widgetAppearance(context, prefs.appearance(style));
         scrubber = new MediaCardView(CardTheme.widget(context, style, appearance,
-                prefs.dayPalette()), width, height,
+                prefs.cardColors()), width, height,
                 width, height, style, appearance,
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), scrubberListener);

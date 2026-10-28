@@ -65,9 +65,9 @@ final class Prefs {
     private static final String KEY_BACKDROP_SEPARATE_DAY_PREFIX = "backdrop_separate_day_";
     private static final String KEY_BACKDROP_DAY_COLOR_PREFIX = "backdrop_day_color_";
     private static final String KEY_BACKDROP_DAY_ALPHA_PREFIX = "backdrop_day_alpha_";
-    private static final String KEY_DAY_BACKGROUND = "day_background";
-    private static final String KEY_DAY_TEXT = "day_text";
-    private static final String KEY_DAY_ACCENT = "day_accent";
+    private static final String KEY_PALETTE_BACKGROUND_SUFFIX = "_background";
+    private static final String KEY_PALETTE_TEXT_SUFFIX = "_text";
+    private static final String KEY_PALETTE_ACCENT_SUFFIX = "_accent";
     private static final String KEY_COVER_DIM_PRESET_MIGRATED = "cover_dim_preset_migrated";
     static final int POSITION_UNSET = Integer.MIN_VALUE;
     static final int MIN_CARD_WIDTH_DP = 360;
@@ -396,21 +396,36 @@ final class Prefs {
                 getInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, alpha));
     }
 
-    DayPalette dayPalette() {
-        return new DayPalette(getInt(KEY_DAY_BACKGROUND, DayPalette.DEFAULT_BACKGROUND),
-                getInt(KEY_DAY_TEXT, DayPalette.DEFAULT_TEXT),
-                getInt(KEY_DAY_ACCENT, DayPalette.DEFAULT_ACCENT));
+    CardColors cardColors() {
+        return new CardColors(palette(false), palette(true));
     }
 
-    void putDayPalette(DayPalette value) {
-        putDayPalette(preferences.edit(), value).apply();
+    private CardPalette palette(boolean night) {
+        CardPalette defaults = CardPalette.defaults(night);
+        String prefix = paletteKey(night);
+        return defaults.with(
+                getInt(prefix + KEY_PALETTE_BACKGROUND_SUFFIX, defaults.background),
+                getInt(prefix + KEY_PALETTE_TEXT_SUFFIX, defaults.text),
+                getInt(prefix + KEY_PALETTE_ACCENT_SUFFIX, defaults.accent));
     }
 
-    private static SharedPreferences.Editor putDayPalette(SharedPreferences.Editor editor,
-            DayPalette value) {
-        return editor.putInt(KEY_DAY_BACKGROUND, value.background)
-                .putInt(KEY_DAY_TEXT, value.text)
-                .putInt(KEY_DAY_ACCENT, value.accent);
+    void putCardColors(CardColors value) {
+        putCardColors(preferences.edit(), value).apply();
+    }
+
+    private static SharedPreferences.Editor putCardColors(SharedPreferences.Editor editor,
+            CardColors value) {
+        for (CardPalette palette : new CardPalette[]{value.day, value.night}) {
+            String prefix = paletteKey(palette.night);
+            editor.putInt(prefix + KEY_PALETTE_BACKGROUND_SUFFIX, palette.background)
+                    .putInt(prefix + KEY_PALETTE_TEXT_SUFFIX, palette.text)
+                    .putInt(prefix + KEY_PALETTE_ACCENT_SUFFIX, palette.accent);
+        }
+        return editor;
+    }
+
+    private static String paletteKey(boolean night) {
+        return night ? "night" : "day";
     }
 
     private static void putBackdrop(SharedPreferences.Editor editor, CardStyle style,
@@ -597,7 +612,7 @@ final class Prefs {
         }
         putStyle(editor, CardStyle.COMPACT, data.compact);
         putStyle(editor, CardStyle.SQUARE, data.square);
-        putDayPalette(editor, data.dayPalette);
+        putCardColors(editor, data.colors);
         return editor.commit();
     }
 

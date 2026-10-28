@@ -42,10 +42,10 @@ public class CardThemeTest {
         Prefs prefs = new Prefs(context);
         RuntimeEnvironment.setQualifiers("+notnight");
         assertColor(0xEDEEF0, surface(card(context, prefs)));
-        assertEquals(0xFF1D2228, CardTheme.overlay(context).getColor(R.color.card_background));
+        assertEquals(0xFF1D2228, CardTheme.overlay(context, CardColors.DEFAULT).getColor(R.color.card_background));
         RuntimeEnvironment.setQualifiers("+night");
         assertColor(0x1D2228, surface(card(context, prefs)));
-        assertSame(context, CardTheme.overlay(context));
+        assertSame(context, CardTheme.overlay(context, CardColors.DEFAULT));
     }
 
     @Test public void singleColourBackdropKeepsReadableContentInBothModes() {
@@ -64,38 +64,49 @@ public class CardThemeTest {
         CardStyle style = CardStyle.COMPACT;
         WidgetAppearance light = defaults.withBackdrop(
                 new CardBackdrop(true, 0xF0F0F0, 255, false, false));
-        assertEquals(0xFF202124, CardTheme.widget(context, style, light, DayPalette.DEFAULT).getColor(R.color.card_text));
+        assertEquals(0xFF202124, CardTheme.widget(context, style, light, CardColors.DEFAULT).getColor(R.color.card_text));
     }
 
-    @Test public void dayPaletteRecoloursOnlyTheLightCard() {
+    @Test public void eachModeTakesItsOwnPalette() {
         Context context = RuntimeEnvironment.getApplication();
         Prefs prefs = new Prefs(context);
         WidgetAppearance appearance = WidgetAppearance.defaults(CardStyle.SQUARE);
         RuntimeEnvironment.setQualifiers("+notnight");
-        assertSame("the default palette keeps the resources", context,
-                CardTheme.widget(context, CardStyle.SQUARE, appearance, DayPalette.DEFAULT));
-        DayPalette palette = new DayPalette(0xFFF4E0, 0x102030, 0xC04000);
-        prefs.putDayPalette(palette);
+        assertSame("the default palettes keep the resources", context,
+                CardTheme.widget(context, CardStyle.SQUARE, appearance, CardColors.DEFAULT));
+        CardColors colors = new CardColors(CardPalette.DAY.with(0xFFF4E0, 0x102030, 0xC04000),
+                CardPalette.NIGHT.with(0x101830, 0xE0E8FF, 0x40C0A0));
+        prefs.putCardColors(colors);
+        assertEquals(colors, prefs.cardColors());
         assertColor(0xFFF4E0, surface(card(context, prefs)));
-        Context day = CardTheme.widget(context, CardStyle.SQUARE, appearance, palette);
+        Context day = CardTheme.widget(context, CardStyle.SQUARE, appearance, colors);
         assertEquals(0xFF102030, CardTheme.color(day, R.color.card_text));
         assertEquals(0xB3102030, CardTheme.color(day, R.color.card_text_secondary));
         assertEquals(0xFFC04000, CardTheme.color(day, R.color.card_progress));
         assertEquals("untouched tones stay", 0xFFB3261E, CardTheme.color(day, R.color.card_error));
+        Context overlay = CardTheme.overlay(context, colors);
+        assertEquals("the overlay is night by day too", 0xFFE0E8FF,
+                CardTheme.color(overlay, R.color.card_text));
         RuntimeEnvironment.setQualifiers("+night");
-        assertColor(0x1D2228, surface(card(context, prefs)));
-        Context night = CardTheme.widget(context, CardStyle.SQUARE, appearance, palette);
-        assertEquals(0xFFF5F5F5, CardTheme.color(night, R.color.card_text));
+        assertColor(0x101830, surface(card(context, prefs)));
+        Context night = CardTheme.widget(context, CardStyle.SQUARE, appearance, colors);
+        assertEquals(0xFFE0E8FF, CardTheme.color(night, R.color.card_text));
+        assertEquals(0xD9E0E8FF, CardTheme.color(night, R.color.card_text_secondary));
+        assertEquals(0xFF40C0A0, CardTheme.color(night, R.color.card_progress));
     }
 
-    @Test public void dayPaletteKeepsTheDefaultsUntilAColourChanges() {
-        DayPalette accentOnly = new DayPalette(DayPalette.DEFAULT_BACKGROUND,
-                DayPalette.DEFAULT_TEXT, 0x00AA00);
-        assertTrue(DayPalette.DEFAULT.isDefault());
-        assertNull(DayPalette.DEFAULT.override(R.color.card_text));
+    @Test public void palettesKeepTheDefaultsUntilAColourChanges() {
+        CardPalette accentOnly = CardPalette.DAY.with(CardPalette.DAY.background,
+                CardPalette.DAY.text, 0x00AA00);
+        assertTrue(CardPalette.DAY.isDefault());
+        assertTrue(CardPalette.NIGHT.isDefault());
+        assertNull(CardPalette.DAY.override(R.color.card_text));
+        assertNull(CardPalette.NIGHT.override(R.color.card_text));
         assertNull(accentOnly.override(R.color.card_background));
         assertNull(accentOnly.override(R.color.card_text));
         assertEquals(Integer.valueOf(0x3300AA00), accentOnly.override(R.color.card_option_selected));
+        assertFalse("a night palette with day colours is customised",
+                new CardPalette(true, 0xEDEEF0, 0x202124, 0x5F7C89).isDefault());
     }
 
     @Test public void separateDayBackdropShowsOnlyInTheDayMode() {
@@ -110,10 +121,10 @@ public class CardThemeTest {
         WidgetAppearance day = CardTheme.widgetAppearance(context,
                 prefs.appearance(CardStyle.COMPACT));
         assertEquals(0xFF202124, CardTheme.widget(context, CardStyle.COMPACT, day,
-                DayPalette.DEFAULT).getColor(R.color.card_text));
+                CardColors.DEFAULT).getColor(R.color.card_text));
         RuntimeEnvironment.setQualifiers("+night");
         assertColor(0x262626, surface(card(context, prefs)));
-        assertColor(0xF0F0F0, surface(card(CardTheme.day(context), prefs)));
+        assertColor(0xF0F0F0, surface(card(CardTheme.mode(context, false), prefs)));
     }
 
     @Test public void darknessPicksTheMoreReadableText() {

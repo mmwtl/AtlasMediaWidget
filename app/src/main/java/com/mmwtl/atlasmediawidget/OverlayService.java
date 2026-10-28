@@ -1156,7 +1156,7 @@ public final class OverlayService extends Service
                 CardStyle.DEFAULT.preferenceValue));
         int maxWidth = Math.max(1, bounds.width() - Ui.dp(this, 32));
         int maxHeight = Math.max(1, bounds.height() - Ui.dp(this, 32));
-        MediaCardView candidate = new MediaCardView(CardTheme.overlay(this),
+        MediaCardView candidate = new MediaCardView(CardTheme.overlay(this, prefs.cardColors()),
                 prefs.cardWidthPx(), prefs.cardHeightPx(),
                 maxWidth, maxHeight, style, prefs.appearance(style),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),

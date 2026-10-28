@@ -225,7 +225,7 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             WidgetAppearance appearance = CardTheme.widgetAppearance(context,
                     prefs.appearance(style));
             card = new MediaCardView(CardTheme.widget(context, style, appearance,
-                    prefs.dayPalette()), width, height,
+                    prefs.cardColors()), width, height,
                     width, height, style, appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
             card.setCustomActionPolicy(prefs.playerActionsCount(), prefs.playerActionRules());

@@ -50,10 +50,10 @@ is light in the AtlasLauncher palette, and artwork dimming becomes a light veil 
 strength. A solid-colour backdrop keeps its chosen colour, with dark or light text picked by its
 brightness. The overlay stays graphite in both modes.
 
-The light theme colours are set separately: the card background (also the colour of the veil over
-the artwork), the text and the accent. A solid-colour backdrop can have its own day colour and
-opacity. By default the light theme looks as before, and the backdrop keeps one colour day and
-night.
+The card colours are set separately for day and night: the background (also the colour of the
+veil over the artwork), the text and the accent; the overlay uses the night ones. A solid-colour
+backdrop also has its own day and night colour and opacity. By default both themes look as
+before, and the day backdrop repeats the night one.
 
 <p align="center">
   <a href="docs/images/home-overview.webp">

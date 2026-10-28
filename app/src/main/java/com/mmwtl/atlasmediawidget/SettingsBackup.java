@@ -45,7 +45,7 @@ final class SettingsBackup {
         final Integer cardHeightPx;
         final StyleData compact;
         final StyleData square;
-        final DayPalette dayPalette;
+        final CardColors colors;
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
                 int appUiScaleTenths,
@@ -171,7 +171,7 @@ final class SettingsBackup {
                     cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
                     radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
                     playerActionsCount, playerActionRules, statusBarMedia, statusBarFormat,
-                    cardOpensPlayer, DayPalette.DEFAULT);
+                    cardOpensPlayer, CardColors.DEFAULT);
         }
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
@@ -182,9 +182,9 @@ final class SettingsBackup {
                 boolean widgetMode, int playerActionsCount,
                 PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
                 StatusBarScene.Format statusBarFormat, boolean cardOpensPlayer,
-                DayPalette dayPalette) throws IOException {
-            if (dayPalette == null) throw invalid("Не указаны цвета светлой темы");
-            this.dayPalette = dayPalette;
+                CardColors colors) throws IOException {
+            if (colors == null) throw invalid("Не указаны цвета карточки");
+            this.colors = colors;
             this.widgetMode = widgetMode;
             this.statusBarMedia = statusBarMedia;
             this.cardOpensPlayer = cardOpensPlayer;
@@ -334,7 +334,7 @@ final class SettingsBackup {
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
                 prefs.playerActionsCount(), prefs.playerActionRules(),
                 prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat(),
-                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.dayPalette());
+                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.cardColors());
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -405,10 +405,8 @@ final class SettingsBackup {
                         .put("widthPx", data.cardWidthPx)
                         .put("heightPx", data.cardHeightPx));
             }
-            settings.put("dayPalette", new JSONObject()
-                    .put("background", hex(data.dayPalette.background))
-                    .put("text", hex(data.dayPalette.text))
-                    .put("accent", hex(data.dayPalette.accent)));
+            settings.put("dayPalette", encodePalette(data.colors.day));
+            settings.put("nightPalette", encodePalette(data.colors.night));
             settings.put("cardStyles", new JSONObject()
                     .put("compact", encodeStyle(data.compact))
                     .put("square", encodeStyle(data.square)));
@@ -512,10 +510,9 @@ final class SettingsBackup {
                     // Added within schema 15; older files keep opening the player on a tap.
                     !settings.has("cardOpensPlayer") || requireBoolean(settings,
                             "cardOpensPlayer", "settings.cardOpensPlayer"),
-                    // Added within schema 15; older files keep the default light palette.
-                    settings.has("dayPalette") ? decodeDayPalette(requireObject(settings,
-                            "dayPalette", "settings.dayPalette"), "settings.dayPalette")
-                            : DayPalette.DEFAULT);
+                    // Added within schema 15; older files keep the default palettes.
+                    new CardColors(decodePalette(settings, false),
+                            decodePalette(settings, true)));
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
@@ -604,9 +601,21 @@ final class SettingsBackup {
         return Integer.parseInt(color.substring(1), 16);
     }
 
-    private static DayPalette decodeDayPalette(JSONObject object, String path)
+    private static JSONObject encodePalette(CardPalette palette) throws JSONException {
+        return new JSONObject()
+                .put("background", hex(palette.background))
+                .put("text", hex(palette.text))
+                .put("accent", hex(palette.accent));
+    }
+
+    private static CardPalette decodePalette(JSONObject settings, boolean night)
             throws IOException {
-        return new DayPalette(requireColor(object, "background", path + ".background"),
+        String key = night ? "nightPalette" : "dayPalette";
+        CardPalette defaults = CardPalette.defaults(night);
+        if (!settings.has(key)) return defaults;
+        String path = "settings." + key;
+        JSONObject object = requireObject(settings, key, path);
+        return defaults.with(requireColor(object, "background", path + ".background"),
                 requireColor(object, "text", path + ".text"),
                 requireColor(object, "accent", path + ".accent"));
     }

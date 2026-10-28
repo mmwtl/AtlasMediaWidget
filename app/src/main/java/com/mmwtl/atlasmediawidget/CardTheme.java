@@ -11,27 +11,30 @@ import android.content.res.Configuration;
 final class CardTheme {
     private CardTheme() {}
 
-    /** The overlay keeps the graphite night card over the OEM launcher in either system mode. */
-    static Context overlay(Context base) {
-        return withNight(base, true);
+    /** The overlay keeps the night card over the OEM launcher in either system mode. */
+    static Context overlay(Context base, CardColors colors) {
+        return paletted(withNight(base, true), colors);
     }
 
-    /** A day context for previewing the light widget card at night. */
-    static Context day(Context base) {
-        return withNight(base, false);
+    /** A context of the given mode, for previewing the widget card in either mode. */
+    static Context mode(Context base, boolean night) {
+        return withNight(base, night);
     }
 
     /**
      * An AppWidget follows the system night mode, as its launcher does. A single-colour backdrop
      * is the user's fixed colour, so its content takes the mode that stays readable on it.
-     * Light content takes the user's day palette.
      */
     static Context widget(Context base, CardStyle style, WidgetAppearance appearance,
-            DayPalette palette) {
-        Context themed = appearance.backdrop.solidFor(style)
-                ? withNight(base, isDark(appearance.backdrop.color)) : base;
-        return palette.isDefault() || isNight(themed.getResources().getConfiguration())
-                ? themed : new Palette(themed, palette);
+            CardColors colors) {
+        return paletted(appearance.backdrop.solidFor(style)
+                ? withNight(base, isDark(appearance.backdrop.color)) : base, colors);
+    }
+
+    /** Applies the user's palette of the mode the content is drawn in. */
+    private static Context paletted(Context themed, CardColors colors) {
+        CardPalette palette = colors.palette(isNight(themed.getResources().getConfiguration()));
+        return palette.isDefault() ? themed : new Palette(themed, palette);
     }
 
     /** The appearance an AppWidget shows in the mode of {@code base}: by day its day backdrop. */
@@ -40,7 +43,7 @@ final class CardTheme {
                 : appearance.withBackdrop(appearance.backdrop.forDay());
     }
 
-    /** A card_* colour of the context's mode, with the day palette applied to light content. */
+    /** A card_* colour of the context's mode, with the user's palette of that mode applied. */
     static int color(Context context, int id) {
         if (context instanceof Palette themed) {
             Integer value = themed.palette.override(id);
@@ -76,11 +79,11 @@ final class CardTheme {
         return base.createConfigurationContext(themed);
     }
 
-    /** Carries the day palette to the card views, which read their colours through color(). */
+    /** Carries the palette to the card views, which read their colours through color(). */
     private static final class Palette extends ContextWrapper {
-        final DayPalette palette;
+        final CardPalette palette;
 
-        Palette(Context base, DayPalette palette) {
+        Palette(Context base, CardPalette palette) {
             super(base);
             this.palette = palette;
         }
