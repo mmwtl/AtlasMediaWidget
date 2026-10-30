@@ -232,7 +232,7 @@ Activity.
 
 ## Дневная и ночная тема
 
-Цвета карточки лежат в `values/colors.xml` (день) и `values-night/colors.xml` (ночь) под именами `card_*`; фон обоих режимов совпадает с AtlasLauncher.
+Цвета карточки лежат в `values/colors.xml` (день) и `values-night/colors.xml` (ночь) под именами `card_*`; фон, текст и плитки обоих режимов совпадают с AtlasLauncher; акцент свой, по контрасту на поверхности.
 
 - Факт Android: хост при смене `uiMode` пересоздаёт виджеты из закэшированных RemoteViews,
   а провайдер обновления не получает; `ACTION_CONFIGURATION_CHANGED` доходит только до приёмника,

@@ -20,14 +20,15 @@ import org.robolectric.annotation.GraphicsMode;
 public class CardThemeTest {
     private static final String PREFS_NAME = "atlas_media_widget";
 
-    @Test public void nightUsesTheLauncherSurfaceAndGraphiteTones() {
+    @Test public void nightUsesTheLauncherPalette() {
         RuntimeEnvironment.setQualifiers("+night");
         Context context = RuntimeEnvironment.getApplication();
         assertEquals(0xFF232528, context.getColor(R.color.card_background));
-        assertEquals(0xFFF5F5F5, context.getColor(R.color.card_text));
-        assertEquals(0xFFD4D4D4, context.getColor(R.color.card_text_secondary));
+        assertEquals(0xFFF1F2F4, context.getColor(R.color.card_text));
+        assertEquals(0xFFC4C7CA, context.getColor(R.color.card_text_secondary));
+        assertEquals(0xFF404347, context.getColor(R.color.card_nested));
         assertEquals(0xFF83AFC2, context.getColor(R.color.card_progress));
-        assertEquals(0xB333333B, context.getColor(R.color.card_pill));
+        assertEquals(0xB3404347, context.getColor(R.color.card_pill));
         assertEquals(0xFF232528, context.getColor(R.color.widget_empty_background));
     }
 
@@ -151,7 +152,7 @@ public class CardThemeTest {
         RuntimeEnvironment.setQualifiers("+notnight");
         Context day = CardTheme.widget(context, CardStyle.SQUARE, appearance, colors);
         assertEquals(0xFF102030, CardTheme.color(day, R.color.card_background));
-        assertEquals("light text on a dark day card", 0xFFF5F5F5,
+        assertEquals("light text on a dark day card", 0xFFF1F2F4,
                 CardTheme.color(day, R.color.card_text));
         RuntimeEnvironment.setQualifiers("+night");
         Context night = CardTheme.widget(context, CardStyle.SQUARE, appearance, colors);
@@ -191,6 +192,20 @@ public class CardThemeTest {
         assertEquals(0x102030, picked.color);
         assertEquals(0x102030, picked.dayColor);
         assertEquals(90, picked.dayAlpha);
+    }
+
+    @Test public void upgradeForgetsTheOldStoredNightDefaults() {
+        Context context = RuntimeEnvironment.getApplication();
+        context.createDeviceProtectedStorageContext()
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+                .putInt("night_background", 0x1D2228)
+                .putInt("night_text", 0xF5F5F5)
+                .putInt("night_accent", 0x40C0A0)
+                .commit();
+        CardPalette night = new Prefs(context).cardColors().night;
+        assertEquals(CardPalette.NIGHT.background, night.background);
+        assertEquals(CardPalette.NIGHT.text, night.text);
+        assertEquals("a picked colour stays", 0x40C0A0, night.accent);
     }
 
     @Test public void darknessPicksTheMoreReadableText() {

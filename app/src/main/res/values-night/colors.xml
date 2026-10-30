@@ -1,30 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Media card, night: the AtlasLauncher surface under the original graphite tones. -->
+    <!-- Media card, night: surface, text and raised tones of AtlasLauncher. -->
     <color name="card_background">#232528</color>
-    <color name="card_nested">#333333</color>
+    <color name="card_nested">#404347</color>
     <color name="card_outline">#334F5E68</color>
-    <color name="card_pill">#B333333B</color>
+    <color name="card_pill">#B3404347</color>
     <color name="card_pill_stroke">#334F5E68</color>
     <color name="card_source_dot">#58A6FF</color>
-    <color name="card_text">#F5F5F5</color>
-    <color name="card_text_secondary">#D4D4D4</color>
-    <color name="card_text_subtitle">#AFB1B7</color>
+    <color name="card_text">#F1F2F4</color>
+    <color name="card_text_secondary">#C4C7CA</color>
+    <color name="card_text_subtitle">#C4C7CA</color>
     <color name="card_text_shadow">#B0000000</color>
     <color name="card_error">#D98282</color>
     <color name="card_status">#7893A0</color>
     <color name="card_divider">#553B444C</color>
     <color name="card_panel">#F0232528</color>
     <color name="card_panel_stroke">#77596872</color>
-    <color name="card_option">#B3262A30</color>
+    <color name="card_option">#B3404347</color>
     <color name="card_option_stroke">#66505B64</color>
     <color name="card_option_selected">#593E5966</color>
     <color name="card_option_selected_stroke">#83AFC2</color>
-    <color name="card_tile">#D1262A30</color>
+    <color name="card_tile">#D1404347</color>
     <color name="card_tile_stroke">#554F5E68</color>
     <color name="card_track">#553C4148</color>
     <color name="card_progress">#83AFC2</color>
-    <color name="card_control_disabled">#9EF5F5F5</color>
+    <color name="card_control_disabled">#9EF1F2F4</color>
     <color name="card_control_pressed">#9DC2D2</color>
     <color name="widget_empty_background">#232528</color>
 </resources>

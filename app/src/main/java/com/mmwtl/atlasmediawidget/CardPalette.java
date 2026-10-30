@@ -7,7 +7,7 @@ package com.mmwtl.atlasmediawidget;
  */
 final class CardPalette {
     static final CardPalette DAY = new CardPalette(false, 0xEDEEF0, 0x202124, 0x5F7C89);
-    static final CardPalette NIGHT = new CardPalette(true, 0x232528, 0xF5F5F5, 0x83AFC2);
+    static final CardPalette NIGHT = new CardPalette(true, 0x232528, 0xF1F2F4, 0x83AFC2);
 
     final boolean night;
     /** RGB colours without alpha. */

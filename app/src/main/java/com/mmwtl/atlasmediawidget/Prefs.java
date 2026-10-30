@@ -65,6 +65,7 @@ final class Prefs {
     private static final String KEY_LEGACY_BACKDROP_SEPARATE_DAY_PREFIX =
             "backdrop_separate_day_";
     private static final String KEY_THEME_COLORS_MIGRATED = "theme_colors_migrated";
+    private static final String KEY_NIGHT_PALETTE_MIGRATED = "night_palette_migrated";
     private static final String KEY_BACKDROP_DAY_COLOR_PREFIX = "backdrop_day_color_";
     private static final String KEY_BACKDROP_DAY_ALPHA_PREFIX = "backdrop_day_alpha_";
     private static final String KEY_PALETTE_BACKGROUND_SUFFIX = "_background";
@@ -135,6 +136,7 @@ final class Prefs {
         // A completely empty store is a new installation and gets the gentler default.
         migrateCoverDimPreset();
         migrateThemeColors();
+        migrateNightPalette();
     }
 
     private static void migrateCredentialPreferencesWhenAvailable(Context credentialContext,
@@ -441,6 +443,24 @@ final class Prefs {
                         value.opaqueTopRow)
                 .putInt(KEY_BACKDROP_DAY_COLOR_PREFIX + style.preferenceValue, value.dayColor)
                 .putInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, value.dayAlpha);
+    }
+
+    /**
+     * Saving any card colour stores the whole palette, defaults included, so the night defaults
+     * from before the launcher palette would otherwise read as colours the user picked.
+     */
+    private void migrateNightPalette() {
+        if (preferences.contains(KEY_NIGHT_PALETTE_MIGRATED)) return;
+        SharedPreferences.Editor editor = preferences.edit()
+                .putBoolean(KEY_NIGHT_PALETTE_MIGRATED, true);
+        String prefix = paletteKey(true);
+        if (preferences.getInt(prefix + KEY_PALETTE_BACKGROUND_SUFFIX, -1) == 0x1D2228) {
+            editor.remove(prefix + KEY_PALETTE_BACKGROUND_SUFFIX);
+        }
+        if (preferences.getInt(prefix + KEY_PALETTE_TEXT_SUFFIX, -1) == 0xF5F5F5) {
+            editor.remove(prefix + KEY_PALETTE_TEXT_SUFFIX);
+        }
+        editor.apply();
     }
 
     /**
