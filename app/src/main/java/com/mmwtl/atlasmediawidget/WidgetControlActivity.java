@@ -33,10 +33,10 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
     private final Runnable scrubberIdle = this::closeScrubber;
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = new Prefs(this);
         requestedWidgetControl = getIntent().getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL);
         int id = getIntent().getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID);
+        prefs = new Prefs(this).forWidget(id);
         if (!prefs.isWidgetMode() || !AtlasMediaWidgetProvider.owns(this, id)
                 || !("open".equals(requestedWidgetControl) || "scrub".equals(requestedWidgetControl))
                 || "open".equals(requestedWidgetControl)

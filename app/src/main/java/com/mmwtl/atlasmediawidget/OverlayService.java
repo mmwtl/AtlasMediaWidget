@@ -619,7 +619,7 @@ public final class OverlayService extends Service
                 if (force || !key.equals(widgetRenderKey) || !widgetFrames.containsKey(id)) {
                     Trace.beginSection("AtlasWidgetFrame");
                     try {
-                        var frame = new AtlasMediaWidgetProvider.Frame(this, prefs,
+                        var frame = new AtlasMediaWidgetProvider.Frame(this, prefs.forWidget(id),
                                 manager.getAppWidgetOptions(id), id, snapshot, currentArtwork, connected,
                                 openSourceWidgetIds.contains(id) ? "sources"
                                         : openFavoritesWidgetIds.contains(id) ? "favorites" : null,

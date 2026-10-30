@@ -50,6 +50,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,6 +76,9 @@ public final class MainActivity extends ScaledActivity {
             "android.media.browse.MediaBrowserService";
     private Prefs prefs;
     private static final String STATE_TAB = "settings_tab";
+    private static final String STATE_EDITED_WIDGET = "edited_widget";
+    /** Stands for the shared look, which is the template of new widgets and the overlay's look. */
+    private static final int TEMPLATE = android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID;
     private static final int TAB_CARD = 0;
     private static final int TAB_MEDIA = 1;
     private static final int TAB_RADIO = 2;
@@ -82,6 +86,8 @@ public final class MainActivity extends ScaledActivity {
     private static final int[] TAB_LABELS = {R.string.tab_card, R.string.tab_media,
             R.string.tab_radio, R.string.tab_system};
     private boolean builtWidgetMode;
+    private int[] widgetIds = new int[0];
+    private int editedWidget = TEMPLATE;
     private TextView widgetPreviewTitle;
     private final List<View> overlayOnly = new ArrayList<>();
     private final List<View> widgetOnly = new ArrayList<>();
@@ -255,7 +261,7 @@ public final class MainActivity extends ScaledActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = new Prefs(this);
+        openEditedWidget(savedInstanceState);
         mediaBridgeClient = new MediaBridgeClient(this, mediaBridgeListener);
         View content = buildContent(savedInstanceState == null ? TAB_CARD
                 : savedInstanceState.getInt(STATE_TAB, TAB_CARD));
@@ -264,9 +270,33 @@ public final class MainActivity extends ScaledActivity {
         AtlasMediaWidgetProvider.refresh(this);
     }
 
+    /** Every look control reads and writes through {@link #prefs}, so it alone picks the widget. */
+    private void openEditedWidget(Bundle savedInstanceState) {
+        Prefs shared = new Prefs(this);
+        widgetIds = AtlasMediaWidgetProvider.sortedIds(this);
+        editedWidget = shared.isWidgetMode() ? requestedWidget(savedInstanceState) : TEMPLATE;
+        prefs = editedWidget == TEMPLATE ? shared : shared.forWidget(editedWidget);
+        if (editedWidget == TEMPLATE && shared.isWidgetMode()) {
+            // Editing the template must not restyle widgets that still follow it.
+            for (int id : widgetIds) shared.forWidget(id).ensureProfile();
+        }
+    }
+
+    private int requestedWidget(Bundle savedInstanceState) {
+        int fallback = widgetIds.length == 0 ? TEMPLATE : widgetIds[0];
+        int requested = savedInstanceState != null
+                && savedInstanceState.containsKey(STATE_EDITED_WIDGET)
+                ? savedInstanceState.getInt(STATE_EDITED_WIDGET)
+                : getIntent().getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,
+                        fallback);
+        if (requested == TEMPLATE) return savedInstanceState != null ? TEMPLATE : fallback;
+        return Arrays.stream(widgetIds).anyMatch(id -> id == requested) ? requested : fallback;
+    }
+
     @Override protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(STATE_TAB, selectedTab);
+        if (builtWidgetMode) outState.putInt(STATE_EDITED_WIDGET, editedWidget);
     }
 
     @Override protected void onStart() {
@@ -576,14 +606,68 @@ public final class MainActivity extends ScaledActivity {
         });
         card.addView(addWidgetButton, buttonParams());
         TextView hint = text("Или удерживайте свободное место на HOME → Виджеты → "
-                        + "Atlas Media Widget. Оформление общее для всех виджетов. "
-                        + "Медиасервис запускается сам после загрузки ГУ, пока размещён "
+                        + "Atlas Media Widget. Медиасервис запускается сам после загрузки ГУ, пока размещён "
                         + "хотя бы один виджет.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams hintParams = fullWrap();
         hintParams.topMargin = Ui.dp(this, 10);
         card.addView(hint, hintParams);
+        addEditedWidgetChooser(card);
         return card;
+    }
+
+    private void addEditedWidgetChooser(LinearLayout card) {
+        card.addView(text("Какой виджет настраивать", 15, Ui.SECONDARY, Typeface.BOLD),
+                labelParams());
+        List<String> labels = new ArrayList<>();
+        int selection = widgetIds.length;
+        for (int index = 0; index < widgetIds.length; index++) {
+            labels.add(editedWidgetLabel(widgetIds[index]));
+            if (widgetIds[index] == editedWidget) selection = index;
+        }
+        labels.add(editedWidgetLabel(TEMPLATE));
+        Spinner chooser = new Spinner(this);
+        chooser.setContentDescription("Какой виджет настраивать");
+        chooser.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, labels));
+        chooser.setSelection(selection, false);
+        chooser.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                    int position, long id) {
+                int target = position < widgetIds.length ? widgetIds[position] : TEMPLATE;
+                if (target == editedWidget) return;
+                editedWidget = target;
+                recreate();
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        card.addView(dropdownField(chooser), fullWrap());
+        LinearLayout.LayoutParams noteParams = fullWrap();
+        noteParams.topMargin = Ui.dp(this, 8);
+        card.addView(text("Настройки карточки ниже меняют только выбранный виджет. Новый виджет "
+                        + "начинает с шаблона, и этим же оформлением показывается оверлей. Общими "
+                        + "остаются правила кнопок плеера и навигация по радио.",
+                13, Ui.SECONDARY, Typeface.NORMAL), noteParams);
+        if (editedWidget != TEMPLATE && widgetIds.length > 1) {
+            Button applyToAll = actionButton("Применить ко всем виджетам");
+            applyToAll.setOnClickListener(v -> {
+                prefs.copyLookTo(widgetIds);
+                refreshOverlayIfRunning();
+                Toast.makeText(this, "Оформление применено ко всем виджетам",
+                        Toast.LENGTH_SHORT).show();
+            });
+            card.addView(applyToAll, buttonParams());
+        }
+    }
+
+    private String editedWidgetLabel(int id) {
+        if (id == TEMPLATE) return "Шаблон для новых виджетов";
+        Bundle options = android.appwidget.AppWidgetManager.getInstance(this)
+                .getAppWidgetOptions(id);
+        int number = Arrays.binarySearch(widgetIds, id) + 1;
+        return "Виджет " + number + " · " + AtlasMediaWidgetProvider.widthDp(this, options) + "×"
+                + AtlasMediaWidgetProvider.heightDp(this, options) + " dp";
     }
 
     private void refreshWidgetPlacement() {
@@ -593,6 +677,25 @@ public final class MainActivity extends ScaledActivity {
                 : "Размещено виджетов: " + placed);
         addWidgetButton.setBackground(Ui.background(placed == 0 ? Ui.ACCENT : Ui.NESTED, 8, this));
         addWidgetButton.setTextColor(placed == 0 ? Ui.ON_ACCENT : Ui.PRIMARY);
+    }
+
+    private FrameLayout dropdownField(Spinner spinner) {
+        FrameLayout field = new FrameLayout(this);
+        field.setBackground(Ui.background(Ui.NESTED, 8, this));
+        spinner.setBackgroundColor(0x00000000);
+        spinner.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 34), 0);
+        field.addView(spinner, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView arrow = text("▾", 16, Ui.ACCENT, Typeface.BOLD);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        FrameLayout.LayoutParams arrowParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        arrowParams.rightMargin = Ui.dp(this, 10);
+        field.addView(arrow, arrowParams);
+        field.setOnClickListener(v -> spinner.performClick());
+        return field;
     }
 
     private LinearLayout createGeometryCard() {
@@ -640,22 +743,7 @@ public final class MainActivity extends ScaledActivity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        FrameLayout positionCornerField = new FrameLayout(this);
-        positionCornerField.setBackground(Ui.background(Ui.NESTED, 8, this));
-        positionCornerSpinner.setBackgroundColor(0x00000000);
-        positionCornerSpinner.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 34), 0);
-        positionCornerField.addView(positionCornerSpinner, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView positionCornerArrow = text("▾", 16, Ui.ACCENT, Typeface.BOLD);
-        positionCornerArrow.setGravity(Gravity.CENTER);
-        positionCornerArrow.setImportantForAccessibility(
-                View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        FrameLayout.LayoutParams positionCornerArrowParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
-                Gravity.END | Gravity.CENTER_VERTICAL);
-        positionCornerArrowParams.rightMargin = Ui.dp(this, 10);
-        positionCornerField.addView(positionCornerArrow, positionCornerArrowParams);
-        positionCornerField.setOnClickListener(v -> positionCornerSpinner.performClick());
+        FrameLayout positionCornerField = dropdownField(positionCornerSpinner);
 
         LinearLayout positionGrid = new LinearLayout(this);
         positionGrid.setOrientation(LinearLayout.VERTICAL);
@@ -1194,7 +1282,9 @@ public final class MainActivity extends ScaledActivity {
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView favoritesGridHint = text(
                 "Число столбцов и строк на первом экране списка избранного. "
-                        + "Остальные станции доступны прокруткой.",
+                        + "Остальные станции доступны прокруткой."
+                        + (builtWidgetMode ? " Настройка относится к выбранному на вкладке "
+                                + "«Карточка»: " + editedWidgetLabel(editedWidget) + "." : ""),
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams favoritesGridHintParams = fullWrap();
         favoritesGridHintParams.topMargin = Ui.dp(this, 8);
@@ -1344,11 +1434,10 @@ public final class MainActivity extends ScaledActivity {
     private void renderSystemWidgetPreview() {
         var context = getApplicationContext();
         var manager = android.appwidget.AppWidgetManager.getInstance(context);
-        int[] ids = AtlasMediaWidgetProvider.ids(context);
-        int id = getIntent().getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, 0);
-        if (!AtlasMediaWidgetProvider.owns(context, id)) id = ids.length == 0 ? 0 : ids[0];
-        Bundle options = id == 0 ? new Bundle() : manager.getAppWidgetOptions(id);
-        widgetPreviewTitle.setText((id == 0 ? "Пример размера " : "Размер #" + id + " ")
+        int id = editedWidget != TEMPLATE || widgetIds.length == 0 ? editedWidget : widgetIds[0];
+        Bundle options = id == TEMPLATE ? new Bundle() : manager.getAppWidgetOptions(id);
+        widgetPreviewTitle.setText((editedWidget == TEMPLATE ? "Шаблон, размер "
+                        : "Виджет " + (Arrays.binarySearch(widgetIds, editedWidget) + 1) + ", размер ")
                 + AtlasMediaWidgetProvider.widthDp(context, options) + "×"
                 + AtlasMediaWidgetProvider.heightDp(context, options) + " dp · демо");
         int maxHeight = Math.round(getWindowManager().getCurrentWindowMetrics().getBounds().height() * .30f);
@@ -1432,7 +1521,8 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void refresh() {
-        if (builtWidgetMode != prefs.isWidgetMode()) { recreate(); return; }
+        if (builtWidgetMode != prefs.isWidgetMode() || builtWidgetMode && !Arrays.equals(
+                widgetIds, AtlasMediaWidgetProvider.sortedIds(this))) { recreate(); return; }
         refreshModeVisibility();
         refreshWidgetPlacement();
         if (hideThreshold != null) hideThreshold.setProgress(prefs.freeformHideThresholdPercent());

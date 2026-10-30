@@ -4,9 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.UserManager;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 final class Prefs {
     private static final String NAME = "atlas_media_widget";
@@ -121,9 +123,31 @@ final class Prefs {
     static final int MIN_PLAYER_ACTIONS = 0;
     static final int MAX_PLAYER_ACTIONS = 5;
     static final int DEFAULT_PLAYER_ACTIONS = 2;
+    private static final int NO_WIDGET = 0;
+    private static final String KEY_PROFILE_PREFIX = "widget_profile_";
+    private static final String PROFILE_MARKER = "exists";
+    /** Look settings a widget keeps for itself; everything else is shared by the whole app. */
+    private static final Set<String> PROFILE_KEYS = Set.of(KEY_CARD_STYLE, KEY_CARD_OPENS_PLAYER,
+            KEY_RADIO_FAVORITES_COLUMNS, KEY_RADIO_FAVORITES_ROWS, KEY_PLAYER_ACTIONS_COUNT,
+            "day" + KEY_PALETTE_BACKGROUND_SUFFIX, "day" + KEY_PALETTE_TEXT_SUFFIX,
+            "day" + KEY_PALETTE_ACCENT_SUFFIX, "night" + KEY_PALETTE_BACKGROUND_SUFFIX,
+            "night" + KEY_PALETTE_TEXT_SUFFIX, "night" + KEY_PALETTE_ACCENT_SUFFIX);
+    /** Look settings stored per card style, as the prefix followed by the style's number. */
+    private static final List<String> PROFILE_STYLE_PREFIXES = List.of(
+            KEY_METADATA_PROGRESS_GAP_PREFIX, KEY_CONTROL_HEIGHT_PREFIX,
+            KEY_CONTROL_ICON_SCALE_PREFIX, KEY_CONTROL_SPREAD_PREFIX,
+            KEY_CONTROL_BOTTOM_INSET_PREFIX, KEY_TOP_INSET_PREFIX, KEY_CONTENT_INSET_PREFIX,
+            KEY_TOP_ROW_TEXT_SIZE_PREFIX, KEY_TITLE_TEXT_SIZE_PREFIX,
+            KEY_SUBTITLE_TEXT_SIZE_PREFIX, KEY_SUBTITLE_GAP_PREFIX, KEY_TIME_TEXT_SIZE_PREFIX,
+            KEY_PROGRESS_GAP_PREFIX, KEY_PROGRESS_THICKNESS_PREFIX, KEY_COVER_DIM_PRESET_PREFIX,
+            KEY_THUMBNAIL_SIZE_PREFIX, KEY_CARD_RADIUS_PREFIX, KEY_BACKDROP_SOLID_PREFIX,
+            KEY_BACKDROP_COLOR_PREFIX, KEY_BACKDROP_ALPHA_PREFIX,
+            KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX, KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX,
+            KEY_BACKDROP_DAY_COLOR_PREFIX, KEY_BACKDROP_DAY_ALPHA_PREFIX);
 
     private final Context appContext;
     private final SharedPreferences preferences;
+    private final int widgetId;
 
     Prefs(Context context) {
         Context app = context.getApplicationContext();
@@ -131,12 +155,202 @@ final class Prefs {
         Context storage = app.createDeviceProtectedStorageContext();
         migrateCredentialPreferencesWhenAvailable(app, storage);
         preferences = storage.getSharedPreferences(NAME, Context.MODE_PRIVATE);
+        widgetId = NO_WIDGET;
         migrateCardSizePx();
         // Before this setting existed, the only available gradient was the strongest one.
         // A completely empty store is a new installation and gets the gentler default.
         migrateCoverDimPreset();
         migrateThemeColors();
         migrateNightPalette();
+    }
+
+    private Prefs(Prefs base, int widgetId) {
+        appContext = base.appContext;
+        preferences = base.preferences;
+        this.widgetId = widgetId;
+    }
+
+    /**
+     * The same settings as seen by one widget: its own look once it has a profile, and the shared
+     * look (the overlay's, which is also the template for new widgets) until then.
+     */
+    Prefs forWidget(int id) {
+        return new Prefs(this, id);
+    }
+
+    /** The shared settings, whichever widget this instance edits. */
+    Prefs global() {
+        return widgetId == NO_WIDGET ? this : new Prefs(this, NO_WIDGET);
+    }
+
+    boolean hasProfile() {
+        return widgetId != NO_WIDGET
+                && preferences.contains(profilePrefix(widgetId) + PROFILE_MARKER);
+    }
+
+    /** Detaches the widget from the template, keeping how it looks right now. */
+    void ensureProfile() {
+        if (widgetId == NO_WIDGET || hasProfile()) return;
+        SharedPreferences.Editor editor = preferences.edit();
+        putProfile(editor, widgetId, look());
+        editor.apply();
+    }
+
+    void removeProfile() {
+        if (widgetId == NO_WIDGET) return;
+        SharedPreferences.Editor editor = preferences.edit();
+        removeProfile(editor, widgetId);
+        editor.apply();
+    }
+
+    /** A restored widget gets a new id from the launcher and keeps its look. */
+    void moveProfile(int oldId, int newId) {
+        Prefs old = forWidget(oldId);
+        if (!old.hasProfile()) return;
+        SharedPreferences.Editor editor = preferences.edit();
+        putProfile(editor, newId, old.look());
+        removeProfile(editor, oldId);
+        editor.apply();
+    }
+
+    /** Gives the listed widgets a copy of this look; the template and the overlay keep theirs. */
+    void copyLookTo(int[] ids) {
+        Map<String, Object> values = look();
+        SharedPreferences.Editor editor = preferences.edit();
+        for (int id : ids) {
+            if (id != widgetId) putProfile(editor, id, values);
+        }
+        editor.apply();
+    }
+
+    /** Placed widgets in id order; null stands for a widget still following the template. */
+    List<Map<String, Object>> widgetProfiles() {
+        List<Map<String, Object>> profiles = new ArrayList<>();
+        for (int id : AtlasMediaWidgetProvider.sortedIds(appContext)) {
+            Prefs widget = forWidget(id);
+            profiles.add(widget.hasProfile() ? widget.look() : null);
+        }
+        return profiles;
+    }
+
+    static boolean isProfileKey(String key) {
+        if (PROFILE_KEYS.contains(key)) return true;
+        for (String prefix : PROFILE_STYLE_PREFIXES) {
+            if (key.length() > prefix.length() && key.startsWith(prefix)
+                    && Character.isDigit(key.charAt(prefix.length()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private Map<String, Object> look() {
+        Map<String, Object> values = new LinkedHashMap<>();
+        boolean own = hasProfile();
+        String prefix = profilePrefix(widgetId);
+        for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+            String key = entry.getKey();
+            if (!own) {
+                if (isProfileKey(key)) values.put(key, entry.getValue());
+            } else if (key.startsWith(prefix) && !key.endsWith("_" + PROFILE_MARKER)) {
+                values.put(key.substring(prefix.length()), entry.getValue());
+            }
+        }
+        return values;
+    }
+
+    private static String profilePrefix(int id) {
+        return KEY_PROFILE_PREFIX + id + "_";
+    }
+
+    private void putProfile(SharedPreferences.Editor editor, int id, Map<String, Object> values) {
+        removeProfile(editor, id);
+        String prefix = profilePrefix(id);
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            if (entry.getValue() instanceof Integer number) {
+                editor.putInt(prefix + entry.getKey(), number);
+            } else if (entry.getValue() instanceof Boolean flag) {
+                editor.putBoolean(prefix + entry.getKey(), flag);
+            }
+        }
+        editor.putBoolean(prefix + PROFILE_MARKER, true);
+    }
+
+    private void removeProfile(SharedPreferences.Editor editor, int id) {
+        String prefix = profilePrefix(id);
+        for (String key : preferences.getAll().keySet()) {
+            if (key.startsWith(prefix)) editor.remove(key);
+        }
+    }
+
+    private String readKey(String key) {
+        return hasProfile() && isProfileKey(key) ? profilePrefix(widgetId) + key : key;
+    }
+
+    private String writeKey(String key) {
+        if (widgetId == NO_WIDGET || !isProfileKey(key)) return key;
+        ensureProfile();
+        return profilePrefix(widgetId) + key;
+    }
+
+    private SharedPreferences.Editor edit() {
+        return widgetId == NO_WIDGET ? preferences.edit() : new ProfileEditor(preferences.edit());
+    }
+
+    /** Writes the look keys of an edited widget to its profile; other keys pass through. */
+    private final class ProfileEditor implements SharedPreferences.Editor {
+        private final SharedPreferences.Editor editor;
+
+        ProfileEditor(SharedPreferences.Editor editor) {
+            this.editor = editor;
+        }
+
+        @Override public SharedPreferences.Editor putString(String key, String value) {
+            editor.putString(writeKey(key), value);
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor putStringSet(String key, Set<String> values) {
+            editor.putStringSet(writeKey(key), values);
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor putInt(String key, int value) {
+            editor.putInt(writeKey(key), value);
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor putLong(String key, long value) {
+            editor.putLong(writeKey(key), value);
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor putFloat(String key, float value) {
+            editor.putFloat(writeKey(key), value);
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor putBoolean(String key, boolean value) {
+            editor.putBoolean(writeKey(key), value);
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor remove(String key) {
+            editor.remove(writeKey(key));
+            return this;
+        }
+
+        @Override public SharedPreferences.Editor clear() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override public boolean commit() {
+            return editor.commit();
+        }
+
+        @Override public void apply() {
+            editor.apply();
+        }
     }
 
     private static void migrateCredentialPreferencesWhenAvailable(Context credentialContext,
@@ -196,7 +410,7 @@ final class Prefs {
     }
 
     boolean getBoolean(String key, boolean fallback) {
-        return preferences.getBoolean(key, fallback);
+        return preferences.getBoolean(readKey(key), fallback);
     }
 
     int freeformHideThresholdPercent() {
@@ -207,23 +421,23 @@ final class Prefs {
     }
 
     int getInt(String key, int fallback) {
-        return preferences.getInt(key, fallback);
+        return preferences.getInt(readKey(key), fallback);
     }
 
     String getString(String key, String fallback) {
-        return preferences.getString(key, fallback);
+        return preferences.getString(readKey(key), fallback);
     }
 
     void putBoolean(String key, boolean value) {
-        preferences.edit().putBoolean(key, value).apply();
+        edit().putBoolean(key, value).apply();
     }
 
     void putInt(String key, int value) {
-        preferences.edit().putInt(key, value).apply();
+        edit().putInt(key, value).apply();
     }
 
     void putPosition(OverlayCorner corner, int offsetX, int offsetY) {
-        preferences.edit()
+        edit()
                 .putString(KEY_POSITION_CORNER, corner.preferenceValue)
                 .putInt(KEY_POSITION_X, Math.max(0, offsetX))
                 .putInt(KEY_POSITION_Y, Math.max(0, offsetY))
@@ -232,7 +446,7 @@ final class Prefs {
     }
 
     void putString(String key, String value) {
-        preferences.edit().putString(key, value).apply();
+        edit().putString(key, value).apply();
     }
 
     int cardWidthPx() {
@@ -246,7 +460,7 @@ final class Prefs {
     }
 
     void putCardSizePx(int widthPx, int heightPx) {
-        preferences.edit()
+        edit()
                 .putInt(KEY_CARD_WIDTH_PX, Math.max(MIN_CARD_WIDTH_PX, widthPx))
                 .putInt(KEY_CARD_HEIGHT_PX, Math.max(MIN_CARD_HEIGHT_PX, heightPx))
                 .apply();
@@ -285,7 +499,7 @@ final class Prefs {
     }
 
     void putPlayerActionsCount(int count) {
-        preferences.edit().putInt(KEY_PLAYER_ACTIONS_COUNT,
+        edit().putInt(KEY_PLAYER_ACTIONS_COUNT,
                 clamp(count, MIN_PLAYER_ACTIONS, MAX_PLAYER_ACTIONS)).apply();
     }
 
@@ -305,7 +519,7 @@ final class Prefs {
             List<String> order) {
         PlayerActionFilter.Rules rules = playerActionRules();
         boolean configured = !hidden.isEmpty() || !order.equals(published);
-        preferences.edit()
+        edit()
                 .putString(KEY_HIDDEN_PLAYER_ACTIONS, PlayerActionFilter.encode(
                         withPlayer(rules.hidden, packageName, configured ? hidden : null)))
                 .putString(KEY_PLAYER_ACTION_ORDER, PlayerActionFilter.encode(
@@ -329,7 +543,7 @@ final class Prefs {
     }
 
     void putRadioFavoritesGrid(int columns, int rows) {
-        preferences.edit()
+        edit()
                 .putInt(KEY_RADIO_FAVORITES_COLUMNS, clamp(columns,
                         MIN_RADIO_FAVORITES_GRID_COLUMNS, MAX_RADIO_FAVORITES_GRID_COLUMNS))
                 .putInt(KEY_RADIO_FAVORITES_ROWS, clamp(rows,
@@ -346,7 +560,7 @@ final class Prefs {
     }
 
     void putCardSize(CardStyle style, int widthDp, int heightDp) {
-        preferences.edit()
+        edit()
                 .putInt(KEY_CARD_WIDTH_PREFIX + style.preferenceValue, widthDp)
                 .putInt(KEY_CARD_HEIGHT_PREFIX + style.preferenceValue, heightDp)
                 .apply();
@@ -414,7 +628,7 @@ final class Prefs {
     }
 
     void putCardColors(CardColors value) {
-        putCardColors(preferences.edit(), value).apply();
+        putCardColors(edit(), value).apply();
     }
 
     private static SharedPreferences.Editor putCardColors(SharedPreferences.Editor editor,
@@ -507,7 +721,7 @@ final class Prefs {
 
     void putControlLayout(CardStyle style, int heightDp, int iconScalePercent,
             int spreadPercent, int bottomInsetDp) {
-        preferences.edit()
+        edit()
                 .putInt(KEY_CONTROL_HEIGHT_PREFIX + style.preferenceValue,
                         clamp(heightDp, MIN_CONTROL_PANEL_HEIGHT_DP,
                                 MAX_CONTROL_PANEL_HEIGHT_DP))
@@ -559,7 +773,7 @@ final class Prefs {
     }
 
     void putAppearance(CardStyle style, WidgetAppearance value) {
-        SharedPreferences.Editor editor = preferences.edit();
+        SharedPreferences.Editor editor = edit();
         putBackdrop(editor, style, value.backdrop);
         editor
                 .putInt(KEY_METADATA_PROGRESS_GAP_PREFIX + style.preferenceValue,
@@ -659,6 +873,14 @@ final class Prefs {
         putStyle(editor, CardStyle.COMPACT, data.compact);
         putStyle(editor, CardStyle.SQUARE, data.square);
         putCardColors(editor, data.colors);
+        for (String key : preferences.getAll().keySet()) {
+            if (key.startsWith(KEY_PROFILE_PREFIX)) editor.remove(key);
+        }
+        int[] ids = AtlasMediaWidgetProvider.sortedIds(appContext);
+        for (int index = 0; index < ids.length && index < data.widgetProfiles.size(); index++) {
+            Map<String, Object> profile = data.widgetProfiles.get(index);
+            if (profile != null) putProfile(editor, ids[index], profile);
+        }
         return editor.commit();
     }
 

@@ -87,18 +87,35 @@ public class AtlasMediaWidgetTest {
         assertFalse("setup must stay open", activity.isFinishing());
         find(root, "Просторная").performClick();
         find(root, "Максимум").performClick();
-        assertEquals(CoverDimPreset.MAXIMUM, prefs.coverDimPreset(CardStyle.SQUARE));
+        Prefs widget = prefs.forWidget(41);
+        assertEquals(CoverDimPreset.MAXIMUM, widget.coverDimPreset(CardStyle.SQUARE));
+        assertEquals(CoverDimPreset.WEAK, prefs.coverDimPreset(CardStyle.SQUARE));
         find(root, "✕").performClick();
         assertTrue(activity.isFinishing());
         controller.destroy();
         assertEquals(Activity.RESULT_CANCELED, Shadows.shadowOf(activity).getResultCode());
         assertEquals(41, Shadows.shadowOf(activity).getResultIntent()
                 .getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
+        assertFalse(widget.hasProfile());
         assertEquals(CardStyle.COMPACT.preferenceValue,
-                prefs.getInt(Prefs.KEY_CARD_STYLE, -1));
-        assertEquals(CoverDimPreset.WEAK, prefs.coverDimPreset(CardStyle.SQUARE));
+                widget.getInt(Prefs.KEY_CARD_STYLE, -1));
+        assertEquals(CoverDimPreset.WEAK, widget.coverDimPreset(CardStyle.SQUARE));
         assertFalse(prefs.isWidgetMode());
         assertArrayEquals(new int[]{41}, AtlasMediaWidgetProvider.ids(context));
+    }
+
+    @Test public void setupCancelRestoresTheProfileOfAPlacedWidget() {
+        Prefs widget = new Prefs(context).forWidget(44);
+        widget.putInt(Prefs.KEY_CARD_STYLE, CardStyle.COMPACT.preferenceValue);
+        bind(44);
+        var controller = Robolectric.buildActivity(WidgetSetupActivity.class, configure(44)).create();
+        View root = controller.get().findViewById(android.R.id.content);
+        find(root, "Просторная").performClick();
+        assertEquals(CardStyle.SQUARE.preferenceValue, widget.getInt(Prefs.KEY_CARD_STYLE, -1));
+        find(root, "✕").performClick();
+        controller.destroy();
+        assertTrue(widget.hasProfile());
+        assertEquals(CardStyle.COMPACT.preferenceValue, widget.getInt(Prefs.KEY_CARD_STYLE, -1));
     }
 
     @Test public void setupConfirmKeepsLookAndSwitchesModeOnlyWhenChecked() {
@@ -121,6 +138,8 @@ public class AtlasMediaWidgetTest {
             assertEquals(id, Shadows.shadowOf(activity).getResultIntent()
                     .getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
             assertEquals(CardStyle.SQUARE.preferenceValue,
+                    prefs.forWidget(id).getInt(Prefs.KEY_CARD_STYLE, -1));
+            assertEquals(CardStyle.COMPACT.preferenceValue,
                     prefs.getInt(Prefs.KEY_CARD_STYLE, -1));
             assertEquals(switchMode, prefs.isWidgetMode());
         }
@@ -154,7 +173,9 @@ public class AtlasMediaWidgetTest {
         assertEquals(Activity.RESULT_OK, Shadows.shadowOf(activity).getResultCode());
         Intent settings = Shadows.shadowOf(activity).getNextStartedActivity();
         assertEquals(new ComponentName(context, MainActivity.class), settings.getComponent());
+        assertEquals(41, settings.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 0));
         assertTrue((settings.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0);
+        assertTrue((settings.getFlags() & Intent.FLAG_ACTIVITY_CLEAR_TOP) != 0);
         controller.destroy();
     }
 

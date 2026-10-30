@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -11,6 +12,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,12 +22,15 @@ import java.util.Map;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 16;
+    private static final int SCHEMA_VERSION = 17;
     private static final int MIN_SCHEMA_VERSION = 1;
     private static final String BACKDROP_THEME = "theme";
     private static final int MAX_FILE_BYTES = 256 * 1024;
+    private static final int MAX_WIDGET_PROFILES = 32;
 
     static final class Data {
+        /** Look of the placed widgets by position; null follows the shared look. */
+        List<Map<String, Object>> widgetProfiles = List.of();
         final int freeformHideThresholdPercent;
         final boolean widgetMode;
         final boolean autoStart;
@@ -310,12 +317,13 @@ final class SettingsBackup {
 
     private SettingsBackup() {}
 
-    static Data capture(Prefs prefs) throws IOException {
+    static Data capture(Prefs editedPrefs) throws IOException {
+        Prefs prefs = editedPrefs.global();
         int x = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
         int y = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
         Integer positionX = x == Prefs.POSITION_UNSET || y == Prefs.POSITION_UNSET ? null : x;
         Integer positionY = positionX == null ? null : y;
-        return new Data(
+        Data data = new Data(
                 prefs.getBoolean(Prefs.KEY_AUTO_START, false),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
@@ -336,6 +344,8 @@ final class SettingsBackup {
                 prefs.playerActionsCount(), prefs.playerActionRules(),
                 prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat(),
                 prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.cardColors());
+        data.widgetProfiles = prefs.widgetProfiles();
+        return data;
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -411,6 +421,7 @@ final class SettingsBackup {
             settings.put("cardStyles", new JSONObject()
                     .put("compact", encodeStyle(data.compact))
                     .put("square", encodeStyle(data.square)));
+            settings.put("widgetProfiles", encodeWidgetProfiles(data.widgetProfiles));
             root.put("settings", settings);
             return root.toString(2) + '\n';
         } catch (JSONException error) {
@@ -461,7 +472,7 @@ final class SettingsBackup {
                 cardWidthPx = requireInt(cardSize, "widthPx", "settings.cardSizePx.widthPx");
                 cardHeightPx = requireInt(cardSize, "heightPx", "settings.cardSizePx.heightPx");
             }
-            return new Data(
+            Data data = new Data(
                     requireBoolean(settings, "autoStart", "settings.autoStart"),
                     version >= 3 && requireBoolean(settings, "radioSavedNavigation",
                             "settings.radioSavedNavigation"),
@@ -514,9 +525,46 @@ final class SettingsBackup {
                     // Added within schema 15; older files keep the default palettes.
                     new CardColors(decodePalette(settings, false),
                             decodePalette(settings, true)));
+            if (version >= 17) data.widgetProfiles = decodeWidgetProfiles(settings);
+            return data;
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
+    }
+
+    private static JSONArray encodeWidgetProfiles(List<Map<String, Object>> profiles)
+            throws JSONException {
+        JSONArray array = new JSONArray();
+        for (Map<String, Object> profile : profiles) {
+            array.put(profile == null ? JSONObject.NULL : new JSONObject(profile));
+        }
+        return array;
+    }
+
+    /** Keys outside the look and values of another type are dropped; the getters clamp the rest. */
+    private static List<Map<String, Object>> decodeWidgetProfiles(JSONObject settings)
+            throws JSONException {
+        List<Map<String, Object>> profiles = new ArrayList<>();
+        JSONArray array = settings.optJSONArray("widgetProfiles");
+        for (int index = 0; array != null && index < array.length()
+                && index < MAX_WIDGET_PROFILES; index++) {
+            JSONObject profile = array.optJSONObject(index);
+            if (profile == null) {
+                profiles.add(null);
+                continue;
+            }
+            Map<String, Object> values = new LinkedHashMap<>();
+            for (Iterator<String> keys = profile.keys(); keys.hasNext(); ) {
+                String key = keys.next();
+                Object value = profile.get(key);
+                if (Prefs.isProfileKey(key)
+                        && (value instanceof Integer || value instanceof Boolean)) {
+                    values.put(key, value);
+                }
+            }
+            profiles.add(values);
+        }
+        return profiles;
     }
 
     private static StatusBarScene.Format statusBarFormat(JSONObject settings) throws IOException {

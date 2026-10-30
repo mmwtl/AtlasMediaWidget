@@ -46,7 +46,10 @@ migration request.
   ACTION_APPWIDGET_CONFIGURE as a short dialog over HOME limited to layout, artwork dimming and the
   switch to widget mode; cancelling restores the look it changed.
 - Validate appWidgetId ownership; return the original ID with OK or CANCELED. Settings apply
-  immediately and are shared across instances; the launcher owns allocation and cancellation.
+  immediately; the launcher owns allocation and cancellation.
+- Each widget keeps its own look through `Prefs.forWidget(id)`; `Prefs.isProfileKey` lists the keys.
+  A new look setting must be added there to be per-widget. The shared look is the overlay's and
+  the template of new widgets; a widget without a profile follows it until its first edit.
 - OverlayService owns the existing MediaBridgeClient for both display modes. Do not stop it when
   hiding the overlay while AppWidgets need it. In widget mode, do not run HOME observations.
 - RemoteViews pixels and preview use the measured MediaCardView. Transport targets use its actual

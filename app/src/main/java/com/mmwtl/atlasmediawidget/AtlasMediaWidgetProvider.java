@@ -18,6 +18,8 @@ import android.view.View;
 import android.widget.GridView;
 import android.widget.RemoteViews;
 
+import java.util.Arrays;
+
 /** Lifecycle entry point only; the foreground service owns the bridge and live state. */
 public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     static final String EXTRA_CONTROL = "widget_control";
@@ -34,6 +36,13 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     static int[] ids(Context context) {
         return AppWidgetManager.getInstance(context.getApplicationContext()).getAppWidgetIds(
                 new ComponentName(context, AtlasMediaWidgetProvider.class));
+    }
+
+    /** Placed widgets in a stable order: the settings list and the backups number them by it. */
+    static int[] sortedIds(Context context) {
+        int[] ids = ids(context);
+        Arrays.sort(ids);
+        return ids;
     }
 
     static boolean owns(Context context, int id) {
@@ -53,11 +62,17 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     }
 
     @Override public void onRestored(Context context, int[] oldIds, int[] newIds) {
+        Prefs prefs = new Prefs(context);
+        for (int index = 0; index < oldIds.length && index < newIds.length; index++) {
+            prefs.moveProfile(oldIds[index], newIds[index]);
+        }
         refresh(context);
     }
 
     @Override public void onDeleted(Context context, int[] ids) {
-        new Prefs(context).setWidgetsConfigured(ids, false);
+        Prefs prefs = new Prefs(context);
+        prefs.setWidgetsConfigured(ids, false);
+        for (int id : ids) prefs.forWidget(id).removeProfile();
         refresh(context);
     }
     @Override public void onDisabled(Context context) { refresh(context); }
