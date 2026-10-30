@@ -77,6 +77,7 @@ public final class MainActivity extends ScaledActivity {
     private Prefs prefs;
     private static final String STATE_TAB = "settings_tab";
     private static final String STATE_EDITED_WIDGET = "edited_widget";
+    private static final int OPACITY_STEPS = 20;
     /** Stands for the shared look, which is the template of new widgets and the overlay's look. */
     private static final int TEMPLATE = android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID;
     private static final int TAB_CARD = 0;
@@ -944,15 +945,15 @@ public final class MainActivity extends ScaledActivity {
         backdropColorOptions = new LinearLayout(this);
         backdropColorOptions.setOrientation(LinearLayout.VERTICAL);
         backdropAlphaSetting = addLabeledSeek(backdropColorOptions,
-                "Непрозрачность подложки", 0, 255);
+                "Непрозрачность подложки", 0, OPACITY_STEPS);
         backdropAlphaSetting.seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar seekBar, int progress,
                     boolean fromUser) {
                 if (!fromUser) return;
                 if (editingDay()) {
-                    backdropDayAlpha = progress;
+                    backdropDayAlpha = opacityAlpha(progress);
                 } else {
-                    backdropAlpha = progress;
+                    backdropAlpha = opacityAlpha(progress);
                 }
                 updateAppearanceLabels();
                 renderPreview();
@@ -3563,8 +3564,7 @@ public final class MainActivity extends ScaledActivity {
                 progressThicknessSetting.seek.getProgress() + " dp");
         thumbnailSizeSetting.value.setText(thumbnailSizeSetting.seek.getProgress() + " dp");
         cornerRadiusSetting.value.setText(cornerRadiusSetting.seek.getProgress() + " dp");
-        backdropAlphaSetting.value.setText(
-                Math.round(backdropAlphaSetting.seek.getProgress() * 100f / 255f) + " %");
+        backdropAlphaSetting.value.setText(backdropAlphaSetting.seek.getProgress() * 5 + " %");
         updateBackdropControls();
     }
 
@@ -3582,9 +3582,19 @@ public final class MainActivity extends ScaledActivity {
         backdropSwatch.setBackground(Ui.background(0xFF000000 | shownBackdropRgb(), 8, this));
         backdropColorButton.setText(shownBackdropColor() == CardBackdrop.THEME_COLOR
                 ? "Цвет подложки  по теме" : "Цвет подложки");
-        if (backdropAlphaSetting.seek.getProgress() != shownBackdropAlpha()) {
-            backdropAlphaSetting.seek.setProgress(shownBackdropAlpha());
+        int opacityStep = opacityStep(shownBackdropAlpha());
+        if (backdropAlphaSetting.seek.getProgress() != opacityStep) {
+            backdropAlphaSetting.seek.setProgress(opacityStep);
         }
+    }
+
+    /** Stored as alpha 0–255, moved in steps of 5%; a stored value changes only when moved. */
+    static int opacityStep(int alpha) {
+        return Math.round(alpha * (float) OPACITY_STEPS / 255f);
+    }
+
+    static int opacityAlpha(int step) {
+        return Math.round(step * 255f / OPACITY_STEPS);
     }
 
     private CardBackdrop selectedBackdrop() {
