@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Media card, night: the original graphite card. -->
-    <color name="card_background">#1D2228</color>
+    <!-- Media card, night: the AtlasLauncher surface under the original graphite tones. -->
+    <color name="card_background">#232528</color>
     <color name="card_nested">#333333</color>
     <color name="card_outline">#334F5E68</color>
     <color name="card_pill">#B333333B</color>
@@ -14,7 +14,7 @@
     <color name="card_error">#D98282</color>
     <color name="card_status">#7893A0</color>
     <color name="card_divider">#553B444C</color>
-    <color name="card_panel">#F0191D23</color>
+    <color name="card_panel">#F0232528</color>
     <color name="card_panel_stroke">#77596872</color>
     <color name="card_option">#B3262A30</color>
     <color name="card_option_stroke">#66505B64</color>
@@ -26,5 +26,5 @@
     <color name="card_progress">#83AFC2</color>
     <color name="card_control_disabled">#9EF5F5F5</color>
     <color name="card_control_pressed">#9DC2D2</color>
-    <color name="widget_empty_background">#262626</color>
+    <color name="widget_empty_background">#232528</color>
 </resources>

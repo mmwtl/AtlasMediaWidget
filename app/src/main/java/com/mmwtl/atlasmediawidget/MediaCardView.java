@@ -161,8 +161,8 @@ final class MediaCardView extends FrameLayout {
         setMinimumHeight(cardHeight);
         // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
         boolean solidBackdrop = appearance.backdrop.solidFor(style);
-        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb()
-                : color(R.color.card_background),
+        int surface = color(R.color.card_background);
+        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb(surface) : surface,
                 appearance.cornerRadiusDp, context));
         setClipToOutline(true);
         setClickable(true);
@@ -191,14 +191,14 @@ final class MediaCardView extends FrameLayout {
 
         // Keeps the transport buttons on an opaque strip over a translucent backdrop.
         controlsBand = new View(context);
-        controlsBand.setBackgroundColor(0xFF000000 | appearance.backdrop.color);
+        controlsBand.setBackgroundColor(0xFF000000 | appearance.backdrop.rgb(surface));
         controlsBand.setVisibility(GONE);
         addView(controlsBand);
 
         int topPillHeightDp = Math.max(38, appearance.topRowTextSizeSp + 24);
         // The top row gets the same kind of strip, as deep below the pills as above them.
         View topRowBand = new View(context);
-        topRowBand.setBackgroundColor(0xFF000000 | appearance.backdrop.color);
+        topRowBand.setBackgroundColor(0xFF000000 | appearance.backdrop.rgb(surface));
         topRowBand.setVisibility(appearance.backdrop.opaqueTopRowFor(style) ? VISIBLE : GONE);
         addView(topRowBand, new LayoutParams(LayoutParams.MATCH_PARENT,
                 by(appearance.topInsetDp) * 2 + d(topPillHeightDp), Gravity.TOP));

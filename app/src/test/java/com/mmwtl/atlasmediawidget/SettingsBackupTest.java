@@ -36,7 +36,7 @@ public final class SettingsBackupTest {
         assertEquals(76, restored.compact.appearance.thumbnailSizeDp);
         JSONObject root = new JSONObject(json);
         assertEquals("atlas-media-widget-settings", root.getString("format"));
-        assertEquals(15, root.getInt("schemaVersion"));
+        assertEquals(16, root.getInt("schemaVersion"));
         assertEquals("1.2.3", root.getString("appVersion"));
         JSONObject settings = root.getJSONObject("settings");
         assertFalse(settings.has("serviceEnabled"));
@@ -114,7 +114,7 @@ public final class SettingsBackupTest {
         assertTrue(backdrop.solid);
         assertEquals(0x12A0FF, backdrop.color);
         assertEquals(128, backdrop.alpha);
-        assertEquals(0x8012A0FF, backdrop.argb());
+        assertEquals(0x8012A0FF, backdrop.argb(0));
         assertTrue(backdrop.opaqueControlsFor(CardStyle.COMPACT));
         assertTrue(backdrop.opaqueTopRowFor(CardStyle.COMPACT));
         assertFalse(backdrop.solidFor(CardStyle.SQUARE));
@@ -139,7 +139,7 @@ public final class SettingsBackupTest {
                 data(15, CardStyle.COMPACT, null, null), "test"));
         JSONObject settings = root.getJSONObject("settings");
         assertEquals("#EDEEF0", settings.getJSONObject("dayPalette").getString("background"));
-        assertEquals("#1D2228", settings.getJSONObject("nightPalette").getString("background"));
+        assertEquals("#232528", settings.getJSONObject("nightPalette").getString("background"));
         settings.put("dayPalette", new JSONObject().put("background", "#fff4e0")
                 .put("text", "#102030").put("accent", "#C04000"));
         settings.put("nightPalette", new JSONObject().put("background", "#101830")
@@ -147,16 +147,15 @@ public final class SettingsBackupTest {
         JSONObject backdrop = settings.getJSONObject("cardStyles").getJSONObject("compact")
                 .getJSONObject("backdrop");
         backdrop.put("solid", true).put("color", "#262626").put("alpha", 200)
-                .put("separateDay", true).put("dayColor", "#F0F0F0").put("dayAlpha", 90);
+                .put("dayColor", "#F0F0F0").put("dayAlpha", 90);
         SettingsBackup.Data restored = SettingsBackup.decode(
                 SettingsBackup.encode(SettingsBackup.decode(root.toString()), "test"));
         assertEquals(new CardColors(CardPalette.DAY.with(0xFFF4E0, 0x102030, 0xC04000),
                 CardPalette.NIGHT.with(0x101830, 0xE0E8FF, 0x40C0A0)), restored.colors);
         CardBackdrop day = restored.compact.appearance.backdrop.forDay();
-        assertEquals(0x5AF0F0F0, day.argb());
-        assertEquals(0xC8262626, restored.compact.appearance.backdrop.argb());
+        assertEquals(0x5AF0F0F0, day.argb(0));
+        assertEquals(0xC8262626, restored.compact.appearance.backdrop.argb(0));
 
-        backdrop.remove("separateDay");
         backdrop.remove("dayColor");
         backdrop.remove("dayAlpha");
         settings.remove("dayPalette");
@@ -164,10 +163,42 @@ public final class SettingsBackupTest {
         SettingsBackup.Data legacy = SettingsBackup.decode(root.toString());
         assertEquals(CardColors.DEFAULT, legacy.colors);
         assertEquals("one colour all day", 0xC8262626,
-                legacy.compact.appearance.backdrop.forDay().argb());
+                legacy.compact.appearance.backdrop.forDay().argb(0));
         settings.put("nightPalette", new JSONObject().put("background", "white")
                 .put("text", "#102030").put("accent", "#C04000"));
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+    }
+
+    @Test public void themedBackdropRoundTrips() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.COMPACT, null, null), "test"));
+        JSONObject backdrop = root.getJSONObject("settings").getJSONObject("cardStyles")
+                .getJSONObject("compact").getJSONObject("backdrop");
+        assertEquals("theme", backdrop.getString("color"));
+        assertEquals("theme", backdrop.getString("dayColor"));
+        backdrop.put("solid", true).put("color", "#262626");
+        CardBackdrop picked = SettingsBackup.decode(root.toString()).compact.appearance.backdrop;
+        assertEquals("graphite picked in this schema stays picked", 0x262626, picked.color);
+        assertEquals(CardBackdrop.THEME_COLOR, picked.dayColor);
+    }
+
+    @Test public void schema15GraphiteBackdropFollowsTheTheme() throws Exception {
+        JSONObject root = new JSONObject(SettingsBackup.encode(
+                data(15, CardStyle.COMPACT, null, null), "test"));
+        root.put("schemaVersion", 15);
+        JSONObject backdrop = root.getJSONObject("settings").getJSONObject("cardStyles")
+                .getJSONObject("compact").getJSONObject("backdrop");
+        backdrop.remove("dayColor");
+        backdrop.remove("dayAlpha");
+        backdrop.put("solid", true).put("color", "#262626").put("alpha", 200);
+        CardBackdrop graphite = SettingsBackup.decode(root.toString()).compact.appearance.backdrop;
+        assertEquals(CardBackdrop.THEME_COLOR, graphite.color);
+        assertEquals(CardBackdrop.THEME_COLOR, graphite.dayColor);
+        assertEquals(200, graphite.dayAlpha);
+        backdrop.put("color", "#102030");
+        CardBackdrop picked = SettingsBackup.decode(root.toString()).compact.appearance.backdrop;
+        assertEquals(0x102030, picked.color);
+        assertEquals(0x102030, picked.dayColor);
     }
 
     @Test public void jsonRoundTripPreservesFavoriteGrid() throws Exception {
@@ -293,7 +324,7 @@ public final class SettingsBackupTest {
     @Test public void rejectsUnsupportedSchemaVersion() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.SQUARE, null, null), "test"));
-        root.put("schemaVersion", 16);
+        root.put("schemaVersion", 17);
 
         IOException error = assertThrows(IOException.class,
                 () -> SettingsBackup.decode(root.toString()));

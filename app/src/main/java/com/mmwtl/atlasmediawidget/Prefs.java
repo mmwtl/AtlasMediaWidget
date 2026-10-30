@@ -62,7 +62,9 @@ final class Prefs {
             "backdrop_opaque_controls_";
     private static final String KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX =
             "backdrop_opaque_top_row_";
-    private static final String KEY_BACKDROP_SEPARATE_DAY_PREFIX = "backdrop_separate_day_";
+    private static final String KEY_LEGACY_BACKDROP_SEPARATE_DAY_PREFIX =
+            "backdrop_separate_day_";
+    private static final String KEY_THEME_COLORS_MIGRATED = "theme_colors_migrated";
     private static final String KEY_BACKDROP_DAY_COLOR_PREFIX = "backdrop_day_color_";
     private static final String KEY_BACKDROP_DAY_ALPHA_PREFIX = "backdrop_day_alpha_";
     private static final String KEY_PALETTE_BACKGROUND_SUFFIX = "_background";
@@ -132,6 +134,7 @@ final class Prefs {
         // Before this setting existed, the only available gradient was the strongest one.
         // A completely empty store is a new installation and gets the gentler default.
         migrateCoverDimPreset();
+        migrateThemeColors();
     }
 
     private static void migrateCredentialPreferencesWhenAvailable(Context credentialContext,
@@ -382,7 +385,7 @@ final class Prefs {
 
     CardBackdrop backdrop(CardStyle style) {
         int color = getInt(KEY_BACKDROP_COLOR_PREFIX + style.preferenceValue,
-                CardBackdrop.DEFAULT_COLOR);
+                CardBackdrop.THEME_COLOR);
         int alpha = getInt(KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue,
                 CardBackdrop.DEFAULT_ALPHA);
         return new CardBackdrop(
@@ -391,7 +394,6 @@ final class Prefs {
                 alpha,
                 getBoolean(KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX + style.preferenceValue, false),
                 getBoolean(KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX + style.preferenceValue, false),
-                getBoolean(KEY_BACKDROP_SEPARATE_DAY_PREFIX + style.preferenceValue, false),
                 getInt(KEY_BACKDROP_DAY_COLOR_PREFIX + style.preferenceValue, color),
                 getInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, alpha));
     }
@@ -437,10 +439,34 @@ final class Prefs {
                         value.opaqueControls)
                 .putBoolean(KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX + style.preferenceValue,
                         value.opaqueTopRow)
-                .putBoolean(KEY_BACKDROP_SEPARATE_DAY_PREFIX + style.preferenceValue,
-                        value.separateDay)
                 .putInt(KEY_BACKDROP_DAY_COLOR_PREFIX + style.preferenceValue, value.dayColor)
                 .putInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, value.dayAlpha);
+    }
+
+    /**
+     * Earlier versions stored the graphite backdrop as a plain colour and had one colour set:
+     * the old default becomes «по теме», and a picked colour stays in both modes.
+     */
+    private void migrateThemeColors() {
+        if (preferences.contains(KEY_THEME_COLORS_MIGRATED)) return;
+        SharedPreferences.Editor editor = preferences.edit()
+                .putBoolean(KEY_THEME_COLORS_MIGRATED, true);
+        for (CardStyle style : CardStyle.values()) {
+            String key = KEY_BACKDROP_COLOR_PREFIX + style.preferenceValue;
+            if (preferences.contains(key)) {
+                int color = CardBackdrop.fromLegacyColor(preferences.getInt(key,
+                        CardBackdrop.LEGACY_DEFAULT_COLOR));
+                editor.putInt(key, color)
+                        .putInt(KEY_BACKDROP_DAY_COLOR_PREFIX + style.preferenceValue, color);
+            }
+            String alpha = KEY_BACKDROP_ALPHA_PREFIX + style.preferenceValue;
+            if (preferences.contains(alpha)) {
+                editor.putInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue,
+                        preferences.getInt(alpha, CardBackdrop.DEFAULT_ALPHA));
+            }
+            editor.remove(KEY_LEGACY_BACKDROP_SEPARATE_DAY_PREFIX + style.preferenceValue);
+        }
+        editor.apply();
     }
 
     private void migrateCoverDimPreset() {

@@ -7,7 +7,7 @@ package com.mmwtl.atlasmediawidget;
  */
 final class CardPalette {
     static final CardPalette DAY = new CardPalette(false, 0xEDEEF0, 0x202124, 0x5F7C89);
-    static final CardPalette NIGHT = new CardPalette(true, 0x1D2228, 0xF5F5F5, 0x83AFC2);
+    static final CardPalette NIGHT = new CardPalette(true, 0x232528, 0xF5F5F5, 0x83AFC2);
 
     final boolean night;
     /** RGB colours without alpha. */
@@ -32,6 +32,20 @@ final class CardPalette {
 
     boolean isDefault() {
         return equals(defaults(night));
+    }
+
+    /**
+     * This palette for content drawn in the other mode's resources: the colours the user chose
+     * stay, and the ones left at the default take the default of that mode.
+     */
+    CardPalette forContent(boolean contentNight) {
+        if (contentNight == night) return this;
+        CardPalette from = defaults(night);
+        CardPalette to = defaults(contentNight);
+        return new CardPalette(contentNight,
+                background == from.background ? to.background : background,
+                text == from.text ? to.text : text,
+                accent == from.accent ? to.accent : accent);
     }
 
     /**

@@ -11,9 +11,9 @@ import android.content.res.Configuration;
 final class CardTheme {
     private CardTheme() {}
 
-    /** The overlay keeps the night card over the OEM launcher in either system mode. */
+    /** The overlay keeps the night colours over the OEM launcher in either system mode. */
     static Context overlay(Context base, CardColors colors) {
-        return paletted(withNight(base, true), colors);
+        return content(base, colors.night, colors.night.background);
     }
 
     /** A context of the given mode, for previewing the widget card in either mode. */
@@ -22,19 +22,23 @@ final class CardTheme {
     }
 
     /**
-     * An AppWidget follows the system night mode, as its launcher does. A single-colour backdrop
-     * is the user's fixed colour, so its content takes the mode that stays readable on it.
+     * An AppWidget follows the system night mode, as its launcher does, in the palette of that
+     * mode. Content takes the resources that stay readable on the surface actually shown: a
+     * picked single-colour backdrop or a picked card colour can be dark by day or light at night.
      */
     static Context widget(Context base, CardStyle style, WidgetAppearance appearance,
             CardColors colors) {
-        return paletted(appearance.backdrop.solidFor(style)
-                ? withNight(base, isDark(appearance.backdrop.color)) : base, colors);
+        CardPalette palette = colors.palette(isNight(base.getResources().getConfiguration()));
+        CardBackdrop backdrop = appearance.backdrop;
+        return content(base, palette, backdrop.solidFor(style) && !backdrop.themed()
+                ? backdrop.color : palette.background);
     }
 
-    /** Applies the user's palette of the mode the content is drawn in. */
-    private static Context paletted(Context themed, CardColors colors) {
-        CardPalette palette = colors.palette(isNight(themed.getResources().getConfiguration()));
-        return palette.isDefault() ? themed : new Palette(themed, palette);
+    private static Context content(Context base, CardPalette palette, int surface) {
+        boolean night = isDark(surface);
+        Context themed = withNight(base, night);
+        CardPalette shown = palette.forContent(night);
+        return shown.isDefault() ? themed : new Palette(themed, shown);
     }
 
     /** The appearance an AppWidget shows in the mode of {@code base}: by day its day backdrop. */

@@ -18,15 +18,17 @@ import org.robolectric.annotation.GraphicsMode;
 @Config(sdk = 30)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class CardThemeTest {
-    @Test public void nightKeepsTheOriginalGraphiteCard() {
+    private static final String PREFS_NAME = "atlas_media_widget";
+
+    @Test public void nightUsesTheLauncherSurfaceAndGraphiteTones() {
         RuntimeEnvironment.setQualifiers("+night");
         Context context = RuntimeEnvironment.getApplication();
-        assertEquals(0xFF1D2228, context.getColor(R.color.card_background));
+        assertEquals(0xFF232528, context.getColor(R.color.card_background));
         assertEquals(0xFFF5F5F5, context.getColor(R.color.card_text));
         assertEquals(0xFFD4D4D4, context.getColor(R.color.card_text_secondary));
         assertEquals(0xFF83AFC2, context.getColor(R.color.card_progress));
         assertEquals(0xB333333B, context.getColor(R.color.card_pill));
-        assertEquals(0xFF262626, context.getColor(R.color.widget_empty_background));
+        assertEquals(0xFF232528, context.getColor(R.color.widget_empty_background));
     }
 
     @Test public void dayUsesTheLauncherPalette() {
@@ -42,9 +44,9 @@ public class CardThemeTest {
         Prefs prefs = new Prefs(context);
         RuntimeEnvironment.setQualifiers("+notnight");
         assertColor(0xEDEEF0, surface(card(context, prefs)));
-        assertEquals(0xFF1D2228, CardTheme.overlay(context, CardColors.DEFAULT).getColor(R.color.card_background));
+        assertEquals(0xFF232528, CardTheme.overlay(context, CardColors.DEFAULT).getColor(R.color.card_background));
         RuntimeEnvironment.setQualifiers("+night");
-        assertColor(0x1D2228, surface(card(context, prefs)));
+        assertColor(0x232528, surface(card(context, prefs)));
         assertSame(context, CardTheme.overlay(context, CardColors.DEFAULT));
     }
 
@@ -115,7 +117,7 @@ public class CardThemeTest {
         prefs.putInt(Prefs.KEY_CARD_STYLE, CardStyle.COMPACT.preferenceValue);
         prefs.putAppearance(CardStyle.COMPACT, WidgetAppearance.defaults(CardStyle.COMPACT)
                 .withBackdrop(new CardBackdrop(true, 0x262626, 255, false, false,
-                        true, 0xF0F0F0, 255)));
+                        0xF0F0F0, 255)));
         RuntimeEnvironment.setQualifiers("+notnight");
         assertColor(0xF0F0F0, surface(card(context, prefs)));
         WidgetAppearance day = CardTheme.widgetAppearance(context,
@@ -125,6 +127,70 @@ public class CardThemeTest {
         RuntimeEnvironment.setQualifiers("+night");
         assertColor(0x262626, surface(card(context, prefs)));
         assertColor(0xF0F0F0, surface(card(CardTheme.mode(context, false), prefs)));
+    }
+
+    @Test public void themedBackdropTakesTheSurfaceOfEachMode() {
+        Context context = RuntimeEnvironment.getApplication();
+        Prefs prefs = new Prefs(context);
+        prefs.putInt(Prefs.KEY_CARD_STYLE, CardStyle.COMPACT.preferenceValue);
+        prefs.putAppearance(CardStyle.COMPACT, WidgetAppearance.defaults(CardStyle.COMPACT)
+                .withBackdrop(new CardBackdrop(true, CardBackdrop.THEME_COLOR, 255, false, false)));
+        assertEquals(CardBackdrop.THEME_COLOR, prefs.backdrop(CardStyle.COMPACT).color);
+        RuntimeEnvironment.setQualifiers("+notnight");
+        assertColor(0xEDEEF0, surface(card(context, prefs)));
+        RuntimeEnvironment.setQualifiers("+night");
+        assertColor(0x232528, surface(card(context, prefs)));
+    }
+
+    @Test public void pickedCardColorKeepsTextReadableInBothModes() {
+        Context context = RuntimeEnvironment.getApplication();
+        WidgetAppearance appearance = WidgetAppearance.defaults(CardStyle.SQUARE);
+        CardColors colors = new CardColors(
+                CardPalette.DAY.with(0x102030, CardPalette.DAY.text, CardPalette.DAY.accent),
+                CardPalette.NIGHT.with(0xF0E0D0, CardPalette.NIGHT.text, CardPalette.NIGHT.accent));
+        RuntimeEnvironment.setQualifiers("+notnight");
+        Context day = CardTheme.widget(context, CardStyle.SQUARE, appearance, colors);
+        assertEquals(0xFF102030, CardTheme.color(day, R.color.card_background));
+        assertEquals("light text on a dark day card", 0xFFF5F5F5,
+                CardTheme.color(day, R.color.card_text));
+        RuntimeEnvironment.setQualifiers("+night");
+        Context night = CardTheme.widget(context, CardStyle.SQUARE, appearance, colors);
+        assertEquals(0xFFF0E0D0, CardTheme.color(night, R.color.card_background));
+        assertEquals("dark text on a light night card", 0xFF202124,
+                CardTheme.color(night, R.color.card_text));
+    }
+
+    @Test public void pickedTextStaysOnAnyBackground() {
+        Context context = RuntimeEnvironment.getApplication();
+        CardColors colors = new CardColors(
+                CardPalette.DAY.with(0x102030, 0xC0FF00, CardPalette.DAY.accent),
+                CardPalette.NIGHT);
+        RuntimeEnvironment.setQualifiers("+notnight");
+        Context day = CardTheme.widget(context, CardStyle.SQUARE,
+                WidgetAppearance.defaults(CardStyle.SQUARE), colors);
+        assertEquals(0xFFC0FF00, CardTheme.color(day, R.color.card_text));
+    }
+
+    @Test public void upgradeMakesTheGraphiteBackdropFollowTheTheme() {
+        Context context = RuntimeEnvironment.getApplication();
+        context.createDeviceProtectedStorageContext()
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+                .putBoolean("backdrop_solid_0", true)
+                .putInt("backdrop_color_0", 0x262626)
+                .putInt("backdrop_alpha_0", 200)
+                .putBoolean("backdrop_solid_1", true)
+                .putInt("backdrop_color_1", 0x102030)
+                .putInt("backdrop_alpha_1", 90)
+                .commit();
+        Prefs prefs = new Prefs(context);
+        CardBackdrop graphite = prefs.backdrop(CardStyle.fromPreference(0));
+        assertEquals(CardBackdrop.THEME_COLOR, graphite.color);
+        assertEquals(CardBackdrop.THEME_COLOR, graphite.dayColor);
+        assertEquals(200, graphite.dayAlpha);
+        CardBackdrop picked = prefs.backdrop(CardStyle.fromPreference(1));
+        assertEquals(0x102030, picked.color);
+        assertEquals(0x102030, picked.dayColor);
+        assertEquals(90, picked.dayAlpha);
     }
 
     @Test public void darknessPicksTheMoreReadableText() {

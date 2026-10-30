@@ -18,8 +18,9 @@ import java.util.Map;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 15;
+    private static final int SCHEMA_VERSION = 16;
     private static final int MIN_SCHEMA_VERSION = 1;
+    private static final String BACKDROP_THEME = "theme";
     private static final int MAX_FILE_BYTES = 256 * 1024;
 
     static final class Data {
@@ -579,17 +580,26 @@ final class SettingsBackup {
                 .put("coverDimPreset", value.coverDimPreset.backupName)
                 .put("backdrop", new JSONObject()
                         .put("solid", value.backdrop.solid)
-                        .put("color", hex(value.backdrop.color))
+                        .put("color", backdropColor(value.backdrop.color))
                         .put("alpha", value.backdrop.alpha)
                         .put("opaqueControls", value.backdrop.opaqueControls)
                         .put("opaqueTopRow", value.backdrop.opaqueTopRow)
-                        .put("separateDay", value.backdrop.separateDay)
-                        .put("dayColor", hex(value.backdrop.dayColor))
+                        .put("dayColor", backdropColor(value.backdrop.dayColor))
                         .put("dayAlpha", value.backdrop.dayAlpha));
     }
 
     private static String hex(int rgb) {
         return String.format(Locale.ROOT, "#%06X", rgb);
+    }
+
+    private static String backdropColor(int color) {
+        return color == CardBackdrop.THEME_COLOR ? BACKDROP_THEME : hex(color);
+    }
+
+    private static int requireBackdropColor(JSONObject object, String key, String path)
+            throws IOException {
+        return BACKDROP_THEME.equals(object.opt(key)) ? CardBackdrop.THEME_COLOR
+                : requireColor(object, key, path);
     }
 
     private static int requireColor(JSONObject object, String key, String path)
@@ -620,12 +630,18 @@ final class SettingsBackup {
                 requireColor(object, "accent", path + ".accent"));
     }
 
-    private static CardBackdrop decodeBackdrop(JSONObject object, String path)
+    private static CardBackdrop decodeBackdrop(JSONObject object, String path, int schemaVersion)
             throws IOException {
-        int color = requireColor(object, "color", path + ".color");
+        int color = requireBackdropColor(object, "color", path + ".color");
+        // Before schema 16 graphite stood for the default and one colour served the whole day.
+        boolean legacy = schemaVersion < 16;
+        if (legacy) color = CardBackdrop.fromLegacyColor(color);
         int alpha = requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
                 0, 255);
-        // The day colour was added within schema 15; older files use one colour all day.
+        boolean ownDay = legacy
+                ? object.has("separateDay") && requireBoolean(object, "separateDay",
+                        path + ".separateDay")
+                : object.has("dayColor");
         return new CardBackdrop(
                 requireBoolean(object, "solid", path + ".solid"),
                 color,
@@ -634,11 +650,8 @@ final class SettingsBackup {
                         path + ".opaqueControls"),
                 object.has("opaqueTopRow") && requireBoolean(object, "opaqueTopRow",
                         path + ".opaqueTopRow"),
-                object.has("separateDay") && requireBoolean(object, "separateDay",
-                        path + ".separateDay"),
-                object.has("dayColor") ? requireColor(object, "dayColor", path + ".dayColor")
-                        : color,
-                object.has("dayAlpha") ? requireRange(path + ".dayAlpha",
+                ownDay ? requireBackdropColor(object, "dayColor", path + ".dayColor") : color,
+                ownDay ? requireRange(path + ".dayAlpha",
                         requireInt(object, "dayAlpha", path + ".dayAlpha"), 0, 255) : alpha);
     }
 
@@ -684,7 +697,7 @@ final class SettingsBackup {
                                 : Prefs.DEFAULT_THUMBNAIL_SIZE_DP,
                         schemaVersion >= 13
                                 ? decodeBackdrop(requireObject(object, "backdrop",
-                                        path + ".backdrop"), path + ".backdrop")
+                                        path + ".backdrop"), path + ".backdrop", schemaVersion)
                                 : CardBackdrop.ARTWORK,
                         schemaVersion >= 15
                                 ? requireInt(object, "cornerRadiusDp", path + ".cornerRadiusDp")

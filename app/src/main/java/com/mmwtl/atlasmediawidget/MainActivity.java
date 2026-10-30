@@ -152,15 +152,15 @@ public final class MainActivity extends ScaledActivity {
     private View backdropSwatch;
     private Switch backdropOpaqueControls;
     private Switch backdropOpaqueTopRow;
-    private int backdropColor = CardBackdrop.DEFAULT_COLOR;
+    private Button backdropColorButton;
+    private LinearLayout backdropColorOptions;
+    private int backdropColor = CardBackdrop.THEME_COLOR;
     private int backdropAlpha = CardBackdrop.DEFAULT_ALPHA;
-    private boolean backdropSeparateDay;
-    private int backdropDayColor = CardBackdrop.DEFAULT_COLOR;
+    private int backdropDayColor = CardBackdrop.THEME_COLOR;
     private int backdropDayAlpha = CardBackdrop.DEFAULT_ALPHA;
-    private TextView backdropDayNote;
-    private Button backdropDayReset;
     private CardColors cardColors = CardColors.DEFAULT;
     private final View[] paletteSwatches = new View[3];
+    private final Button[] paletteButtons = new Button[3];
     /**
      * The mode whose colours the settings edit and the preview shows. The overlay is always
      * night; in widget mode it starts at the system mode and is not stored.
@@ -516,6 +516,8 @@ public final class MainActivity extends ScaledActivity {
                 "Размеры шрифтов, отступы и линия прогресса"));
         createControlsSection(collapsibleCard(page, "Панель управления",
                 "Высота панели, размер и разбежка кнопок"));
+        createColorsSection(collapsibleCard(page, "Свои цвета",
+                "Необязательно: без них карточка следует теме OneOS"));
     }
 
     private LinearLayout createModeCard() {
@@ -763,7 +765,6 @@ public final class MainActivity extends ScaledActivity {
         lookCard.addView(styles);
         lookCard.addView(text("Компактная подходит для широкой невысокой карточки; просторная — для квадратной или высокой. Выбор не меняет размер карточки.",
                 13, Ui.SECONDARY, Typeface.NORMAL));
-        createColorsSection(lookCard);
         backdropSection = new LinearLayout(this);
         backdropSection.setOrientation(LinearLayout.VERTICAL);
         backdropSection.addView(text("Подложка", 15, Ui.SECONDARY, Typeface.BOLD),
@@ -781,51 +782,6 @@ public final class MainActivity extends ScaledActivity {
         backdropSection.addView(backdropGroup, fullWrap());
         backdropSolidOptions = new LinearLayout(this);
         backdropSolidOptions.setOrientation(LinearLayout.VERTICAL);
-        backdropAlphaSetting = addLabeledSeek(backdropSolidOptions,
-                "Непрозрачность подложки", 0, 255);
-        backdropAlphaSetting.seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar seekBar, int progress,
-                    boolean fromUser) {
-                if (!fromUser) return;
-                if (editingDay()) {
-                    separateDayBackdrop();
-                    backdropDayAlpha = progress;
-                } else {
-                    backdropAlpha = progress;
-                }
-                updateAppearanceLabels();
-                renderPreview();
-            }
-
-            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
-
-            @Override public void onStopTrackingTouch(SeekBar seekBar) {
-                if (!refreshingStyle) saveAppearance();
-            }
-        });
-        backdropSwatch = new View(this);
-        backdropSolidOptions.addView(colorRow(backdropSwatch, "Изменить цвет подложки",
-                () -> ColorPickerDialog.show(this, "Цвет подложки", shownBackdropColor(),
-                        color -> {
-                            if (editingDay()) {
-                                separateDayBackdrop();
-                                backdropDayColor = color;
-                            } else {
-                                backdropColor = color;
-                            }
-                            updateBackdropControls();
-                            saveAppearance();
-                        })), colorRowParams());
-        backdropDayNote = text("Днём подложка того же цвета и непрозрачности, что ночью, "
-                + "пока их не изменить здесь.", 13, Ui.SECONDARY, Typeface.NORMAL);
-        backdropSolidOptions.addView(backdropDayNote, labelParams());
-        backdropDayReset = actionButton("Днём как ночью");
-        backdropDayReset.setOnClickListener(v -> {
-            backdropSeparateDay = false;
-            updateBackdropControls();
-            saveAppearance();
-        });
-        backdropSolidOptions.addView(backdropDayReset, buttonParams());
         backdropSolidOptions.addView(text("Выключено — панель прозрачна, как подложка; "
                 + "включено — всегда непрозрачна.", 13, Ui.SECONDARY, Typeface.NORMAL),
                 labelParams());
@@ -865,11 +821,10 @@ public final class MainActivity extends ScaledActivity {
         return lookCard;
     }
 
-    private void createColorsSection(LinearLayout lookCard) {
+    private void createColorsSection(LinearLayout section) {
         cardColors = prefs.cardColors();
         boolean widgetMode = prefs.isWidgetMode();
         editNight = !widgetMode || CardTheme.isNight(getResources().getConfiguration());
-        lookCard.addView(text("Цвета", 15, Ui.SECONDARY, Typeface.BOLD), labelParams());
         if (widgetMode) {
             RadioGroup modes = new RadioGroup(this);
             modes.setOrientation(RadioGroup.HORIZONTAL);
@@ -885,39 +840,89 @@ public final class MainActivity extends ScaledActivity {
                 updateAppearanceLabels();
                 renderPreview();
             });
-            lookCard.addView(modes, fullWrap());
+            section.addView(modes, fullWrap());
         }
-        lookCard.addView(text(widgetMode
-                        ? "AppWidget следует дневному и ночному режиму системы; здесь и в "
-                                + "предпросмотре — цвета выбранного режима, включая подложку. "
-                                + "Фон карточки — также цвет вуали над обложкой."
-                        : "Оверлей всегда в ночных цветах. Фон карточки — также цвет вуали "
-                                + "над обложкой; второстепенный текст берётся из цвета текста.",
+        section.addView(text(widgetMode
+                        ? "Цвета отдельно для дня и ночи; предпросмотр показывает выбранный режим. "
+                                + "«По теме» в выборе цвета возвращает цвет темы. Фон карточки — "
+                                + "также цвет вуали над обложкой. Текст подбирается по яркости фона, "
+                                + "пока не задан свой."
+                        : "Оверлей не следует теме OneOS и всегда использует эти цвета. Фон "
+                                + "карточки — также цвет вуали над обложкой; второстепенный текст "
+                                + "берётся из цвета текста.",
                 13, Ui.SECONDARY, Typeface.NORMAL));
-        String[] labels = {"Фон карточки", "Текст", "Акцент и прогресс"};
-        for (int index = 0; index < labels.length; index++) {
-            int channel = index;
-            paletteSwatches[index] = new View(this);
-            lookCard.addView(colorRow(paletteSwatches[index], labels[index],
-                    () -> ColorPickerDialog.show(this, labels[channel],
-                            paletteColor(channel), color -> {
-                                CardPalette palette = cardColors.palette(editNight);
-                                int[] colors = {palette.background, palette.text,
-                                        palette.accent};
-                                colors[channel] = color;
-                                savePalette(palette.with(colors[0], colors[1], colors[2]));
-                            })), colorRowParams());
-        }
+        addPaletteRow(section, 0, "Фон карточки");
+
+        backdropColorOptions = new LinearLayout(this);
+        backdropColorOptions.setOrientation(LinearLayout.VERTICAL);
+        backdropAlphaSetting = addLabeledSeek(backdropColorOptions,
+                "Непрозрачность подложки", 0, 255);
+        backdropAlphaSetting.seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                    boolean fromUser) {
+                if (!fromUser) return;
+                if (editingDay()) {
+                    backdropDayAlpha = progress;
+                } else {
+                    backdropAlpha = progress;
+                }
+                updateAppearanceLabels();
+                renderPreview();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (!refreshingStyle) saveAppearance();
+            }
+        });
+        backdropSwatch = new View(this);
+        LinearLayout backdropRow = colorRow(backdropSwatch, "Цвет подложки",
+                () -> ColorPickerDialog.show(this, "Цвет подложки", shownBackdropRgb(),
+                        CardBackdrop.THEME_COLOR, color -> {
+                            setShownBackdropColor(color);
+                            updateBackdropControls();
+                            saveAppearance();
+                        }));
+        backdropColorButton = (Button) backdropRow.getChildAt(1);
+        backdropColorOptions.addView(backdropRow, colorRowParams());
+        section.addView(backdropColorOptions, fullWrap());
+
+        addPaletteRow(section, 1, "Текст");
+        addPaletteRow(section, 2, "Акцент и прогресс");
         Button reset = actionButton("Вернуть цвета по умолчанию");
-        reset.setOnClickListener(v -> savePalette(CardPalette.defaults(editNight)));
-        lookCard.addView(reset, buttonParams());
+        reset.setOnClickListener(v -> {
+            setShownBackdropColor(CardBackdrop.THEME_COLOR);
+            savePalette(CardPalette.defaults(editNight));
+            updateBackdropControls();
+            saveAppearance();
+        });
+        section.addView(reset, buttonParams());
         updatePaletteSwatches();
     }
 
-    private int paletteColor(int channel) {
-        CardPalette palette = cardColors.palette(editNight);
+    private void addPaletteRow(LinearLayout parent, int channel, String label) {
+        paletteSwatches[channel] = new View(this);
+        LinearLayout row = colorRow(paletteSwatches[channel], label,
+                () -> ColorPickerDialog.show(this, label, paletteColor(channel),
+                        channelOf(CardPalette.defaults(editNight), channel), color -> {
+                            CardPalette palette = cardColors.palette(editNight);
+                            int[] colors = {palette.background, palette.text, palette.accent};
+                            colors[channel] = color;
+                            savePalette(palette.with(colors[0], colors[1], colors[2]));
+                        }));
+        paletteButtons[channel] = (Button) row.getChildAt(1);
+        paletteButtons[channel].setTag(label);
+        parent.addView(row, colorRowParams());
+    }
+
+    private static int channelOf(CardPalette palette, int channel) {
         return channel == 0 ? palette.background
                 : channel == 1 ? palette.text : palette.accent;
+    }
+
+    private int paletteColor(int channel) {
+        return channelOf(cardColors.palette(editNight), channel);
     }
 
     private void savePalette(CardPalette value) {
@@ -929,9 +934,12 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void updatePaletteSwatches() {
+        CardPalette defaults = CardPalette.defaults(editNight);
         for (int index = 0; index < paletteSwatches.length; index++) {
             paletteSwatches[index].setBackground(
                     Ui.background(0xFF000000 | paletteColor(index), 8, this));
+            paletteButtons[index].setText(paletteButtons[index].getTag()
+                    + (paletteColor(index) == channelOf(defaults, index) ? "  по теме" : ""));
         }
     }
 
@@ -940,20 +948,26 @@ public final class MainActivity extends ScaledActivity {
         return !editNight && prefs.isWidgetMode();
     }
 
-    /** The first day edit starts from the night backdrop the day has shown so far. */
-    private void separateDayBackdrop() {
-        if (backdropSeparateDay) return;
-        backdropSeparateDay = true;
-        backdropDayColor = backdropColor;
-        backdropDayAlpha = backdropAlpha;
+    private int shownBackdropColor() {
+        return editingDay() ? backdropDayColor : backdropColor;
     }
 
-    private int shownBackdropColor() {
-        return editingDay() && backdropSeparateDay ? backdropDayColor : backdropColor;
+    private void setShownBackdropColor(int color) {
+        if (editingDay()) {
+            backdropDayColor = color;
+        } else {
+            backdropColor = color;
+        }
+    }
+
+    /** The colour shown for the edited mode, with a colour left to the theme resolved. */
+    private int shownBackdropRgb() {
+        int color = shownBackdropColor();
+        return color == CardBackdrop.THEME_COLOR ? paletteColor(0) : color;
     }
 
     private int shownBackdropAlpha() {
-        return editingDay() && backdropSeparateDay ? backdropDayAlpha : backdropAlpha;
+        return editingDay() ? backdropDayAlpha : backdropAlpha;
     }
 
     /** A colour swatch with the button that opens its picker. */
@@ -3071,7 +3085,6 @@ public final class MainActivity extends ScaledActivity {
         backdropAlpha = appearance.backdrop.alpha;
         backdropOpaqueControls.setChecked(appearance.backdrop.opaqueControls);
         backdropOpaqueTopRow.setChecked(appearance.backdrop.opaqueTopRow);
-        backdropSeparateDay = appearance.backdrop.separateDay;
         backdropDayColor = appearance.backdrop.dayColor;
         backdropDayAlpha = appearance.backdrop.dayAlpha;
         (appearance.backdrop.solid ? backdropSolidButton : backdropArtworkButton)
@@ -3474,22 +3487,21 @@ public final class MainActivity extends ScaledActivity {
         coverDimTitle.setVisibility(solid ? View.GONE : View.VISIBLE);
         coverDimPresetGroup.setVisibility(solid ? View.GONE : View.VISIBLE);
         // The swatch shows the colour itself; opacity has its own slider.
-        backdropSwatch.setBackground(Ui.background(0xFF000000 | shownBackdropColor(), 8, this));
+        backdropColorOptions.setVisibility(backdropSolidButton.isChecked()
+                && currentStyle() == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
+        backdropSwatch.setBackground(Ui.background(0xFF000000 | shownBackdropRgb(), 8, this));
+        backdropColorButton.setText(shownBackdropColor() == CardBackdrop.THEME_COLOR
+                ? "Цвет подложки  по теме" : "Цвет подложки");
         if (backdropAlphaSetting.seek.getProgress() != shownBackdropAlpha()) {
             backdropAlphaSetting.seek.setProgress(shownBackdropAlpha());
         }
-        backdropDayNote.setVisibility(editingDay() && !backdropSeparateDay
-                ? View.VISIBLE : View.GONE);
-        backdropDayReset.setVisibility(editingDay() && backdropSeparateDay
-                ? View.VISIBLE : View.GONE);
     }
 
     private CardBackdrop selectedBackdrop() {
         if (backdropSolidButton == null) return prefs.backdrop(currentStyle());
         return new CardBackdrop(backdropSolidButton.isChecked(), backdropColor,
                 backdropAlpha, backdropOpaqueControls.isChecked(),
-                backdropOpaqueTopRow.isChecked(), backdropSeparateDay,
-                backdropDayColor, backdropDayAlpha);
+                backdropOpaqueTopRow.isChecked(), backdropDayColor, backdropDayAlpha);
     }
 
     private Switch backdropPanelSwitch(String label) {
