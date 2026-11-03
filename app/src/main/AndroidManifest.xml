@@ -129,6 +129,16 @@
             android:exported="false"
             android:grantUriPermissions="true" />
 
+        <!-- AtlasLauncher transport gestures; play/pause/next/previous only, no permission:
+             any app can already send these as media keys. -->
+        <receiver
+            android:name=".LauncherMediaCommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.mmwtl.atlasmediawidget.action.MEDIA_COMMAND" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".BootReceiver"
             android:directBootAware="true"

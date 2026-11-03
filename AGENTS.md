@@ -86,6 +86,10 @@ migration request.
   explicit unavailable/disconnected state.
 - Send transport and source commands only through the explicit versioned service. Respect the
   capability mask and treat `OK` as delivery/pending until a newer snapshot confirms the result.
+- `LauncherMediaCommandReceiver` serves the AtlasLauncher gesture contract in
+  `docs/full-media-bridge.md` §9 (action, extra values, exported without permission). Do not
+  change it without coordinating with AtlasLauncher. It only forwards to a running
+  `OverlayService` with a connected Bridge; it never starts the service or binds.
 - Automatic playback (startup autoplay, autoplay after source loss) runs through `CallGuard`: an
   active call by audio mode skips it or cancels its play retries, which would otherwise restart
   the player against the call's audio focus. User commands are not blocked.

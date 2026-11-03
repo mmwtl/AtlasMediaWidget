@@ -422,6 +422,30 @@ public final class OverlayService extends Service
             onCustomAction(command.substring(AtlasMediaWidgetProvider.CUSTOM_ACTION_PREFIX.length()));
             return;
         }
+        String transport = supportedTransportCommand(command, snapshot);
+        if (transport != null) onCommand(transport);
+    }
+
+    /** Launcher gestures: the card's transport path, only on a connected running service. */
+    void executeLauncherCommand(String command) {
+        MediaSnapshot snapshot = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
+        if (destroyed || bridgeState != MediaBridgeClient.State.CONNECTED || snapshot == null) {
+            AppLog.info("Launcher media command " + command + " ignored: bridge=" + bridgeState
+                    + " snapshot=" + (snapshot != null));
+            return;
+        }
+        String transport = supportedTransportCommand(command, snapshot);
+        if (transport == null) {
+            AppLog.info("Launcher media command " + command + " unsupported by "
+                    + snapshot.audioSource);
+            return;
+        }
+        AppLog.info("Launcher media command " + command + " -> " + transport);
+        onCommand(transport);
+    }
+
+    /** Maps PLAY_PAUSE like the card button; null when the snapshot lacks the capability. */
+    private String supportedTransportCommand(String command, MediaSnapshot snapshot) {
         if ("PLAY_PAUSE".equals(command)) command = PlayPauseActionPolicy.command(
                 snapshot.audioSource, snapshot.isPlaying(), snapshot.capabilities);
         long capability = switch (command) {
@@ -433,7 +457,7 @@ public final class OverlayService extends Service
                     : "NEXT".equals(command) ? MediaBridgeContract.CAP_NEXT : MediaBridgeContract.CAP_PREVIOUS;
             default -> 0L;
         };
-        if (capability != 0 && snapshot.supports(capability)) onCommand(command);
+        return capability != 0 && snapshot.supports(capability) ? command : null;
     }
 
     private void executeWidgetSourceAction(int widgetId, String control) {

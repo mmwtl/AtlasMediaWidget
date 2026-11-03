@@ -101,6 +101,8 @@ open directly inside the AppWidget, and the favorites list scrolls.
   updates;
 - optional now-playing text in the OneOS status bar pill with a choice of text layout (station or
   frequency for radio) — [details and limitations](docs/statusbar-media.md) (in Russian);
+- AtlasLauncher gestures control playback (play/pause, next, previous) through the same path as
+  the card buttons — [contract](docs/full-media-bridge.md#9-команды-от-atlaslauncher--atlaslauncher-commands);
 - shortcuts to the active media app or stock Radio, Bluetooth and USB screens;
 - ZIP settings backup/restore, legacy JSON import and separate radio-catalog transfer
   (`stations.csv` and `covers/`);

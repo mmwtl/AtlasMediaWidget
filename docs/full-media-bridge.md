@@ -233,3 +233,38 @@ entire station/artwork catalog after validation. Staged settings imports use UUI
 tokens and persisted metadata; states are `IDLE`, `PREPARED`, `COMMITTING`,
 `COMMITTED`, `FAILED`. A successful settings update follows synchronous preference
 and revision writes; multiple preference files are not a single disk transaction.
+
+---
+
+## 9. Команды от AtlasLauncher / AtlasLauncher Commands
+
+### [RU]
+Жесты AtlasLauncher (`com.geely.atlaslauncher`) управляют воспроизведением через явный broadcast
+в приложение Widget, потому что `AudioManager.dispatchMediaKeyEvent` на ГУ не работает
+(наблюдение на ГУ).
+
+- `setPackage("com.mmwtl.atlasmediawidget")`, action
+  `com.mmwtl.atlasmediawidget.action.MEDIA_COMMAND`;
+- extra `command` (String): `PLAY_PAUSE`, `NEXT` или `PREVIOUS`; другие значения игнорируются;
+- `LauncherMediaCommandReceiver` экспортирован без permission и работает в основном процессе
+  рядом с `OverlayService`. Он открывает только play/pause/next/prev, которые любое приложение
+  и так может отправить медиакнопкой; signature-разрешение не используется, потому что debug-сборки
+  лаунчера и виджета подписаны разными ключами.
+
+Команда выполняется только запущенной `OverlayService` с подключённым `MediaBridgeClient` и
+непустым снимком. Иначе она тихо отбрасывается (запись в лог): служба не запускается, Bridge не
+привязывается заново, UI не показывается. `PLAY_PAUSE` переводится в `TOGGLE`/`PLAY`/`PAUSE`
+через `PlayPauseActionPolicy` по текущему снимку, как кнопка карточки. `NEXT`/`PREVIOUS`
+уходят тем же путём, что и кнопки карточки, включая навигацию по сохранённым станциям радио.
+Команда, которой нет в маске `capabilities` текущего источника, отбрасывается, как и в режиме
+AppWidget. Результат команды подтверждает только следующий снимок.
+
+### [EN]
+AtlasLauncher (`com.geely.atlaslauncher`) gestures send an explicit broadcast to package
+`com.mmwtl.atlasmediawidget` with action `com.mmwtl.atlasmediawidget.action.MEDIA_COMMAND` and a
+String extra `command` of `PLAY_PAUSE`, `NEXT` or `PREVIOUS`; other values are ignored. The
+exported, permissionless `LauncherMediaCommandReceiver` runs in the main process and forwards the
+command to the running `OverlayService` only while its existing `MediaBridgeClient` is connected
+and a snapshot is present; otherwise it drops the command without starting the service, rebinding
+the Bridge or showing UI. `PLAY_PAUSE` maps through `PlayPauseActionPolicy` like the card button;
+commands outside the current capability mask are dropped, as in AppWidget mode.
