@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -11,6 +12,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -18,11 +22,15 @@ import java.util.Map;
 final class SettingsBackup {
     static final String FILE_NAME = "AtlasMediaWidget-settings.json";
     private static final String FORMAT = "atlas-media-widget-settings";
-    private static final int SCHEMA_VERSION = 15;
+    private static final int SCHEMA_VERSION = 17;
     private static final int MIN_SCHEMA_VERSION = 1;
+    private static final String BACKDROP_THEME = "theme";
     private static final int MAX_FILE_BYTES = 256 * 1024;
+    private static final int MAX_WIDGET_PROFILES = 32;
 
     static final class Data {
+        /** Look of the placed widgets by position; null follows the shared look. */
+        List<Map<String, Object>> widgetProfiles = List.of();
         final int freeformHideThresholdPercent;
         final boolean widgetMode;
         final boolean autoStart;
@@ -45,6 +53,7 @@ final class SettingsBackup {
         final Integer cardHeightPx;
         final StyleData compact;
         final StyleData square;
+        final CardColors colors;
 
         Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
                 int appUiScaleTenths,
@@ -165,6 +174,25 @@ final class SettingsBackup {
                 PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
                 StatusBarScene.Format statusBarFormat, boolean cardOpensPlayer)
                 throws IOException {
+            this(autoStart, radioSavedNavigation, dragHandleVisible, appUiScaleTenths,
+                    selectedStyle, positionX, positionY, positionCorner, compact, square,
+                    cardWidthPx, cardHeightPx, favoriteColumns, favoriteRows,
+                    radioFavoritesNavigation, freeformHideThresholdPercent, widgetMode,
+                    playerActionsCount, playerActionRules, statusBarMedia, statusBarFormat,
+                    cardOpensPlayer, CardColors.DEFAULT);
+        }
+
+        Data(boolean autoStart, boolean radioSavedNavigation, boolean dragHandleVisible,
+                int appUiScaleTenths, CardStyle selectedStyle, Integer positionX, Integer positionY,
+                OverlayCorner positionCorner, StyleData compact, StyleData square,
+                Integer cardWidthPx, Integer cardHeightPx, int favoriteColumns, int favoriteRows,
+                boolean radioFavoritesNavigation, int freeformHideThresholdPercent,
+                boolean widgetMode, int playerActionsCount,
+                PlayerActionFilter.Rules playerActionRules, boolean statusBarMedia,
+                StatusBarScene.Format statusBarFormat, boolean cardOpensPlayer,
+                CardColors colors) throws IOException {
+            if (colors == null) throw invalid("Не указаны цвета карточки");
+            this.colors = colors;
             this.widgetMode = widgetMode;
             this.statusBarMedia = statusBarMedia;
             this.cardOpensPlayer = cardOpensPlayer;
@@ -289,12 +317,13 @@ final class SettingsBackup {
 
     private SettingsBackup() {}
 
-    static Data capture(Prefs prefs) throws IOException {
+    static Data capture(Prefs editedPrefs) throws IOException {
+        Prefs prefs = editedPrefs.global();
         int x = prefs.getInt(Prefs.KEY_POSITION_X, Prefs.POSITION_UNSET);
         int y = prefs.getInt(Prefs.KEY_POSITION_Y, Prefs.POSITION_UNSET);
         Integer positionX = x == Prefs.POSITION_UNSET || y == Prefs.POSITION_UNSET ? null : x;
         Integer positionY = positionX == null ? null : y;
-        return new Data(
+        Data data = new Data(
                 prefs.getBoolean(Prefs.KEY_AUTO_START, false),
                 prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
@@ -314,7 +343,9 @@ final class SettingsBackup {
                 prefs.freeformHideThresholdPercent(), prefs.isWidgetMode(),
                 prefs.playerActionsCount(), prefs.playerActionRules(),
                 prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat(),
-                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true));
+                prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.cardColors());
+        data.widgetProfiles = prefs.widgetProfiles();
+        return data;
     }
 
     static String encode(Context context, Prefs prefs) throws IOException {
@@ -385,9 +416,12 @@ final class SettingsBackup {
                         .put("widthPx", data.cardWidthPx)
                         .put("heightPx", data.cardHeightPx));
             }
+            settings.put("dayPalette", encodePalette(data.colors.day));
+            settings.put("nightPalette", encodePalette(data.colors.night));
             settings.put("cardStyles", new JSONObject()
                     .put("compact", encodeStyle(data.compact))
                     .put("square", encodeStyle(data.square)));
+            settings.put("widgetProfiles", encodeWidgetProfiles(data.widgetProfiles));
             root.put("settings", settings);
             return root.toString(2) + '\n';
         } catch (JSONException error) {
@@ -438,7 +472,7 @@ final class SettingsBackup {
                 cardWidthPx = requireInt(cardSize, "widthPx", "settings.cardSizePx.widthPx");
                 cardHeightPx = requireInt(cardSize, "heightPx", "settings.cardSizePx.heightPx");
             }
-            return new Data(
+            Data data = new Data(
                     requireBoolean(settings, "autoStart", "settings.autoStart"),
                     version >= 3 && requireBoolean(settings, "radioSavedNavigation",
                             "settings.radioSavedNavigation"),
@@ -487,10 +521,50 @@ final class SettingsBackup {
                             : StatusBarScene.Format.DEFAULT,
                     // Added within schema 15; older files keep opening the player on a tap.
                     !settings.has("cardOpensPlayer") || requireBoolean(settings,
-                            "cardOpensPlayer", "settings.cardOpensPlayer"));
+                            "cardOpensPlayer", "settings.cardOpensPlayer"),
+                    // Added within schema 15; older files keep the default palettes.
+                    new CardColors(decodePalette(settings, false),
+                            decodePalette(settings, true)));
+            if (version >= 17) data.widgetProfiles = decodeWidgetProfiles(settings);
+            return data;
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
+    }
+
+    private static JSONArray encodeWidgetProfiles(List<Map<String, Object>> profiles)
+            throws JSONException {
+        JSONArray array = new JSONArray();
+        for (Map<String, Object> profile : profiles) {
+            array.put(profile == null ? JSONObject.NULL : new JSONObject(profile));
+        }
+        return array;
+    }
+
+    /** Keys outside the look and values of another type are dropped; the getters clamp the rest. */
+    private static List<Map<String, Object>> decodeWidgetProfiles(JSONObject settings)
+            throws JSONException {
+        List<Map<String, Object>> profiles = new ArrayList<>();
+        JSONArray array = settings.optJSONArray("widgetProfiles");
+        for (int index = 0; array != null && index < array.length()
+                && index < MAX_WIDGET_PROFILES; index++) {
+            JSONObject profile = array.optJSONObject(index);
+            if (profile == null) {
+                profiles.add(null);
+                continue;
+            }
+            Map<String, Object> values = new LinkedHashMap<>();
+            for (Iterator<String> keys = profile.keys(); keys.hasNext(); ) {
+                String key = keys.next();
+                Object value = profile.get(key);
+                if (Prefs.isProfileKey(key)
+                        && (value instanceof Integer || value instanceof Boolean)) {
+                    values.put(key, value);
+                }
+            }
+            profiles.add(values);
+        }
+        return profiles;
     }
 
     private static StatusBarScene.Format statusBarFormat(JSONObject settings) throws IOException {
@@ -554,27 +628,79 @@ final class SettingsBackup {
                 .put("coverDimPreset", value.coverDimPreset.backupName)
                 .put("backdrop", new JSONObject()
                         .put("solid", value.backdrop.solid)
-                        .put("color", String.format(Locale.ROOT, "#%06X", value.backdrop.color))
+                        .put("color", backdropColor(value.backdrop.color))
                         .put("alpha", value.backdrop.alpha)
                         .put("opaqueControls", value.backdrop.opaqueControls)
-                        .put("opaqueTopRow", value.backdrop.opaqueTopRow));
+                        .put("opaqueTopRow", value.backdrop.opaqueTopRow)
+                        .put("dayColor", backdropColor(value.backdrop.dayColor))
+                        .put("dayAlpha", value.backdrop.dayAlpha));
     }
 
-    private static CardBackdrop decodeBackdrop(JSONObject object, String path)
+    private static String hex(int rgb) {
+        return String.format(Locale.ROOT, "#%06X", rgb);
+    }
+
+    private static String backdropColor(int color) {
+        return color == CardBackdrop.THEME_COLOR ? BACKDROP_THEME : hex(color);
+    }
+
+    private static int requireBackdropColor(JSONObject object, String key, String path)
             throws IOException {
-        String color = requireString(object, "color", path + ".color");
+        return BACKDROP_THEME.equals(object.opt(key)) ? CardBackdrop.THEME_COLOR
+                : requireColor(object, key, path);
+    }
+
+    private static int requireColor(JSONObject object, String key, String path)
+            throws IOException {
+        String color = requireString(object, key, path);
         if (!color.matches("#[0-9A-Fa-f]{6}")) {
-            throw invalid("Поле " + path + ".color должно быть цветом #RRGGBB");
+            throw invalid("Поле " + path + " должно быть цветом #RRGGBB");
         }
+        return Integer.parseInt(color.substring(1), 16);
+    }
+
+    private static JSONObject encodePalette(CardPalette palette) throws JSONException {
+        return new JSONObject()
+                .put("background", hex(palette.background))
+                .put("text", hex(palette.text))
+                .put("accent", hex(palette.accent));
+    }
+
+    private static CardPalette decodePalette(JSONObject settings, boolean night)
+            throws IOException {
+        String key = night ? "nightPalette" : "dayPalette";
+        CardPalette defaults = CardPalette.defaults(night);
+        if (!settings.has(key)) return defaults;
+        String path = "settings." + key;
+        JSONObject object = requireObject(settings, key, path);
+        return defaults.with(requireColor(object, "background", path + ".background"),
+                requireColor(object, "text", path + ".text"),
+                requireColor(object, "accent", path + ".accent"));
+    }
+
+    private static CardBackdrop decodeBackdrop(JSONObject object, String path, int schemaVersion)
+            throws IOException {
+        int color = requireBackdropColor(object, "color", path + ".color");
+        // Before schema 16 graphite stood for the default and one colour served the whole day.
+        boolean legacy = schemaVersion < 16;
+        if (legacy) color = CardBackdrop.fromLegacyColor(color);
+        int alpha = requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
+                0, 255);
+        boolean ownDay = legacy
+                ? object.has("separateDay") && requireBoolean(object, "separateDay",
+                        path + ".separateDay")
+                : object.has("dayColor");
         return new CardBackdrop(
                 requireBoolean(object, "solid", path + ".solid"),
-                Integer.parseInt(color.substring(1), 16),
-                requireRange(path + ".alpha", requireInt(object, "alpha", path + ".alpha"),
-                        0, 255),
+                color,
+                alpha,
                 object.has("opaqueControls") && requireBoolean(object, "opaqueControls",
                         path + ".opaqueControls"),
                 object.has("opaqueTopRow") && requireBoolean(object, "opaqueTopRow",
-                        path + ".opaqueTopRow"));
+                        path + ".opaqueTopRow"),
+                ownDay ? requireBackdropColor(object, "dayColor", path + ".dayColor") : color,
+                ownDay ? requireRange(path + ".dayAlpha",
+                        requireInt(object, "dayAlpha", path + ".dayAlpha"), 0, 255) : alpha);
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,
@@ -619,7 +745,7 @@ final class SettingsBackup {
                                 : Prefs.DEFAULT_THUMBNAIL_SIZE_DP,
                         schemaVersion >= 13
                                 ? decodeBackdrop(requireObject(object, "backdrop",
-                                        path + ".backdrop"), path + ".backdrop")
+                                        path + ".backdrop"), path + ".backdrop", schemaVersion)
                                 : CardBackdrop.ARTWORK,
                         schemaVersion >= 15
                                 ? requireInt(object, "cornerRadiusDp", path + ".cornerRadiusDp")

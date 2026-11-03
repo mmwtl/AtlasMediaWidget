@@ -22,7 +22,9 @@ final class TransportButton extends ImageView {
                         new int[]{android.R.attr.state_pressed},
                         new int[]{}
                 },
-                new int[]{0x9EF5F5F5, 0xFF9DC2D2, Ui.PRIMARY}));
+                new int[]{CardTheme.color(context, R.color.card_control_disabled),
+                        CardTheme.color(context, R.color.card_control_pressed),
+                        CardTheme.color(context, R.color.card_text)}));
         if (type == Type.NEXT) setScaleX(-1f);
         setClickable(true);
         setFocusable(true);

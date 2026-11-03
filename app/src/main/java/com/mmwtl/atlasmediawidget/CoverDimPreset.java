@@ -52,4 +52,20 @@ enum CoverDimPreset {
     int[] colors(CardStyle style) {
         return style == CardStyle.COMPACT ? compactColors : squareColors;
     }
+
+    /**
+     * The preset's gradient in {@code rgb}, the card surface of the current day or night mode.
+     * Covers are mostly dark, so the dark text of a light surface needs a denser veil than the
+     * shadowed light text of the night card; each preset keeps its relative strength.
+     */
+    int[] colors(CardStyle style, int rgb) {
+        boolean light = !CardTheme.isDark(rgb);
+        int[] colors = colors(style).clone();
+        for (int index = 0; index < colors.length; index++) {
+            int alpha = colors[index] >>> 24;
+            if (light) alpha = 255 - (255 - alpha) * 3 / 5;
+            colors[index] = alpha << 24 | rgb & 0xFFFFFF;
+        }
+        return colors;
+    }
 }

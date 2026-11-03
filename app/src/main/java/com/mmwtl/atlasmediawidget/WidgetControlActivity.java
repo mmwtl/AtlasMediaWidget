@@ -33,10 +33,10 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
     private final Runnable scrubberIdle = this::closeScrubber;
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = new Prefs(this);
         requestedWidgetControl = getIntent().getStringExtra(AtlasMediaWidgetProvider.EXTRA_CONTROL);
         int id = getIntent().getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID);
+        prefs = new Prefs(this).forWidget(id);
         if (!prefs.isWidgetMode() || !AtlasMediaWidgetProvider.owns(this, id)
                 || !("open".equals(requestedWidgetControl) || "scrub".equals(requestedWidgetControl))
                 || "open".equals(requestedWidgetControl)
@@ -146,9 +146,11 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         int width = Math.min(4096, Ui.dp(context, AtlasMediaWidgetProvider.widthDp(context, options)));
         int height = Math.min(4096, Ui.dp(context, AtlasMediaWidgetProvider.heightDp(context, options)));
         CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue));
-        WidgetAppearance appearance = prefs.appearance(style);
-        scrubber = new MediaCardView(context, width, height, width, height, style,
-                appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
+        WidgetAppearance appearance = CardTheme.widgetAppearance(context, prefs.appearance(style));
+        scrubber = new MediaCardView(CardTheme.widget(context, style, appearance,
+                prefs.cardColors()), width, height,
+                width, height, style, appearance,
+                prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                 false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), scrubberListener);
         scrubber.showProgressOnly();
         // Keep the finger-sized window inside the card so its backdrop is always card pixels.

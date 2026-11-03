@@ -20,7 +20,9 @@ final class ColorPickerDialog {
 
     private ColorPickerDialog() {}
 
-    static void show(Context context, String title, int initialRgb, Listener listener) {
+    /** @param themeRgb what «По теме» selects: the colour of the theme or a value standing for it */
+    static void show(Context context, String title, int initialRgb, int themeRgb,
+            Listener listener) {
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(Ui.dp(context, 24), Ui.dp(context, 10),
@@ -71,6 +73,7 @@ final class ColorPickerDialog {
                 .setTitle(title)
                 .setView(content)
                 .setNegativeButton("Отмена", null)
+                .setNeutralButton("По теме", (dialog, which) -> listener.onColorSelected(themeRgb))
                 .setPositiveButton("Применить", (dialog, which) -> listener.onColorSelected(
                         Color.rgb(channels[0], channels[1], channels[2]) & 0x00FFFFFF)));
     }

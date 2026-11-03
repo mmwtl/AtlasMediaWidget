@@ -50,6 +50,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,6 +76,10 @@ public final class MainActivity extends ScaledActivity {
             "android.media.browse.MediaBrowserService";
     private Prefs prefs;
     private static final String STATE_TAB = "settings_tab";
+    private static final String STATE_EDITED_WIDGET = "edited_widget";
+    private static final int OPACITY_STEPS = 20;
+    /** Stands for the shared look, which is the template of new widgets and the overlay's look. */
+    private static final int TEMPLATE = android.appwidget.AppWidgetManager.INVALID_APPWIDGET_ID;
     private static final int TAB_CARD = 0;
     private static final int TAB_MEDIA = 1;
     private static final int TAB_RADIO = 2;
@@ -82,6 +87,8 @@ public final class MainActivity extends ScaledActivity {
     private static final int[] TAB_LABELS = {R.string.tab_card, R.string.tab_media,
             R.string.tab_radio, R.string.tab_system};
     private boolean builtWidgetMode;
+    private int[] widgetIds = new int[0];
+    private int editedWidget = TEMPLATE;
     private TextView widgetPreviewTitle;
     private final List<View> overlayOnly = new ArrayList<>();
     private final List<View> widgetOnly = new ArrayList<>();
@@ -152,7 +159,20 @@ public final class MainActivity extends ScaledActivity {
     private View backdropSwatch;
     private Switch backdropOpaqueControls;
     private Switch backdropOpaqueTopRow;
-    private int backdropColor = CardBackdrop.DEFAULT_COLOR;
+    private Button backdropColorButton;
+    private LinearLayout backdropColorOptions;
+    private int backdropColor = CardBackdrop.THEME_COLOR;
+    private int backdropAlpha = CardBackdrop.DEFAULT_ALPHA;
+    private int backdropDayColor = CardBackdrop.THEME_COLOR;
+    private int backdropDayAlpha = CardBackdrop.DEFAULT_ALPHA;
+    private CardColors cardColors = CardColors.DEFAULT;
+    private final View[] paletteSwatches = new View[3];
+    private final Button[] paletteButtons = new Button[3];
+    /**
+     * The mode whose colours the settings edit and the preview shows. The overlay is always
+     * night; in widget mode it starts at the system mode and is not stored.
+     */
+    private boolean editNight = true;
     private RadioButton[] coverDimPresetButtons;
     private LinearLayout thumbnailSizeSection;
     private LabeledSeek thumbnailSizeSetting;
@@ -242,7 +262,7 @@ public final class MainActivity extends ScaledActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        prefs = new Prefs(this);
+        openEditedWidget(savedInstanceState);
         mediaBridgeClient = new MediaBridgeClient(this, mediaBridgeListener);
         View content = buildContent(savedInstanceState == null ? TAB_CARD
                 : savedInstanceState.getInt(STATE_TAB, TAB_CARD));
@@ -251,9 +271,33 @@ public final class MainActivity extends ScaledActivity {
         AtlasMediaWidgetProvider.refresh(this);
     }
 
+    /** Every look control reads and writes through {@link #prefs}, so it alone picks the widget. */
+    private void openEditedWidget(Bundle savedInstanceState) {
+        Prefs shared = new Prefs(this);
+        widgetIds = AtlasMediaWidgetProvider.sortedIds(this);
+        editedWidget = shared.isWidgetMode() ? requestedWidget(savedInstanceState) : TEMPLATE;
+        prefs = editedWidget == TEMPLATE ? shared : shared.forWidget(editedWidget);
+        if (editedWidget == TEMPLATE && shared.isWidgetMode()) {
+            // Editing the template must not restyle widgets that still follow it.
+            for (int id : widgetIds) shared.forWidget(id).ensureProfile();
+        }
+    }
+
+    private int requestedWidget(Bundle savedInstanceState) {
+        int fallback = widgetIds.length == 0 ? TEMPLATE : widgetIds[0];
+        int requested = savedInstanceState != null
+                && savedInstanceState.containsKey(STATE_EDITED_WIDGET)
+                ? savedInstanceState.getInt(STATE_EDITED_WIDGET)
+                : getIntent().getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,
+                        fallback);
+        if (requested == TEMPLATE) return savedInstanceState != null ? TEMPLATE : fallback;
+        return Arrays.stream(widgetIds).anyMatch(id -> id == requested) ? requested : fallback;
+    }
+
     @Override protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(STATE_TAB, selectedTab);
+        if (builtWidgetMode) outState.putInt(STATE_EDITED_WIDGET, editedWidget);
     }
 
     @Override protected void onStart() {
@@ -503,6 +547,8 @@ public final class MainActivity extends ScaledActivity {
                 "Размеры шрифтов, отступы и линия прогресса"));
         createControlsSection(collapsibleCard(page, "Панель управления",
                 "Высота панели, размер и разбежка кнопок"));
+        createColorsSection(collapsibleCard(page, "Свои цвета",
+                "Необязательно: без них карточка следует теме OneOS"));
     }
 
     private LinearLayout createModeCard() {
@@ -561,14 +607,68 @@ public final class MainActivity extends ScaledActivity {
         });
         card.addView(addWidgetButton, buttonParams());
         TextView hint = text("Или удерживайте свободное место на HOME → Виджеты → "
-                        + "Atlas Media Widget. Оформление общее для всех виджетов. "
-                        + "Медиасервис запускается сам после загрузки ГУ, пока размещён "
+                        + "Atlas Media Widget. Медиасервис запускается сам после загрузки ГУ, пока размещён "
                         + "хотя бы один виджет.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams hintParams = fullWrap();
         hintParams.topMargin = Ui.dp(this, 10);
         card.addView(hint, hintParams);
+        addEditedWidgetChooser(card);
         return card;
+    }
+
+    private void addEditedWidgetChooser(LinearLayout card) {
+        card.addView(text("Какой виджет настраивать", 15, Ui.SECONDARY, Typeface.BOLD),
+                labelParams());
+        List<String> labels = new ArrayList<>();
+        int selection = widgetIds.length;
+        for (int index = 0; index < widgetIds.length; index++) {
+            labels.add(editedWidgetLabel(widgetIds[index]));
+            if (widgetIds[index] == editedWidget) selection = index;
+        }
+        labels.add(editedWidgetLabel(TEMPLATE));
+        Spinner chooser = new Spinner(this);
+        chooser.setContentDescription("Какой виджет настраивать");
+        chooser.setAdapter(new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_dropdown_item, labels));
+        chooser.setSelection(selection, false);
+        chooser.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(AdapterView<?> parent, View view,
+                    int position, long id) {
+                int target = position < widgetIds.length ? widgetIds[position] : TEMPLATE;
+                if (target == editedWidget) return;
+                editedWidget = target;
+                recreate();
+            }
+
+            @Override public void onNothingSelected(AdapterView<?> parent) {}
+        });
+        card.addView(dropdownField(chooser), fullWrap());
+        LinearLayout.LayoutParams noteParams = fullWrap();
+        noteParams.topMargin = Ui.dp(this, 8);
+        card.addView(text("Настройки карточки ниже меняют только выбранный виджет. Новый виджет "
+                        + "начинает с шаблона, и этим же оформлением показывается оверлей. Общими "
+                        + "остаются правила кнопок плеера и навигация по радио.",
+                13, Ui.SECONDARY, Typeface.NORMAL), noteParams);
+        if (editedWidget != TEMPLATE && widgetIds.length > 1) {
+            Button applyToAll = actionButton("Применить ко всем виджетам");
+            applyToAll.setOnClickListener(v -> {
+                prefs.copyLookTo(widgetIds);
+                refreshOverlayIfRunning();
+                Toast.makeText(this, "Оформление применено ко всем виджетам",
+                        Toast.LENGTH_SHORT).show();
+            });
+            card.addView(applyToAll, buttonParams());
+        }
+    }
+
+    private String editedWidgetLabel(int id) {
+        if (id == TEMPLATE) return "Шаблон для новых виджетов";
+        Bundle options = android.appwidget.AppWidgetManager.getInstance(this)
+                .getAppWidgetOptions(id);
+        int number = Arrays.binarySearch(widgetIds, id) + 1;
+        return "Виджет " + number + " · " + AtlasMediaWidgetProvider.widthDp(this, options) + "×"
+                + AtlasMediaWidgetProvider.heightDp(this, options) + " dp";
     }
 
     private void refreshWidgetPlacement() {
@@ -578,6 +678,25 @@ public final class MainActivity extends ScaledActivity {
                 : "Размещено виджетов: " + placed);
         addWidgetButton.setBackground(Ui.background(placed == 0 ? Ui.ACCENT : Ui.NESTED, 8, this));
         addWidgetButton.setTextColor(placed == 0 ? Ui.ON_ACCENT : Ui.PRIMARY);
+    }
+
+    private FrameLayout dropdownField(Spinner spinner) {
+        FrameLayout field = new FrameLayout(this);
+        field.setBackground(Ui.background(Ui.NESTED, 8, this));
+        spinner.setBackgroundColor(0x00000000);
+        spinner.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 34), 0);
+        field.addView(spinner, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        TextView arrow = text("▾", 16, Ui.ACCENT, Typeface.BOLD);
+        arrow.setGravity(Gravity.CENTER);
+        arrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        FrameLayout.LayoutParams arrowParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
+                Gravity.END | Gravity.CENTER_VERTICAL);
+        arrowParams.rightMargin = Ui.dp(this, 10);
+        field.addView(arrow, arrowParams);
+        field.setOnClickListener(v -> spinner.performClick());
+        return field;
     }
 
     private LinearLayout createGeometryCard() {
@@ -625,22 +744,7 @@ public final class MainActivity extends ScaledActivity {
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         });
 
-        FrameLayout positionCornerField = new FrameLayout(this);
-        positionCornerField.setBackground(Ui.background(Ui.NESTED, 8, this));
-        positionCornerSpinner.setBackgroundColor(0x00000000);
-        positionCornerSpinner.setPadding(Ui.dp(this, 12), 0, Ui.dp(this, 34), 0);
-        positionCornerField.addView(positionCornerSpinner, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        TextView positionCornerArrow = text("▾", 16, Ui.ACCENT, Typeface.BOLD);
-        positionCornerArrow.setGravity(Gravity.CENTER);
-        positionCornerArrow.setImportantForAccessibility(
-                View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        FrameLayout.LayoutParams positionCornerArrowParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT,
-                Gravity.END | Gravity.CENTER_VERTICAL);
-        positionCornerArrowParams.rightMargin = Ui.dp(this, 10);
-        positionCornerField.addView(positionCornerArrow, positionCornerArrowParams);
-        positionCornerField.setOnClickListener(v -> positionCornerSpinner.performClick());
+        FrameLayout positionCornerField = dropdownField(positionCornerSpinner);
 
         LinearLayout positionGrid = new LinearLayout(this);
         positionGrid.setOrientation(LinearLayout.VERTICAL);
@@ -767,28 +871,6 @@ public final class MainActivity extends ScaledActivity {
         backdropSection.addView(backdropGroup, fullWrap());
         backdropSolidOptions = new LinearLayout(this);
         backdropSolidOptions.setOrientation(LinearLayout.VERTICAL);
-        backdropAlphaSetting = addLabeledSeek(backdropSolidOptions,
-                "Непрозрачность подложки", 0, 255);
-        LinearLayout colorRow = new LinearLayout(this);
-        colorRow.setOrientation(LinearLayout.HORIZONTAL);
-        colorRow.setGravity(Gravity.CENTER_VERTICAL);
-        backdropSwatch = new View(this);
-        LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(
-                Ui.dp(this, 44), Ui.dp(this, 44));
-        swatchParams.rightMargin = Ui.dp(this, 12);
-        colorRow.addView(backdropSwatch, swatchParams);
-        Button backdropColorButton = actionButton("Изменить цвет подложки");
-        backdropColorButton.setOnClickListener(v -> ColorPickerDialog.show(this,
-                "Цвет подложки", backdropColor, color -> {
-                    backdropColor = color;
-                    updateBackdropControls();
-                    saveAppearance();
-                }));
-        colorRow.addView(backdropColorButton, new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        LinearLayout.LayoutParams colorRowParams = fullWrap();
-        colorRowParams.topMargin = Ui.dp(this, 12);
-        backdropSolidOptions.addView(colorRow, colorRowParams);
         backdropSolidOptions.addView(text("Выключено — панель прозрачна, как подложка; "
                 + "включено — всегда непрозрачна.", 13, Ui.SECONDARY, Typeface.NORMAL),
                 labelParams());
@@ -826,6 +908,177 @@ public final class MainActivity extends ScaledActivity {
         cornerRadiusSetting = addLabeledSeek(lookCard, "Радиус карточки",
                 0, Prefs.MAX_CARD_RADIUS_DP);
         return lookCard;
+    }
+
+    private void createColorsSection(LinearLayout section) {
+        cardColors = prefs.cardColors();
+        boolean widgetMode = prefs.isWidgetMode();
+        editNight = !widgetMode || CardTheme.isNight(getResources().getConfiguration());
+        if (widgetMode) {
+            RadioGroup modes = new RadioGroup(this);
+            modes.setOrientation(RadioGroup.HORIZONTAL);
+            RadioButton day = styleButton("День");
+            RadioButton night = styleButton("Ночь");
+            modes.addView(day);
+            modes.addView(night);
+            modes.check(editNight ? night.getId() : day.getId());
+            modes.setOnCheckedChangeListener((group, id) -> {
+                editNight = id == night.getId();
+                updatePaletteSwatches();
+                updateBackdropControls();
+                updateAppearanceLabels();
+                renderPreview();
+            });
+            section.addView(modes, fullWrap());
+        }
+        section.addView(text(widgetMode
+                        ? "Цвета отдельно для дня и ночи; предпросмотр показывает выбранный режим. "
+                                + "«По теме» в выборе цвета возвращает цвет темы. Фон карточки — "
+                                + "также цвет вуали над обложкой. Текст подбирается по яркости фона, "
+                                + "пока не задан свой."
+                        : "Оверлей не следует теме OneOS и всегда использует эти цвета. Фон "
+                                + "карточки — также цвет вуали над обложкой; второстепенный текст "
+                                + "берётся из цвета текста.",
+                13, Ui.SECONDARY, Typeface.NORMAL));
+        addPaletteRow(section, 0, "Фон карточки");
+
+        backdropColorOptions = new LinearLayout(this);
+        backdropColorOptions.setOrientation(LinearLayout.VERTICAL);
+        backdropAlphaSetting = addLabeledSeek(backdropColorOptions,
+                "Непрозрачность подложки", 0, OPACITY_STEPS);
+        backdropAlphaSetting.seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                    boolean fromUser) {
+                if (!fromUser) return;
+                if (editingDay()) {
+                    backdropDayAlpha = opacityAlpha(progress);
+                } else {
+                    backdropAlpha = opacityAlpha(progress);
+                }
+                updateAppearanceLabels();
+                renderPreview();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (!refreshingStyle) saveAppearance();
+            }
+        });
+        backdropSwatch = new View(this);
+        LinearLayout backdropRow = colorRow(backdropSwatch, "Цвет подложки",
+                () -> ColorPickerDialog.show(this, "Цвет подложки", shownBackdropRgb(),
+                        CardBackdrop.THEME_COLOR, color -> {
+                            setShownBackdropColor(color);
+                            updateBackdropControls();
+                            saveAppearance();
+                        }));
+        backdropColorButton = (Button) backdropRow.getChildAt(1);
+        backdropColorOptions.addView(backdropRow, colorRowParams());
+        section.addView(backdropColorOptions, fullWrap());
+
+        addPaletteRow(section, 1, "Текст");
+        addPaletteRow(section, 2, "Акцент и прогресс");
+        Button reset = actionButton("Вернуть цвета по умолчанию");
+        reset.setOnClickListener(v -> {
+            setShownBackdropColor(CardBackdrop.THEME_COLOR);
+            savePalette(CardPalette.defaults(editNight));
+            updateBackdropControls();
+            saveAppearance();
+        });
+        section.addView(reset, buttonParams());
+        updatePaletteSwatches();
+    }
+
+    private void addPaletteRow(LinearLayout parent, int channel, String label) {
+        paletteSwatches[channel] = new View(this);
+        LinearLayout row = colorRow(paletteSwatches[channel], label,
+                () -> ColorPickerDialog.show(this, label, paletteColor(channel),
+                        channelOf(CardPalette.defaults(editNight), channel), color -> {
+                            CardPalette palette = cardColors.palette(editNight);
+                            int[] colors = {palette.background, palette.text, palette.accent};
+                            colors[channel] = color;
+                            savePalette(palette.with(colors[0], colors[1], colors[2]));
+                        }));
+        paletteButtons[channel] = (Button) row.getChildAt(1);
+        paletteButtons[channel].setTag(label);
+        parent.addView(row, colorRowParams());
+    }
+
+    private static int channelOf(CardPalette palette, int channel) {
+        return channel == 0 ? palette.background
+                : channel == 1 ? palette.text : palette.accent;
+    }
+
+    private int paletteColor(int channel) {
+        return channelOf(cardColors.palette(editNight), channel);
+    }
+
+    private void savePalette(CardPalette value) {
+        cardColors = cardColors.with(value);
+        prefs.putCardColors(cardColors);
+        updatePaletteSwatches();
+        renderPreview();
+        refreshOverlayIfRunning();
+    }
+
+    private void updatePaletteSwatches() {
+        CardPalette defaults = CardPalette.defaults(editNight);
+        for (int index = 0; index < paletteSwatches.length; index++) {
+            paletteSwatches[index].setBackground(
+                    Ui.background(0xFF000000 | paletteColor(index), 8, this));
+            paletteButtons[index].setText(paletteButtons[index].getTag()
+                    + (paletteColor(index) == channelOf(defaults, index) ? "  по теме" : ""));
+        }
+    }
+
+    /** Whether the settings edit the day colours, which only the AppWidget shows. */
+    private boolean editingDay() {
+        return !editNight && prefs.isWidgetMode();
+    }
+
+    private int shownBackdropColor() {
+        return editingDay() ? backdropDayColor : backdropColor;
+    }
+
+    private void setShownBackdropColor(int color) {
+        if (editingDay()) {
+            backdropDayColor = color;
+        } else {
+            backdropColor = color;
+        }
+    }
+
+    /** The colour shown for the edited mode, with a colour left to the theme resolved. */
+    private int shownBackdropRgb() {
+        int color = shownBackdropColor();
+        return color == CardBackdrop.THEME_COLOR ? paletteColor(0) : color;
+    }
+
+    private int shownBackdropAlpha() {
+        return editingDay() ? backdropDayAlpha : backdropAlpha;
+    }
+
+    /** A colour swatch with the button that opens its picker. */
+    private LinearLayout colorRow(View swatch, String label, Runnable pick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams swatchParams = new LinearLayout.LayoutParams(
+                Ui.dp(this, 44), Ui.dp(this, 44));
+        swatchParams.rightMargin = Ui.dp(this, 12);
+        row.addView(swatch, swatchParams);
+        Button button = actionButton(label);
+        button.setOnClickListener(v -> pick.run());
+        row.addView(button, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        return row;
+    }
+
+    private LinearLayout.LayoutParams colorRowParams() {
+        LinearLayout.LayoutParams params = fullWrap();
+        params.topMargin = Ui.dp(this, 12);
+        return params;
     }
 
     private void createTypographySection(LinearLayout body) {
@@ -887,7 +1140,7 @@ public final class MainActivity extends ScaledActivity {
         bind(appearanceListener, topInsetSetting, contentInsetSetting, topRowTextSetting,
                 titleTextSetting, subtitleTextSetting, subtitleGapSetting, timeTextSetting,
                 progressGapSetting, progressThicknessSetting, thumbnailSizeSetting,
-                backdropAlphaSetting, cornerRadiusSetting);
+                cornerRadiusSetting);
 
         Button resetAppearance = actionButton("Вернуть текст и отступы по умолчанию");
         resetAppearance.setOnClickListener(v -> {
@@ -1030,7 +1283,9 @@ public final class MainActivity extends ScaledActivity {
                 20, Ui.PRIMARY, Typeface.BOLD));
         TextView favoritesGridHint = text(
                 "Число столбцов и строк на первом экране списка избранного. "
-                        + "Остальные станции доступны прокруткой.",
+                        + "Остальные станции доступны прокруткой."
+                        + (builtWidgetMode ? " Настройка относится к выбранному на вкладке "
+                                + "«Карточка»: " + editedWidgetLabel(editedWidget) + "." : ""),
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams favoritesGridHintParams = fullWrap();
         favoritesGridHintParams.topMargin = Ui.dp(this, 8);
@@ -1180,15 +1435,15 @@ public final class MainActivity extends ScaledActivity {
     private void renderSystemWidgetPreview() {
         var context = getApplicationContext();
         var manager = android.appwidget.AppWidgetManager.getInstance(context);
-        int[] ids = AtlasMediaWidgetProvider.ids(context);
-        int id = getIntent().getIntExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID, 0);
-        if (!AtlasMediaWidgetProvider.owns(context, id)) id = ids.length == 0 ? 0 : ids[0];
-        Bundle options = id == 0 ? new Bundle() : manager.getAppWidgetOptions(id);
-        widgetPreviewTitle.setText((id == 0 ? "Пример размера " : "Размер #" + id + " ")
+        int id = editedWidget != TEMPLATE || widgetIds.length == 0 ? editedWidget : widgetIds[0];
+        Bundle options = id == TEMPLATE ? new Bundle() : manager.getAppWidgetOptions(id);
+        widgetPreviewTitle.setText((editedWidget == TEMPLATE ? "Шаблон, размер "
+                        : "Виджет " + (Arrays.binarySearch(widgetIds, editedWidget) + 1) + ", размер ")
                 + AtlasMediaWidgetProvider.widthDp(context, options) + "×"
                 + AtlasMediaWidgetProvider.heightDp(context, options) + " dp · демо");
         int maxHeight = Math.round(getWindowManager().getCurrentWindowMetrics().getBounds().height() * .30f);
-        WidgetPreview.renderWidget(context, previewHost, prefs, options, maxHeight);
+        WidgetPreview.renderWidget(CardTheme.mode(context, editNight), previewHost,
+                prefs, options, maxHeight);
     }
 
     private LinearLayout createVisibilityCard() {
@@ -1267,7 +1522,8 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void refresh() {
-        if (builtWidgetMode != prefs.isWidgetMode()) { recreate(); return; }
+        if (builtWidgetMode != prefs.isWidgetMode() || builtWidgetMode && !Arrays.equals(
+                widgetIds, AtlasMediaWidgetProvider.sortedIds(this))) { recreate(); return; }
         refreshModeVisibility();
         refreshWidgetPlacement();
         if (hideThreshold != null) hideThreshold.setProgress(prefs.freeformHideThresholdPercent());
@@ -2917,9 +3173,11 @@ public final class MainActivity extends ScaledActivity {
         coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
         backdropSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         backdropColor = appearance.backdrop.color;
-        backdropAlphaSetting.seek.setProgress(appearance.backdrop.alpha);
+        backdropAlpha = appearance.backdrop.alpha;
         backdropOpaqueControls.setChecked(appearance.backdrop.opaqueControls);
         backdropOpaqueTopRow.setChecked(appearance.backdrop.opaqueTopRow);
+        backdropDayColor = appearance.backdrop.dayColor;
+        backdropDayAlpha = appearance.backdrop.dayAlpha;
         (appearance.backdrop.solid ? backdropSolidButton : backdropArtworkButton)
                 .setChecked(true);
         updateBackdropControls();
@@ -3306,8 +3564,7 @@ public final class MainActivity extends ScaledActivity {
                 progressThicknessSetting.seek.getProgress() + " dp");
         thumbnailSizeSetting.value.setText(thumbnailSizeSetting.seek.getProgress() + " dp");
         cornerRadiusSetting.value.setText(cornerRadiusSetting.seek.getProgress() + " dp");
-        backdropAlphaSetting.value.setText(
-                Math.round(backdropAlphaSetting.seek.getProgress() * 100f / 255f) + " %");
+        backdropAlphaSetting.value.setText(backdropAlphaSetting.seek.getProgress() * 5 + " %");
         updateBackdropControls();
     }
 
@@ -3320,14 +3577,31 @@ public final class MainActivity extends ScaledActivity {
         coverDimTitle.setVisibility(solid ? View.GONE : View.VISIBLE);
         coverDimPresetGroup.setVisibility(solid ? View.GONE : View.VISIBLE);
         // The swatch shows the colour itself; opacity has its own slider.
-        backdropSwatch.setBackground(Ui.background(0xFF000000 | backdropColor, 8, this));
+        backdropColorOptions.setVisibility(backdropSolidButton.isChecked()
+                && currentStyle() == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
+        backdropSwatch.setBackground(Ui.background(0xFF000000 | shownBackdropRgb(), 8, this));
+        backdropColorButton.setText(shownBackdropColor() == CardBackdrop.THEME_COLOR
+                ? "Цвет подложки  по теме" : "Цвет подложки");
+        int opacityStep = opacityStep(shownBackdropAlpha());
+        if (backdropAlphaSetting.seek.getProgress() != opacityStep) {
+            backdropAlphaSetting.seek.setProgress(opacityStep);
+        }
+    }
+
+    /** Stored as alpha 0–255, moved in steps of 5%; a stored value changes only when moved. */
+    static int opacityStep(int alpha) {
+        return Math.round(alpha * (float) OPACITY_STEPS / 255f);
+    }
+
+    static int opacityAlpha(int step) {
+        return Math.round(step * 255f / OPACITY_STEPS);
     }
 
     private CardBackdrop selectedBackdrop() {
         if (backdropSolidButton == null) return prefs.backdrop(currentStyle());
         return new CardBackdrop(backdropSolidButton.isChecked(), backdropColor,
-                backdropAlphaSetting.seek.getProgress(), backdropOpaqueControls.isChecked(),
-                backdropOpaqueTopRow.isChecked());
+                backdropAlpha, backdropOpaqueControls.isChecked(),
+                backdropOpaqueTopRow.isChecked(), backdropDayColor, backdropDayAlpha);
     }
 
     private Switch backdropPanelSwitch(String label) {
@@ -3529,7 +3803,8 @@ public final class MainActivity extends ScaledActivity {
         widgetPreviewTitle.setText("Предпросмотр · демо");
         int configuredWidthPx = widthInput();
         int configuredHeightPx = heightInput();
-        android.content.Context widgetContext = getApplicationContext();
+        android.content.Context widgetContext = CardTheme.overlay(getApplicationContext(),
+                cardColors);
         int maxWidthPx = Math.max(1, previewHost.getWidth()
                 - previewHost.getPaddingLeft() - previewHost.getPaddingRight());
         int maxContainerHeightPx = Math.max(1, Math.round(

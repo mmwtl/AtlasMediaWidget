@@ -161,14 +161,15 @@ final class MediaCardView extends FrameLayout {
         setMinimumHeight(cardHeight);
         // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
         boolean solidBackdrop = appearance.backdrop.solidFor(style);
-        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb() : Ui.BACKGROUND,
+        int surface = color(R.color.card_background);
+        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb(surface) : surface,
                 appearance.cornerRadiusDp, context));
         setClipToOutline(true);
         setClickable(true);
 
         artwork = new ImageView(context);
         artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        artwork.setBackgroundColor(Ui.BACKGROUND);
+        artwork.setBackgroundColor(color(R.color.card_background));
         artwork.setVisibility(solidBackdrop ? GONE : VISIBLE);
         addView(artwork, match());
 
@@ -184,20 +185,20 @@ final class MediaCardView extends FrameLayout {
         View scrim = new View(context);
         scrim.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                appearance.coverDimPreset.colors(style)));
+                appearance.coverDimPreset.colors(style, color(R.color.card_background))));
         scrim.setVisibility(solidBackdrop ? GONE : VISIBLE);
         addView(scrim, match());
 
         // Keeps the transport buttons on an opaque strip over a translucent backdrop.
         controlsBand = new View(context);
-        controlsBand.setBackgroundColor(0xFF000000 | appearance.backdrop.color);
+        controlsBand.setBackgroundColor(0xFF000000 | appearance.backdrop.rgb(surface));
         controlsBand.setVisibility(GONE);
         addView(controlsBand);
 
         int topPillHeightDp = Math.max(38, appearance.topRowTextSizeSp + 24);
         // The top row gets the same kind of strip, as deep below the pills as above them.
         View topRowBand = new View(context);
-        topRowBand.setBackgroundColor(0xFF000000 | appearance.backdrop.color);
+        topRowBand.setBackgroundColor(0xFF000000 | appearance.backdrop.rgb(surface));
         topRowBand.setVisibility(appearance.backdrop.opaqueTopRowFor(style) ? VISIBLE : GONE);
         addView(topRowBand, new LayoutParams(LayoutParams.MATCH_PARENT,
                 by(appearance.topInsetDp) * 2 + d(topPillHeightDp), Gravity.TOP));
@@ -207,8 +208,10 @@ final class MediaCardView extends FrameLayout {
         borderDrawable.setColor(Color.TRANSPARENT);
         borderDrawable.setCornerRadius(cornerRadiusPx());
         // The outline fades with a solid backdrop, so a clear card leaves no frame behind.
-        int borderAlpha = solidBackdrop ? 0x33 * appearance.backdrop.alpha / 255 : 0x33;
-        borderDrawable.setStroke(Math.max(1, d(1)), borderAlpha << 24 | 0x4F5E68);
+        int outline = color(R.color.card_outline);
+        int borderAlpha = solidBackdrop ? Color.alpha(outline) * appearance.backdrop.alpha / 255
+                : Color.alpha(outline);
+        borderDrawable.setStroke(Math.max(1, d(1)), borderAlpha << 24 | outline & 0xFFFFFF);
         border.setBackground(borderDrawable);
         addView(border, match());
 
@@ -219,16 +222,17 @@ final class MediaCardView extends FrameLayout {
         sourcePill = new LinearLayout(context);
         sourcePill.setGravity(Gravity.CENTER_VERTICAL);
         sourcePill.setPadding(d(11), 0, d(15), 0);
-        sourcePill.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
+        sourcePill.setBackground(pillBackground(context, color(R.color.card_pill),
+                color(R.color.card_pill_stroke), d(19)));
         sourceGlyph = new SourceGlyphView(context);
         sourcePill.addView(sourceGlyph,
                 new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
-        TextView sourceDot = text("●", 8, 0xFF58A6FF, Typeface.BOLD);
+        TextView sourceDot = text("●", 8, color(R.color.card_source_dot), Typeface.BOLD);
         LinearLayout.LayoutParams dotParams = wrap();
         dotParams.leftMargin = d(7);
         sourcePill.addView(sourceDot, dotParams);
         sourceLabel = text("MEDIA", appearance.topRowTextSizeSp,
-                Ui.PRIMARY, Typeface.BOLD);
+                color(R.color.card_text), Typeface.BOLD);
         sourceLabel.setLetterSpacing(0.05f);
         LinearLayout.LayoutParams sourceTextParams = wrap();
         sourceTextParams.leftMargin = d(5);
@@ -243,7 +247,7 @@ final class MediaCardView extends FrameLayout {
         addView(sourcePill, sourcePillParams);
 
         statusPill = text("", Math.max(8, appearance.topRowTextSizeSp - 2),
-                Ui.ERROR, Typeface.NORMAL);
+                color(R.color.card_error), Typeface.NORMAL);
         statusPill.setGravity(Gravity.CENTER);
         statusPill.setMaxLines(1);
         statusPill.setPadding(d(11), 0, d(11), 0);
@@ -261,11 +265,11 @@ final class MediaCardView extends FrameLayout {
         favoritesIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
         favoritesIcon.setImageResource(R.drawable.ic_radio_favorites);
         favoritesIcon.setImageTintList(
-                android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
+                android.content.res.ColorStateList.valueOf(color(R.color.card_text)));
         favoritesButton.addView(favoritesIcon,
                 new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
         TextView favoritesLabel = text("ИЗБРАННОЕ", appearance.topRowTextSizeSp,
-                Ui.PRIMARY, Typeface.BOLD);
+                color(R.color.card_text), Typeface.BOLD);
         favoritesLabel.setLetterSpacing(0.05f);
         LinearLayout.LayoutParams favoritesTextParams = wrap();
         favoritesTextParams.leftMargin = d(7);
@@ -273,7 +277,8 @@ final class MediaCardView extends FrameLayout {
         favoritesButton.setClickable(true);
         favoritesButton.setFocusable(true);
         favoritesButton.setContentDescription("Лайкнутые радиостанции");
-        favoritesButton.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
+        favoritesButton.setBackground(pillBackground(context, color(R.color.card_pill),
+                color(R.color.card_pill_stroke), d(19)));
         favoritesButton.setVisibility(GONE);
         favoritesButton.setOnClickListener(v -> toggleFavoritesChooser());
         LayoutParams favoriteButtonParams = new LayoutParams(
@@ -291,14 +296,15 @@ final class MediaCardView extends FrameLayout {
         customActionsRow.setGravity(Gravity.CENTER_VERTICAL);
         // Edges stay 12dp from the glyphs (2 + 10) while neighbours sit 20dp apart.
         customActionsRow.setPadding(d(2), 0, d(2), 0);
-        customActionsRow.setBackground(pillBackground(context, 0xB333333B, 0x334F5E68, d(19)));
+        customActionsRow.setBackground(pillBackground(context, color(R.color.card_pill),
+                color(R.color.card_pill_stroke), d(19)));
         customActionsRow.setVisibility(GONE);
         customActionSlotWidth = d(topPillIconDp) + d(20);
         int customIconInset = Math.max(0, (d(topPillHeightDp) - d(topPillIconDp)) / 2);
         for (int index = 0; index < MAX_CUSTOM_ACTIONS; index++) {
             ImageView button = new ImageView(context);
             button.setScaleType(ImageView.ScaleType.FIT_CENTER);
-            button.setImageTintList(android.content.res.ColorStateList.valueOf(Ui.PRIMARY));
+            button.setImageTintList(android.content.res.ColorStateList.valueOf(color(R.color.card_text)));
             button.setPadding(d(10), customIconInset, d(10), customIconInset);
             button.setClickable(true);
             button.setFocusable(true);
@@ -322,7 +328,7 @@ final class MediaCardView extends FrameLayout {
                 oldLeft, oldTop, oldRight, oldBottom) -> updateStatusPillPosition());
 
         TextView dragHandle = text("⋮", style == CardStyle.COMPACT ? 27 : 29,
-                Ui.SECONDARY, Typeface.BOLD);
+                color(R.color.card_text_secondary), Typeface.BOLD);
         dragHandle.setGravity(Gravity.CENTER);
         dragHandle.setContentDescription("Перетащить виджет");
         dragHandle.setOnTouchListener(listener::onDragTouch);
@@ -354,7 +360,7 @@ final class MediaCardView extends FrameLayout {
             }
         };
         artworkThumbnail.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        artworkThumbnail.setBackground(Ui.background(Ui.NESTED, 10 * uiScale, context));
+        artworkThumbnail.setBackground(Ui.background(color(R.color.card_nested), 10 * uiScale, context));
         metadata.addView(artworkThumbnail, new LinearLayout.LayoutParams(
                 d(appearance.thumbnailSizeDp), d(appearance.thumbnailSizeDp)));
         showThumbnailPlaceholder();
@@ -363,14 +369,14 @@ final class MediaCardView extends FrameLayout {
         textColumn.setOrientation(LinearLayout.VERTICAL);
         textColumn.setGravity(Gravity.CENTER_VERTICAL);
         title = new PyramidTitleView(context);
-        styleText(title, appearance.titleTextSizeSp, Ui.PRIMARY, Typeface.BOLD);
+        styleText(title, appearance.titleTextSizeSp, color(R.color.card_text), Typeface.BOLD);
         title.setTitle(getResources().getString(R.string.unknown_track));
         title.setMaxLines(2);
         title.setLineSpacing(d(2), 1.06f);
-        title.setShadowLayer(d(2), 0, d(1), 0xB0000000);
+        title.setShadowLayer(d(2), 0, d(1), color(R.color.card_text_shadow));
         textColumn.addView(title, fullWrap());
         subtitle = text("", appearance.subtitleTextSizeSp,
-                0xFFAFB1B7, Typeface.NORMAL);
+                color(R.color.card_text_subtitle), Typeface.NORMAL);
         subtitle.setMaxLines(1);
         metadata.setClipChildren(true);
         LinearLayout.LayoutParams subtitleParams = fullWrap();
@@ -385,14 +391,14 @@ final class MediaCardView extends FrameLayout {
         progressRow = new LinearLayout(context);
         progressRow.setGravity(Gravity.CENTER_VERTICAL);
         elapsed = text("–:––", appearance.timeTextSizeSp,
-                Ui.SECONDARY, Typeface.NORMAL);
+                color(R.color.card_text_secondary), Typeface.NORMAL);
         progress = new SeekBar(context);
         progress.setMax(PROGRESS_MAX);
         progress.setPadding(d(6), 0, d(6), 0);
         progress.setSplitTrack(false);
         configureProgressStyle(context, progress, uiScale, appearance.progressThicknessDp);
         duration = text("–:––", appearance.timeTextSizeSp,
-                Ui.SECONDARY, Typeface.NORMAL);
+                color(R.color.card_text_secondary), Typeface.NORMAL);
         duration.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         int timeWidth = d(Math.max(style == CardStyle.COMPACT ? 46 : 58,
                 appearance.timeTextSizeSp * 3.6f));
@@ -403,9 +409,9 @@ final class MediaCardView extends FrameLayout {
 
         radioScaleRow = new LinearLayout(context);
         radioScaleRow.setGravity(Gravity.CENTER_VERTICAL);
-        TextView bandStart = text("", appearance.timeTextSizeSp, Ui.SECONDARY, Typeface.NORMAL);
+        TextView bandStart = text("", appearance.timeTextSizeSp, color(R.color.card_text_secondary), Typeface.NORMAL);
         radioScale = new RadioScaleView(context, uiScale, appearance.progressThicknessDp);
-        TextView bandEnd = text("", appearance.timeTextSizeSp, Ui.SECONDARY, Typeface.NORMAL);
+        TextView bandEnd = text("", appearance.timeTextSizeSp, color(R.color.card_text_secondary), Typeface.NORMAL);
         bandEnd.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
         radioScaleRow.addView(bandStart, new LinearLayout.LayoutParams(timeWidth, LayoutParams.WRAP_CONTENT));
         radioScaleRow.addView(radioScale, new LinearLayout.LayoutParams(0, d(30), 1f));
@@ -413,7 +419,7 @@ final class MediaCardView extends FrameLayout {
         addView(radioScaleRow);
 
         divider = new View(context);
-        divider.setBackgroundColor(0x553B444C);
+        divider.setBackgroundColor(color(R.color.card_divider));
         addView(divider);
 
         controls = new FrameLayout(context);
@@ -429,7 +435,8 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.setVisibility(GONE);
         sourceChooser.setClickable(true);
         sourceChooser.setPadding(d(12), d(10), d(12), d(10));
-        sourceChooser.setBackground(pillBackground(context, 0xF0191D23, 0x77596872, d(22)));
+        sourceChooser.setBackground(pillBackground(context, color(R.color.card_panel),
+                color(R.color.card_panel_stroke), d(22)));
         sourceOptions = new LinearLayout(context);
         sourceOptions.setOrientation(LinearLayout.VERTICAL);
         sourceChooser.addView(sourceOptions, match());
@@ -441,11 +448,12 @@ final class MediaCardView extends FrameLayout {
         favoritesChooser.setClickable(true);
         favoritesChooser.setPadding(d(12), d(10), d(12), d(10));
         favoritesChooser.setBackground(
-                pillBackground(context, 0xF0191D23, 0x77596872, d(22)));
+                pillBackground(context, color(R.color.card_panel),
+                        color(R.color.card_panel_stroke), d(22)));
         LinearLayout favoritesContent = new LinearLayout(context);
         favoritesContent.setOrientation(LinearLayout.VERTICAL);
         favoritesEmpty = text("Загрузка…", style == CardStyle.COMPACT ? 14 : 16,
-                Ui.SECONDARY, Typeface.NORMAL);
+                color(R.color.card_text_secondary), Typeface.NORMAL);
         favoritesEmpty.setGravity(Gravity.CENTER);
         favoritesContent.addView(favoritesEmpty,
                 new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
@@ -747,7 +755,7 @@ final class MediaCardView extends FrameLayout {
         favoritesLoading = false;
         favoritesEmpty.setText(message == null || message.isBlank()
                 ? "Список станций недоступен" : message);
-        favoritesEmpty.setTextColor(Ui.ERROR);
+        favoritesEmpty.setTextColor(color(R.color.card_error));
         favoritesEmpty.setVisibility(VISIBLE);
         favoritesGrid.setVisibility(GONE);
     }
@@ -1056,13 +1064,15 @@ final class MediaCardView extends FrameLayout {
             option.setOrientation(LinearLayout.VERTICAL);
             option.setGravity(Gravity.CENTER);
             option.setPadding(d(8), d(7), d(8), d(7));
-            option.setBackground(pillBackground(getContext(), selected ? 0x593E5966 : 0xB3262A30,
-                    selected ? 0xFF83AFC2 : 0x66505B64, d(17)));
+            option.setBackground(pillBackground(getContext(),
+                    color(selected ? R.color.card_option_selected : R.color.card_option),
+                    color(selected ? R.color.card_option_selected_stroke
+                            : R.color.card_option_stroke), d(17)));
             SourceGlyphView glyph = new SourceGlyphView(getContext());
             glyph.setSource(id);
             option.addView(glyph, new LinearLayout.LayoutParams(d(36), d(36)));
             TextView label = text(id.label(), style == CardStyle.COMPACT ? 14 : 16,
-                    Ui.PRIMARY, Typeface.BOLD);
+                    color(R.color.card_text), Typeface.BOLD);
             label.setGravity(Gravity.CENTER);
             LinearLayout.LayoutParams labelParams = wrap();
             labelParams.topMargin = d(4);
@@ -1159,12 +1169,12 @@ final class MediaCardView extends FrameLayout {
     private void updateFavoritesEmptyState() {
         if (favoritesLoading && favoriteStations.isEmpty()) {
             favoritesEmpty.setText("Загрузка…");
-            favoritesEmpty.setTextColor(Ui.SECONDARY);
+            favoritesEmpty.setTextColor(color(R.color.card_text_secondary));
             favoritesEmpty.setVisibility(VISIBLE);
             favoritesGrid.setVisibility(GONE);
         } else if (favoriteStations.isEmpty()) {
             favoritesEmpty.setText("Нет лайкнутых станций");
-            favoritesEmpty.setTextColor(Ui.SECONDARY);
+            favoritesEmpty.setTextColor(color(R.color.card_text_secondary));
             favoritesEmpty.setVisibility(VISIBLE);
             favoritesGrid.setVisibility(GONE);
         } else {
@@ -1188,11 +1198,11 @@ final class MediaCardView extends FrameLayout {
                         ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
                 container.setGravity(horizontal
                         ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
-                container.setBackground(pillBackground(getContext(), 0xD1262A30,
-                        0x554F5E68, d(14)));
+                container.setBackground(pillBackground(getContext(), color(R.color.card_tile),
+                        color(R.color.card_tile_stroke), d(14)));
                 ImageView cover = new ImageView(getContext());
                 cover.setScaleType(ImageView.ScaleType.CENTER_CROP);
-                cover.setBackground(Ui.background(Ui.NESTED, 14 * uiScale, getContext()));
+                cover.setBackground(Ui.background(color(R.color.card_nested), 14 * uiScale, getContext()));
                 cover.setClipToOutline(true);
                 int logoSize = d(horizontal ? 72 : 128);
                 container.addView(cover, new LinearLayout.LayoutParams(
@@ -1202,7 +1212,7 @@ final class MediaCardView extends FrameLayout {
                 labels.setGravity(horizontal
                         ? Gravity.CENTER_VERTICAL : Gravity.CENTER_HORIZONTAL);
                 TextView name = text("", style == CardStyle.COMPACT ? 15 : 18,
-                        Ui.PRIMARY, Typeface.BOLD);
+                        color(R.color.card_text), Typeface.BOLD);
                 name.setGravity(horizontal ? Gravity.START : Gravity.CENTER);
                 name.setMaxLines(1);
                 name.setEllipsize(TextUtils.TruncateAt.END);
@@ -1301,10 +1311,10 @@ final class MediaCardView extends FrameLayout {
 
     private void setStatusPill(String message, boolean error) {
         statusPill.setText((error ? "△  " : "") + message);
-        statusPill.setTextColor(error ? Ui.ERROR : Ui.ACCENT);
-        statusPill.setBackground(pillBackground(getContext(),
-                error ? 0x1FD98282 : 0x1F7893A0,
-                error ? 0x88D98282 : 0x887893A0, d(16)));
+        int tone = color(error ? R.color.card_error : R.color.card_status) & 0xFFFFFF;
+        statusPill.setTextColor(0xFF000000 | tone);
+        statusPill.setBackground(pillBackground(getContext(), 0x1F000000 | tone,
+                0x88000000 | tone, d(16)));
         statusPill.setVisibility(VISIBLE);
         updateStatusPillPosition();
     }
@@ -1396,10 +1406,10 @@ final class MediaCardView extends FrameLayout {
         int trackHeight = Math.max(1, Math.round(Ui.dp(context, thicknessDp) * scale));
         float radius = trackHeight / 2f;
         GradientDrawable track = new GradientDrawable();
-        track.setColor(0x553C4148);
+        track.setColor(CardTheme.color(context, R.color.card_track));
         track.setCornerRadius(radius);
         GradientDrawable fill = new GradientDrawable();
-        fill.setColor(0xFF83AFC2);
+        fill.setColor(CardTheme.color(context, R.color.card_progress));
         fill.setCornerRadius(radius);
         ClipDrawable clippedFill = new ClipDrawable(fill, Gravity.START, ClipDrawable.HORIZONTAL);
         LayerDrawable layers = new LayerDrawable(new Drawable[]{track, clippedFill});
@@ -1412,7 +1422,7 @@ final class MediaCardView extends FrameLayout {
         seekBar.setProgressDrawable(layers);
         GradientDrawable thumb = new GradientDrawable();
         thumb.setShape(GradientDrawable.OVAL);
-        thumb.setColor(0xFF83AFC2);
+        thumb.setColor(CardTheme.color(context, R.color.card_progress));
         int thumbSize = Math.max(trackHeight + Math.round(Ui.dp(context, 4) * scale),
                 Math.round(Ui.dp(context, 11) * scale));
         thumb.setSize(thumbSize, thumbSize);
@@ -1439,6 +1449,7 @@ final class MediaCardView extends FrameLayout {
      */
     float cornerRadiusPx() { return Ui.dp(getContext(), appearance.cornerRadiusDp); }
 
+    private int color(int id) { return CardTheme.color(getContext(), id); }
     private int d(float baseDp) { return Math.max(1, Math.round(Ui.dp(getContext(), baseDp) * uiScale)); }
     private int bx(float baseDp) { return Math.round(Ui.dp(getContext(), baseDp) * widthScale); }
     private int by(float baseDp) { return Math.round(Ui.dp(getContext(), baseDp) * heightScale); }

@@ -27,6 +27,7 @@ public final class WidgetSetupActivity extends ScaledActivity {
     private boolean confirmed;
     private boolean reconfigure;
     private boolean changed;
+    private boolean hadProfile;
     private int originalStyle;
     private final Map<CardStyle, CoverDimPreset> originalDim = new EnumMap<>(CardStyle.class);
     private FrameLayout previewHost;
@@ -45,7 +46,8 @@ public final class WidgetSetupActivity extends ScaledActivity {
             finish();
             return;
         }
-        prefs = new Prefs(this);
+        prefs = new Prefs(this).forWidget(widgetId);
+        hadProfile = prefs.hasProfile();
         reconfigure = prefs.isWidgetConfigured(widgetId);
         originalStyle = prefs.getInt(Prefs.KEY_CARD_STYLE, CardStyle.DEFAULT.preferenceValue);
         for (CardStyle style : CardStyle.values()) {
@@ -60,9 +62,13 @@ public final class WidgetSetupActivity extends ScaledActivity {
 
     @Override protected void onDestroy() {
         if (prefs != null && isFinishing() && !confirmed && changed) {
-            prefs.putInt(Prefs.KEY_CARD_STYLE, originalStyle);
-            for (Map.Entry<CardStyle, CoverDimPreset> entry : originalDim.entrySet()) {
-                prefs.putCoverDimPreset(entry.getKey(), entry.getValue());
+            if (hadProfile) {
+                prefs.putInt(Prefs.KEY_CARD_STYLE, originalStyle);
+                for (Map.Entry<CardStyle, CoverDimPreset> entry : originalDim.entrySet()) {
+                    prefs.putCoverDimPreset(entry.getKey(), entry.getValue());
+                }
+            } else {
+                prefs.removeProfile();
             }
             AtlasMediaWidgetProvider.refresh(this);
         }
@@ -144,7 +150,7 @@ public final class WidgetSetupActivity extends ScaledActivity {
                     13, Ui.SECONDARY, Typeface.NORMAL), fullWrap(4));
         }
 
-        card.addView(text("Оформление общее для всех виджетов. Текст, отступы и панель "
+        card.addView(text("Оформление только этого виджета. Текст, отступы и панель "
                         + "кнопок настраиваются в приложении.",
                 13, Ui.SECONDARY, Typeface.NORMAL), fullWrap(16));
 
@@ -172,13 +178,16 @@ public final class WidgetSetupActivity extends ScaledActivity {
             return;
         }
         confirmed = true;
+        prefs.ensureProfile();
         prefs.setWidgetsConfigured(new int[]{widgetId}, true);
         if (widgetModeSwitch != null && widgetModeSwitch.isChecked()) prefs.setWidgetMode(true);
         AtlasMediaWidgetProvider.refresh(this);
         setResult(RESULT_OK, resultIntent());
         if (openSettings) {
             startActivity(new Intent(this, MainActivity.class)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                    .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
+                    // Settings left open behind HOME would come back on their previous widget.
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP));
         }
         finish();
     }
