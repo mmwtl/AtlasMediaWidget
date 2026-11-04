@@ -90,7 +90,8 @@ migration request.
 - Send transport and source commands only through the explicit versioned service. Respect the
   capability mask and treat `OK` as delivery/pending until a newer snapshot confirms the result.
 - `LauncherMediaCommandReceiver` serves the AtlasLauncher gesture contract in
-  `docs/full-media-bridge.md` §9 (action, extra values, exported without permission). Do not
+  `docs/full-media-bridge.md` §9 (action, extra values, exported without permission, ordered
+  broadcast result data `PLAY`/`PAUSE`/`NEXT`/`PREVIOUS` or null when dropped). Do not
   change it without coordinating with AtlasLauncher. It only forwards to a running
   `OverlayService` with a connected Bridge; it never starts the service or binds.
 - Automatic playback (startup autoplay, autoplay after source loss) runs through `CallGuard`: an

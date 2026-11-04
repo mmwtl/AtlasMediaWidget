@@ -259,6 +259,16 @@ and revision writes; multiple preference files are not a single disk transaction
 Команда, которой нет в маске `capabilities` текущего источника, отбрасывается, как и в режиме
 AppWidget. Результат команды подтверждает только следующий снимок.
 
+Ответ лаунчеру: AtlasLauncher отправляет broadcast через `sendOrderedBroadcast` с result receiver
+и пустым начальным result data. Если команда отправлена в Bridge, приёмник при
+`isOrderedBroadcast()` записывает в result data фактическую команду: `PLAY`, `PAUSE`, `NEXT` или
+`PREVIOUS`. `TOGGLE` сообщается как `PAUSE`, если снимок играл (`isPlaying()`), иначе `PLAY`;
+навигация по сохранённым станциям радио сообщается исходными `NEXT`/`PREVIOUS`. Отброшенная
+команда (служба не запущена, Bridge не подключён, нет снимка или capability) оставляет result data
+пустым (null), и лаунчер показывает «Недоступно». Ответ означает доставку команды, а не
+подтверждённый результат воспроизведения. Обычный (неупорядоченный) broadcast по-прежнему
+принимается без ответа.
+
 ### [EN]
 AtlasLauncher (`com.geely.atlaslauncher`) gestures send an explicit broadcast to package
 `com.mmwtl.atlasmediawidget` with action `com.mmwtl.atlasmediawidget.action.MEDIA_COMMAND` and a
@@ -268,3 +278,13 @@ command to the running `OverlayService` only while its existing `MediaBridgeClie
 and a snapshot is present; otherwise it drops the command without starting the service, rebinding
 the Bridge or showing UI. `PLAY_PAUSE` maps through `PlayPauseActionPolicy` like the card button;
 commands outside the current capability mask are dropped, as in AppWidget mode.
+
+Reply: AtlasLauncher sends the broadcast with `sendOrderedBroadcast`, a result receiver and empty
+initial result data. When the command was sent to the Bridge, the receiver calls
+`setResultData` (only if `isOrderedBroadcast()`) with the command actually sent: `PLAY`, `PAUSE`,
+`NEXT` or `PREVIOUS`. `TOGGLE` is reported as `PAUSE` when the snapshot was playing
+(`isPlaying()`), otherwise `PLAY`; saved radio station navigation reports the original
+`NEXT`/`PREVIOUS`. A dropped command (service not running, Bridge disconnected, no snapshot or
+capability) leaves the result data null, and the launcher shows it as unavailable. The reply
+means delivery, not a confirmed playback result. A plain unordered broadcast is still accepted
+without a reply.

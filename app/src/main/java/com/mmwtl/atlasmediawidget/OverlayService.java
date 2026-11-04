@@ -444,22 +444,27 @@ public final class OverlayService extends Service
         if (transport != null) onCommand(transport);
     }
 
-    /** Launcher gestures: the card's transport path, only on a connected running service. */
-    void executeLauncherCommand(String command) {
+    /**
+     * Launcher gestures: the card's transport path, only on a connected running service.
+     * Returns the command reported back to AtlasLauncher (PLAY, PAUSE, NEXT or PREVIOUS), or null
+     * when the command was dropped.
+     */
+    String executeLauncherCommand(String command) {
         MediaSnapshot snapshot = reducer.visibleSnapshot(SystemClock.elapsedRealtime());
         if (destroyed || bridgeState != MediaBridgeClient.State.CONNECTED || snapshot == null) {
             AppLog.info("Launcher media command " + command + " ignored: bridge=" + bridgeState
                     + " snapshot=" + (snapshot != null));
-            return;
+            return null;
         }
         String transport = supportedTransportCommand(command, snapshot);
         if (transport == null) {
             AppLog.info("Launcher media command " + command + " unsupported by "
                     + snapshot.audioSource);
-            return;
+            return null;
         }
         AppLog.info("Launcher media command " + command + " -> " + transport);
         onCommand(transport);
+        return LauncherMediaCommandReceiver.reported(transport, snapshot.isPlaying());
     }
 
     /** Maps PLAY_PAUSE like the card button; null when the snapshot lacks the capability. */

@@ -17,4 +17,13 @@ public class LauncherMediaCommandReceiverTest {
         assertNull(LauncherMediaCommandReceiver.command("SEEK_TO"));
         assertNull(LauncherMediaCommandReceiver.command("SET_SOURCE"));
     }
+
+    @Test public void reportsTheCommandActuallySent() {
+        assertEquals("PAUSE", LauncherMediaCommandReceiver.reported("TOGGLE", true));
+        assertEquals("PLAY", LauncherMediaCommandReceiver.reported("TOGGLE", false));
+        assertEquals("PLAY", LauncherMediaCommandReceiver.reported("PLAY", true));
+        assertEquals("PAUSE", LauncherMediaCommandReceiver.reported("PAUSE", false));
+        assertEquals("NEXT", LauncherMediaCommandReceiver.reported("NEXT", true));
+        assertEquals("PREVIOUS", LauncherMediaCommandReceiver.reported("PREVIOUS", false));
+    }
 }
