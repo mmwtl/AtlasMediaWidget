@@ -47,7 +47,9 @@ open directly inside the AppWidget, and the favorites list scrolls.
 The AppWidget follows the system day/night mode (OneOS switches it with the headlights) and changes
 theme at once, without a restart and without losing the track or an open picker. The card is light
 by day and dark at night in the AtlasLauncher palette; by day the artwork dimming becomes a light
-veil of the same strength. The overlay stays dark in both modes.
+veil of the same strength. The overlay stays dark in both modes. The «Тема» card on the Card tab
+fixes the widget's theme: «Авто» follows the system mode, «День» and «Ночь» keep the widget in one
+theme whatever the mode. Each widget has its own theme, and the settings export keeps it.
 
 The collapsed «Свои цвета» section at the bottom of the Card tab sets the background (also the colour
 of the veil over the artwork), the solid-colour backdrop's colour and opacity, the text and the accent

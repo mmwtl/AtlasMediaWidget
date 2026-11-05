@@ -38,6 +38,8 @@ final class Prefs {
     static final String KEY_STATUS_BAR_MEDIA = "status_bar_media";
     static final String KEY_CARD_OPENS_PLAYER = "card_opens_player";
     static final String KEY_STATUS_BAR_FORMAT = "status_bar_format";
+    /** {@link CardTheme#AUTO}, {@link CardTheme#DAY} or {@link CardTheme#NIGHT}. */
+    static final String KEY_WIDGET_THEME = "widget_theme";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
     private static final String KEY_CARD_HEIGHT_PREFIX = "card_height_";
     private static final String KEY_METADATA_PROGRESS_GAP_PREFIX = "metadata_progress_gap_";
@@ -129,7 +131,7 @@ final class Prefs {
     /** Look settings a widget keeps for itself; everything else is shared by the whole app. */
     private static final Set<String> PROFILE_KEYS = Set.of(KEY_CARD_STYLE, KEY_CARD_OPENS_PLAYER,
             KEY_RADIO_FAVORITES_COLUMNS, KEY_RADIO_FAVORITES_ROWS, KEY_PLAYER_ACTIONS_COUNT,
-            "day" + KEY_PALETTE_BACKGROUND_SUFFIX, "day" + KEY_PALETTE_TEXT_SUFFIX,
+            KEY_WIDGET_THEME, "day" + KEY_PALETTE_BACKGROUND_SUFFIX, "day" + KEY_PALETTE_TEXT_SUFFIX,
             "day" + KEY_PALETTE_ACCENT_SUFFIX, "night" + KEY_PALETTE_BACKGROUND_SUFFIX,
             "night" + KEY_PALETTE_TEXT_SUFFIX, "night" + KEY_PALETTE_ACCENT_SUFFIX);
     /** Look settings stored per card style, as the prefix followed by the style's number. */
@@ -614,6 +616,11 @@ final class Prefs {
                 getInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, alpha));
     }
 
+    int widgetTheme() {
+        int value = getInt(KEY_WIDGET_THEME, CardTheme.AUTO);
+        return value >= CardTheme.AUTO && value <= CardTheme.NIGHT ? value : CardTheme.AUTO;
+    }
+
     CardColors cardColors() {
         return new CardColors(palette(false), palette(true));
     }
@@ -844,6 +851,7 @@ final class Prefs {
                 .putBoolean(KEY_DRAG_HANDLE_VISIBLE, data.dragHandleVisible)
                 .putBoolean(KEY_STATUS_BAR_MEDIA, data.statusBarMedia)
                 .putBoolean(KEY_CARD_OPENS_PLAYER, data.cardOpensPlayer)
+                .putInt(KEY_WIDGET_THEME, data.widgetTheme)
                 .putInt(KEY_STATUS_BAR_FORMAT, data.statusBarFormat.preferenceValue)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)

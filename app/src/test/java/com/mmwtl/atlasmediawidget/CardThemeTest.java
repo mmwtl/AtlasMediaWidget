@@ -51,6 +51,21 @@ public class CardThemeTest {
         assertSame(context, CardTheme.overlay(context, CardColors.DEFAULT));
     }
 
+    @Test public void fixedWidgetThemeIgnoresTheSystemMode() {
+        Context context = RuntimeEnvironment.getApplication();
+        Prefs prefs = new Prefs(context);
+        prefs.putInt(Prefs.KEY_WIDGET_THEME, CardTheme.NIGHT);
+        RuntimeEnvironment.setQualifiers("+notnight");
+        assertColor(0x232528, surface(card(context, prefs)));
+        prefs.putInt(Prefs.KEY_WIDGET_THEME, CardTheme.DAY);
+        RuntimeEnvironment.setQualifiers("+night");
+        assertColor(0xEDEEF0, surface(card(context, prefs)));
+        prefs.putInt(Prefs.KEY_WIDGET_THEME, CardTheme.AUTO);
+        assertColor(0x232528, surface(card(context, prefs)));
+        prefs.putInt(Prefs.KEY_WIDGET_THEME, 7);
+        assertEquals("an unknown value follows the system", CardTheme.AUTO, prefs.widgetTheme());
+    }
+
     @Test public void singleColourBackdropKeepsReadableContentInBothModes() {
         Context context = RuntimeEnvironment.getApplication();
         Prefs prefs = new Prefs(context);

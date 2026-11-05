@@ -9,7 +9,20 @@ import android.content.res.Configuration;
  * The card is drawn into bitmaps, so the caller chooses the mode through the context it passes.
  */
 final class CardTheme {
+    /** Values of {@link Prefs#KEY_WIDGET_THEME}: the system mode or a fixed day or night. */
+    static final int AUTO = 0;
+    static final int DAY = 1;
+    static final int NIGHT = 2;
+
     private CardTheme() {}
+
+    /**
+     * The context an AppWidget is drawn in: the system night mode for {@link #AUTO}, otherwise
+     * the theme fixed in the widget's settings, whatever the system mode.
+     */
+    static Context forWidget(Context base, int theme) {
+        return theme == AUTO ? base : withNight(base, theme == NIGHT);
+    }
 
     /** The overlay keeps the night colours over the OEM launcher in either system mode. */
     static Context overlay(Context base, CardColors colors) {

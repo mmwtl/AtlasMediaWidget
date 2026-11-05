@@ -31,6 +31,8 @@ final class SettingsBackup {
     static final class Data {
         /** Look of the placed widgets by position; null follows the shared look. */
         List<Map<String, Object>> widgetProfiles = List.of();
+        /** The shared widget theme, {@link CardTheme#AUTO} in files without it. */
+        int widgetTheme = CardTheme.AUTO;
         final int freeformHideThresholdPercent;
         final boolean widgetMode;
         final boolean autoStart;
@@ -345,6 +347,7 @@ final class SettingsBackup {
                 prefs.getBoolean(Prefs.KEY_STATUS_BAR_MEDIA, false), prefs.statusBarFormat(),
                 prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.cardColors());
         data.widgetProfiles = prefs.widgetProfiles();
+        data.widgetTheme = prefs.widgetTheme();
         return data;
     }
 
@@ -396,6 +399,7 @@ final class SettingsBackup {
             settings.put("statusBarMedia", data.statusBarMedia);
             settings.put("statusBarFormat", data.statusBarFormat.preferenceValue);
             settings.put("cardOpensPlayer", data.cardOpensPlayer);
+            settings.put("widgetTheme", data.widgetTheme);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -526,6 +530,12 @@ final class SettingsBackup {
                     new CardColors(decodePalette(settings, false),
                             decodePalette(settings, true)));
             if (version >= 17) data.widgetProfiles = decodeWidgetProfiles(settings);
+            // Added within schema 17; older files follow the system mode.
+            if (settings.has("widgetTheme")) {
+                data.widgetTheme = requireRange("settings.widgetTheme",
+                        requireInt(settings, "widgetTheme", "settings.widgetTheme"),
+                        CardTheme.AUTO, CardTheme.NIGHT);
+            }
             return data;
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);

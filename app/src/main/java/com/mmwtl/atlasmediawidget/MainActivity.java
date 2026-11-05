@@ -170,9 +170,13 @@ public final class MainActivity extends ScaledActivity {
     private final Button[] paletteButtons = new Button[3];
     /**
      * The mode whose colours the settings edit and the preview shows. The overlay is always
-     * night; in widget mode it starts at the system mode and is not stored.
+     * night; in widget mode it starts at the widget's theme and is not stored.
      */
     private boolean editNight = true;
+    /** The День/Ночь choice of the edited colours, in widget mode only. */
+    private RadioGroup paletteModes;
+    private RadioButton paletteDay;
+    private RadioButton paletteNight;
     private RadioButton[] coverDimPresetButtons;
     private LinearLayout thumbnailSizeSection;
     private LabeledSeek thumbnailSizeSetting;
@@ -542,6 +546,9 @@ public final class MainActivity extends ScaledActivity {
         overlayOnly.add(visibilityCard);
 
         page.addView(createLookCard());
+        LinearLayout themeCard = createThemeCard();
+        page.addView(themeCard);
+        widgetOnly.add(themeCard);
         page.addView(createPlayerActionsCard());
         createTypographySection(collapsibleCard(page, "Текст и отступы",
                 "Размеры шрифтов, отступы и линия прогресса"));
@@ -831,6 +838,37 @@ public final class MainActivity extends ScaledActivity {
         return geometryCard;
     }
 
+    private LinearLayout createThemeCard() {
+        LinearLayout card = card();
+        card.addView(text("Тема", 20, Ui.PRIMARY, Typeface.BOLD));
+        RadioGroup themes = new RadioGroup(this);
+        themes.setOrientation(RadioGroup.HORIZONTAL);
+        RadioButton[] buttons = {styleButton("Авто"), styleButton("День"), styleButton("Ночь")};
+        for (RadioButton button : buttons) themes.addView(button);
+        themes.check(buttons[prefs.widgetTheme()].getId());
+        themes.setOnCheckedChangeListener((group, id) -> {
+            int theme = id == buttons[CardTheme.NIGHT].getId() ? CardTheme.NIGHT
+                    : id == buttons[CardTheme.DAY].getId() ? CardTheme.DAY : CardTheme.AUTO;
+            prefs.putInt(Prefs.KEY_WIDGET_THEME, theme);
+            // The colours being edited and the preview follow the theme the widget now shows.
+            if (paletteModes != null) {
+                paletteModes.check(widgetNight() ? paletteNight.getId() : paletteDay.getId());
+            }
+        });
+        card.addView(themes, fullWrap());
+        card.addView(text("«Авто» переключает карточку вместе с дневным и ночным режимом OneOS. "
+                        + "«День» и «Ночь» оставляют её в одной теме при любом режиме.",
+                13, Ui.SECONDARY, Typeface.NORMAL), fullWrap());
+        return card;
+    }
+
+    /** Whether the edited widget shows its night theme now. */
+    private boolean widgetNight() {
+        int theme = prefs.widgetTheme();
+        return theme == CardTheme.AUTO ? CardTheme.isNight(getResources().getConfiguration())
+                : theme == CardTheme.NIGHT;
+    }
+
     private LinearLayout createLookCard() {
         LinearLayout lookCard = card();
         lookCard.addView(text(getString(R.string.appearance_title),
@@ -913,12 +951,15 @@ public final class MainActivity extends ScaledActivity {
     private void createColorsSection(LinearLayout section) {
         cardColors = prefs.cardColors();
         boolean widgetMode = prefs.isWidgetMode();
-        editNight = !widgetMode || CardTheme.isNight(getResources().getConfiguration());
+        editNight = !widgetMode || widgetNight();
         if (widgetMode) {
             RadioGroup modes = new RadioGroup(this);
             modes.setOrientation(RadioGroup.HORIZONTAL);
             RadioButton day = styleButton("День");
             RadioButton night = styleButton("Ночь");
+            paletteModes = modes;
+            paletteDay = day;
+            paletteNight = night;
             modes.addView(day);
             modes.addView(night);
             modes.check(editNight ? night.getId() : day.getId());

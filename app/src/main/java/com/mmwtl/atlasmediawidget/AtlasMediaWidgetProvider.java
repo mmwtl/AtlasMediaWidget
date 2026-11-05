@@ -92,9 +92,18 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
     }
 
     static void showInactive(Context context, String text) {
+        Prefs prefs = new Prefs(context);
         for (int id : ids(context)) {
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.media_widget_empty);
             views.setTextViewText(R.id.widget_empty, text);
+            int theme = prefs.forWidget(id).widgetTheme();
+            if (theme != CardTheme.AUTO) {
+                // The host resolves the layout's colours in its own mode; a fixed theme sets them.
+                Context themed = CardTheme.forWidget(context, theme);
+                views.setInt(R.id.widget_empty, "setBackgroundColor",
+                        themed.getColor(R.color.widget_empty_background));
+                views.setTextColor(R.id.widget_empty, themed.getColor(R.color.card_text));
+            }
             views.setOnClickPendingIntent(R.id.widget_empty, click(context, id, "settings", false));
             AppWidgetManager.getInstance(context.getApplicationContext()).updateAppWidget(id, views);
         }
@@ -237,9 +246,10 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             height = Math.min(4096, Ui.dp(context, heightDp(context, options)));
             CardStyle style = CardStyle.fromPreference(prefs.getInt(Prefs.KEY_CARD_STYLE,
                     CardStyle.DEFAULT.preferenceValue));
-            WidgetAppearance appearance = CardTheme.widgetAppearance(context,
+            Context themed = CardTheme.forWidget(context, prefs.widgetTheme());
+            WidgetAppearance appearance = CardTheme.widgetAppearance(themed,
                     prefs.appearance(style));
-            card = new MediaCardView(CardTheme.widget(context, style, appearance,
+            card = new MediaCardView(CardTheme.widget(themed, style, appearance,
                     prefs.cardColors()), width, height,
                     width, height, style, appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);

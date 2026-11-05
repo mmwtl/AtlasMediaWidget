@@ -169,6 +169,20 @@ public final class SettingsBackupTest {
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
     }
 
+    @Test public void widgetThemeRoundTripsAndDefaultsToAuto() throws Exception {
+        SettingsBackup.Data data = data(15, CardStyle.COMPACT, null, null);
+        data.widgetTheme = CardTheme.NIGHT;
+        JSONObject root = new JSONObject(SettingsBackup.encode(data, "test"));
+        JSONObject settings = root.getJSONObject("settings");
+        assertEquals(CardTheme.NIGHT, settings.getInt("widgetTheme"));
+        assertEquals(CardTheme.NIGHT, SettingsBackup.decode(root.toString()).widgetTheme);
+        settings.remove("widgetTheme");
+        assertEquals(CardTheme.AUTO, SettingsBackup.decode(root.toString()).widgetTheme);
+        settings.put("widgetTheme", 3);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        assertTrue(Prefs.isProfileKey(Prefs.KEY_WIDGET_THEME));
+    }
+
     @Test public void themedBackdropRoundTrips() throws Exception {
         JSONObject root = new JSONObject(SettingsBackup.encode(
                 data(15, CardStyle.COMPACT, null, null), "test"));

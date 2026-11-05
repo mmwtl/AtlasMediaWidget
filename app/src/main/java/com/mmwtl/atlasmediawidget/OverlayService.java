@@ -382,10 +382,18 @@ public final class OverlayService extends Service
         boolean night = CardTheme.isNight(configuration);
         if (night == widgetNight) return;
         widgetNight = night;
-        if (destroyed || !prefs.isWidgetMode()) return;
+        if (destroyed || !prefs.isWidgetMode() || !followsSystemMode()) return;
         AppLog.info("Night mode " + (night ? "on" : "off") + ", redrawing widgets");
         widgetRenderKey = null;
         renderWidgets(true);
+    }
+
+    /** Whether a placed widget follows the system mode rather than a theme fixed in its settings. */
+    private boolean followsSystemMode() {
+        for (int id : AtlasMediaWidgetProvider.ids(this)) {
+            if (prefs.forWidget(id).widgetTheme() == CardTheme.AUTO) return true;
+        }
+        return false;
     }
 
     private void syncDisplayMode() {
