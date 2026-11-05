@@ -226,6 +226,17 @@ public class CardThemeTest {
         assertTrue("presets keep their order", weak[3] >>> 24 < day[3] >>> 24);
     }
 
+    @Test public void squareDayVeilKeepsTheArtworkMiddleClear() {
+        for (CoverDimPreset preset : CoverDimPreset.values()) {
+            int[] night = preset.colors(CardStyle.SQUARE);
+            int[] day = preset.colors(CardStyle.SQUARE, 0xEDEEF0);
+            assertTrue(preset + " middle stays near the night veil",
+                    (day[1] >>> 24) - (night[1] >>> 24) <= 8);
+        }
+        int[] minimum = CoverDimPreset.MINIMUM.colors(CardStyle.SQUARE, 0xEDEEF0);
+        assertEquals("a clear stop stays clear", 0, minimum[1] >>> 24);
+    }
+
     private static Bitmap card(Context context, Prefs prefs) {
         Bundle options = new Bundle();
         options.putInt(android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 500);
