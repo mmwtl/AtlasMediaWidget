@@ -120,21 +120,27 @@ public final class SettingsBackupTest {
         assertFalse(backdrop.solidFor(CardStyle.SQUARE));
         assertFalse(backdrop.opaqueControlsFor(CardStyle.SQUARE));
         assertEquals(255, backdrop.artworkAlpha);
+        assertEquals(255, backdrop.contentAlpha);
 
         JSONObject square = root.getJSONObject("settings").getJSONObject("cardStyles")
                 .getJSONObject("square");
-        square.getJSONObject("backdrop").put("artworkAlpha", 102);
+        square.getJSONObject("backdrop").put("artworkAlpha", 102).put("contentAlpha", 204);
         CardBackdrop squareBackdrop = SettingsBackup.decode(SettingsBackup.encode(
                 SettingsBackup.decode(root.toString()), "test")).square.appearance.backdrop;
         assertEquals(102, squareBackdrop.artworkAlpha);
+        assertEquals(204, squareBackdrop.contentAlpha);
         assertEquals(102, squareBackdrop.backdropAlphaFor(CardStyle.SQUARE));
         assertTrue(squareBackdrop.translucentFor(CardStyle.SQUARE));
         assertFalse(squareBackdrop.opaqueControlsFor(CardStyle.SQUARE));
         square.getJSONObject("backdrop").put("artworkAlpha", 256);
         assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
         square.getJSONObject("backdrop").remove("artworkAlpha");
-        assertEquals(255, SettingsBackup.decode(root.toString())
-                .square.appearance.backdrop.artworkAlpha);
+        square.getJSONObject("backdrop").put("contentAlpha", -1);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        square.getJSONObject("backdrop").remove("contentAlpha");
+        CardBackdrop opaque = SettingsBackup.decode(root.toString()).square.appearance.backdrop;
+        assertEquals(255, opaque.artworkAlpha);
+        assertEquals(255, opaque.contentAlpha);
         compact.getJSONObject("backdrop").remove("opaqueControls");
         compact.getJSONObject("backdrop").remove("opaqueTopRow");
         CardBackdrop legacy = SettingsBackup.decode(root.toString()).compact.appearance.backdrop;

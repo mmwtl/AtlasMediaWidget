@@ -91,6 +91,8 @@ final class MediaCardView extends FrameLayout {
     private final View divider;
     private final FrameLayout controls;
     private final View controlsBand;
+    /** Opacity of everything over the backdrop, 0…1. */
+    private final float contentAlpha;
     private final TransportButton previous;
     private final TransportButton playPause;
     private final TransportButton next;
@@ -482,6 +484,15 @@ final class MediaCardView extends FrameLayout {
                 new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
         favoritesChooser.addView(favoritesContent, match());
         addView(favoritesChooser);
+        // Everything over the backdrop fades by the content opacity; the backdrop has its own.
+        contentAlpha = appearance.backdrop.contentAlpha / 255f;
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child != artworkLayer && child != controlsBand && child != topRowBand
+                    && child != border) {
+                child.setAlpha(contentAlpha);
+            }
+        }
         setOnClickListener(v -> {
             if (favoritesChooser.getVisibility() == VISIBLE) {
                 hideFavoritesChooser();
@@ -682,7 +693,7 @@ final class MediaCardView extends FrameLayout {
         favoritesButton.setVisibility(activeSource.displayId() == MediaSource.Id.RADIO
                 ? VISIBLE : GONE);
         favoritesButton.setEnabled(value.supports(MediaBridgeContract.CAP_TUNE_RADIO));
-        favoritesButton.setAlpha(favoritesButton.isEnabled() ? 1f : 0.45f);
+        favoritesButton.setAlpha((favoritesButton.isEnabled() ? 1f : 0.45f) * contentAlpha);
         renderCustomActions(activeSource.displayId() == MediaSource.Id.RADIO
                 ? List.of() : value.customActions);
         updateStatusPillPosition();

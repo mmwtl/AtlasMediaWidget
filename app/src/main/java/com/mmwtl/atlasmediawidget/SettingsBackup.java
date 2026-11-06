@@ -644,7 +644,8 @@ final class SettingsBackup {
                         .put("opaqueTopRow", value.backdrop.opaqueTopRow)
                         .put("dayColor", backdropColor(value.backdrop.dayColor))
                         .put("dayAlpha", value.backdrop.dayAlpha)
-                        .put("artworkAlpha", value.backdrop.artworkAlpha));
+                        .put("artworkAlpha", value.backdrop.artworkAlpha)
+                        .put("contentAlpha", value.backdrop.contentAlpha));
     }
 
     private static String hex(int rgb) {
@@ -712,10 +713,15 @@ final class SettingsBackup {
                 ownDay ? requireBackdropColor(object, "dayColor", path + ".dayColor") : color,
                 ownDay ? requireRange(path + ".dayAlpha",
                         requireInt(object, "dayAlpha", path + ".dayAlpha"), 0, 255) : alpha,
-                // Files without it come from versions with an always opaque artwork backdrop.
-                object.has("artworkAlpha") ? requireRange(path + ".artworkAlpha",
-                        requireInt(object, "artworkAlpha", path + ".artworkAlpha"), 0, 255)
-                        : 255);
+                // Files without them come from versions with an always opaque card.
+                optionalAlpha(object, "artworkAlpha", path),
+                optionalAlpha(object, "contentAlpha", path));
+    }
+
+    private static int optionalAlpha(JSONObject object, String key, String path)
+            throws IOException {
+        return object.has(key) ? requireRange(path + "." + key,
+                requireInt(object, key, path + "." + key), 0, 255) : 255;
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,

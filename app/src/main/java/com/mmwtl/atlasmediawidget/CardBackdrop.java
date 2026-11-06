@@ -29,6 +29,8 @@ final class CardBackdrop {
     final int dayAlpha;
     /** Opacity of the artwork backdrop with its veil and the surface under it, 0…255. */
     final int artworkAlpha;
+    /** Opacity of everything drawn over the backdrop: text, pills, progress and buttons, 0…255. */
+    final int contentAlpha;
 
     CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
             boolean opaqueTopRow) {
@@ -37,11 +39,12 @@ final class CardBackdrop {
 
     CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
             boolean opaqueTopRow, int dayColor, int dayAlpha) {
-        this(solid, color, alpha, opaqueControls, opaqueTopRow, dayColor, dayAlpha, 255);
+        this(solid, color, alpha, opaqueControls, opaqueTopRow, dayColor, dayAlpha, 255, 255);
     }
 
     CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
-            boolean opaqueTopRow, int dayColor, int dayAlpha, int artworkAlpha) {
+            boolean opaqueTopRow, int dayColor, int dayAlpha, int artworkAlpha,
+            int contentAlpha) {
         this.solid = solid;
         this.color = rgbOrTheme(color);
         this.alpha = Math.max(0, Math.min(255, alpha));
@@ -50,6 +53,7 @@ final class CardBackdrop {
         this.dayColor = rgbOrTheme(dayColor);
         this.dayAlpha = Math.max(0, Math.min(255, dayAlpha));
         this.artworkAlpha = Math.max(0, Math.min(255, artworkAlpha));
+        this.contentAlpha = Math.max(0, Math.min(255, contentAlpha));
     }
 
     private static int rgbOrTheme(int color) {
@@ -64,7 +68,7 @@ final class CardBackdrop {
     /** The backdrop of the day mode. */
     CardBackdrop forDay() {
         return new CardBackdrop(solid, dayColor, dayAlpha, opaqueControls, opaqueTopRow,
-                dayColor, dayAlpha, artworkAlpha);
+                dayColor, dayAlpha, artworkAlpha, contentAlpha);
     }
 
     boolean themed() {
