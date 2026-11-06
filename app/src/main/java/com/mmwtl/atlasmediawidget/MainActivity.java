@@ -156,6 +156,9 @@ public final class MainActivity extends ScaledActivity {
     private RadioButton backdropSolidButton;
     private LinearLayout backdropSolidOptions;
     private LabeledSeek backdropAlphaSetting;
+    private LinearLayout artworkAlphaSection;
+    private LabeledSeek artworkAlphaSetting;
+    private int artworkAlpha = 255;
     private View backdropSwatch;
     private Switch backdropOpaqueControls;
     private Switch backdropOpaqueTopRow;
@@ -936,6 +939,30 @@ public final class MainActivity extends ScaledActivity {
             if (!refreshingStyle) saveAppearance();
         });
         lookCard.addView(coverDimPresetGroup, fullWrap());
+
+        // Fades the artwork, its veil and the surface; text and buttons stay opaque.
+        artworkAlphaSection = new LinearLayout(this);
+        artworkAlphaSection.setOrientation(LinearLayout.VERTICAL);
+        artworkAlphaSetting = addLabeledSeek(artworkAlphaSection,
+                "Непрозрачность карточки с обложкой", 0, OPACITY_STEPS);
+        artworkAlphaSection.addView(text("Обложка с затемнением становится прозрачной; "
+                + "текст и кнопки остаются непрозрачными.", 13, Ui.SECONDARY, Typeface.NORMAL));
+        artworkAlphaSetting.seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar seekBar, int progress,
+                    boolean fromUser) {
+                if (!fromUser) return;
+                artworkAlpha = opacityAlpha(progress);
+                updateAppearanceLabels();
+                renderPreview();
+            }
+
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+
+            @Override public void onStopTrackingTouch(SeekBar seekBar) {
+                if (!refreshingStyle) saveAppearance();
+            }
+        });
+        lookCard.addView(artworkAlphaSection, fullWrap());
 
         thumbnailSizeSection = new LinearLayout(this);
         thumbnailSizeSection.setOrientation(LinearLayout.VERTICAL);
@@ -3215,6 +3242,7 @@ public final class MainActivity extends ScaledActivity {
         backdropSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         backdropColor = appearance.backdrop.color;
         backdropAlpha = appearance.backdrop.alpha;
+        artworkAlpha = appearance.backdrop.artworkAlpha;
         backdropOpaqueControls.setChecked(appearance.backdrop.opaqueControls);
         backdropOpaqueTopRow.setChecked(appearance.backdrop.opaqueTopRow);
         backdropDayColor = appearance.backdrop.dayColor;
@@ -3606,17 +3634,24 @@ public final class MainActivity extends ScaledActivity {
         thumbnailSizeSetting.value.setText(thumbnailSizeSetting.seek.getProgress() + " dp");
         cornerRadiusSetting.value.setText(cornerRadiusSetting.seek.getProgress() + " dp");
         backdropAlphaSetting.value.setText(backdropAlphaSetting.seek.getProgress() * 5 + " %");
+        artworkAlphaSetting.value.setText(artworkAlphaSetting.seek.getProgress() * 5 + " %");
         updateBackdropControls();
     }
 
     private void updateBackdropControls() {
-        if (backdropSolidButton == null || coverDimTitle == null) return;
+        if (backdropSolidButton == null || coverDimTitle == null
+                || artworkAlphaSection == null) return;
         boolean solid = selectedBackdrop().solidFor(currentStyle());
         backdropSolidOptions.setVisibility(backdropSolidButton.isChecked()
                 ? View.VISIBLE : View.GONE);
         // Dimming applies only to the artwork backdrop.
         coverDimTitle.setVisibility(solid ? View.GONE : View.VISIBLE);
         coverDimPresetGroup.setVisibility(solid ? View.GONE : View.VISIBLE);
+        artworkAlphaSection.setVisibility(solid ? View.GONE : View.VISIBLE);
+        int artworkStep = opacityStep(artworkAlpha);
+        if (artworkAlphaSetting.seek.getProgress() != artworkStep) {
+            artworkAlphaSetting.seek.setProgress(artworkStep);
+        }
         // The swatch shows the colour itself; opacity has its own slider.
         backdropColorOptions.setVisibility(backdropSolidButton.isChecked()
                 && currentStyle() == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
@@ -3642,7 +3677,8 @@ public final class MainActivity extends ScaledActivity {
         if (backdropSolidButton == null) return prefs.backdrop(currentStyle());
         return new CardBackdrop(backdropSolidButton.isChecked(), backdropColor,
                 backdropAlpha, backdropOpaqueControls.isChecked(),
-                backdropOpaqueTopRow.isChecked(), backdropDayColor, backdropDayAlpha);
+                backdropOpaqueTopRow.isChecked(), backdropDayColor, backdropDayAlpha,
+                artworkAlpha);
     }
 
     private Switch backdropPanelSwitch(String label) {

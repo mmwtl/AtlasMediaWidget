@@ -161,17 +161,23 @@ final class MediaCardView extends FrameLayout {
         setMinimumHeight(cardHeight);
         // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
         boolean solidBackdrop = appearance.backdrop.solidFor(style);
+        int backdropAlpha = appearance.backdrop.backdropAlphaFor(style);
         int surface = color(R.color.card_background);
-        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb(surface) : surface,
-                appearance.cornerRadiusDp, context));
+        // The artwork layer carries its own surface; the clear background only shapes the outline.
+        setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb(surface)
+                        : surface & 0xFFFFFF, appearance.cornerRadiusDp, context));
         setClipToOutline(true);
         setClickable(true);
 
         artwork = new ImageView(context);
         artwork.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        artwork.setBackgroundColor(color(R.color.card_background));
-        artwork.setVisibility(solidBackdrop ? GONE : VISIBLE);
-        addView(artwork, match());
+        // The artwork, its placeholder and its veil fade together, as one translucent picture.
+        FrameLayout artworkLayer = new FrameLayout(context);
+        artworkLayer.setBackgroundColor(surface);
+        artworkLayer.setAlpha(appearance.backdrop.artworkAlpha / 255f);
+        artworkLayer.setVisibility(solidBackdrop ? GONE : VISIBLE);
+        addView(artworkLayer, match());
+        artworkLayer.addView(artwork, match());
 
         placeholder = new ImageView(context);
         placeholder.setImageResource(R.drawable.ic_sound_wave);
@@ -180,14 +186,13 @@ final class MediaCardView extends FrameLayout {
         placeholder.setAlpha(0.22f);
         placeholder.setPadding(d(7), d(7), d(7), d(7));
         placeholder.setContentDescription("Звуковая дорожка — обложка отсутствует");
-        addView(placeholder);
+        artworkLayer.addView(placeholder);
 
         View scrim = new View(context);
         scrim.setBackground(new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 appearance.coverDimPreset.colors(style, color(R.color.card_background))));
-        scrim.setVisibility(solidBackdrop ? GONE : VISIBLE);
-        addView(scrim, match());
+        artworkLayer.addView(scrim, match());
 
         // Keeps the transport buttons on an opaque strip over a translucent backdrop.
         controlsBand = new View(context);
@@ -207,10 +212,9 @@ final class MediaCardView extends FrameLayout {
         GradientDrawable borderDrawable = new GradientDrawable();
         borderDrawable.setColor(Color.TRANSPARENT);
         borderDrawable.setCornerRadius(cornerRadiusPx());
-        // The outline fades with a solid backdrop, so a clear card leaves no frame behind.
+        // The outline fades with the backdrop, so a clear card leaves no frame behind.
         int outline = color(R.color.card_outline);
-        int borderAlpha = solidBackdrop ? Color.alpha(outline) * appearance.backdrop.alpha / 255
-                : Color.alpha(outline);
+        int borderAlpha = Color.alpha(outline) * backdropAlpha / 255;
         borderDrawable.setStroke(Math.max(1, d(1)), borderAlpha << 24 | outline & 0xFFFFFF);
         border.setBackground(borderDrawable);
         addView(border, match());

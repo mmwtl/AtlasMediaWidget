@@ -119,6 +119,22 @@ public final class SettingsBackupTest {
         assertTrue(backdrop.opaqueTopRowFor(CardStyle.COMPACT));
         assertFalse(backdrop.solidFor(CardStyle.SQUARE));
         assertFalse(backdrop.opaqueControlsFor(CardStyle.SQUARE));
+        assertEquals(255, backdrop.artworkAlpha);
+
+        JSONObject square = root.getJSONObject("settings").getJSONObject("cardStyles")
+                .getJSONObject("square");
+        square.getJSONObject("backdrop").put("artworkAlpha", 102);
+        CardBackdrop squareBackdrop = SettingsBackup.decode(SettingsBackup.encode(
+                SettingsBackup.decode(root.toString()), "test")).square.appearance.backdrop;
+        assertEquals(102, squareBackdrop.artworkAlpha);
+        assertEquals(102, squareBackdrop.backdropAlphaFor(CardStyle.SQUARE));
+        assertTrue(squareBackdrop.translucentFor(CardStyle.SQUARE));
+        assertFalse(squareBackdrop.opaqueControlsFor(CardStyle.SQUARE));
+        square.getJSONObject("backdrop").put("artworkAlpha", 256);
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        square.getJSONObject("backdrop").remove("artworkAlpha");
+        assertEquals(255, SettingsBackup.decode(root.toString())
+                .square.appearance.backdrop.artworkAlpha);
         compact.getJSONObject("backdrop").remove("opaqueControls");
         compact.getJSONObject("backdrop").remove("opaqueTopRow");
         CardBackdrop legacy = SettingsBackup.decode(root.toString()).compact.appearance.backdrop;

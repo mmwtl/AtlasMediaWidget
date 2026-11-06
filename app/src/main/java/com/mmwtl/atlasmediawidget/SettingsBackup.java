@@ -643,7 +643,8 @@ final class SettingsBackup {
                         .put("opaqueControls", value.backdrop.opaqueControls)
                         .put("opaqueTopRow", value.backdrop.opaqueTopRow)
                         .put("dayColor", backdropColor(value.backdrop.dayColor))
-                        .put("dayAlpha", value.backdrop.dayAlpha));
+                        .put("dayAlpha", value.backdrop.dayAlpha)
+                        .put("artworkAlpha", value.backdrop.artworkAlpha));
     }
 
     private static String hex(int rgb) {
@@ -710,7 +711,11 @@ final class SettingsBackup {
                         path + ".opaqueTopRow"),
                 ownDay ? requireBackdropColor(object, "dayColor", path + ".dayColor") : color,
                 ownDay ? requireRange(path + ".dayAlpha",
-                        requireInt(object, "dayAlpha", path + ".dayAlpha"), 0, 255) : alpha);
+                        requireInt(object, "dayAlpha", path + ".dayAlpha"), 0, 255) : alpha,
+                // Files without it come from versions with an always opaque artwork backdrop.
+                object.has("artworkAlpha") ? requireRange(path + ".artworkAlpha",
+                        requireInt(object, "artworkAlpha", path + ".artworkAlpha"), 0, 255)
+                        : 255);
     }
 
     private static StyleData decodeStyle(JSONObject object, String path,

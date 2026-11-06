@@ -72,6 +72,7 @@ final class Prefs {
     private static final String KEY_NIGHT_PALETTE_MIGRATED = "night_palette_migrated";
     private static final String KEY_BACKDROP_DAY_COLOR_PREFIX = "backdrop_day_color_";
     private static final String KEY_BACKDROP_DAY_ALPHA_PREFIX = "backdrop_day_alpha_";
+    private static final String KEY_BACKDROP_ARTWORK_ALPHA_PREFIX = "backdrop_artwork_alpha_";
     private static final String KEY_PALETTE_BACKGROUND_SUFFIX = "_background";
     private static final String KEY_PALETTE_TEXT_SUFFIX = "_text";
     private static final String KEY_PALETTE_ACCENT_SUFFIX = "_accent";
@@ -145,7 +146,8 @@ final class Prefs {
             KEY_THUMBNAIL_SIZE_PREFIX, KEY_CARD_RADIUS_PREFIX, KEY_BACKDROP_SOLID_PREFIX,
             KEY_BACKDROP_COLOR_PREFIX, KEY_BACKDROP_ALPHA_PREFIX,
             KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX, KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX,
-            KEY_BACKDROP_DAY_COLOR_PREFIX, KEY_BACKDROP_DAY_ALPHA_PREFIX);
+            KEY_BACKDROP_DAY_COLOR_PREFIX, KEY_BACKDROP_DAY_ALPHA_PREFIX,
+            KEY_BACKDROP_ARTWORK_ALPHA_PREFIX);
 
     private final Context appContext;
     private final SharedPreferences preferences;
@@ -613,7 +615,8 @@ final class Prefs {
                 getBoolean(KEY_BACKDROP_OPAQUE_CONTROLS_PREFIX + style.preferenceValue, false),
                 getBoolean(KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX + style.preferenceValue, false),
                 getInt(KEY_BACKDROP_DAY_COLOR_PREFIX + style.preferenceValue, color),
-                getInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, alpha));
+                getInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, alpha),
+                getInt(KEY_BACKDROP_ARTWORK_ALPHA_PREFIX + style.preferenceValue, 255));
     }
 
     int widgetTheme() {
@@ -663,7 +666,9 @@ final class Prefs {
                 .putBoolean(KEY_BACKDROP_OPAQUE_TOP_ROW_PREFIX + style.preferenceValue,
                         value.opaqueTopRow)
                 .putInt(KEY_BACKDROP_DAY_COLOR_PREFIX + style.preferenceValue, value.dayColor)
-                .putInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, value.dayAlpha);
+                .putInt(KEY_BACKDROP_DAY_ALPHA_PREFIX + style.preferenceValue, value.dayAlpha)
+                .putInt(KEY_BACKDROP_ARTWORK_ALPHA_PREFIX + style.preferenceValue,
+                        value.artworkAlpha);
     }
 
     /**

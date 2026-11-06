@@ -1,6 +1,9 @@
 package com.mmwtl.atlasmediawidget;
 
-/** What fills the compact card behind its content: the artwork or one translucent colour. */
+/**
+ * What fills the card behind its content: the artwork, which either layout can make translucent, or
+ * (compact layout only) one translucent colour.
+ */
 final class CardBackdrop {
     /** A colour left to the theme: the card surface of the mode; never an RGB value. */
     static final int THEME_COLOR = -1;
@@ -24,6 +27,8 @@ final class CardBackdrop {
     final int dayColor;
     /** Opacity of {@link #dayColor}, 0…255. */
     final int dayAlpha;
+    /** Opacity of the artwork backdrop with its veil and the surface under it, 0…255. */
+    final int artworkAlpha;
 
     CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
             boolean opaqueTopRow) {
@@ -32,6 +37,11 @@ final class CardBackdrop {
 
     CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
             boolean opaqueTopRow, int dayColor, int dayAlpha) {
+        this(solid, color, alpha, opaqueControls, opaqueTopRow, dayColor, dayAlpha, 255);
+    }
+
+    CardBackdrop(boolean solid, int color, int alpha, boolean opaqueControls,
+            boolean opaqueTopRow, int dayColor, int dayAlpha, int artworkAlpha) {
         this.solid = solid;
         this.color = rgbOrTheme(color);
         this.alpha = Math.max(0, Math.min(255, alpha));
@@ -39,6 +49,7 @@ final class CardBackdrop {
         this.opaqueTopRow = opaqueTopRow;
         this.dayColor = rgbOrTheme(dayColor);
         this.dayAlpha = Math.max(0, Math.min(255, dayAlpha));
+        this.artworkAlpha = Math.max(0, Math.min(255, artworkAlpha));
     }
 
     private static int rgbOrTheme(int color) {
@@ -52,7 +63,8 @@ final class CardBackdrop {
 
     /** The backdrop of the day mode. */
     CardBackdrop forDay() {
-        return new CardBackdrop(solid, dayColor, dayAlpha, opaqueControls, opaqueTopRow);
+        return new CardBackdrop(solid, dayColor, dayAlpha, opaqueControls, opaqueTopRow,
+                dayColor, dayAlpha, artworkAlpha);
     }
 
     boolean themed() {
@@ -71,17 +83,22 @@ final class CardBackdrop {
 
     /** Whether whatever lies under the card shows through it. */
     boolean translucentFor(CardStyle style) {
-        return solidFor(style) && alpha < 255;
+        return solidFor(style) ? alpha < 255 : artworkAlpha < 255;
     }
 
-    /** Whether the control panel needs its own opaque band over the translucent backdrop. */
+    /** Whether the control panel needs its own opaque band over the translucent colour. */
     boolean opaqueControlsFor(CardStyle style) {
-        return opaqueControls && translucentFor(style);
+        return opaqueControls && solidFor(style) && alpha < 255;
     }
 
-    /** Whether the top row needs its own opaque band over the translucent backdrop. */
+    /** Whether the top row needs its own opaque band over the translucent colour. */
     boolean opaqueTopRowFor(CardStyle style) {
-        return opaqueTopRow && translucentFor(style);
+        return opaqueTopRow && solidFor(style) && alpha < 255;
+    }
+
+    /** Opacity of whatever the style draws behind its content: the colour or the artwork. */
+    int backdropAlphaFor(CardStyle style) {
+        return solidFor(style) ? alpha : artworkAlpha;
     }
 
     int argb(int themeSurface) {
