@@ -198,7 +198,7 @@ public final class WidgetSetupActivity extends ScaledActivity {
             Ui.setSegmentSelected(this, entry.getValue(), entry.getKey() == style);
         }
         // A single-colour backdrop has no artwork to dim.
-        int dimVisibility = prefs.backdrop(style).solidFor(style) ? View.GONE : View.VISIBLE;
+        int dimVisibility = prefs.backdrop(style).solid ? View.GONE : View.VISIBLE;
         dimTitle.setVisibility(dimVisibility);
         dims.setVisibility(dimVisibility);
         CoverDimPreset dim = prefs.coverDimPreset(style);

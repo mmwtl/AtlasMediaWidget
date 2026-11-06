@@ -43,7 +43,7 @@ final class CardTheme {
             CardColors colors) {
         CardPalette palette = colors.palette(isNight(base.getResources().getConfiguration()));
         CardBackdrop backdrop = appearance.backdrop;
-        return content(base, palette, backdrop.solidFor(style) && !backdrop.themed()
+        return content(base, palette, backdrop.solid && !backdrop.themed()
                 ? backdrop.color : palette.background);
     }
 

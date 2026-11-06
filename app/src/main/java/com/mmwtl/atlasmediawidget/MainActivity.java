@@ -3209,10 +3209,8 @@ public final class MainActivity extends ScaledActivity {
         progressGapSetting.seek.setProgress(appearance.progressGapDp);
         progressThicknessSetting.seek.setProgress(appearance.progressThicknessDp);
         thumbnailSizeSetting.seek.setProgress(appearance.thumbnailSizeDp);
-        thumbnailSizeSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         cornerRadiusSetting.seek.setProgress(appearance.cornerRadiusDp);
         coverDimPresetButtons[appearance.coverDimPreset.preferenceValue].setChecked(true);
-        backdropSection.setVisibility(style == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
         backdropColor = appearance.backdrop.color;
         backdropAlpha = appearance.backdrop.alpha;
         backdropOpaqueControls.setChecked(appearance.backdrop.opaqueControls);
@@ -3610,8 +3608,9 @@ public final class MainActivity extends ScaledActivity {
     }
 
     private void updateBackdropControls() {
-        if (backdropSolidButton == null || coverDimTitle == null) return;
-        boolean solid = selectedBackdrop().solidFor(currentStyle());
+        if (backdropSolidButton == null || coverDimTitle == null
+                || thumbnailSizeSection == null) return;
+        boolean solid = selectedBackdrop().solid;
         backdropSolidOptions.setVisibility(backdropSolidButton.isChecked()
                 ? View.VISIBLE : View.GONE);
         // Dimming applies only to the artwork backdrop.
@@ -3619,7 +3618,10 @@ public final class MainActivity extends ScaledActivity {
         coverDimPresetGroup.setVisibility(solid ? View.GONE : View.VISIBLE);
         // The swatch shows the colour itself; opacity has its own slider.
         backdropColorOptions.setVisibility(backdropSolidButton.isChecked()
-                && currentStyle() == CardStyle.COMPACT ? View.VISIBLE : View.GONE);
+                ? View.VISIBLE : View.GONE);
+        // The square card shows the thumbnail only while the solid backdrop hides its artwork.
+        thumbnailSizeSection.setVisibility(currentStyle() == CardStyle.COMPACT || solid
+                ? View.VISIBLE : View.GONE);
         backdropSwatch.setBackground(Ui.background(0xFF000000 | shownBackdropRgb(), 8, this));
         backdropColorButton.setText(shownBackdropColor() == CardBackdrop.THEME_COLOR
                 ? "Цвет подложки  по теме" : "Цвет подложки");

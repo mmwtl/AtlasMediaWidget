@@ -160,7 +160,7 @@ final class MediaCardView extends FrameLayout {
         setMinimumWidth(cardWidth);
         setMinimumHeight(cardHeight);
         // A solid backdrop replaces the full-bleed artwork and its dimming gradient.
-        boolean solidBackdrop = appearance.backdrop.solidFor(style);
+        boolean solidBackdrop = appearance.backdrop.solid;
         int surface = color(R.color.card_background);
         setBackground(Ui.background(solidBackdrop ? appearance.backdrop.argb(surface) : surface,
                 appearance.cornerRadiusDp, context));
@@ -199,7 +199,7 @@ final class MediaCardView extends FrameLayout {
         // The top row gets the same kind of strip, as deep below the pills as above them.
         View topRowBand = new View(context);
         topRowBand.setBackgroundColor(0xFF000000 | appearance.backdrop.rgb(surface));
-        topRowBand.setVisibility(appearance.backdrop.opaqueTopRowFor(style) ? VISIBLE : GONE);
+        topRowBand.setVisibility(appearance.backdrop.opaqueTopRowShown() ? VISIBLE : GONE);
         addView(topRowBand, new LayoutParams(LayoutParams.MATCH_PARENT,
                 by(appearance.topInsetDp) * 2 + d(topPillHeightDp), Gravity.TOP));
 
@@ -884,8 +884,9 @@ final class MediaCardView extends FrameLayout {
         // Live streams keep the row too, with listening time and ∞, so the text never shifts.
         boolean showProgress = !radio && hasMedia && snapshot != null;
         // The compact thumbnail slot stays even without media; its placeholder replaces the
-        // large centred one, which would cover the whole compact card.
-        boolean showThumbnail = compact;
+        // large centred one, which would cover the whole compact card. A solid backdrop hides
+        // the full-bleed artwork, so the square card then shows the thumbnail too.
+        boolean showThumbnail = compact || appearance.backdrop.solid;
         int panelHeight = Math.min(cardHeight, by(appearance.controlPanelHeightDp));
         int controlsTop = Math.max(0, cardHeight - panelHeight);
         int progressTop = Math.max(0,
@@ -955,7 +956,7 @@ final class MediaCardView extends FrameLayout {
         bandParams.topMargin = controlsParams.topMargin;
         controlsBand.setLayoutParams(bandParams);
         controlsBand.setVisibility(!chooserVisible
-                && appearance.backdrop.opaqueControlsFor(style) ? VISIBLE : GONE);
+                && appearance.backdrop.opaqueControlsShown() ? VISIBLE : GONE);
         updateControlLayout(compact, panelHeight);
 
         LayoutParams chooserParams = new LayoutParams(LayoutParams.MATCH_PARENT,
