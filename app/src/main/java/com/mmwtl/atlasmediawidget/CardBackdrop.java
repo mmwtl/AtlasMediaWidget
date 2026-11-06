@@ -1,6 +1,6 @@
 package com.mmwtl.atlasmediawidget;
 
-/** What fills the card behind its content: the artwork or one translucent colour. */
+/** What fills the compact card behind its content: the artwork or one translucent colour. */
 final class CardBackdrop {
     /** A colour left to the theme: the card surface of the mode; never an RGB value. */
     static final int THEME_COLOR = -1;
@@ -64,19 +64,24 @@ final class CardBackdrop {
         return themed() ? themeSurface & 0x00FFFFFF : color;
     }
 
+    /** Only the compact layout offers the single-colour backdrop. */
+    boolean solidFor(CardStyle style) {
+        return solid && style == CardStyle.COMPACT;
+    }
+
     /** Whether whatever lies under the card shows through it. */
-    boolean translucent() {
-        return solid && alpha < 255;
+    boolean translucentFor(CardStyle style) {
+        return solidFor(style) && alpha < 255;
     }
 
     /** Whether the control panel needs its own opaque band over the translucent backdrop. */
-    boolean opaqueControlsShown() {
-        return opaqueControls && translucent();
+    boolean opaqueControlsFor(CardStyle style) {
+        return opaqueControls && translucentFor(style);
     }
 
     /** Whether the top row needs its own opaque band over the translucent backdrop. */
-    boolean opaqueTopRowShown() {
-        return opaqueTopRow && translucent();
+    boolean opaqueTopRowFor(CardStyle style) {
+        return opaqueTopRow && translucentFor(style);
     }
 
     int argb(int themeSurface) {

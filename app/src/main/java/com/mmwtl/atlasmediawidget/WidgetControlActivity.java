@@ -177,7 +177,7 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
         var frame = service == null ? null : service.widgetFrame(widgetId);
         // A translucent backdrop would let the widget's own strip show through the copy.
         if (frame != null && frame.width == width && frame.height == height
-                && !appearance.backdrop.translucent()) {
+                && !appearance.backdrop.translucentFor(style)) {
             // An opaque copy of the card under the strip hides whatever the widget's own strip
             // shows, so it never has to be hidden or restored and is never drawn twice.
             Rect crop = new Rect(Math.round(area.left * frame.cardScale),
