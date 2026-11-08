@@ -27,6 +27,11 @@ final class PlayerIconStyle {
     /** Luminance distance from the main tone where a pixel starts and fully becomes a mark. */
     private static final float MARK_START = 0.12f;
     private static final float MARK_FULL = 0.24f;
+    /**
+     * The icon is drawn this much larger and scaled down at the end: the logo fills only part of
+     * the icon, and enlarging it from a tile-sized drawing blurs its edges.
+     */
+    private static final int OVERSAMPLE = 4;
     /** An adaptive layer is 108 dp with the logo in the middle 72 dp. */
     private static final float LAYER_TO_LOGO = 108f / 72f;
 
@@ -40,22 +45,24 @@ final class PlayerIconStyle {
         if (cached != null) return cached;
         Drawable icon = app.newIcon();
         if (icon == null || sizePx <= 0) return null;
-        Bitmap source = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888);
+        int drawSize = sizePx * OVERSAMPLE;
+        Bitmap source = Bitmap.createBitmap(drawSize, drawSize, Bitmap.Config.ARGB_8888);
         if (icon instanceof AdaptiveIconDrawable adaptive && adaptive.getForeground() != null) {
             Drawable logo = adaptive.getForeground();
-            int inset = Math.round(sizePx * (LAYER_TO_LOGO - 1f) / 2f);
-            logo.setBounds(-inset, -inset, sizePx + inset, sizePx + inset);
+            int inset = Math.round(drawSize * (LAYER_TO_LOGO - 1f) / 2f);
+            logo.setBounds(-inset, -inset, drawSize + inset, drawSize + inset);
             logo.draw(new Canvas(source));
         } else {
-            icon.setBounds(0, 0, sizePx, sizePx);
+            icon.setBounds(0, 0, drawSize, drawSize);
             icon.draw(new Canvas(source));
         }
-        int[] pixels = new int[sizePx * sizePx];
-        source.getPixels(pixels, 0, sizePx, 0, 0, sizePx, sizePx);
+        int[] pixels = new int[drawSize * drawSize];
+        source.getPixels(pixels, 0, drawSize, 0, 0, drawSize, drawSize);
         source.recycle();
         int[] glyph = oneTone(pixels, color);
         Bitmap bitmap = glyph != null
-                ? fitted(Bitmap.createBitmap(glyph, sizePx, sizePx, Bitmap.Config.ARGB_8888))
+                ? fitted(Bitmap.createBitmap(glyph, drawSize, drawSize, Bitmap.Config.ARGB_8888),
+                        sizePx)
                 : greyscale(icon, sizePx);
         CACHE.put(key, bitmap);
         return bitmap;
@@ -102,8 +109,8 @@ final class PlayerIconStyle {
         return keptShare < MIN_GLYPH_COVERAGE || keptShare > MAX_LOGO_COVERAGE ? null : out;
     }
 
-    /** Scales the glyph's content to {@link #GLYPH_FILL} of the box, centred. */
-    private static Bitmap fitted(Bitmap glyph) {
+    /** Scales the glyph's content down to {@link #GLYPH_FILL} of a {@code size} box, centred. */
+    private static Bitmap fitted(Bitmap glyph, int targetSize) {
         int size = glyph.getWidth();
         int[] pixels = new int[size * size];
         glyph.getPixels(pixels, 0, size, 0, 0, size, size);
@@ -117,16 +124,32 @@ final class PlayerIconStyle {
                 bottom = Math.max(bottom, y);
             }
         }
-        if (right < left) return glyph;
-        float width = right - left + 1;
-        float height = bottom - top + 1;
-        float scale = size * GLYPH_FILL / Math.max(width, height);
-        float dx = (size - width * scale) / 2f;
-        float dy = (size - height * scale) / 2f;
-        Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
-        new Canvas(out).drawBitmap(glyph, new android.graphics.Rect(left, top, right + 1, bottom + 1),
+        if (right < left) {
+            left = 0;
+            top = 0;
+            right = size - 1;
+            bottom = size - 1;
+        }
+        Bitmap content = Bitmap.createBitmap(glyph, left, top, right - left + 1, bottom - top + 1);
+        float fit = targetSize * GLYPH_FILL;
+        // Halving steps: one large bilinear reduction skips pixels and leaves jagged edges.
+        while (Math.max(content.getWidth(), content.getHeight()) >= fit * 2f) {
+            Bitmap half = Bitmap.createScaledBitmap(content, Math.max(1, content.getWidth() / 2),
+                    Math.max(1, content.getHeight() / 2), true);
+            if (content != glyph) content.recycle();
+            content = half;
+        }
+        float width = content.getWidth();
+        float height = content.getHeight();
+        float scale = fit / Math.max(width, height);
+        float dx = (targetSize - width * scale) / 2f;
+        float dy = (targetSize - height * scale) / 2f;
+        Bitmap out = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888);
+        new Canvas(out).drawBitmap(content, null,
                 new android.graphics.RectF(dx, dy, dx + width * scale, dy + height * scale),
-                new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG));
+                new android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG
+                        | android.graphics.Paint.ANTI_ALIAS_FLAG));
+        if (content != glyph) content.recycle();
         glyph.recycle();
         return out;
     }
