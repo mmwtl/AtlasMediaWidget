@@ -22,12 +22,25 @@
 | [aimp.svg](aimp.svg) | [Официальный SVG сайта AIMP](https://www.aimp.ru/v2/theme/images/header-logo.svg) | Извлечён знак A, убраны надпись и круги с градиентом, нормализован размер. |
 | [poweramp.svg](poweramp.svg) | [Официальный сайт](https://powerampapp.com/), [логотип](https://powerampapp.com/logo.1c51fc5e.png) | Ручная геометрическая перерисовка: кольцо и скруглённый треугольник. Убрана цветная внешняя подложка. Это приближение, не официальный вектор. |
 | [zvuk.svg](zvuk.svg) | [Trace Logos](https://trace-logos.ru/logos/media/zvuk/), [исходный SVG](https://trace-logos.ru/assets/logos/svgs/zvuk.svg) | Сохранена геометрия знака, убрана зелёная плашка, нормализован размер. Источник сторонний. |
-| [murglar.svg](murglar.svg) | [Официальный сайт](https://murglar.app/), [иконка](https://murglar.app/docs/en/images/icon.png) | Ручная монохромная адаптация: нота, список и стрелка загрузки внутри кольца. Убраны градиент и диагональная цветная подложка; детали упрощены для малого размера. Это приближение, не официальный вектор. |
+| [murglar.svg](murglar.svg) | [Официальный сайт](https://murglar.app/), [иконка](https://murglar.app/docs/en/images/icon.png) | Векторизация исходной иконки с сохранением круглого диска, диагонального разделения, расположения ноты, списка и стрелки. Нота и список превращены в прозрачные вырезы; диагональ обозначена тонким прозрачным разрезом. Заменяет прежнюю ручную версию с кольцом и изменёнными пропорциями. Это монохромная адаптация, не официальный вектор. |
 | [waves-of-sound.svg](waves-of-sound.svg) | APK «Волны Звука» 1.0.29, предоставленный пользователем | Геометрия `drawable/ic_launcher_foreground` из APK: кольцо, V и четыре столбика. Убраны фон и цвет; обводки переведены в залитые контуры, нормализован размер. |
 | [yandex-radio.svg](yandex-radio.svg) | [Актуальный сайт](https://radio.yandex.ru/), [официальный SVG favicon](https://radio.yandex.ru/favicon.svg) | Сохранён знак актуального сервиса, убрана красная подложка. Круглая обрезка длинного луча выражена дугой в контуре, без clipPath. Нормализован размер. |
+| [vk-music.svg](vk-music.svg) | [LogoTeka](https://logo-teka.com/vk-music/), [SVG](https://logo-teka.com/wp-content/uploads/2025/08/vk-music-sign-logo.svg) | Сохранена розовая волна; пять столбиков эквалайзера стали прозрачными вырезами. Синяя часть фона удалена. Это знак VK Музыки, а не общий знак VK. Источник сторонний. |
+| [kion-music.svg](kion-music.svg) | [Официальный бренд-гайд](https://design.kion.ru/), [SVG иконки](https://static.kion.ru/kds/kiondesignru/kionmusic/kion_music_app_icon_sq.svg) | Сохранены три исходных контура ноты, убран градиентный фон, нормализован размер. |
+| [vlc.svg](vlc.svg) | [Simple Icons v15](https://cdn.jsdelivr.net/npm/simple-icons@v15/icons/vlcmediaplayer.svg), CC0 | Исходный монохромный знак, нормализован размер с полем 1 px. |
+| [stellio.svg](stellio.svg) | [Официальный сайт](https://stellio.ru/ru), [PNG иконки](https://stellio.ru/img/store_data/icon_jfrost.png) | Цветной знак хамелеона векторизован в одну заливку. Белая подложка и внешнее кольцо удалены; сохранена внутренняя геометрия. |
+| [musicolet.svg](musicolet.svg) | [Официальный сайт](https://krosbits.in/musicolet/), [PNG иконки](https://krosbits.in/musicolet/icons/android-icon-192x192.png) | Векторизован исходный треугольник с нотой как прозрачным вырезом. Убрана зелёная круглая подложка. |
+| [foobar2000.svg](foobar2000.svg) | [Simple Icons v15](https://cdn.jsdelivr.net/npm/simple-icons@v15/icons/foobar2000.svg), CC0 | Исходный монохромный знак, нормализован размер с полем 1 px. |
 
-Три дополнительных SVG пока не включены в `tools/make_player_icons.py` и
+Дополнительные SVG (Murglar, Волны Звука, Яндекс Радио, VK Музыка, КИОН Музыка,
+VLC, Stellio, Musicolet и foobar2000) пока не включены в `tools/make_player_icons.py` и
 `PlayerIconStyle.CURATED`; подключение к приложению — отдельное изменение.
+Уже существующий drawable VLC из Simple Icons не изменялся. Общий знак VK в
+приложении также не заменялся новым знаком VK Музыки в рамках подготовки SVG.
+
+Растровые исходники Murglar, Stellio и Musicolet обработаны VTracer (binary/spline)
+во временном окружении вне репозитория. Конечные SVG содержат только залитые
+контуры; зависимости приложения не добавлялись.
 
 ### Идентификация «Волн Звука»
 
@@ -42,5 +55,5 @@
 
 SVG разобраны XML-парсером; не содержат растровых вставок, внешних ссылок,
 скриптов, фильтров или градиентов. Предпросмотр проверен визуально в 24, 32 и 64 px.
-Для трёх дополнительных исходных SVG код приложения и версия не менялись;
+Для дополнительных исходных SVG код приложения и версия не менялись;
 Gradle и проверка на ГУ не запускались.
