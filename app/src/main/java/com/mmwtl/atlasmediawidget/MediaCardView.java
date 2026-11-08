@@ -983,7 +983,7 @@ final class MediaCardView extends FrameLayout {
         updateControlLayout(compact, panelHeight);
 
         LayoutParams chooserParams = new LayoutParams(LayoutParams.MATCH_PARENT,
-                Math.max(d(120), cardHeight - by(compact ? 63 : 68) - by(16)));
+                sourceChooserHeight());
         chooserParams.gravity = Gravity.TOP;
         chooserParams.leftMargin = bx(18);
         chooserParams.rightMargin = bx(18);
@@ -991,6 +991,27 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.setLayoutParams(chooserParams);
         favoritesChooser.setLayoutParams(new LayoutParams(chooserParams));
         updateFavoriteTileDimensions(chooserParams);
+    }
+
+    private int sourceChooserHeight() {
+        boolean compact = style == CardStyle.COMPACT;
+        return Math.max(d(120), cardHeight - by(compact ? 63 : 68) - by(16));
+    }
+
+    /**
+     * Icon size for the source tiles: 36 dp on a small card, growing with the tile so a large card
+     * does not show small icons in big empty tiles. The label keeps its room below the icon.
+     */
+    private int sourceIconSize(int count) {
+        int top = topRowTiles(count);
+        int rows = top > 0 ? 2 : 1;
+        int columns = Math.max(top, count - top);
+        int tileWidth = (cardWidth - 2 * bx(18) - 2 * d(12)) / Math.max(1, columns) - 2 * d(5);
+        int tileHeight = (sourceChooserHeight() - 2 * d(10)) / rows - 2 * d(5);
+        int label = Math.round(Ui.dp(getContext(), (style == CardStyle.COMPACT ? 14 : 16) * 1.4f)
+                * uiScale) + d(4) + 2 * d(7);
+        int room = Math.min(Math.round(tileWidth * 0.5f), tileHeight - label);
+        return Math.max(d(36), Math.min(Math.round(room * 0.62f), d(96)));
     }
 
     private void updateFavoriteTileDimensions(LayoutParams chooserParams) {
@@ -1071,6 +1092,7 @@ final class MediaCardView extends FrameLayout {
     private void rebuildSourceOptions(MediaSnapshot value, int selectedIndex) {
         sourceOptions.removeAllViews();
         int top = topRowTiles(shownTiles.size());
+        int iconSize = sourceIconSize(shownTiles.size());
         LinearLayout topRow = sourceRow();
         LinearLayout bottomRow = sourceRow();
         if (top > 0) {
@@ -1093,16 +1115,17 @@ final class MediaCardView extends FrameLayout {
                     color(selected ? R.color.card_option_selected : R.color.card_option),
                     color(selected ? R.color.card_option_selected_stroke
                             : R.color.card_option_stroke), d(17)));
-            Drawable icon = app == null ? null : app.newIcon();
+            Bitmap icon = app == null ? null : PlayerIconStyle.glyph(tile.playerPackage, app,
+                    color(R.color.card_text), iconSize);
             if (icon != null) {
                 ImageView appIcon = new ImageView(getContext());
                 appIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                appIcon.setImageDrawable(icon);
-                option.addView(appIcon, new LinearLayout.LayoutParams(d(36), d(36)));
+                appIcon.setImageBitmap(icon);
+                option.addView(appIcon, new LinearLayout.LayoutParams(iconSize, iconSize));
             } else {
                 SourceGlyphView glyph = new SourceGlyphView(getContext());
                 glyph.setSource(tile.source);
-                option.addView(glyph, new LinearLayout.LayoutParams(d(36), d(36)));
+                option.addView(glyph, new LinearLayout.LayoutParams(iconSize, iconSize));
             }
             TextView label = text(app != null ? app.label() : tile.source.label(),
                     style == CardStyle.COMPACT ? 14 : 16,
