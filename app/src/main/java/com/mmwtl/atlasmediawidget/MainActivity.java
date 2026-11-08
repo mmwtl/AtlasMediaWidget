@@ -2356,10 +2356,10 @@ public final class MainActivity extends ScaledActivity {
                 MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY);
         startupInternetSwitch = mediaSwitch(startup, "Ждать подключения к интернету", 12,
                 MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET);
-        TextView internetNote = text("Переключение и автовоспроизведение при старте начнутся, "
-                        + "только когда появится интернет (Wi-Fi, точка доступа телефона или "
-                        + "связь машины). Если за отведённое время его нет, автозапуск "
-                        + "пропускается.",
+        TextView internetNote = text("Работает вместе с автовоспроизведением: переключение и "
+                        + "запуск при старте начнутся, только когда появится интернет (Wi-Fi, "
+                        + "точка доступа телефона или связь машины). Если за отведённое время его "
+                        + "нет, автозапуск пропускается.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         LinearLayout.LayoutParams internetNoteParams = fullWrap();
         internetNoteParams.topMargin = Ui.dp(this, 4);
@@ -2718,11 +2718,14 @@ public final class MainActivity extends ScaledActivity {
             startupAutoplaySwitch.setEnabled(true);
             startupAutoplaySwitch.setAlpha(1f);
         }
+        boolean autoplay = snapshot.defaultAudioSourceAutoplayOnStartup;
         if (startupInternetSwitch != null) {
             startupInternetSwitch.setChecked(snapshot.startupWaitForInternet);
+            startupInternetSwitch.setEnabled(autoplay);
+            startupInternetSwitch.setAlpha(autoplay ? 1f : 0.45f);
         }
         if (startupInternetTimeoutSeekBar != null) {
-            boolean waits = snapshot.startupWaitForInternet;
+            boolean waits = autoplay && snapshot.startupWaitForInternet;
             setStartupInternetTimeoutLabel(snapshot.startupInternetTimeoutSec);
             startupInternetTimeoutSeekBar.setProgress(snapshot.startupInternetTimeoutSec / 10);
             startupInternetTimeoutSeekBar.setEnabled(waits);

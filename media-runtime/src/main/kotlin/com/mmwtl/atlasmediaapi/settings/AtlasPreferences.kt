@@ -65,7 +65,10 @@ class AtlasPreferences(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY_ON_SOURCE_LOST, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY_ON_SOURCE_LOST, value).apply()
 
-    /** The startup source switch and autoplay wait for a validated internet connection. */
+    /**
+     * With startup autoplay, the startup source switch and autoplay wait for a validated internet
+     * connection. Without autoplay the setting has no effect.
+     */
     var startupWaitForInternet: Boolean
         get() = prefs.getBoolean(KEY_STARTUP_WAIT_FOR_INTERNET, false)
         set(value) = prefs.edit().putBoolean(KEY_STARTUP_WAIT_FOR_INTERNET, value).apply()

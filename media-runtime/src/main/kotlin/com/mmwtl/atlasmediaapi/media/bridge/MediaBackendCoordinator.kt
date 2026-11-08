@@ -346,7 +346,10 @@ class MediaBackendCoordinator(
                 delay(delayMs)
             }
             if (!isBackendStarted) return@launch
-            if (preferences.startupWaitForInternet && !awaitStartupInternet(targetDescription)) {
+            // Internet is needed to play, not to select a source: without autoplay nothing waits.
+            if (autoplay && preferences.startupWaitForInternet &&
+                !awaitStartupInternet(targetDescription)
+            ) {
                 // The condition was not met; a Bridge reconnect must not start it later.
                 hasAppliedDefaultSource = true
                 return@launch
