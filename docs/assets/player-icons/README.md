@@ -22,8 +22,25 @@
 | [aimp.svg](aimp.svg) | [Официальный SVG сайта AIMP](https://www.aimp.ru/v2/theme/images/header-logo.svg) | Извлечён знак A, убраны надпись и круги с градиентом, нормализован размер. |
 | [poweramp.svg](poweramp.svg) | [Официальный сайт](https://powerampapp.com/), [логотип](https://powerampapp.com/logo.1c51fc5e.png) | Ручная геометрическая перерисовка: кольцо и скруглённый треугольник. Убрана цветная внешняя подложка. Это приближение, не официальный вектор. |
 | [zvuk.svg](zvuk.svg) | [Trace Logos](https://trace-logos.ru/logos/media/zvuk/), [исходный SVG](https://trace-logos.ru/assets/logos/svgs/zvuk.svg) | Сохранена геометрия знака, убрана зелёная плашка, нормализован размер. Источник сторонний. |
+| [murglar.svg](murglar.svg) | [Официальный сайт](https://murglar.app/), [иконка](https://murglar.app/docs/en/images/icon.png) | Ручная монохромная адаптация: нота, список и стрелка загрузки внутри кольца. Убраны градиент и диагональная цветная подложка; детали упрощены для малого размера. Это приближение, не официальный вектор. |
+| [waves-of-sound.svg](waves-of-sound.svg) | APK «Волны Звука» 1.0.29, предоставленный пользователем | Геометрия `drawable/ic_launcher_foreground` из APK: кольцо, V и четыре столбика. Убраны фон и цвет; обводки переведены в залитые контуры, нормализован размер. |
+| [yandex-radio.svg](yandex-radio.svg) | [Актуальный сайт](https://radio.yandex.ru/), [официальный SVG favicon](https://radio.yandex.ru/favicon.svg) | Сохранён знак актуального сервиса, убрана красная подложка. Круглая обрезка длинного луча выражена дугой в контуре, без clipPath. Нормализован размер. |
+
+Три дополнительных SVG пока не включены в `tools/make_player_icons.py` и
+`PlayerIconStyle.CURATED`; подключение к приложению — отдельное изменение.
+
+### Идентификация «Волн Звука»
+
+- Исходный файл: `WavesOfSound-1.0.29.apk` из «Загрузок» пользователя.
+- Package: `ru.chan.music`; versionName: `1.0.29`; versionCode: `120`.
+- SHA-256 APK: `944038228c7b1249ad4909ebecb0cedbd15a31b84e8f7ef2f3f7c334b617bc03`.
+- Ресурс: `drawable/ic_launcher_foreground` (`res/Qr.xml`), выбранный через
+  adaptive icon `mipmap/ic_launcher` (`res/BW.xml`). Геометрия прочитана `aapt dump xmltree`.
+- APK и декомпилированные ресурсы в репозиторий не добавлялись.
 
 ## Проверка
 
 SVG разобраны XML-парсером; не содержат растровых вставок, внешних ссылок,
 скриптов, фильтров или градиентов. Предпросмотр проверен визуально в 24, 32 и 64 px.
+Для трёх дополнительных исходных SVG код приложения и версия не менялись;
+Gradle и проверка на ГУ не запускались.
