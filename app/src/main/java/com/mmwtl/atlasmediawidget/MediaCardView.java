@@ -1197,7 +1197,10 @@ final class MediaCardView extends FrameLayout {
             label.setGravity(Gravity.CENTER);
             // Not setSingleLine: its horizontal scrolling draws a centred label outside the tile.
             label.setMaxLines(1);
-            LinearLayout.LayoutParams labelParams = wrap();
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            // The tile's full width: a label measured to its own text loses its last letter when
+            // the widget picture is drawn scaled down.
+            LinearLayout.LayoutParams labelParams = fullWrap();
             labelParams.topMargin = d(4);
             option.addView(label, labelParams);
             boolean selectable = SourceTile.selectable(shownTiles, index, value,
