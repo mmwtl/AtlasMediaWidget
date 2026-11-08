@@ -46,8 +46,15 @@ final class PlayerIconStyle {
      */
     static final Map<String, Integer> CURATED = Map.ofEntries(
             Map.entry("com.aimp.player", R.drawable.ic_player_aimp),
+            Map.entry("com.foobar2000.foobar2000", R.drawable.ic_player_foobar2000),
+            Map.entry("ru.mts.music.android", R.drawable.ic_player_kionmusic),
+            Map.entry("com.badmanners.murglar2", R.drawable.ic_player_murglar),
+            Map.entry("in.krosbits.musicolet", R.drawable.ic_player_musicolet),
             Map.entry("com.maxmpz.audioplayer", R.drawable.ic_player_poweramp),
+            Map.entry("io.stellio.music", R.drawable.ic_player_stellio),
+            Map.entry("ru.chan.music", R.drawable.ic_player_wavesofsound),
             Map.entry("ru.yandex.music", R.drawable.ic_player_yandexmusic),
+            Map.entry("ru.yandex.radio", R.drawable.ic_player_yandexradio),
             Map.entry("com.zvooq.openplay", R.drawable.ic_player_zvuk),
             Map.entry("com.apple.android.music", R.drawable.ic_player_applemusic),
             Map.entry("com.audible.application", R.drawable.ic_player_audible),
@@ -60,9 +67,9 @@ final class PlayerIconStyle {
             Map.entry("com.soundcloud.android", R.drawable.ic_player_soundcloud),
             Map.entry("com.spotify.music", R.drawable.ic_player_spotify),
             Map.entry("com.aspiro.tidal", R.drawable.ic_player_tidal),
-            Map.entry("com.uma.musicvk", R.drawable.ic_player_vk),
+            Map.entry("com.uma.musicvk", R.drawable.ic_player_vkmusic),
             Map.entry("com.vkontakte.android", R.drawable.ic_player_vk),
-            Map.entry("org.videolan.vlc", R.drawable.ic_player_vlcmediaplayer),
+            Map.entry("org.videolan.vlc", R.drawable.ic_player_vlc),
             Map.entry("com.google.android.apps.youtube.music", R.drawable.ic_player_youtubemusic));
 
     private PlayerIconStyle() {}

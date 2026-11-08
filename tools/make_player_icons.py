@@ -20,13 +20,22 @@ import xml.etree.ElementTree as ElementTree
 SIMPLE_ICONS_URL = "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/{}.svg"
 SIMPLE_ICONS = [
     "applemusic", "audible", "castbox", "deezer", "kodi", "plex", "pocketcasts",
-    "podcastaddict", "soundcloud", "spotify", "tidal", "vk", "vlcmediaplayer", "youtubemusic",
+    "podcastaddict", "soundcloud", "spotify", "tidal", "vk", "youtubemusic",
 ]
-# docs/assets/player-icons file -> drawable name.
+# docs/assets/player-icons file -> drawable name. A local file wins over Simple Icons.
 LOCAL_ICONS = {
     "aimp.svg": "aimp",
+    "foobar2000.svg": "foobar2000",
+    "kion-music.svg": "kionmusic",
+    "murglar.svg": "murglar",
+    "musicolet.svg": "musicolet",
     "poweramp.svg": "poweramp",
+    "stellio.svg": "stellio",
+    "vk-music.svg": "vkmusic",
+    "vlc.svg": "vlc",
+    "waves-of-sound.svg": "wavesofsound",
     "yandex-music.svg": "yandexmusic",
+    "yandex-radio.svg": "yandexradio",
     "zvuk.svg": "zvuk",
 }
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

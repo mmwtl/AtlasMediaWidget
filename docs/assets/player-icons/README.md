@@ -32,11 +32,9 @@
 | [musicolet.svg](musicolet.svg) | [Официальный сайт](https://krosbits.in/musicolet/), [PNG иконки](https://krosbits.in/musicolet/icons/android-icon-192x192.png) | Векторизован исходный треугольник с нотой как прозрачным вырезом. Убрана зелёная круглая подложка. |
 | [foobar2000.svg](foobar2000.svg) | [Simple Icons v15](https://cdn.jsdelivr.net/npm/simple-icons@v15/icons/foobar2000.svg), CC0 | Исходный монохромный знак, нормализован размер с полем 1 px. |
 
-Дополнительные SVG (Murglar, Волны Звука, Яндекс Радио, VK Музыка, КИОН Музыка,
-VLC, Stellio, Musicolet и foobar2000) пока не включены в `tools/make_player_icons.py` и
-`PlayerIconStyle.CURATED`; подключение к приложению — отдельное изменение.
-Уже существующий drawable VLC из Simple Icons не изменялся. Общий знак VK в
-приложении также не заменялся новым знаком VK Музыки в рамках подготовки SVG.
+Все SVG этой папки подключены через `tools/make_player_icons.py` и `PlayerIconStyle.CURATED`.
+Локальные `vlc.svg` и `foobar2000.svg` заменяют одноимённые знаки Simple Icons; `vk-music.svg`
+используется для приложения VK Музыка, общий знак VK — для приложения VK.
 
 Растровые исходники Murglar, Stellio и Musicolet обработаны VTracer (binary/spline)
 во временном окружении вне репозитория. Конечные SVG содержат только залитые
@@ -55,5 +53,3 @@ VLC, Stellio, Musicolet и foobar2000) пока не включены в `tools/
 
 SVG разобраны XML-парсером; не содержат растровых вставок, внешних ссылок,
 скриптов, фильтров или градиентов. Предпросмотр проверен визуально в 24, 32 и 64 px.
-Для дополнительных исходных SVG код приложения и версия не менялись;
-Gradle и проверка на ГУ не запускались.

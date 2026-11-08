@@ -71,6 +71,9 @@ final class MediaCardView extends FrameLayout {
     private final ImageView placeholder;
     private final LinearLayout sourcePill;
     private final SourceGlyphView sourceGlyph;
+    /** The playing player's icon in place of the Online glyph. */
+    private final ImageView sourceAppIcon;
+    private String sourceAppIconKey = "";
     private final TextView sourceLabel;
     private final FrameLayout sourceChooser;
     private final LinearLayout sourceOptions;
@@ -231,6 +234,11 @@ final class MediaCardView extends FrameLayout {
                 color(R.color.card_pill_stroke), d(19)));
         sourceGlyph = new SourceGlyphView(context);
         sourcePill.addView(sourceGlyph,
+                new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
+        sourceAppIcon = new ImageView(context);
+        sourceAppIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        sourceAppIcon.setVisibility(GONE);
+        sourcePill.addView(sourceAppIcon,
                 new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
         TextView sourceDot = text("●", 8, color(R.color.card_source_dot), Typeface.BOLD);
         LinearLayout.LayoutParams dotParams = wrap();
@@ -571,6 +579,7 @@ final class MediaCardView extends FrameLayout {
 
     void setSourceTiles(List<SourceTile> tiles, boolean monochromePlayerIcons) {
         sourceTiles = tiles == null || tiles.isEmpty() ? SourceTile.DEFAULT : List.copyOf(tiles);
+        if (playerIconsMono != monochromePlayerIcons) sourceAppIconKey = "-";
         playerIconsMono = monochromePlayerIcons;
         if (snapshot != null) renderSources(snapshot);
     }
@@ -580,28 +589,43 @@ final class MediaCardView extends FrameLayout {
      * the player has one and otherwise a logo reduced from its icon. Null leaves the source glyph.
      */
     private ImageView playerIcon(SourceTile tile, PlayerApps.Info app, int size) {
-        if (app == null || !app.installed()) return null;
+        if (app == null) return null;
+        Drawable icon = playerIconDrawable(tile.playerPackage, app, size);
+        if (icon == null) return null;
         ImageView view = new ImageView(getContext());
         view.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        Integer curated = PlayerIconStyle.CURATED.get(tile.playerPackage);
-        if (!playerIconsMono) {
-            Drawable icon = app.newIcon();
-            if (icon == null) return null;
-            view.setImageDrawable(icon);
-        } else if (curated != null) {
+        view.setImageDrawable(icon);
+        return view;
+    }
+
+    private Drawable playerIconDrawable(String packageName, PlayerApps.Info app, int size) {
+        if (!app.installed()) return null;
+        if (!playerIconsMono) return app.newIcon();
+        Integer curated = PlayerIconStyle.CURATED.get(packageName);
+        if (curated != null) {
             Drawable logo = getContext().getDrawable(curated).mutate();
             logo.setTint(color(R.color.card_text));
-            view.setImageDrawable(logo);
             // Simple Icons fill their box; the card's glyphs keep a margin.
-            int inset = Math.round(size * 0.08f);
-            view.setPadding(inset, inset, inset, inset);
-        } else {
-            Bitmap glyph = PlayerIconStyle.glyph(tile.playerPackage, app,
-                    color(R.color.card_text), size);
-            if (glyph == null) return null;
-            view.setImageBitmap(glyph);
+            return new android.graphics.drawable.InsetDrawable(logo, 0.08f);
         }
-        return view;
+        Bitmap glyph = PlayerIconStyle.glyph(packageName, app, color(R.color.card_text), size);
+        return glyph == null ? null
+                : new android.graphics.drawable.BitmapDrawable(getResources(), glyph);
+    }
+
+    /** Online shows the playing player's own icon in the pill; other sources keep their glyph. */
+    private void setSourcePillIcon(MediaSource.Id source, String ownerPackage) {
+        String owner = source.displayId() == MediaSource.Id.ONLINE && ownerPackage != null
+                ? ownerPackage : "";
+        String key = owner.isEmpty() ? "" : owner + '|' + playerIconsMono;
+        if (key.equals(sourceAppIconKey)) return;
+        sourceAppIconKey = key;
+        Drawable icon = owner.isEmpty() ? null : playerIconDrawable(owner,
+                PlayerApps.get(getContext(), owner), sourceAppIcon.getLayoutParams().width);
+        sourceAppIcon.setImageDrawable(icon);
+        sourceAppIcon.setVisibility(icon == null ? GONE : VISIBLE);
+        sourceGlyph.setVisibility(icon == null ? VISIBLE : GONE);
+        if (icon == null) sourceAppIconKey = "";
     }
 
     android.graphics.Rect widgetBounds(View target) {
@@ -1095,12 +1119,14 @@ final class MediaCardView extends FrameLayout {
         shownTiles.clear();
         shownTiles.addAll(sourceTiles);
         int selected = SourceTile.selectedIndex(shownTiles, activeSource, value.ownerPackage);
-        SourceTile selectedTile = selected < 0 ? null : shownTiles.get(selected);
-        // A player tile names its app in the pill as well, instead of the generic "Online".
-        String label = selectedTile != null && selectedTile.isPlayer()
-                ? PlayerApps.get(getContext(), selectedTile.playerPackage).label()
+        // Online names the playing player app in the pill, as its icon does, not "Online".
+        PlayerApps.Info owner = activeSource == MediaSource.Id.ONLINE
+                && !value.ownerPackage.isBlank()
+                ? PlayerApps.get(getContext(), value.ownerPackage) : null;
+        String label = owner != null && owner.installed() ? owner.label()
                 : activeSource == MediaSource.Id.UNKNOWN ? "MEDIA" : activeSource.label();
         setSourcePill(activeSource, label);
+        setSourcePillIcon(activeSource, value.ownerPackage);
         rebuildSourceOptions(value, selected);
     }
 
@@ -1111,6 +1137,7 @@ final class MediaCardView extends FrameLayout {
     private void renderFallbackSource() {
         shownTiles.clear();
         setSourcePill(MediaSource.Id.UNKNOWN, "MEDIA");
+        setSourcePillIcon(MediaSource.Id.UNKNOWN, "");
         sourceChooser.setVisibility(GONE);
         sourceOptions.removeAllViews();
     }
