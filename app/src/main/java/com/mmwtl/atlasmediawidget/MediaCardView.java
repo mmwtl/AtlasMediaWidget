@@ -111,6 +111,8 @@ final class MediaCardView extends FrameLayout {
     private boolean playerIconsMono;
     /** Tiles of the last rendered chooser, matching the option views by index. */
     private final List<SourceTile> shownTiles = new ArrayList<>();
+    /** Rows of the last rendered chooser. */
+    private SourceGrid shownGrid = SourceGrid.plan(0, 1, 1, 1, 1);
     private final Map<String, Bitmap> radioArtwork = new HashMap<>();
     private final Set<String> failedRadioArtwork = new HashSet<>();
     private List<RadioStation> favoriteStations = List.of();
@@ -566,15 +568,9 @@ final class MediaCardView extends FrameLayout {
 
     View widgetSourceOption(int index) {
         if (index < 0 || index >= shownTiles.size()) return null;
-        int top = topRowTiles(shownTiles.size());
-        int row = top > 0 && index >= top ? 1 : 0;
-        LinearLayout options = (LinearLayout) sourceOptions.getChildAt(row);
-        return options == null ? null : options.getChildAt(index < top ? index : index - top);
-    }
-
-    /** Smaller row on top: five tiles stay two over three as before, six make three and three. */
-    private static int topRowTiles(int count) {
-        return count / 2;
+        int row = shownGrid.rowOf(index);
+        LinearLayout options = row < 0 ? null : (LinearLayout) sourceOptions.getChildAt(row);
+        return options == null ? null : options.getChildAt(shownGrid.columnOf(index));
     }
 
     void setSourceTiles(List<SourceTile> tiles, boolean monochromePlayerIcons) {
@@ -1054,18 +1050,36 @@ final class MediaCardView extends FrameLayout {
     }
 
     /**
+     * The chooser grid for the card's shape: one row on a flat wide card, pairs on a tall narrow
+     * one, whichever gives the tiles the most room.
+     */
+    private SourceGrid sourceGrid(int count) {
+        return SourceGrid.plan(count, sourceChooserWidth(), sourceChooserInnerHeight(),
+                d(64) + 2 * d(5), d(24) + sourceLabelHeight() + 2 * d(5));
+    }
+
+    private int sourceChooserWidth() {
+        return cardWidth - 2 * bx(18) - 2 * d(12);
+    }
+
+    private int sourceChooserInnerHeight() {
+        return sourceChooserHeight() - 2 * d(10);
+    }
+
+    /** Label line with its gap above and the tile padding. */
+    private int sourceLabelHeight() {
+        return Math.round(Ui.dp(getContext(), (style == CardStyle.COMPACT ? 14 : 16) * 1.4f)
+                * uiScale) + d(4) + 2 * d(7);
+    }
+
+    /**
      * Icon size for the source tiles: 36 dp on a small card, growing with the tile so a large card
      * does not show small icons in big empty tiles. The label keeps its room below the icon.
      */
-    private int sourceIconSize(int count) {
-        int top = topRowTiles(count);
-        int rows = top > 0 ? 2 : 1;
-        int columns = Math.max(top, count - top);
-        int tileWidth = (cardWidth - 2 * bx(18) - 2 * d(12)) / Math.max(1, columns) - 2 * d(5);
-        int tileHeight = (sourceChooserHeight() - 2 * d(10)) / rows - 2 * d(5);
-        int label = Math.round(Ui.dp(getContext(), (style == CardStyle.COMPACT ? 14 : 16) * 1.4f)
-                * uiScale) + d(4) + 2 * d(7);
-        int room = Math.min(Math.round(tileWidth * 0.5f), tileHeight - label);
+    private int sourceIconSize(SourceGrid grid) {
+        int tileWidth = sourceChooserWidth() / Math.max(1, grid.columns) - 2 * d(5);
+        int tileHeight = sourceChooserInnerHeight() / Math.max(1, grid.rows()) - 2 * d(5);
+        int room = Math.min(Math.round(tileWidth * 0.5f), tileHeight - sourceLabelHeight());
         return Math.max(d(36), Math.min(Math.round(room * 0.62f), d(96)));
     }
 
@@ -1149,16 +1163,12 @@ final class MediaCardView extends FrameLayout {
 
     private void rebuildSourceOptions(MediaSnapshot value, int selectedIndex) {
         sourceOptions.removeAllViews();
-        int top = topRowTiles(shownTiles.size());
-        int iconSize = sourceIconSize(shownTiles.size());
-        LinearLayout topRow = sourceRow();
-        LinearLayout bottomRow = sourceRow();
-        if (top > 0) {
-            sourceOptions.addView(topRow, new LinearLayout.LayoutParams(
+        shownGrid = sourceGrid(shownTiles.size());
+        int iconSize = sourceIconSize(shownGrid);
+        for (int row = 0; row < shownGrid.rows(); row++) {
+            sourceOptions.addView(sourceRow(), new LinearLayout.LayoutParams(
                     LayoutParams.MATCH_PARENT, 0, 1f));
         }
-        sourceOptions.addView(bottomRow, new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, 1f));
         for (int index = 0; index < shownTiles.size(); index++) {
             SourceTile tile = shownTiles.get(index);
             MediaSource source = SourceTile.sourceFor(tile, value.sources);
@@ -1203,7 +1213,8 @@ final class MediaCardView extends FrameLayout {
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LayoutParams.MATCH_PARENT, 1f);
             params.setMargins(d(5), d(5), d(5), d(5));
-            (index < top ? topRow : bottomRow).addView(option, params);
+            ((LinearLayout) sourceOptions.getChildAt(shownGrid.rowOf(index)))
+                    .addView(option, params);
         }
     }
 
