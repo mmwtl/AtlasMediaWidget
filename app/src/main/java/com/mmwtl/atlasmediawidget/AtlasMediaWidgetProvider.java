@@ -255,7 +255,8 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     width, height, style, appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
             card.setCustomActionPolicy(prefs.playerActionsCount(), prefs.playerActionRules());
-            card.setSourceTiles(prefs.sourceTiles());
+            card.setSourceTiles(prefs.sourceTiles(),
+                    prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false));
             if (snapshot == null || !connected) card.renderWidgetUnavailable(connected);
             else card.renderSnapshot(snapshot, true);
             boolean showSources = "sources".equals(chooser) && snapshot != null && connected;

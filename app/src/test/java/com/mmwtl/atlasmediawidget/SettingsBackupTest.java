@@ -549,6 +549,18 @@ public final class SettingsBackupTest {
         assertEquals(SourceTile.DEFAULT, SettingsBackup.decode(root.toString()).sourceTiles);
     }
 
+    @Test public void playerIconStyleRoundTripsAndDefaultsToColour() throws Exception {
+        SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
+        assertFalse(base.playerIconsMono);
+        base.playerIconsMono = true;
+        JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
+        assertTrue(SettingsBackup.decode(root.toString()).playerIconsMono);
+        root.getJSONObject("settings").put("playerIconsMono", "yes");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("playerIconsMono");
+        assertFalse(SettingsBackup.decode(root.toString()).playerIconsMono);
+    }
+
     @Test public void playerActionsCountRoundTripsAndDefaultsForOlderFiles() throws Exception {
         SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
         assertEquals(Prefs.DEFAULT_PLAYER_ACTIONS, base.playerActionsCount);

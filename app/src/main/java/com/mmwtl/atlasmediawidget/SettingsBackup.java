@@ -35,6 +35,8 @@ final class SettingsBackup {
         int widgetTheme = CardTheme.AUTO;
         /** Tiles of the source chooser, {@link SourceTile#DEFAULT} in files without them. */
         List<SourceTile> sourceTiles = SourceTile.DEFAULT;
+        /** One-tone player icons; colour icons in files without the setting. */
+        boolean playerIconsMono;
         final int freeformHideThresholdPercent;
         final boolean widgetMode;
         final boolean autoStart;
@@ -351,6 +353,7 @@ final class SettingsBackup {
         data.widgetProfiles = prefs.widgetProfiles();
         data.widgetTheme = prefs.widgetTheme();
         data.sourceTiles = prefs.sourceTiles();
+        data.playerIconsMono = prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false);
         return data;
     }
 
@@ -406,6 +409,7 @@ final class SettingsBackup {
             JSONArray tiles = new JSONArray();
             for (SourceTile tile : data.sourceTiles) tiles.put(tile.wire());
             settings.put("sourceTiles", tiles);
+            settings.put("playerIconsMono", data.playerIconsMono);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -544,6 +548,8 @@ final class SettingsBackup {
             }
             // Added within schema 17; older files keep the stock tiles.
             if (settings.has("sourceTiles")) data.sourceTiles = decodeSourceTiles(settings);
+            data.playerIconsMono = settings.has("playerIconsMono") && requireBoolean(settings,
+                    "playerIconsMono", "settings.playerIconsMono");
             return data;
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);

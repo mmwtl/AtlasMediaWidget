@@ -105,6 +105,7 @@ final class MediaCardView extends FrameLayout {
     private int favoriteTileHeight;
     private int favoriteColumnWidth;
     private List<SourceTile> sourceTiles = SourceTile.DEFAULT;
+    private boolean playerIconsMono;
     /** Tiles of the last rendered chooser, matching the option views by index. */
     private final List<SourceTile> shownTiles = new ArrayList<>();
     private final Map<String, Bitmap> radioArtwork = new HashMap<>();
@@ -568,9 +569,39 @@ final class MediaCardView extends FrameLayout {
         return count / 2;
     }
 
-    void setSourceTiles(List<SourceTile> tiles) {
+    void setSourceTiles(List<SourceTile> tiles, boolean monochromePlayerIcons) {
         sourceTiles = tiles == null || tiles.isEmpty() ? SourceTile.DEFAULT : List.copyOf(tiles);
+        playerIconsMono = monochromePlayerIcons;
         if (snapshot != null) renderSources(snapshot);
+    }
+
+    /**
+     * The player tile's icon: the app's own colour icon, or in one-tone mode a drawn logo when
+     * the player has one and otherwise a logo reduced from its icon. Null leaves the source glyph.
+     */
+    private ImageView playerIcon(SourceTile tile, PlayerApps.Info app, int size) {
+        if (app == null || !app.installed()) return null;
+        ImageView view = new ImageView(getContext());
+        view.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        Integer curated = PlayerIconStyle.CURATED.get(tile.playerPackage);
+        if (!playerIconsMono) {
+            Drawable icon = app.newIcon();
+            if (icon == null) return null;
+            view.setImageDrawable(icon);
+        } else if (curated != null) {
+            Drawable logo = getContext().getDrawable(curated).mutate();
+            logo.setTint(color(R.color.card_text));
+            view.setImageDrawable(logo);
+            // Simple Icons fill their box; the card's glyphs keep a margin.
+            int inset = Math.round(size * 0.08f);
+            view.setPadding(inset, inset, inset, inset);
+        } else {
+            Bitmap glyph = PlayerIconStyle.glyph(tile.playerPackage, app,
+                    color(R.color.card_text), size);
+            if (glyph == null) return null;
+            view.setImageBitmap(glyph);
+        }
+        return view;
     }
 
     android.graphics.Rect widgetBounds(View target) {
@@ -1115,12 +1146,8 @@ final class MediaCardView extends FrameLayout {
                     color(selected ? R.color.card_option_selected : R.color.card_option),
                     color(selected ? R.color.card_option_selected_stroke
                             : R.color.card_option_stroke), d(17)));
-            Bitmap icon = app == null ? null : PlayerIconStyle.glyph(tile.playerPackage, app,
-                    color(R.color.card_text), iconSize);
-            if (icon != null) {
-                ImageView appIcon = new ImageView(getContext());
-                appIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                appIcon.setImageBitmap(icon);
+            ImageView appIcon = playerIcon(tile, app, iconSize);
+            if (appIcon != null) {
                 option.addView(appIcon, new LinearLayout.LayoutParams(iconSize, iconSize));
             } else {
                 SourceGlyphView glyph = new SourceGlyphView(getContext());

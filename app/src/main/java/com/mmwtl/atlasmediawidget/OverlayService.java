@@ -1197,7 +1197,8 @@ public final class OverlayService extends Service
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), this);
         candidate.setCustomActionPolicy(prefs.playerActionsCount(), prefs.playerActionRules());
-        candidate.setSourceTiles(prefs.sourceTiles());
+        candidate.setSourceTiles(prefs.sourceTiles(),
+                prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false));
         migrateLegacyPosition(bounds, candidate.cardWidth(), candidate.cardHeight());
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),

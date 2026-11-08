@@ -115,6 +115,7 @@ public final class MainActivity extends ScaledActivity {
     private LinearLayout sourceTilesList;
     private Button sourceTilesAdd;
     private Button sourceTilesReset;
+    private Switch playerIconsMono;
     private TextView onlinePlayerTitle;
     private Spinner onlinePlayerSpinner;
     private ArrayAdapter<OnlinePlayerOption> onlinePlayerAdapter;
@@ -3402,6 +3403,25 @@ public final class MainActivity extends ScaledActivity {
         sourceTilesReset = actionButton("Вернуть стандартный набор");
         sourceTilesReset.setOnClickListener(v -> saveSourceTiles(SourceTile.DEFAULT));
         card.addView(sourceTilesReset, buttonParams());
+        playerIconsMono = new Switch(this);
+        playerIconsMono.setText("Одноцветные иконки плееров");
+        playerIconsMono.setTextColor(Ui.PRIMARY);
+        playerIconsMono.setTextSize(15);
+        playerIconsMono.setChecked(prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false));
+        playerIconsMono.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_PLAYER_ICONS_MONO, checked);
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams monoParams = fullWrap();
+        monoParams.topMargin = Ui.dp(this, 14);
+        card.addView(playerIconsMono, monoParams);
+        TextView monoNote = text("Логотип плеера в цвете значков карточки. Для популярных плееров "
+                        + "— готовые значки, для остальных логотип берётся из иконки приложения.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams monoNoteParams = fullWrap();
+        monoNoteParams.topMargin = Ui.dp(this, 4);
+        card.addView(monoNote, monoNoteParams);
         refreshSourceTiles();
         return card;
     }

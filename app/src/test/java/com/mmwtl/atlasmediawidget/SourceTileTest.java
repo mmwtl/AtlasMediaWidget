@@ -95,6 +95,16 @@ public class SourceTileTest {
         assertFalse(SourceTile.selectable(tiles, 1, withoutOneOs, true));
     }
 
+    @Test public void everyDrawnPlayerLogoIsAVectorThatLoads() {
+        android.content.Context context =
+                org.robolectric.RuntimeEnvironment.getApplication();
+        for (var entry : PlayerIconStyle.CURATED.entrySet()) {
+            assertTrue(entry.getKey(), SourceTile.isPackageName(entry.getKey()));
+            assertTrue(entry.getKey(), context.getDrawable(entry.getValue())
+                    instanceof android.graphics.drawable.VectorDrawable);
+        }
+    }
+
     private static MediaSnapshot snapshot(MediaSource.Id source, String ownerPackage,
             List<MediaSource> sources) {
         return new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",

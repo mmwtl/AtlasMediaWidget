@@ -39,6 +39,8 @@ final class Prefs {
     static final String KEY_CARD_OPENS_PLAYER = "card_opens_player";
     static final String KEY_STATUS_BAR_FORMAT = "status_bar_format";
     static final String KEY_SOURCE_TILES = "source_tiles";
+    /** Player tiles show one-tone logos instead of the apps' colour icons. */
+    static final String KEY_PLAYER_ICONS_MONO = "player_icons_mono";
     /** {@link CardTheme#AUTO}, {@link CardTheme#DAY} or {@link CardTheme#NIGHT}. */
     static final String KEY_WIDGET_THEME = "widget_theme";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
@@ -871,6 +873,7 @@ final class Prefs {
                 .putBoolean(KEY_CARD_OPENS_PLAYER, data.cardOpensPlayer)
                 .putInt(KEY_WIDGET_THEME, data.widgetTheme)
                 .putString(KEY_SOURCE_TILES, SourceTile.encode(data.sourceTiles))
+                .putBoolean(KEY_PLAYER_ICONS_MONO, data.playerIconsMono)
                 .putInt(KEY_STATUS_BAR_FORMAT, data.statusBarFormat.preferenceValue)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)
