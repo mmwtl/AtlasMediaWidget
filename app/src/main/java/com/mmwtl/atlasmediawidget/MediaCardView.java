@@ -1108,8 +1108,8 @@ final class MediaCardView extends FrameLayout {
                     style == CardStyle.COMPACT ? 14 : 16,
                     color(R.color.card_text), Typeface.BOLD);
             label.setGravity(Gravity.CENTER);
-            label.setSingleLine(true);
-            label.setEllipsize(TextUtils.TruncateAt.END);
+            // Not setSingleLine: its horizontal scrolling draws a centred label outside the tile.
+            label.setMaxLines(1);
             LinearLayout.LayoutParams labelParams = wrap();
             labelParams.topMargin = d(4);
             option.addView(label, labelParams);
