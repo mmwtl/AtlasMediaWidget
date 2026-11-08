@@ -346,6 +346,12 @@ class MediaBackendCoordinator(
                 delay(delayMs)
             }
             if (!isBackendStarted) return@launch
+            if (preferences.startupWaitForInternet && !awaitStartupInternet(targetDescription)) {
+                // The condition was not met; a Bridge reconnect must not start it later.
+                hasAppliedDefaultSource = true
+                return@launch
+            }
+            if (!isBackendStarted) return@launch
             var attempt = 0
             while (isBackendStarted && !hasAppliedDefaultSource) {
                 isApplyingDefaultSource = true
@@ -406,6 +412,19 @@ class MediaBackendCoordinator(
                 delay(retryDelay)
             }
         }
+    }
+
+    private suspend fun awaitStartupInternet(targetDescription: String): Boolean {
+        val timeoutMs = preferences.startupInternetTimeoutSec * 1_000L
+        if (InternetAvailability.isValidated(context)) return true
+        Timber.i("Startup media action for %s waits up to %d ms for internet", targetDescription, timeoutMs)
+        val online = StartupInternetGate.await(timeoutMs) { InternetAvailability.isValidated(context) }
+        if (online) {
+            Timber.i("Internet is available; continuing startup media action for %s", targetDescription)
+        } else {
+            Timber.w("Startup media action for %s skipped: no internet within %d ms", targetDescription, timeoutMs)
+        }
+        return online
     }
 
     /** Runs an automatic action; with [autoplay] a phone call cancels it and yields null. */

@@ -112,12 +112,18 @@ public final class MainActivity extends ScaledActivity {
     private TextView defaultSourceTitle;
     private TextView defaultSourceDelayLabel;
     private SeekBar defaultSourceDelaySeekBar;
+    private LinearLayout sourceTilesList;
+    private Button sourceTilesAdd;
+    private Button sourceTilesReset;
     private TextView onlinePlayerTitle;
     private Spinner onlinePlayerSpinner;
     private ArrayAdapter<OnlinePlayerOption> onlinePlayerAdapter;
     private boolean refreshingOnlinePlayer;
     private Switch minimizeOnlinePlayerSwitch;
     private Switch startupAutoplaySwitch;
+    private Switch startupInternetSwitch;
+    private TextView startupInternetTimeoutLabel;
+    private SeekBar startupInternetTimeoutSeekBar;
     private Switch sourceLostSwitch;
     private Switch sourceLostAutoplaySwitch;
     private Switch radioWidgetBroadcastSwitch;
@@ -554,6 +560,7 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout themeCard = createThemeCard();
         page.addView(themeCard);
         widgetOnly.add(themeCard);
+        page.addView(createSourceTilesCard());
         page.addView(createPlayerActionsCard());
         createTypographySection(collapsibleCard(page, "Текст и отступы",
                 "Размеры шрифтов, отступы и линия прогресса"));
@@ -2346,6 +2353,37 @@ public final class MainActivity extends ScaledActivity {
 
         startupAutoplaySwitch = mediaSwitch(startup, "Автовоспроизведение при старте", 12,
                 MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY);
+        startupInternetSwitch = mediaSwitch(startup, "Ждать подключения к интернету", 12,
+                MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET);
+        TextView internetNote = text("Переключение и автовоспроизведение при старте начнутся, "
+                        + "только когда появится интернет (Wi-Fi, точка доступа телефона или "
+                        + "связь машины). Если за отведённое время его нет, автозапуск "
+                        + "пропускается.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams internetNoteParams = fullWrap();
+        internetNoteParams.topMargin = Ui.dp(this, 4);
+        startup.addView(internetNote, internetNoteParams);
+        startupInternetTimeoutLabel = text("Ждать не дольше 60 сек", 15, Ui.PRIMARY,
+                Typeface.BOLD);
+        LinearLayout.LayoutParams internetLabelParams = fullWrap();
+        internetLabelParams.topMargin = Ui.dp(this, 10);
+        startup.addView(startupInternetTimeoutLabel, internetLabelParams);
+        startupInternetTimeoutSeekBar = sizeSeekBar(
+                MediaSettingsSnapshot.MIN_STARTUP_INTERNET_TIMEOUT_SEC / 10,
+                MediaSettingsSnapshot.MAX_STARTUP_INTERNET_TIMEOUT_SEC / 10);
+        startupInternetTimeoutSeekBar.setContentDescription("Предел ожидания интернета");
+        startupInternetTimeoutSeekBar.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) setStartupInternetTimeoutLabel(progress * 10);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                sendMediaSettingChange(MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC,
+                        bar.getProgress() * 10);
+            }
+        });
+        startup.addView(startupInternetTimeoutSeekBar, fullWrap());
         page.addView(startupCard);
 
         LinearLayout onlineCard = card();
@@ -2679,6 +2717,17 @@ public final class MainActivity extends ScaledActivity {
             startupAutoplaySwitch.setEnabled(true);
             startupAutoplaySwitch.setAlpha(1f);
         }
+        if (startupInternetSwitch != null) {
+            startupInternetSwitch.setChecked(snapshot.startupWaitForInternet);
+        }
+        if (startupInternetTimeoutSeekBar != null) {
+            boolean waits = snapshot.startupWaitForInternet;
+            setStartupInternetTimeoutLabel(snapshot.startupInternetTimeoutSec);
+            startupInternetTimeoutSeekBar.setProgress(snapshot.startupInternetTimeoutSec / 10);
+            startupInternetTimeoutSeekBar.setEnabled(waits);
+            startupInternetTimeoutSeekBar.setAlpha(waits ? 1f : 0.45f);
+            startupInternetTimeoutLabel.setAlpha(waits ? 1f : 0.45f);
+        }
         if (sourceLostSwitch != null) {
             sourceLostSwitch.setChecked(snapshot.autoSwitchToDefaultOnSourceLost);
             sourceLostSwitch.setEnabled(hasSource);
@@ -2955,6 +3004,13 @@ public final class MainActivity extends ScaledActivity {
                 Toast.makeText(MainActivity.this, "Ошибка восстановления каталога: " + message, Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void setStartupInternetTimeoutLabel(int seconds) {
+        if (startupInternetTimeoutLabel == null) return;
+        startupInternetTimeoutLabel.setText(seconds < 60 ? "Ждать не дольше " + seconds + " сек"
+                : seconds % 60 == 0 ? "Ждать не дольше " + seconds / 60 + " мин"
+                : "Ждать не дольше " + seconds / 60 + " мин " + seconds % 60 + " сек");
     }
 
     private void commitDelaySetting(int seconds) {
@@ -3319,6 +3375,139 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
+    /**
+     * The card's source chooser: head-unit sources and Android players in the user's order, up
+     * to {@link SourceTile#MAX_TILES}. A player tile switches Online to that app.
+     */
+    private LinearLayout createSourceTilesCard() {
+        LinearLayout card = card();
+        card.addView(text("Источники на карточке", 20, Ui.PRIMARY, Typeface.BOLD));
+        TextView hint = text("Плитки, которые открываются нажатием на название источника. "
+                        + "Можно убрать ненужные и добавить Android-плееры: плитка плеера "
+                        + "переключает Онлайн на это приложение и включает его. Плитка «Онлайн» "
+                        + "запускает плеер по умолчанию с вкладки «Медиа». Не больше "
+                        + SourceTile.MAX_TILES + " плиток.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams hintParams = fullWrap();
+        hintParams.topMargin = Ui.dp(this, 8);
+        card.addView(hint, hintParams);
+        sourceTilesList = new LinearLayout(this);
+        sourceTilesList.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams listParams = fullWrap();
+        listParams.topMargin = Ui.dp(this, 8);
+        card.addView(sourceTilesList, listParams);
+        sourceTilesAdd = actionButton("Добавить источник");
+        sourceTilesAdd.setOnClickListener(v -> showAddSourceTile());
+        card.addView(sourceTilesAdd, buttonParams());
+        sourceTilesReset = actionButton("Вернуть стандартный набор");
+        sourceTilesReset.setOnClickListener(v -> saveSourceTiles(SourceTile.DEFAULT));
+        card.addView(sourceTilesReset, buttonParams());
+        refreshSourceTiles();
+        return card;
+    }
+
+    private void refreshSourceTiles() {
+        if (sourceTilesList == null) return;
+        List<SourceTile> tiles = prefs.sourceTiles();
+        sourceTilesList.removeAllViews();
+        for (int position = 0; position < tiles.size(); position++) {
+            SourceTile tile = tiles.get(position);
+            OnlinePlayerOption option = sourceTileOption(tile);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            View label = createOnlinePlayerRow(option, false);
+            row.addView(label, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            TextView remove = text("✕", 20, Ui.SECONDARY, Typeface.NORMAL);
+            remove.setGravity(Gravity.CENTER);
+            remove.setContentDescription("Убрать «" + option.label + "»");
+            int size = Ui.dp(this, 48);
+            boolean removable = tiles.size() > 1;
+            remove.setEnabled(removable);
+            remove.setAlpha(removable ? 1f : 0.25f);
+            final int index = position;
+            remove.setOnClickListener(v -> {
+                List<SourceTile> next = new ArrayList<>(prefs.sourceTiles());
+                if (next.size() <= 1 || index >= next.size()) return;
+                next.remove(index);
+                saveSourceTiles(next);
+            });
+            row.addView(remove, new LinearLayout.LayoutParams(size, size));
+            row.addView(playerActionDragHandle(sourceTilesList, row, option.label, index,
+                    tiles.size(), to -> {
+                        List<SourceTile> next = new ArrayList<>(prefs.sourceTiles());
+                        if (index >= next.size() || to >= next.size()) return;
+                        next.add(to, next.remove(index));
+                        saveSourceTiles(next);
+                    }));
+            row.setTag(index);
+            sourceTilesList.addView(row, fullWrap());
+        }
+        boolean full = tiles.size() >= SourceTile.MAX_TILES;
+        sourceTilesAdd.setEnabled(!full);
+        sourceTilesAdd.setAlpha(full ? 0.45f : 1f);
+        sourceTilesAdd.setText(full ? "Добавлено " + SourceTile.MAX_TILES + " из "
+                + SourceTile.MAX_TILES : "Добавить источник");
+        sourceTilesReset.setVisibility(tiles.equals(SourceTile.DEFAULT) ? View.GONE : View.VISIBLE);
+    }
+
+    private OnlinePlayerOption sourceTileOption(SourceTile tile) {
+        if (!tile.isPlayer()) return new OnlinePlayerOption(tile.wire(), tile.source.label());
+        PlayerApps.Info app = PlayerApps.get(this, tile.playerPackage);
+        return new OnlinePlayerOption(tile.wire(), app.installed() ? app.label()
+                : "Не установлено: " + tile.playerPackage, app.newIcon());
+    }
+
+    private void showAddSourceTile() {
+        List<SourceTile> tiles = prefs.sourceTiles();
+        if (tiles.size() >= SourceTile.MAX_TILES) return;
+        List<OnlinePlayerOption> options = new ArrayList<>();
+        List<SourceTile> choices = new ArrayList<>();
+        for (MediaSource.Id id : SourceTile.NATIVE_SOURCES) {
+            SourceTile tile = SourceTile.source(id);
+            if (tiles.contains(tile)) continue;
+            choices.add(tile);
+            options.add(sourceTileOption(tile));
+        }
+        for (OnlinePlayerOption player : queryOnlinePlayerOptions()) {
+            if (!SourceTile.isPackageName(player.packageName)) continue;
+            SourceTile tile = SourceTile.player(player.packageName);
+            if (tiles.contains(tile)) continue;
+            choices.add(tile);
+            options.add(player);
+        }
+        if (choices.isEmpty()) {
+            Toast.makeText(this, "Все источники и плееры уже на карточке",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ArrayAdapter<OnlinePlayerOption> adapter = new ArrayAdapter<OnlinePlayerOption>(
+                this, android.R.layout.simple_list_item_1, options) {
+            @Override public View getView(int position, View convertView, ViewGroup parent) {
+                View row = createOnlinePlayerRow(getItem(position), true);
+                row.setPadding(Ui.dp(MainActivity.this, 20), row.getPaddingTop(),
+                        Ui.dp(MainActivity.this, 20), row.getPaddingBottom());
+                return row;
+            }
+        };
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Добавить источник")
+                .setAdapter(adapter, (dialog, which) -> {
+                    List<SourceTile> next = new ArrayList<>(prefs.sourceTiles());
+                    if (next.size() >= SourceTile.MAX_TILES
+                            || next.contains(choices.get(which))) return;
+                    next.add(choices.get(which));
+                    saveSourceTiles(next);
+                })
+                .setNegativeButton("Отмена", null));
+    }
+
+    private void saveSourceTiles(List<SourceTile> tiles) {
+        prefs.putSourceTiles(tiles);
+        refreshSourceTiles();
+        refreshOverlayIfRunning();
+    }
+
     private LinearLayout createPlayerActionsCard() {
         LinearLayout card = card();
         card.addView(text("Кнопки плеера", 20, Ui.PRIMARY, Typeface.BOLD));
@@ -3442,7 +3631,8 @@ public final class MainActivity extends ScaledActivity {
             row.addView(box, new LinearLayout.LayoutParams(0,
                     ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             final int index = position;
-            row.addView(playerActionDragHandle(row, action.label(), index, arranged.size(),
+            row.addView(playerActionDragHandle(playerActionsList, row, action.label(), index,
+                    arranged.size(),
                     to -> movePlayerAction(owner, actions, hidden, arranged, index, to)));
             row.setTag(index);
             playerActionsList.addView(row, fullWrap());
@@ -3458,7 +3648,8 @@ public final class MainActivity extends ScaledActivity {
      * finger, the rows it passes slide aside, and the order is saved on release. TalkBack gets
      * «Выше» and «Ниже» actions instead of the gesture.
      */
-    private TextView playerActionDragHandle(LinearLayout row, String label, int index, int count,
+    private TextView playerActionDragHandle(LinearLayout list, LinearLayout row, String label,
+            int index, int count,
             java.util.function.IntConsumer moveTo) {
         TextView handle = text("≡", 24, Ui.SECONDARY, Typeface.NORMAL);
         handle.setGravity(Gravity.CENTER);
@@ -3518,7 +3709,7 @@ public final class MainActivity extends ScaledActivity {
                     if (next != target[0]) {
                         target[0] = next;
                         for (int other = 0; other < count; other++) {
-                            View sibling = playerActionRow(other);
+                            View sibling = playerActionRow(list, other);
                             if (sibling == null || sibling == row) continue;
                             sibling.animate().translationY(playerActionShift(other, index, next)
                                     * step).setDuration(120L).start();
@@ -3529,7 +3720,7 @@ public final class MainActivity extends ScaledActivity {
                 case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     view.getParent().requestDisallowInterceptTouchEvent(false);
                     for (int other = 0; other < count; other++) {
-                        View sibling = playerActionRow(other);
+                        View sibling = playerActionRow(list, other);
                         if (sibling == null) continue;
                         sibling.animate().cancel();
                         sibling.setTranslationY(0f);
@@ -3551,9 +3742,9 @@ public final class MainActivity extends ScaledActivity {
     }
 
     /** The row for list position {@code index}; rows carry their position as a tag. */
-    private View playerActionRow(int index) {
-        for (int child = 0; child < playerActionsList.getChildCount(); child++) {
-            View view = playerActionsList.getChildAt(child);
+    private View playerActionRow(LinearLayout list, int index) {
+        for (int child = 0; child < list.getChildCount(); child++) {
+            View view = list.getChildAt(child);
             if (Integer.valueOf(index).equals(view.getTag())) return view;
         }
         return null;

@@ -1,5 +1,6 @@
 package com.mmwtl.atlasmediaapi.diagnostics
 
+import com.mmwtl.atlasmediaapi.media.bridge.InternetAvailability
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -1090,6 +1091,11 @@ class DiagnosticActivity : Activity() {
             appendLine("Default media package: ${coordinator.preferences.defaultMediaPackage.ifBlank { "none" }}")
             appendLine("Default audio source: ${coordinator.preferences.defaultAudioSource.ifBlank { "disabled" }}")
             appendLine("Default audio source delay: ${coordinator.preferences.defaultAudioSourceDelaySec}s")
+            appendLine(
+                "Startup waits for internet: ${coordinator.preferences.startupWaitForInternet} " +
+                    "(up to ${coordinator.preferences.startupInternetTimeoutSec}s); " +
+                    "validated internet now: ${InternetAvailability.isValidated(this@DiagnosticActivity)}",
+            )
             appendLine("Autoplay on startup: ${coordinator.preferences.defaultAudioSourceAutoplayOnStartup}")
             appendLine("Auto-switch on source lost: ${coordinator.preferences.autoSwitchToDefaultOnSourceLost}")
             appendLine("Autoplay on source lost: ${coordinator.preferences.autoSwitchToDefaultAutoplayOnSourceLost}")

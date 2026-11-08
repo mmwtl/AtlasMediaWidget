@@ -21,6 +21,12 @@ final class MediaSettingsSnapshot {
     final int catalogStationCount;
     final String catalogDescription;
     final int uiScaleTenths;
+    static final int MIN_STARTUP_INTERNET_TIMEOUT_SEC = 10;
+    static final int MAX_STARTUP_INTERNET_TIMEOUT_SEC = 300;
+    static final int DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC = 60;
+    /** Startup waits for a validated internet connection; set only from a Bridge snapshot. */
+    boolean startupWaitForInternet;
+    int startupInternetTimeoutSec = DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC;
 
     MediaSettingsSnapshot(
             long revision,
@@ -112,7 +118,7 @@ final class MediaSettingsSnapshot {
         if (bundle == null) {
             return new MediaSettingsSnapshot(0L, "", 0, true, false, true, "", true, true, 1250L, "BUILT_IN", 0, "", 15);
         }
-        return new MediaSettingsSnapshot(
+        MediaSettingsSnapshot snapshot = new MediaSettingsSnapshot(
                 bundle.getLong(MediaBridgeContract.K_SETTINGS_REVISION, 0L),
                 bundle.getString(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE, ""),
                 bundle.getInt(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_DELAY_SEC, 0),
@@ -131,6 +137,12 @@ final class MediaSettingsSnapshot {
                 bundle.getInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, 0),
                 bundle.getString(MediaBridgeContract.K_CATALOG_DESCRIPTION, ""),
                 bundle.getInt(MediaBridgeContract.K_UI_SCALE_TENTHS, 15));
+        snapshot.startupWaitForInternet =
+                bundle.getBoolean(MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET, false);
+        snapshot.startupInternetTimeoutSec = bundle.getInt(
+                MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC,
+                DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC);
+        return snapshot;
     }
 
     Bundle toBundle() {
@@ -154,6 +166,8 @@ final class MediaSettingsSnapshot {
         bundle.putInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, catalogStationCount);
         bundle.putString(MediaBridgeContract.K_CATALOG_DESCRIPTION, catalogDescription);
         bundle.putInt(MediaBridgeContract.K_UI_SCALE_TENTHS, uiScaleTenths);
+        bundle.putBoolean(MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET, startupWaitForInternet);
+        bundle.putInt(MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC, startupInternetTimeoutSec);
         return bundle;
     }
 }

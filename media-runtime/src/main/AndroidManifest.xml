@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- The startup media action can wait for a validated internet connection. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <queries>
         <package android:name="com.geely.service.oneosapi" />
         <package android:name="com.autolink.diminteraction" />

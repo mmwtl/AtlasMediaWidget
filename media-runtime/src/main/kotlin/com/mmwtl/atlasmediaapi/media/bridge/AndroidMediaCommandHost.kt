@@ -410,6 +410,66 @@ class AndroidMediaCommandHost(
         launchConfiguredOnlinePackage = false,
     )
 
+    /**
+     * A player tile: ONLINE goes to [packageName], which becomes the remembered Online player and
+     * starts through the same session, browser, media-key and launch paths as the default player.
+     * The player that played before is paused only after the new one confirms playback, so a
+     * failed start leaves it playing.
+     */
+    override suspend fun selectPlayer(packageName: String, autoplay: Boolean): Boolean {
+        onUserAction?.invoke()
+        if (packageName == context.packageName || !isInstalled(packageName)) {
+            Timber.w("Player %s is not installed or not visible", packageName)
+            return false
+        }
+        rememberOnlineMediaPackage(packageName)
+        currentMediaPackageRef.set(packageName)
+        val center = mediaCenter()
+        val onlineSelected = center == null || runCatching { center.currentAudioSource }
+            .getOrNull() == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE
+        if (!onlineSelected) {
+            // The OneOS ONLINE request without autoplay; the player itself starts below.
+            if (!setSource(BridgeAudioSource.ONLINE, appSource = null, autoplay = false)) return false
+        } else if (center == null) {
+            stateHub?.onSourceChanged(
+                MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+                MediaCenterConstant.AppSource.UNKNOWN,
+            )
+        }
+        val controller = configuredController(packageName)
+        if (!autoplay) {
+            controller?.let { stateHub?.onMediaController(it) }
+            return true
+        }
+        val playing = if (controller != null) {
+            playAndConfirm(packageName, controller)
+        } else {
+            launchPackageAndMaybePlay(
+                packageName = packageName,
+                autoplay = true,
+                returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+            )
+        }
+        if (playing) pauseOtherPlayers(packageName)
+        return playing
+    }
+
+    private fun pauseOtherPlayers(packageName: String) {
+        sessionObserver.getActiveControllers()
+            .filter {
+                it.packageName != packageName &&
+                    it.packageName !in CARPLAY_MEDIA_SESSION_PACKAGES &&
+                    PlayerSessionSelector.isPlaying(it.playbackState?.state)
+            }
+            .forEach { other ->
+                Timber.i("Pausing %s after switching to %s", other.packageName, packageName)
+                runCatching { other.transportControls.pause() }.onFailure(Timber::w)
+            }
+    }
+
+    private fun isInstalled(packageName: String): Boolean =
+        runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.isSuccess
+
     private suspend fun setSourceInternal(
         source: BridgeAudioSource,
         appSource: String?,

@@ -85,6 +85,74 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
+    fun `player tile refuses an app that is not installed`() = runBlocking {
+        val launched = mutableListOf<String>()
+        val fixture = fixture(launchPackage = { launched += it; true })
+
+        assertFalse(fixture.host.selectPlayer("com.example.missing", autoplay = true))
+        assertTrue(launched.isEmpty())
+    }
+
+    @Test
+    fun `player tile shows the chosen playing player and keeps it for commands`() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        install(context, "com.example.chosen")
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+        val playing = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PLAYING, 0L, 1f)
+            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE)
+            .build()
+        val chosen = MediaSession(context, "chosen-session").apply {
+            isActive = true
+            setPlaybackState(playing)
+        }
+        val chosenController = controller(context, chosen, "com.example.chosen")
+        shadowOf(chosenController).setPlaybackState(playing)
+        shadowOf(chosenController).setMetadata(
+            MediaMetadata.Builder()
+                .putString(MediaMetadata.METADATA_KEY_TITLE, "Chosen track")
+                .build(),
+        )
+        activeControllers(observer) += chosenController
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply {
+                defaultMediaPackage = "com.example.default"
+            },
+            hub = hub,
+            launchPackage = { false },
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+        )
+
+        assertTrue(host.selectPlayer("com.example.chosen", autoplay = true))
+        assertEquals("com.example.chosen", repository.snapshot().ownerPackage)
+        assertEquals(BridgeAudioSource.ONLINE.name, repository.snapshot().audioSource)
+        assertEquals("com.example.chosen", host.currentMediaPackage())
+        assertEquals("com.example.chosen", host.preferredOnlineSession()?.packageName)
+        chosen.release()
+    }
+
+    @Test
+    fun `player tile without a session launches that player, not the default one`() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        install(context, "com.example.chosen")
+        val launched = mutableListOf<String>()
+        val fixture = fixture(
+            configuredPackage = "com.example.default",
+            launchPackage = { launched += it; true },
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+        )
+
+        assertFalse(fixture.host.selectPlayer("com.example.chosen", autoplay = true))
+        assertEquals(listOf("com.example.chosen"), launched)
+    }
+
+    @Test
     fun `configured online player launches and returns home`() = runBlocking {
         val launched = mutableListOf<String>()
         val fixture = fixture(
@@ -607,6 +675,17 @@ class AndroidMediaCommandHostTest {
             browserSessionWaitTimeoutMs = browserSessionWaitTimeoutMs,
         )
         return BackgroundStartFixture(host, starter, launched, session)
+    }
+
+    private fun install(context: Context, packageName: String) {
+        shadowOf(context.packageManager).installPackage(
+            android.content.pm.PackageInfo().apply {
+                this.packageName = packageName
+                applicationInfo = android.content.pm.ApplicationInfo().apply {
+                    this.packageName = packageName
+                }
+            },
+        )
     }
 
     private fun pausedState(lastUpdateTime: Long): PlaybackState = PlaybackState.Builder()

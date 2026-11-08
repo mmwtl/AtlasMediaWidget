@@ -30,10 +30,6 @@ final class MediaSource {
             };
         }
 
-        boolean isWidgetChoice() {
-            return this == BT || this == RADIO || this == USB || this == ONLINE || this == CPAA;
-        }
-
         Id displayId() {
             return this == YUNTING ? ONLINE : this;
         }

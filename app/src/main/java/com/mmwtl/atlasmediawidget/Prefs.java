@@ -38,6 +38,7 @@ final class Prefs {
     static final String KEY_STATUS_BAR_MEDIA = "status_bar_media";
     static final String KEY_CARD_OPENS_PLAYER = "card_opens_player";
     static final String KEY_STATUS_BAR_FORMAT = "status_bar_format";
+    static final String KEY_SOURCE_TILES = "source_tiles";
     /** {@link CardTheme#AUTO}, {@link CardTheme#DAY} or {@link CardTheme#NIGHT}. */
     static final String KEY_WIDGET_THEME = "widget_theme";
     private static final String KEY_CARD_WIDTH_PREFIX = "card_width_";
@@ -497,6 +498,15 @@ final class Prefs {
                 MIN_RADIO_FAVORITES_GRID_ROWS, MAX_RADIO_FAVORITES_GRID_ROWS);
     }
 
+    /** Tiles of the card's source chooser, in order; the stock five until the user edits them. */
+    List<SourceTile> sourceTiles() {
+        return SourceTile.decode(getString(KEY_SOURCE_TILES, null));
+    }
+
+    void putSourceTiles(List<SourceTile> tiles) {
+        putString(KEY_SOURCE_TILES, SourceTile.encode(tiles));
+    }
+
     /** How many of the active player's own buttons the card shows; 0 hides them. */
     int playerActionsCount() {
         return clamp(getInt(KEY_PLAYER_ACTIONS_COUNT, DEFAULT_PLAYER_ACTIONS),
@@ -860,6 +870,7 @@ final class Prefs {
                 .putBoolean(KEY_STATUS_BAR_MEDIA, data.statusBarMedia)
                 .putBoolean(KEY_CARD_OPENS_PLAYER, data.cardOpensPlayer)
                 .putInt(KEY_WIDGET_THEME, data.widgetTheme)
+                .putString(KEY_SOURCE_TILES, SourceTile.encode(data.sourceTiles))
                 .putInt(KEY_STATUS_BAR_FORMAT, data.statusBarFormat.preferenceValue)
                 .putInt(KEY_FREEFORM_HIDE_THRESHOLD_PERCENT, data.freeformHideThresholdPercent)
                 .putInt(KEY_APP_UI_SCALE_TENTHS, data.appUiScaleTenths)

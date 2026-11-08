@@ -200,6 +200,8 @@ data class MediaCommandRequest(
     val autoplay: Boolean = true,
     val radioStation: RadioStationTarget? = null,
     val customAction: String? = null,
+    /** SET_SOURCE to ONLINE only: the player app that should take the source and play. */
+    val playerPackage: String? = null,
 )
 
 data class MediaCommandResult(

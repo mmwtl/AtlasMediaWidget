@@ -123,6 +123,7 @@ final class MediaBridgeContract {
     static final String K_COMMAND_APP_SOURCE = "appSource";
     static final String K_COMMAND_AUTOPLAY = "autoplay";
     static final String K_COMMAND_CUSTOM_ACTION = "customAction";
+    static final String K_COMMAND_PLAYER_PACKAGE = "playerPackage";
     static final String K_UI_SCALE_TENTHS = "uiScaleTenths";
 
     static final String K_SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion";
@@ -141,6 +142,8 @@ final class MediaBridgeContract {
     static final String K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay";
     static final String K_DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage";
     static final String K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART = "minimizeOnlinePlayerAfterAutostart";
+    static final String K_STARTUP_WAIT_FOR_INTERNET = "startupWaitForInternet";
+    static final String K_STARTUP_INTERNET_TIMEOUT_SEC = "startupInternetTimeoutSec";
     static final String K_RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled";
     static final String K_CLUSTER_COVERS_ENABLED = "clusterCoversEnabled";
     static final String K_CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled";

@@ -87,6 +87,10 @@ migration request.
   while the overlay is visible or playback is expected.
 - Never retain stale playback state indefinitely. After bounded reconciliation failure, show an
   explicit unavailable/disconnected state.
+- The card's source chooser is the ordered `SourceTile` set in Widget preferences (at most six):
+  head-unit sources and Android player tiles. A player tile sends `SET_SOURCE` ONLINE with
+  `playerPackage`; the generic Online tile keeps the default player. Startup can wait for a
+  validated internet connection (`StartupInternetGate`) and is skipped when it does not appear.
 - Send transport and source commands only through the explicit versioned service. Respect the
   capability mask and treat `OK` as delivery/pending until a newer snapshot confirms the result.
 - `LauncherMediaCommandReceiver` serves the AtlasLauncher gesture contract in

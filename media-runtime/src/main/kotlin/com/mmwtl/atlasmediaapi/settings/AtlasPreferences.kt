@@ -16,6 +16,11 @@ class AtlasPreferences(context: Context) {
         private const val KEY_AUTO_SWITCH_TO_DEFAULT_ON_SOURCE_LOST = "auto_switch_to_default_on_source_lost"
         private const val KEY_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY_ON_SOURCE_LOST = "auto_switch_to_default_autoplay_on_source_lost"
         private const val KEY_DEMO_MODE_ENABLED = "demo_mode_enabled"
+        private const val KEY_STARTUP_WAIT_FOR_INTERNET = "startup_wait_for_internet"
+        private const val KEY_STARTUP_INTERNET_TIMEOUT_SEC = "startup_internet_timeout_sec"
+        const val MIN_STARTUP_INTERNET_TIMEOUT_SEC = 10
+        const val MAX_STARTUP_INTERNET_TIMEOUT_SEC = 300
+        const val DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC = 60
         const val KEY_UI_SCALE_TENTHS = "ui_scale_tenths"
         const val EXTRA_UI_SCALE_TENTHS = "app_ui_scale_tenths"
         const val MIN_UI_SCALE_TENTHS = 10
@@ -59,6 +64,22 @@ class AtlasPreferences(context: Context) {
     var autoSwitchToDefaultAutoplayOnSourceLost: Boolean
         get() = prefs.getBoolean(KEY_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY_ON_SOURCE_LOST, true)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY_ON_SOURCE_LOST, value).apply()
+
+    /** The startup source switch and autoplay wait for a validated internet connection. */
+    var startupWaitForInternet: Boolean
+        get() = prefs.getBoolean(KEY_STARTUP_WAIT_FOR_INTERNET, false)
+        set(value) = prefs.edit().putBoolean(KEY_STARTUP_WAIT_FOR_INTERNET, value).apply()
+
+    /** How long the startup action waits for internet before it is skipped. */
+    var startupInternetTimeoutSec: Int
+        get() = prefs.getInt(KEY_STARTUP_INTERNET_TIMEOUT_SEC, DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC)
+            .coerceIn(MIN_STARTUP_INTERNET_TIMEOUT_SEC, MAX_STARTUP_INTERNET_TIMEOUT_SEC)
+        set(value) = prefs.edit()
+            .putInt(
+                KEY_STARTUP_INTERNET_TIMEOUT_SEC,
+                value.coerceIn(MIN_STARTUP_INTERNET_TIMEOUT_SEC, MAX_STARTUP_INTERNET_TIMEOUT_SEC),
+            )
+            .apply()
 
     /** Uses synthetic media data and never connects to vendor OneOS services. */
     var demoModeEnabled: Boolean

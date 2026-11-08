@@ -253,6 +253,18 @@ final class MediaBridgeClient {
         return sendCommand("SET_SOURCE", -1L, source.name(), null, true);
     }
 
+    /** Switches ONLINE to the player app and starts it there. */
+    String selectPlayer(String packageName) {
+        String requestId = requestId("command");
+        Bundle extra = new Bundle();
+        extra.putString(MediaBridgeContract.K_COMMAND, "SET_SOURCE");
+        extra.putString(MediaBridgeContract.K_COMMAND_SOURCE, MediaSource.Id.ONLINE.name());
+        extra.putString(MediaBridgeContract.K_COMMAND_PLAYER_PACKAGE, packageName);
+        extra.putBoolean(MediaBridgeContract.K_COMMAND_AUTOPLAY, true);
+        sendSimple(MediaBridgeContract.COMMAND, requestId, extra);
+        return requestId;
+    }
+
     String sendCustomAction(String action) {
         String requestId = requestId("command");
         Bundle extra = new Bundle();

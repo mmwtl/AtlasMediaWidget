@@ -285,7 +285,7 @@ public final class WidgetControlActivity extends Activity implements MediaBridge
             OverlayService service = OverlayService.current();
             if (service != null) service.seekFromWidget(positionMs);
         }
-        @Override public void onSource(MediaSource.Id source) {}
+        @Override public void onSource(SourceTile tile) {}
         @Override public void onOpenSource() {}
         @Override public void onRadioStationsRequested() {}
         @Override public void onRadioStation(RadioStation station) {}

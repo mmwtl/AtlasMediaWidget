@@ -156,7 +156,13 @@ Binding is established via explicit Intent (`bindService`):
 - `0x08` (`NEXT`) — следующий трек или поиск следующей станции
 - `0x10` (`PREVIOUS`) — предыдущий трек или поиск предыдущей станции
 - `0x20` (`SEEK_TO`) — перемотка по таймлайну (требует аргумент `position: Long >= 0`)
-- `0x40` (`SET_SOURCE`) — переключение источника (`source: String`, `autoplay: Boolean`)
+- `0x40` (`SET_SOURCE`) — переключение источника (`source: String`, `autoplay: Boolean`).
+  Необязательный `playerPackage: String` (только с `source = ONLINE`, корректное имя пакета до
+  128 символов, иначе `INVALID_REQUEST`) переключает Online на это Android-приложение: сервис
+  при необходимости запрашивает у OneOS ONLINE без автозапуска, запоминает плеер как последний
+  Online-плеер и запускает его теми же путями, что и плеер по умолчанию (сессия, MediaBrowser,
+  кнопка MEDIA_PLAY, окно приложения). Плеер, который играл до этого, ставится на паузу только
+  после того, как новый подтвердил воспроизведение. Неустановленный пакет даёт `FAILED`.
 - `0x80` (`TUNE_RADIO`) — прямая настройка частоты радио (`radioFrequencyKHz: Int`, `radioBand: String`)
 
 Команда `CUSTOM_ACTION` (`customAction: String`) не входит в маску: она доступна, пока действие

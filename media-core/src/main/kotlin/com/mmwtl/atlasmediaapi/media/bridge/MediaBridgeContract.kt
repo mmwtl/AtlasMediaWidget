@@ -18,6 +18,7 @@ object MediaBridgeContract {
     const val MAX_CUSTOM_ACTIONS = 8
     const val MAX_CUSTOM_ACTION_LENGTH = 128
     const val MAX_CUSTOM_ACTION_NAME_LENGTH = 64
+    const val MAX_PACKAGE_NAME_LENGTH = 128
 
     object ClientMessage {
         const val REGISTER = 1
@@ -123,6 +124,8 @@ object MediaBridgeContract {
         const val COMMAND_APP_SOURCE = "appSource"
         const val COMMAND_AUTOPLAY = "autoplay"
         const val COMMAND_CUSTOM_ACTION = "customAction"
+        /** Optional SET_SOURCE extra: switch ONLINE to this player app. */
+        const val COMMAND_PLAYER_PACKAGE = "playerPackage"
         const val UI_SCALE_TENTHS = "uiScaleTenths"
 
         const val SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion"
@@ -141,6 +144,8 @@ object MediaBridgeContract {
         const val AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay"
         const val DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage"
         const val MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART = "minimizeOnlinePlayerAfterAutostart"
+        const val STARTUP_WAIT_FOR_INTERNET = "startupWaitForInternet"
+        const val STARTUP_INTERNET_TIMEOUT_SEC = "startupInternetTimeoutSec"
         const val RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled"
         const val CLUSTER_COVERS_ENABLED = "clusterCoversEnabled"
         const val CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled"
@@ -256,12 +261,20 @@ fun Bundle.toMediaCommandRequest(): MediaCommandRequest? {
                 ?: return null
             val appSource = getString(MediaBridgeContract.Key.COMMAND_APP_SOURCE)
                 ?.takeIf { it.length <= 64 }
+            val playerPackage = if (containsKey(MediaBridgeContract.Key.COMMAND_PLAYER_PACKAGE)) {
+                getString(MediaBridgeContract.Key.COMMAND_PLAYER_PACKAGE)
+                    ?.takeIf { source == BridgeAudioSource.ONLINE && isPlayerPackageName(it) }
+                    ?: return null
+            } else {
+                null
+            }
             MediaCommandRequest(
                 requestId = rawRequestId,
                 command = command,
                 source = source,
                 appSource = appSource,
                 autoplay = getBoolean(MediaBridgeContract.Key.COMMAND_AUTOPLAY, true),
+                playerPackage = playerPackage,
             )
         }
 
@@ -329,6 +342,12 @@ fun RadioStationSnapshot.toBundle(): Bundle = Bundle().apply {
     putBoolean(MediaBridgeContract.Key.RADIO_FAVORITE, favorite)
     putString(MediaBridgeContract.Key.RADIO_ARTWORK_URI, artworkUri)
 }
+
+private val PACKAGE_NAME = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
+
+/** A syntactically valid Android package name within the protocol limit. */
+fun isPlayerPackageName(value: String): Boolean =
+    value.length <= MediaBridgeContract.MAX_PACKAGE_NAME_LENGTH && PACKAGE_NAME.matches(value)
 
 private fun Bundle.radioString(key: String): String? {
     val value = getString(key).orEmpty().trim()

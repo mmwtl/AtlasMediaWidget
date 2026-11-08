@@ -14,6 +14,8 @@ data class MediaSettingsSnapshot(
     val autoSwitchToDefaultAutoplayOnSourceLost: Boolean = true,
     val defaultMediaPackage: String = "",
     val minimizeOnlinePlayerAfterAutostart: Boolean = false,
+    val startupWaitForInternet: Boolean = false,
+    val startupInternetTimeoutSec: Int = 60,
     val radioWidgetBroadcastEnabled: Boolean = true,
     val clusterCoversEnabled: Boolean = true,
     val clusterOnlineEnabled: Boolean = false,
@@ -38,6 +40,8 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
         MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
         minimizeOnlinePlayerAfterAutostart,
     )
+    putBoolean(MediaBridgeContract.Key.STARTUP_WAIT_FOR_INTERNET, startupWaitForInternet)
+    putInt(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC, startupInternetTimeoutSec)
     putBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, radioWidgetBroadcastEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, clusterCoversEnabled)
     putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, clusterOnlineEnabled)
@@ -62,6 +66,8 @@ fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnaps
         MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
         false,
     ),
+    startupWaitForInternet = getBoolean(MediaBridgeContract.Key.STARTUP_WAIT_FOR_INTERNET, false),
+    startupInternetTimeoutSec = getInt(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC, 60),
     radioWidgetBroadcastEnabled = getBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED, true),
     clusterCoversEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED, true),
     clusterOnlineEnabled = getBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, false),

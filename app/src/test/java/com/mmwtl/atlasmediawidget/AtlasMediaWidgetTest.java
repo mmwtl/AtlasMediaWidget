@@ -32,7 +32,7 @@ public class AtlasMediaWidgetTest {
         public boolean onDragTouch(View v, android.view.MotionEvent e) { return false; }
         public void onCommand(String command) {}
         public void onSeek(long value) {}
-        public void onSource(MediaSource.Id id) {}
+        public void onSource(SourceTile tile) {}
         public void onOpenSource() {}
         public void onRadioStationsRequested() {}
         public void onRadioStation(RadioStation station) {}
@@ -674,9 +674,9 @@ public class AtlasMediaWidgetTest {
                 options, 41, sourceSnapshot(), null, true, true, listener);
         assertEquals(View.VISIBLE, frame.card.widgetTarget("source_chooser").getVisibility());
         assertTrue(frame.progressBounds.isEmpty());
-        assertTrue(frame.card.widgetSourceOption(MediaSource.Id.RADIO).isEnabled());
-        assertFalse(frame.card.widgetSourceOption(MediaSource.Id.BT).isEnabled());
-        assertFalse(frame.card.widgetSourceOption(MediaSource.Id.ONLINE).isEnabled());
+        assertTrue(frame.card.widgetSourceOption(0).isEnabled());
+        assertFalse(frame.card.widgetSourceOption(1).isEnabled());
+        assertFalse(frame.card.widgetSourceOption(3).isEnabled());
         View rendered = frame.views.apply(context, null);
         assertEquals(3, ((ViewGroup) rendered.findViewById(R.id.widget_targets)).getChildCount());
         PendingIntent source = AtlasMediaWidgetProvider.click(context, 41, "sources", true);
@@ -684,6 +684,32 @@ public class AtlasMediaWidgetTest {
         assertEquals(new ComponentName(context, OverlayService.class), intent.getComponent());
         assertEquals(AtlasMediaWidgetProvider.ACTION_COMMAND, intent.getAction());
         assertNotEquals(source, AtlasMediaWidgetProvider.click(context, 41, "source_RADIO", true));
+    }
+
+    @Test public void customTilesShowPlayersByNameAndTargetOnlyInstalledOnes() {
+        Prefs prefs = new Prefs(context);
+        String installed = context.getPackageName();
+        prefs.putSourceTiles(List.of(SourceTile.source(MediaSource.Id.RADIO),
+                SourceTile.player(installed), SourceTile.player("com.example.missing")));
+        try {
+            Bundle options = new Bundle();
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 400);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 300);
+            var frame = new AtlasMediaWidgetProvider.Frame(context, prefs,
+                    options, 41, sourceSnapshot(), null, true, true, listener);
+            assertEquals(3, frame.card.widgetSourceTiles().size());
+            assertTrue(frame.card.widgetSourceOption(0).isEnabled());
+            assertTrue(frame.card.widgetSourceOption(1).isEnabled());
+            assertFalse(frame.card.widgetSourceOption(2).isEnabled());
+            assertNull(frame.card.widgetSourceOption(3));
+            assertNotNull(find(frame.card, PlayerApps.get(context, installed).label()));
+            assertNotNull(find(frame.card, "com.example.missing"));
+            View rendered = frame.views.apply(context, null);
+            // Backdrop, Radio, the installed player and the pill that closes the chooser.
+            assertEquals(4, ((ViewGroup) rendered.findViewById(R.id.widget_targets)).getChildCount());
+        } finally {
+            prefs.putSourceTiles(SourceTile.DEFAULT);
+        }
     }
 
     @Test public void sourceChoiceChangesOnlyItsWidgetAndIgnoresUnavailableChoices() throws Exception {
