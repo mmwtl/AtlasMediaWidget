@@ -119,8 +119,9 @@ final class SourceTile {
     }
 
     /**
-     * A tile is tappable when it is not the playing one and its source accepts a switch; a
-     * player tile also needs its app installed.
+     * A tile is tappable when it is not the playing one and its source accepts a switch. A player
+     * tile needs its app installed but not OneOS reporting ONLINE available: the app itself is the
+     * source, and the Bridge starts it without MediaCenter too.
      */
     static boolean selectable(List<SourceTile> tiles, int index, MediaSnapshot snapshot,
             boolean playerInstalled) {
@@ -130,7 +131,7 @@ final class SourceTile {
         SourceTile tile = tiles.get(index);
         if (tile.isPlayer() && !playerInstalled) return false;
         MediaSource source = sourceFor(tile, snapshot.sources);
-        return source != null && source.available
+        return source != null && (tile.isPlayer() || source.available)
                 && (source.capabilities & MediaBridgeContract.CAP_SET_SOURCE) != 0L;
     }
 

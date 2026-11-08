@@ -83,6 +83,18 @@ public class SourceTileTest {
         assertFalse(SourceTile.selectable(tiles, 1, readOnly, true));
     }
 
+    @Test public void playerTilesDoNotWaitForOneOsToReportOnlineAvailable() {
+        List<SourceTile> tiles = List.of(RADIO, ONLINE, YANDEX);
+        MediaSnapshot withoutOneOs = snapshot(MediaSource.Id.ONLINE, "com.aimp.player", List.of(
+                new MediaSource(MediaSource.Id.ONLINE, false, false, false,
+                        MediaBridgeContract.CAP_SET_SOURCE),
+                new MediaSource(MediaSource.Id.RADIO, false, false, false,
+                        MediaBridgeContract.CAP_SET_SOURCE)));
+        assertTrue(SourceTile.selectable(tiles, 2, withoutOneOs, true));
+        assertFalse(SourceTile.selectable(tiles, 0, withoutOneOs, true));
+        assertFalse(SourceTile.selectable(tiles, 1, withoutOneOs, true));
+    }
+
     private static MediaSnapshot snapshot(MediaSource.Id source, String ownerPackage,
             List<MediaSource> sources) {
         return new MediaSnapshot(MediaBridgeContract.VERSION, 1, 1, true, 0, "",

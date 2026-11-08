@@ -1116,8 +1116,8 @@ final class MediaCardView extends FrameLayout {
             boolean selectable = SourceTile.selectable(shownTiles, index, value,
                     app == null || app.installed());
             option.setEnabled(selectable);
-            boolean present = source != null && (source.available || source.connected)
-                    && (app == null || app.installed());
+            boolean present = app != null ? app.installed()
+                    : source != null && (source.available || source.connected);
             option.setAlpha(selected || present ? 1f : 0.42f);
             option.setOnClickListener(v -> {
                 hideSourceChooser();
