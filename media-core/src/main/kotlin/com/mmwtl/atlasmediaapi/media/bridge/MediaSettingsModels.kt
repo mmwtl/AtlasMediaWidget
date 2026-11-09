@@ -26,6 +26,15 @@ data class MediaSettingsSnapshot(
     val catalogStationCount: Int = 0,
     val catalogDescription: String = "",
     val uiScaleTenths: Int = 15,
+    val catalogActiveId: String = "",
+    val catalogs: List<MediaSettingsCatalog> = emptyList(),
+)
+
+/** One radio catalog as the settings screen lists it. */
+data class MediaSettingsCatalog(
+    val id: String,
+    val name: String,
+    val stationCount: Int,
 )
 
 fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
@@ -52,6 +61,10 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
     putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, catalogStationCount)
     putString(MediaBridgeContract.Key.CATALOG_DESCRIPTION, catalogDescription)
     putInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, uiScaleTenths)
+    putString(MediaBridgeContract.Key.CATALOG_ACTIVE_ID, catalogActiveId)
+    putStringArrayList(MediaBridgeContract.Key.CATALOG_IDS, ArrayList(catalogs.map(MediaSettingsCatalog::id)))
+    putStringArrayList(MediaBridgeContract.Key.CATALOG_NAMES, ArrayList(catalogs.map(MediaSettingsCatalog::name)))
+    putIntArray(MediaBridgeContract.Key.CATALOG_STATION_COUNTS, catalogs.map(MediaSettingsCatalog::stationCount).toIntArray())
 }
 
 fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnapshot(
@@ -78,4 +91,14 @@ fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnaps
     catalogStationCount = getInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, 0),
     catalogDescription = getString(MediaBridgeContract.Key.CATALOG_DESCRIPTION).orEmpty(),
     uiScaleTenths = getInt(MediaBridgeContract.Key.UI_SCALE_TENTHS, 15),
+    catalogActiveId = getString(MediaBridgeContract.Key.CATALOG_ACTIVE_ID).orEmpty(),
+    catalogs = readCatalogs(),
 )
+
+private fun Bundle.readCatalogs(): List<MediaSettingsCatalog> {
+    val ids = getStringArrayList(MediaBridgeContract.Key.CATALOG_IDS).orEmpty()
+    val names = getStringArrayList(MediaBridgeContract.Key.CATALOG_NAMES).orEmpty()
+    val counts = getIntArray(MediaBridgeContract.Key.CATALOG_STATION_COUNTS) ?: IntArray(0)
+    if (ids.size != names.size || ids.size != counts.size) return emptyList()
+    return ids.indices.map { MediaSettingsCatalog(ids[it], names[it], counts[it]) }
+}

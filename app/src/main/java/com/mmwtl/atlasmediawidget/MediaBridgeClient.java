@@ -91,6 +91,11 @@ final class MediaBridgeClient {
         void onError(int status, String message);
     }
 
+    interface ManageCatalogCallback {
+        void onCatalogManaged(MediaSettingsSnapshot snapshot);
+        void onError(int status, String message);
+    }
+
     private final Context context;
     private final Listener listener;
     private final Handler main = new Handler(android.os.Looper.getMainLooper());
@@ -549,6 +554,14 @@ final class MediaBridgeClient {
                         main.post(() -> rcb.onCatalogRestored(snapshot));
                     }
                 }
+                case MediaBridgeContract.RADIO_CATALOG_MANAGED -> {
+                    String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
+                    MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(data);
+                    Object cb = takePendingCallback(requestId);
+                    if (cb instanceof ManageCatalogCallback mcb) {
+                        main.post(() -> mcb.onCatalogManaged(snapshot));
+                    }
+                }
                 case MediaBridgeContract.MEDIA_BACKUP_EXPORTED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
                     Object cb = takePendingCallback(requestId);
@@ -707,6 +720,18 @@ final class MediaBridgeClient {
         sendSimple(MediaBridgeContract.RESTORE_DEFAULT_CATALOG, reqId, null);
     }
 
+    /** Sends [action] (ACTIVATE, RENAME or DELETE) for one radio catalog. */
+    void manageRadioCatalog(String action, String catalogId, String name,
+            ManageCatalogCallback callback) {
+        String reqId = requestId("manage-radio-catalog");
+        if (callback != null) addPendingCallback(reqId, callback);
+        Bundle extra = new Bundle();
+        extra.putString(MediaBridgeContract.K_CATALOG_ACTION, action);
+        extra.putString(MediaBridgeContract.K_CATALOG_ID, catalogId);
+        if (name != null) extra.putString(MediaBridgeContract.K_CATALOG_NAME, name);
+        sendSimple(MediaBridgeContract.MANAGE_RADIO_CATALOG, reqId, extra);
+    }
+
     void exportMediaBackup(File destinationFile, BackupCallback callback) {
         try {
             android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
@@ -732,14 +757,16 @@ final class MediaBridgeClient {
         sendSimple(MediaBridgeContract.EXPORT_MEDIA_BACKUP, reqId, extra);
     }
 
-    void exportRadioCatalog(File destinationFile, RadioCatalogExportCallback callback) {
+    /** Exports [catalogId], or the active catalog when it is null. */
+    void exportRadioCatalog(File destinationFile, String catalogId,
+            RadioCatalogExportCallback callback) {
         try {
             android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
                     destinationFile,
                     android.os.ParcelFileDescriptor.MODE_WRITE_ONLY
                             | android.os.ParcelFileDescriptor.MODE_CREATE
                             | android.os.ParcelFileDescriptor.MODE_TRUNCATE);
-            exportRadioCatalog(pfd, callback);
+            exportRadioCatalog(pfd, catalogId, callback);
         } catch (Exception e) {
             if (callback != null) {
                 main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
@@ -749,20 +776,26 @@ final class MediaBridgeClient {
     }
 
     /** The descriptor overload takes ownership and closes the descriptor after send or drop. */
-    void exportRadioCatalog(android.os.ParcelFileDescriptor pfd,
+    void exportRadioCatalog(android.os.ParcelFileDescriptor pfd, String catalogId,
             RadioCatalogExportCallback callback) {
         String reqId = requestId("export-radio-catalog");
         if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = new Bundle();
         extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
+        if (catalogId != null) extra.putString(MediaBridgeContract.K_CATALOG_ID, catalogId);
         sendSimple(MediaBridgeContract.EXPORT_RADIO_CATALOG, reqId, extra);
     }
 
-    void importRadioCatalog(File zipFile, RadioCatalogImportCallback callback) {
+    /**
+     * Imports a catalog ZIP as a new active catalog named [name], or replaces [replaceCatalogId]
+     * when it is not null.
+     */
+    void importRadioCatalog(File zipFile, String name, String replaceCatalogId,
+            RadioCatalogImportCallback callback) {
         try {
             android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
                     zipFile, android.os.ParcelFileDescriptor.MODE_READ_ONLY);
-            importRadioCatalog(pfd, callback);
+            importRadioCatalog(pfd, name, replaceCatalogId, callback);
         } catch (Exception e) {
             if (callback != null) {
                 main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
@@ -772,12 +805,16 @@ final class MediaBridgeClient {
     }
 
     /** The descriptor overload takes ownership and closes the descriptor after send or drop. */
-    void importRadioCatalog(android.os.ParcelFileDescriptor pfd,
-            RadioCatalogImportCallback callback) {
+    void importRadioCatalog(android.os.ParcelFileDescriptor pfd, String name,
+            String replaceCatalogId, RadioCatalogImportCallback callback) {
         String reqId = requestId("import-radio-catalog");
         if (callback != null) addPendingCallback(reqId, callback);
         Bundle extra = new Bundle();
         extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
+        if (name != null) extra.putString(MediaBridgeContract.K_CATALOG_NAME, name);
+        if (replaceCatalogId != null) {
+            extra.putString(MediaBridgeContract.K_CATALOG_ID, replaceCatalogId);
+        }
         sendSimple(MediaBridgeContract.IMPORT_RADIO_CATALOG, reqId, extra);
     }
 
@@ -885,6 +922,8 @@ final class MediaBridgeClient {
             } else if (callback instanceof ImportStatusCallback cb) {
                 cb.onError(status, message);
             } else if (callback instanceof RestoreCatalogCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof ManageCatalogCallback cb) {
                 cb.onError(status, message);
             }
         });

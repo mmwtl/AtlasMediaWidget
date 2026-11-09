@@ -6,6 +6,7 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk = 30)
@@ -62,6 +63,57 @@ public class MediaBridgeContractTest {
                 MediaBridgeContract.RADIO_CATALOG_IMPORTED);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.FILE_DESCRIPTOR,
                 MediaBridgeContract.K_FILE_DESCRIPTOR);
+    }
+
+    @Test public void radioCatalogCollectionConstantsMatchRuntimeContract() {
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ClientMessage.MANAGE_RADIO_CATALOG,
+                MediaBridgeContract.MANAGE_RADIO_CATALOG);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ServerMessage.RADIO_CATALOG_MANAGED,
+                MediaBridgeContract.RADIO_CATALOG_MANAGED);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_ACTIVE_ID,
+                MediaBridgeContract.K_CATALOG_ACTIVE_ID);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_IDS,
+                MediaBridgeContract.K_CATALOG_IDS);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_NAMES,
+                MediaBridgeContract.K_CATALOG_NAMES);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_STATION_COUNTS,
+                MediaBridgeContract.K_CATALOG_STATION_COUNTS);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_ID,
+                MediaBridgeContract.K_CATALOG_ID);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_NAME,
+                MediaBridgeContract.K_CATALOG_NAME);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_ACTION,
+                MediaBridgeContract.K_CATALOG_ACTION);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.ACTIVATE,
+                MediaBridgeContract.CATALOG_ACTION_ACTIVATE);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.RENAME,
+                MediaBridgeContract.CATALOG_ACTION_RENAME);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.DELETE,
+                MediaBridgeContract.CATALOG_ACTION_DELETE);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository.BUILT_IN_ID,
+                MediaBridgeContract.BUILT_IN_CATALOG_ID);
+    }
+
+    @Test public void runtimeCatalogListReachesTheWidgetSnapshot() {
+        android.os.Bundle bundle = com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsModelsKt.toBundle(
+                new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsSnapshot().copy(
+                        0L, "", 0, true, false, true, "", false, false, 60, true, true, false,
+                        false, 1250L, 100L, "CUSTOM", 3, "", 15, "abc",
+                        java.util.List.of(
+                                new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog(
+                                        "builtin", "Встроенный (Пенза)", 25),
+                                new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog(
+                                        "abc", "Москва", 3))));
+        MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(bundle);
+        assertEquals("abc", snapshot.catalogActiveId);
+        assertEquals(2, snapshot.catalogs.size());
+        assertEquals("Москва", snapshot.activeCatalog().name);
+        assertEquals(3, snapshot.activeCatalog().stationCount);
+        assertTrue(snapshot.catalogs.get(0).isBuiltIn());
+
+        MediaSettingsSnapshot restored = MediaSettingsSnapshot.fromBundle(snapshot.toBundle());
+        assertEquals("abc", restored.catalogActiveId);
+        assertEquals("Встроенный (Пенза)", restored.catalogs.get(0).name);
     }
 
     @Test public void mediaSettingsSnapshotRoundTrip() {

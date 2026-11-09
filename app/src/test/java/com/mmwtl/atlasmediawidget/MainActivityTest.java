@@ -103,16 +103,13 @@ public final class MainActivityTest {
             List<String> labels = new ArrayList<>();
             collectShownLabels(root, labels);
             int navigationIndex = labels.indexOf("Переключать радио без поиска по эфиру");
-            int catalogIndex = labels.indexOf("Каталог станций");
-            int exportIndex = labels.indexOf("Экспортировать каталог радио (ZIP)");
-            int importIndex = labels.indexOf("Импортировать каталог радио (ZIP)");
+            int catalogIndex = labels.indexOf("Каталоги станций");
+            int importIndex = labels.indexOf("Добавить каталог (ZIP)");
             assertTrue(navigationIndex >= 0);
             assertTrue(catalogIndex > navigationIndex);
-            assertTrue(exportIndex > catalogIndex);
-            assertTrue(importIndex > exportIndex);
+            assertTrue(importIndex > catalogIndex);
             assertFalse(labels.contains("Медиасервис OneOS"));
-            assertFalse(findLabel(root, "Экспортировать каталог радио (ZIP)").isEnabled());
-            assertFalse(findLabel(root, "Импортировать каталог радио (ZIP)").isEnabled());
+            assertFalse(findLabel(root, "Добавить каталог (ZIP)").isEnabled());
             assertFalse(findLabel(root, "Названия и обложки из каталога в карточке").isEnabled());
         } finally {
             controller.pause().stop().destroy();
@@ -146,8 +143,7 @@ public final class MainActivityTest {
         AlertDialog dialog = ShadowAlertDialog.getLatestAlertDialog();
         assertTrue(dialog.isShowing());
         ShadowAlertDialog shadowDialog = Shadows.shadowOf(dialog);
-        assertEquals("Заменить каталог радио?", shadowDialog.getTitle());
-        assertTrue(shadowDialog.getMessage().toString().contains("полностью заменён"));
+        assertEquals("Добавить каталог радио", shadowDialog.getTitle());
         Field stagedField = MainActivity.class.getDeclaredField("pendingRadioImportFile");
         stagedField.setAccessible(true);
         File stagedFile = (File) stagedField.get(activity);
@@ -255,6 +251,27 @@ public final class MainActivityTest {
             controller.pause().stop().destroy();
             ShadowLooper.runUiThreadTasks();
         }
+    }
+
+    @Test
+    public void catalogNamesComeFromPickedFilesAndGoIntoExportNames() {
+        assertEquals("Москва", MainActivity.catalogNameFromFileName("Москва.zip"));
+        assertEquals("Москва", MainActivity.catalogNameFromFileName(
+                "2026-11-09_10-20-30_AtlasMediaWidget-radio-Москва.ZIP"));
+        assertEquals("", MainActivity.catalogNameFromFileName(
+                "2026-11-09_10-20-30_AtlasMediaWidget-radio.zip"));
+        assertEquals("my radio", MainActivity.catalogNameFromFileName("my_radio.zip"));
+        assertEquals("", MainActivity.catalogNameFromFileName(null));
+
+        assertEquals(MainActivity.RADIO_ZIP_FILE_NAME, MainActivity.radioCatalogExportFileName(
+                new MediaSettingsSnapshot.Catalog("builtin", "Встроенный (Пенза)", 25)));
+        assertEquals("AtlasMediaWidget-radio-Москва_центр.zip",
+                MainActivity.radioCatalogExportFileName(
+                        new MediaSettingsSnapshot.Catalog("abc", "Москва / центр", 3)));
+        assertEquals("1 станция", MainActivity.stationCountLabel(1));
+        assertEquals("3 станции", MainActivity.stationCountLabel(3));
+        assertEquals("12 станций", MainActivity.stationCountLabel(12));
+        assertEquals("25 станций", MainActivity.stationCountLabel(25));
     }
 
     private static ExecutorService io(MainActivity activity) throws Exception {

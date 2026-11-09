@@ -69,9 +69,10 @@ Binding is established via explicit Intent (`bindService`):
 | `10` | `COMMIT_MEDIA_IMPORT` | Применить подготовленные настройки / Apply staged settings | `protocolVersion`, `operationId`, `stagingToken`, `requestId`, `replyTo` |
 | `11` | `GET_IMPORT_STATUS` | Статус операции / Operation status | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
 | `12` | `ABORT_MEDIA_IMPORT` | Удалить подготовленный импорт / Discard staged import | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
-| `13` | `RESTORE_DEFAULT_CATALOG` | Восстановить встроенное радио / Restore builtin catalog | `protocolVersion`, `requestId`, `replyTo` |
-| `14` | `EXPORT_RADIO_CATALOG` | Экспорт текущих станций и обложек / Export active radio catalog | `protocolVersion`, `fileDescriptor` (write PFD), `requestId`, `replyTo` |
-| `15` | `IMPORT_RADIO_CATALOG` | Полная замена радио / Replace radio catalog | `protocolVersion`, `fileDescriptor` (read PFD), `requestId`, `replyTo` |
+| `13` | `RESTORE_DEFAULT_CATALOG` | Сделать активным встроенный каталог (импортированные сохраняются) / Activate the builtin catalog, keeping imported ones | `protocolVersion`, `requestId`, `replyTo` |
+| `14` | `EXPORT_RADIO_CATALOG` | Экспорт каталога / Export a radio catalog | `protocolVersion`, `fileDescriptor` (write PFD), optional `catalogId` (по умолчанию активный / active by default), `requestId`, `replyTo` |
+| `15` | `IMPORT_RADIO_CATALOG` | Добавить каталог или заменить существующий / Add a catalog or replace one | `protocolVersion`, `fileDescriptor` (read PFD), optional `catalogName`, optional `catalogId` (заменяемый / to replace), `requestId`, `replyTo` |
+| `16` | `MANAGE_RADIO_CATALOG` | Включить, переименовать или удалить каталог / Activate, rename or delete a catalog | `protocolVersion`, `catalogAction` (`ACTIVATE`/`RENAME`/`DELETE`), `catalogId`, `catalogName` для / for `RENAME`, `requestId`, `replyTo` |
 
 ### Сервис → Клиент (Service → Client)
 
@@ -91,7 +92,8 @@ Binding is established via explicit Intent (`bindService`):
 | `111` | `MEDIA_IMPORT_ABORTED` | Отмена обработана / Abort handled | `protocolVersion`, `status`, `requestId`, `operationId` |
 | `112` | `DEFAULT_CATALOG_RESTORED` | Встроенный каталог восстановлен / Builtin catalog restored | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
 | `114` | `RADIO_CATALOG_EXPORTED` | Радио ZIP записан / Radio ZIP written | `protocolVersion`, `status`, `requestId`, `catalogStationCount` |
-| `115` | `RADIO_CATALOG_IMPORTED` | Радиокаталог заменён / Radio catalog replaced | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `settingsRevision` |
+| `115` | `RADIO_CATALOG_IMPORTED` | Каталог добавлен или заменён / Catalog added or replaced | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `catalogId`, `catalogName`, `settingsRevision` |
+| `116` | `RADIO_CATALOG_MANAGED` | Каталог включён, переименован или удалён / Catalog activated, renamed or deleted | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
 
 ---
 
@@ -217,8 +219,12 @@ read-PFD при импорте. Сервис обрабатывает поток
 - `GET_IMPORT_STATUS`: `IDLE`, `PREPARED`, `COMMITTING`, `COMMITTED`, `FAILED`.
   `COMMITTING` повторно завершает сохранённую операцию. Abort не откатывает начатый
   commit. Widget хранит отдельный журнал для согласования своей части импорта.
-- `IMPORT_RADIO_CATALOG` валидирует отдельный архив до замены всего каталога.
-  Старые станции и обложки не объединяются с новыми; настройки сохраняются.
+- `IMPORT_RADIO_CATALOG` валидирует архив целиком до изменений. Без `catalogId` он
+  добавляет новый активный каталог (не больше 8), с `catalogId` заменяет станции и
+  обложки этого каталога, сохраняя название и положение; станции не объединяются.
+  Настройки сохраняются. Снимок настроек перечисляет каталоги полями `catalogActiveId`,
+  `catalogIds`, `catalogNames` и `catalogStationCounts` (параллельные массивы, первым
+  идёт встроенный `builtin`).
 
 Успешный update подтверждается после синхронного сохранения параметров и ревизии.
 Несколько SharedPreferences не являются общей дисковой транзакцией. Журнал импорта

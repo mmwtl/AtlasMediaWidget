@@ -44,7 +44,7 @@ class MediaSettingsControllerTest {
         context.getSharedPreferences("radio_catalog_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("cluster_dim_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("media_settings_meta", Context.MODE_PRIVATE).edit().clear().commit()
-        listOf("custom_radio", "custom_radio_prev", "custom_radio_next").forEach {
+        listOf("custom_radio", "custom_radio_prev", "custom_radio_next", "radio_catalogs", "radio_covers").forEach {
             java.io.File(context.filesDir, it).deleteRecursively()
         }
 

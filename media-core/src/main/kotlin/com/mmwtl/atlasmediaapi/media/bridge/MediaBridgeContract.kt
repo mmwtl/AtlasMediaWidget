@@ -36,6 +36,8 @@ object MediaBridgeContract {
         const val RESTORE_DEFAULT_CATALOG = 13
         const val EXPORT_RADIO_CATALOG = 14
         const val IMPORT_RADIO_CATALOG = 15
+        /** Activates, renames or deletes one radio catalog ([Key.CATALOG_ACTION]). */
+        const val MANAGE_RADIO_CATALOG = 16
     }
 
     object ServerMessage {
@@ -54,6 +56,7 @@ object MediaBridgeContract {
         const val DEFAULT_CATALOG_RESTORED = 112
         const val RADIO_CATALOG_EXPORTED = 114
         const val RADIO_CATALOG_IMPORTED = 115
+        const val RADIO_CATALOG_MANAGED = 116
     }
 
     object Key {
@@ -155,6 +158,21 @@ object MediaBridgeContract {
         const val CATALOG_TYPE = "catalogType"
         const val CATALOG_STATION_COUNT = "catalogStationCount"
         const val CATALOG_DESCRIPTION = "catalogDescription"
+        /** The active catalog and the ordered catalog list as parallel arrays. */
+        const val CATALOG_ACTIVE_ID = "catalogActiveId"
+        const val CATALOG_IDS = "catalogIds"
+        const val CATALOG_NAMES = "catalogNames"
+        const val CATALOG_STATION_COUNTS = "catalogStationCounts"
+        /** Target catalog of MANAGE/EXPORT, or the catalog an import replaces. */
+        const val CATALOG_ID = "catalogId"
+        const val CATALOG_NAME = "catalogName"
+        const val CATALOG_ACTION = "catalogAction"
+    }
+
+    object CatalogAction {
+        const val ACTIVATE = "ACTIVATE"
+        const val RENAME = "RENAME"
+        const val DELETE = "DELETE"
     }
 
     object Status {

@@ -2,6 +2,10 @@ package com.mmwtl.atlasmediawidget;
 
 import android.os.Bundle;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 final class MediaSettingsSnapshot {
     final long revision;
     final String defaultAudioSource;
@@ -27,6 +31,32 @@ final class MediaSettingsSnapshot {
     /** Startup waits for a validated internet connection; set only from a Bridge snapshot. */
     boolean startupWaitForInternet;
     int startupInternetTimeoutSec = DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC;
+    /** The active radio catalog and every catalog in order; set only from a Bridge snapshot. */
+    String catalogActiveId = "";
+    List<Catalog> catalogs = Collections.emptyList();
+
+    static final class Catalog {
+        final String id;
+        final String name;
+        final int stationCount;
+
+        Catalog(String id, String name, int stationCount) {
+            this.id = id;
+            this.name = name;
+            this.stationCount = stationCount;
+        }
+
+        boolean isBuiltIn() {
+            return MediaBridgeContract.BUILT_IN_CATALOG_ID.equals(id);
+        }
+    }
+
+    Catalog activeCatalog() {
+        for (Catalog catalog : catalogs) {
+            if (catalog.id.equals(catalogActiveId)) return catalog;
+        }
+        return null;
+    }
 
     MediaSettingsSnapshot(
             long revision,
@@ -142,6 +172,8 @@ final class MediaSettingsSnapshot {
         snapshot.startupInternetTimeoutSec = bundle.getInt(
                 MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC,
                 DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC);
+        snapshot.catalogActiveId = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_ID, "");
+        snapshot.catalogs = readCatalogs(bundle);
         return snapshot;
     }
 
@@ -168,6 +200,36 @@ final class MediaSettingsSnapshot {
         bundle.putInt(MediaBridgeContract.K_UI_SCALE_TENTHS, uiScaleTenths);
         bundle.putBoolean(MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET, startupWaitForInternet);
         bundle.putInt(MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC, startupInternetTimeoutSec);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_ID, catalogActiveId);
+        ArrayList<String> ids = new ArrayList<>(catalogs.size());
+        ArrayList<String> names = new ArrayList<>(catalogs.size());
+        int[] counts = new int[catalogs.size()];
+        for (int i = 0; i < catalogs.size(); i++) {
+            ids.add(catalogs.get(i).id);
+            names.add(catalogs.get(i).name);
+            counts[i] = catalogs.get(i).stationCount;
+        }
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_IDS, ids);
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_NAMES, names);
+        bundle.putIntArray(MediaBridgeContract.K_CATALOG_STATION_COUNTS, counts);
         return bundle;
+    }
+
+    private static List<Catalog> readCatalogs(Bundle bundle) {
+        ArrayList<String> ids = bundle.getStringArrayList(MediaBridgeContract.K_CATALOG_IDS);
+        ArrayList<String> names = bundle.getStringArrayList(MediaBridgeContract.K_CATALOG_NAMES);
+        int[] counts = bundle.getIntArray(MediaBridgeContract.K_CATALOG_STATION_COUNTS);
+        if (ids == null || names == null || counts == null || ids.size() != names.size()
+                || ids.size() != counts.length) {
+            return Collections.emptyList();
+        }
+        ArrayList<Catalog> result = new ArrayList<>(ids.size());
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i);
+            if (id == null || id.isEmpty()) continue;
+            String name = names.get(i);
+            result.add(new Catalog(id, name != null ? name : "", counts[i]));
+        }
+        return Collections.unmodifiableList(result);
     }
 }

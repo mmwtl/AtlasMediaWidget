@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.AtomicFile
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
+import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogType
@@ -129,6 +130,10 @@ class MediaSettingsController(
             catalogStationCount = catalogInfo.stationCount,
             catalogDescription = catalogInfo.description,
             uiScaleTenths = preferences.uiScaleTenths,
+            catalogActiveId = catalogInfo.activeId,
+            catalogs = catalogInfo.catalogs.map {
+                MediaSettingsCatalog(it.id, it.name, it.stationCount)
+            },
         )
     }
 
@@ -295,6 +300,21 @@ class MediaSettingsController(
         onSettingsChanged?.invoke()
         return getSnapshot()
     }
+
+    /** Activates, renames or deletes one radio catalog; throws IllegalArgumentException if invalid. */
+    fun manageRadioCatalog(action: String, catalogId: String, name: String?): MediaSettingsSnapshot =
+        synchronized(importLock) {
+            require(RadioCatalogRepository.isValidCatalogId(catalogId)) { "Недопустимый идентификатор каталога" }
+            when (action) {
+                MediaBridgeContract.CatalogAction.ACTIVATE -> radioCatalogRepository.activateCatalog(catalogId)
+                MediaBridgeContract.CatalogAction.RENAME -> radioCatalogRepository.renameCatalog(catalogId, name.orEmpty())
+                MediaBridgeContract.CatalogAction.DELETE -> radioCatalogRepository.deleteCatalog(catalogId)
+                else -> throw IllegalArgumentException("Неизвестное действие с каталогом: $action")
+            }
+            nextRevision()
+            onSettingsChanged?.invoke()
+            return getSnapshot()
+        }
 
     /** Publishes a radio catalog mutation to the coordinator and settings clients. */
     fun onRadioCatalogChanged(): MediaSettingsSnapshot = synchronized(importLock) {

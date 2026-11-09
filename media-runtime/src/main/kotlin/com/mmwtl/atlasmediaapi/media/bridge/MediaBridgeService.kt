@@ -88,7 +88,7 @@ class MediaBridgeService : Service() {
                 MediaBridgeContract.ClientMessage.GET_RADIO_STATIONS ->
                     handleGetRadioStations(message)
 
-                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.IMPORT_RADIO_CATALOG -> {
+                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.MANAGE_RADIO_CATALOG -> {
                     // Handler recycles the incoming Message after returning; retain a copy for IO work.
                     val request = Message.obtain(message)
                     scope.launch(Dispatchers.IO) {
@@ -148,6 +148,8 @@ class MediaBridgeService : Service() {
             MediaBridgeContract.ClientMessage.IMPORT_RADIO_CATALOG ->
                 handleImportRadioCatalog(message)
 
+            MediaBridgeContract.ClientMessage.MANAGE_RADIO_CATALOG ->
+                handleManageRadioCatalog(message)
         }
     }
 
@@ -491,6 +493,32 @@ class MediaBridgeService : Service() {
         send(replyTo, MediaBridgeContract.ServerMessage.DEFAULT_CATALOG_RESTORED, bundle)
     }
 
+    private fun handleManageRadioCatalog(message: Message) {
+        val replyTo = message.replyTo ?: return
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        if (!isSettingsAllowed(message)) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Radio catalog IPC restricted")
+            return
+        }
+        val snapshot = try {
+            coordinator.settingsController.manageRadioCatalog(
+                action = data.getString(MediaBridgeContract.Key.CATALOG_ACTION).orEmpty(),
+                catalogId = data.getString(MediaBridgeContract.Key.CATALOG_ID).orEmpty(),
+                name = data.getString(MediaBridgeContract.Key.CATALOG_NAME),
+            )
+        } catch (error: IllegalArgumentException) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.VALIDATION_ERROR,
+                error.message ?: "Radio catalog operation rejected")
+            return
+        }
+        val bundle = snapshot.toBundle().apply {
+            putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+            putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+        }
+        send(replyTo, MediaBridgeContract.ServerMessage.RADIO_CATALOG_MANAGED, bundle)
+    }
+
     private fun handleExportMediaBackup(message: Message) {
         val replyTo = message.replyTo ?: return
         val data = message.data ?: return
@@ -541,11 +569,21 @@ class MediaBridgeService : Service() {
             sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
             return
         }
+        val catalogId = data.getString(MediaBridgeContract.Key.CATALOG_ID)
+            ?.takeIf(String::isNotEmpty)
+            ?: coordinator.radioCatalogRepository.getCatalogInfo().activeId
+        if (!RadioCatalogRepository.isValidCatalogId(catalogId)) {
+            runCatching { pfd.close() }
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "Invalid catalogId")
+            return
+        }
         try {
             android.os.ParcelFileDescriptor.AutoCloseOutputStream(pfd).use { out ->
-                coordinator.radioCatalogRepository.exportCatalogZip(out)
+                coordinator.radioCatalogRepository.exportCatalogZip(out, catalogId)
             }
             val info = coordinator.radioCatalogRepository.getCatalogInfo()
+            val stationCount = info.catalogs.firstOrNull { it.id == catalogId }?.stationCount
+                ?: info.stationCount
             send(
                 replyTo,
                 MediaBridgeContract.ServerMessage.RADIO_CATALOG_EXPORTED,
@@ -553,7 +591,7 @@ class MediaBridgeService : Service() {
                     putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
                     putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
                     putString(MediaBridgeContract.Key.MESSAGE, "Radio catalog exported")
-                    putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, info.stationCount)
+                    putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, stationCount)
                 },
             )
         } catch (e: Exception) {
@@ -581,10 +619,22 @@ class MediaBridgeService : Service() {
             sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
             return
         }
+        val replaceId = data.getString(MediaBridgeContract.Key.CATALOG_ID)?.takeIf(String::isNotEmpty)
+        if (replaceId != null && !RadioCatalogRepository.isValidCatalogId(replaceId)) {
+            runCatching { pfd.close() }
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "Invalid catalogId")
+            return
+        }
+        val catalogName = data.getString(MediaBridgeContract.Key.CATALOG_NAME)
         try {
-            val count = android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
-                coordinator.radioCatalogRepository.importCustomZip(input).getOrThrow()
+            val imported = android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
+                coordinator.radioCatalogRepository.importCatalogZip(
+                    inputStream = input,
+                    name = catalogName,
+                    replaceId = replaceId,
+                ).getOrThrow()
             }
+            val count = imported.stationCount
             val snapshot = coordinator.settingsController.onRadioCatalogChanged()
             send(
                 replyTo,
@@ -594,6 +644,8 @@ class MediaBridgeService : Service() {
                     putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
                     putString(MediaBridgeContract.Key.MESSAGE, "Radio catalog imported")
                     putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, count)
+                    putString(MediaBridgeContract.Key.CATALOG_ID, imported.id)
+                    putString(MediaBridgeContract.Key.CATALOG_NAME, imported.name)
                     putLong(MediaBridgeContract.Key.SETTINGS_REVISION, snapshot.revision)
                 },
             )

@@ -42,6 +42,8 @@ class MediaStateHub(
     private var artworkRequestBitmap: android.graphics.Bitmap? = null
     private var artworkRequestId = 0L
     private val cachedRadioArtwork = AtomicReference<CachedRadioArtwork?>()
+    // Guarded by mediaCallbackLock: the catalog generation the radio artwork was resolved from.
+    private var radioCatalogGeneration: Long? = null
     private val onlineSourcePolicy = OnlineMediaSourcePolicy()
     private val cpaaArtworkFallback = CpaaArtworkFallback(repository, artworkRepository)
     private val usbArtworkResolver = UsbArtworkResolver(context)
@@ -669,6 +671,12 @@ class MediaStateHub(
         markPlayingIfActive(playing)
 
         val widgetBroadcastEnabled = radioCatalogRepository?.isWidgetBroadcastEnabled == true
+        // Another catalog may name or picture the same frequency differently: drop the artwork
+        // resolved from the previous one instead of reusing it for the same mediaId.
+        val catalogGeneration = radioCatalogRepository?.generation ?: 0L
+        val catalogChanged = radioCatalogGeneration.let { it != null && it != catalogGeneration }
+        radioCatalogGeneration = catalogGeneration
+        if (catalogChanged) cachedRadioArtwork.set(null)
         val catalogStation = frequency?.let { radioCatalogRepository?.lookup(it.frequency) }
         val clusterStation = frequency?.let {
             radioMetadata(
@@ -706,7 +714,7 @@ class MediaStateHub(
                 station = widgetStation,
                 playing = playing,
                 elapsedRealtime = android.os.SystemClock.elapsedRealtime(),
-                artworkUri = if (widgetBroadcastEnabled) null else "",
+                artworkUri = if (widgetBroadcastEnabled && !catalogChanged) null else "",
             )
         }
 
@@ -721,6 +729,7 @@ class MediaStateHub(
                 }
                 ?: if (
                     widgetBroadcastEnabled &&
+                    !catalogChanged &&
                     updated.mediaId == clusterStation.mediaId &&
                     updated.artworkUri.isNotBlank()
                 ) {

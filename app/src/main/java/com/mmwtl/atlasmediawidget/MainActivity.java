@@ -69,6 +69,7 @@ public final class MainActivity extends ScaledActivity {
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
     private static final int REQUEST_IMPORT_RADIO_CATALOG = 4103;
     static final String RADIO_ZIP_FILE_NAME = "AtlasMediaWidget-radio.zip";
+    private static final int MAX_CATALOG_NAME_LENGTH = 40;
     private static final long SETTINGS_READINESS_TIMEOUT_MS = 20_000L;
     private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
@@ -135,7 +136,9 @@ public final class MainActivity extends ScaledActivity {
     private TextView clusterReassertBurstLabel;
     private SeekBar clusterReassertBurstSeekBar;
     private TextView radioCatalogInfoText;
-    private Button restoreDefaultRadioCatalogButton;
+    private LinearLayout radioCatalogList;
+    /** The catalog the picked ZIP replaces, or null when it adds a new catalog. */
+    private String pendingReplaceCatalogId;
     private TextView mediaStatusText;
     private final List<View> mediaSettingsViews = new ArrayList<>();
     private Button overlayPermissionButton;
@@ -154,7 +157,6 @@ public final class MainActivity extends ScaledActivity {
     private RadioButton[] statusBarFormatButtons;
     private Button exportSettingsButton;
     private Button importSettingsButton;
-    private Button exportRadioCatalogButton;
     private Button importRadioCatalogButton;
     private TextView coverDimTitle;
     private RadioGroup coverDimPresetGroup;
@@ -1707,7 +1709,9 @@ public final class MainActivity extends ScaledActivity {
         launchFilePicker(picker, REQUEST_IMPORT_SETTINGS);
     }
 
-    private void chooseRadioCatalogImport() {
+    private void chooseRadioCatalogImport(String replaceCatalogId) {
+        if (radioCatalogBusy || mediaSettingsBusy || settingsTransferBusy) return;
+        pendingReplaceCatalogId = replaceCatalogId;
         Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("*/*");
@@ -1809,7 +1813,7 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void exportRadioCatalog() {
+    private void exportRadioCatalog(MediaSettingsSnapshot.Catalog catalog) {
         if (radioCatalogBusy || mediaSettingsBusy || settingsTransferBusy || recoveryInProgress
                 || importInProgress || mediaBridgeClient == null
                 || !mediaBridgeClient.isSettingsSupported()) return;
@@ -1834,7 +1838,7 @@ public final class MainActivity extends ScaledActivity {
                 final CountDownLatch latch = new CountDownLatch(1);
                 final boolean[] success = new boolean[1];
                 final String[] errorHolder = new String[1];
-                mediaBridgeClient.exportRadioCatalog(exportFile,
+                mediaBridgeClient.exportRadioCatalog(exportFile, catalog.id,
                         new MediaBridgeClient.RadioCatalogExportCallback() {
                             @Override public void onCatalogExported(int stationCount) {
                                 success[0] = true;
@@ -1851,7 +1855,7 @@ public final class MainActivity extends ScaledActivity {
                     throw new IOException("Ошибка экспорта каталога радио: "
                             + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
                 }
-                String name = datedExportName(RADIO_ZIP_FILE_NAME);
+                String name = datedExportName(radioCatalogExportFileName(catalog));
                 Uri uri = BackupProvider.publish(appContext, name, exportFile);
                 main.post(() -> {
                     if (isDestroyed()) return;
@@ -1887,9 +1891,12 @@ public final class MainActivity extends ScaledActivity {
         setRadioCatalogTransferEnabled(false);
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
+        String replaceCatalogId = pendingReplaceCatalogId;
+        pendingReplaceCatalogId = null;
         ioExecutor.execute(() -> {
             File staged = null;
             try {
+                String suggestedName = catalogNameFromFileName(displayName(appContext, uri));
                 File importDir = new File(getCacheDir(), "imports");
                 if (!importDir.exists() && !importDir.mkdirs()) {
                     throw new IOException("Не удалось создать временное хранилище импорта");
@@ -1918,7 +1925,8 @@ public final class MainActivity extends ScaledActivity {
                         return;
                     }
                     pendingRadioImportFile = readyFile;
-                    showRadioCatalogImportConfirmation(readyFile);
+                    showRadioCatalogImportConfirmation(readyFile, replaceCatalogId,
+                            suggestedName);
                 });
             } catch (Exception error) {
                 if (staged != null) staged.delete();
@@ -1928,17 +1936,60 @@ public final class MainActivity extends ScaledActivity {
         });
     }
 
-    private void showRadioCatalogImportConfirmation(File stagedFile) {
-        CompactDialog.show(new AlertDialog.Builder(this)
-                .setTitle("Заменить каталог радио?")
-                .setMessage("Текущий каталог радиостанций и обложек будет полностью заменён "
-                        + "содержимым выбранного ZIP-файла.")
-                .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
-                .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
-                .setPositiveButton("Заменить", (d, w) -> importRadioCatalog(stagedFile)));
+    private static String displayName(android.content.Context context, Uri uri) {
+        try (android.database.Cursor cursor = context.getContentResolver().query(uri,
+                new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(0);
+                if (name != null) return name;
+            }
+        } catch (RuntimeException ignored) {
+            // Some pickers expose no display name; fall back to the path.
+        }
+        return uri.getLastPathSegment();
     }
 
-    private void importRadioCatalog(File stagedFile) {
+    private MediaSettingsSnapshot.Catalog catalogById(String id) {
+        if (id == null || currentMediaSettings == null) return null;
+        for (MediaSettingsSnapshot.Catalog catalog : currentMediaSettings.catalogs) {
+            if (catalog.id.equals(id)) return catalog;
+        }
+        return null;
+    }
+
+    private void showRadioCatalogImportConfirmation(File stagedFile, String replaceCatalogId,
+            String suggestedName) {
+        MediaSettingsSnapshot.Catalog replaced = catalogById(replaceCatalogId);
+        if (replaceCatalogId != null && replaced != null) {
+            CompactDialog.show(new AlertDialog.Builder(this)
+                    .setTitle("Заменить каталог «" + replaced.name + "»?")
+                    .setMessage("Станции и обложки каталога будут полностью заменены "
+                            + "содержимым выбранного ZIP-файла. Название сохранится.")
+                    .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
+                    .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
+                    .setPositiveButton("Заменить", (d, w) ->
+                            importRadioCatalog(stagedFile, null, replaced.id)));
+            return;
+        }
+        EditText input = catalogNameInput(suggestedName);
+        input.setHint("Название каталога");
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(text("Новый каталог станет активным. Остальные каталоги сохранятся.",
+                13, Ui.SECONDARY, Typeface.NORMAL));
+        LinearLayout.LayoutParams inputParams = fullWrap();
+        inputParams.topMargin = Ui.dp(this, 8);
+        content.addView(input, inputParams);
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Добавить каталог радио")
+                .setView(paddedDialogView(content))
+                .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
+                .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
+                .setPositiveButton("Добавить", (d, w) -> importRadioCatalog(stagedFile,
+                        input.getText().toString().trim(), null)));
+    }
+
+    private void importRadioCatalog(File stagedFile, String name, String replaceCatalogId) {
         ioExecutor.execute(() -> {
             try {
                 MediaBridgeClient bridge = mediaBridgeClient;
@@ -1954,7 +2005,7 @@ public final class MainActivity extends ScaledActivity {
                 final boolean[] success = new boolean[1];
                 final int[] stationCount = new int[1];
                 final String[] errorHolder = new String[1];
-                bridge.importRadioCatalog(stagedFile,
+                bridge.importRadioCatalog(stagedFile, name, replaceCatalogId,
                         new MediaBridgeClient.RadioCatalogImportCallback() {
                             @Override public void onCatalogImported(int count) {
                                 stationCount[0] = count;
@@ -1974,8 +2025,9 @@ public final class MainActivity extends ScaledActivity {
                 }
                 main.post(() -> {
                     if (isDestroyed()) return;
-                    Toast.makeText(this, "Каталог радио импортирован ("
-                                    + stationCount[0] + " станций)", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, (replaceCatalogId != null ? "Каталог заменён ("
+                                    : "Каталог добавлен (") + stationCountLabel(stationCount[0])
+                                    + ")", Toast.LENGTH_LONG).show();
                 });
             } catch (Exception error) {
                 AppLog.warn("Cannot import radio catalog", error);
@@ -2608,7 +2660,7 @@ public final class MainActivity extends ScaledActivity {
 
     private LinearLayout createRadioCatalogCard() {
         LinearLayout radioCard = card();
-        radioCard.addView(text("Каталог станций", 20, Ui.PRIMARY, Typeface.BOLD));
+        radioCard.addView(text("Каталоги станций", 20, Ui.PRIMARY, Typeface.BOLD));
         LinearLayout catalog = mediaSettingsBody(radioCard);
         radioWidgetBroadcastSwitch = mediaSwitch(catalog,
                 "Названия и обложки из каталога в карточке", 12,
@@ -2617,28 +2669,213 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams rciParams = fullWrap();
         rciParams.topMargin = Ui.dp(this, 12);
         catalog.addView(radioCatalogInfoText, rciParams);
-        restoreDefaultRadioCatalogButton = actionButton("Восстановить стандартный каталог радио");
-        restoreDefaultRadioCatalogButton.setOnClickListener(v -> restoreDefaultRadioCatalog());
-        catalog.addView(restoreDefaultRadioCatalogButton, buttonParams());
+        radioCatalogList = new LinearLayout(this);
+        radioCatalogList.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams listParams = fullWrap();
+        listParams.topMargin = Ui.dp(this, 4);
+        catalog.addView(radioCatalogList, listParams);
 
         TextView hint = text(
-                "Отдельный ZIP-каталог содержит stations.csv и обложки радиостанций. "
-                        + "Импорт заменяет текущий каталог после подтверждения.",
+                "Активен один каталог: нажмите на нужный, чтобы переключиться. В меню «⋯» — "
+                        + "экспорт, замена, переименование и удаление. ZIP-каталог содержит "
+                        + "stations.csv и обложки; одинаковые обложки разных каталогов "
+                        + "хранятся один раз.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         hint.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams hintParams = fullWrap();
         hintParams.topMargin = Ui.dp(this, 14);
         radioCard.addView(hint, hintParams);
 
-        exportRadioCatalogButton = actionButton("Экспортировать каталог радио (ZIP)");
-        exportRadioCatalogButton.setOnClickListener(v -> exportRadioCatalog());
-        radioCard.addView(exportRadioCatalogButton, buttonParams());
-
-        importRadioCatalogButton = actionButton("Импортировать каталог радио (ZIP)");
-        importRadioCatalogButton.setOnClickListener(v -> chooseRadioCatalogImport());
+        importRadioCatalogButton = actionButton("Добавить каталог (ZIP)");
+        importRadioCatalogButton.setOnClickListener(v -> chooseRadioCatalogImport(null));
         radioCard.addView(importRadioCatalogButton, buttonParams());
         setRadioCatalogTransferEnabled(false);
         return radioCard;
+    }
+
+    private void renderRadioCatalogs(MediaSettingsSnapshot snapshot) {
+        if (radioCatalogList == null) return;
+        radioCatalogList.removeAllViews();
+        boolean enabled = !mediaSettingsBusy && !radioCatalogBusy && !settingsTransferBusy;
+        for (MediaSettingsSnapshot.Catalog catalog : snapshot.catalogs) {
+            boolean active = catalog.id.equals(snapshot.catalogActiveId);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setBackground(Ui.background(active ? Ui.ACCENT : Ui.NESTED, 8, this));
+            row.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8));
+            int primary = active ? Ui.ON_ACCENT : Ui.PRIMARY;
+
+            LinearLayout labels = new LinearLayout(this);
+            labels.setOrientation(LinearLayout.VERTICAL);
+            labels.addView(text(catalog.name, 15, primary,
+                    active ? Typeface.BOLD : Typeface.NORMAL));
+            labels.addView(text(stationCountLabel(catalog.stationCount)
+                            + (active ? " · активен" : ""), 12,
+                    active ? Ui.ON_ACCENT : Ui.SECONDARY, Typeface.NORMAL));
+            row.addView(labels, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            Button menu = actionButton("⋯");
+            menu.setTextSize(18);
+            menu.setTextColor(primary);
+            menu.setBackground(null);
+            menu.setMinWidth(Ui.dp(this, 48));
+            menu.setContentDescription("Действия с каталогом " + catalog.name);
+            menu.setOnClickListener(v -> showRadioCatalogActions(catalog, active));
+            menu.setEnabled(enabled);
+            row.addView(menu, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+            row.setOnClickListener(v -> {
+                if (!active) manageRadioCatalog(MediaBridgeContract.CATALOG_ACTION_ACTIVATE,
+                        catalog, null, "Активен каталог «" + catalog.name + "»");
+            });
+            row.setEnabled(enabled);
+            LinearLayout.LayoutParams rowParams = fullWrap();
+            rowParams.topMargin = Ui.dp(this, 8);
+            radioCatalogList.addView(row, rowParams);
+        }
+    }
+
+    static String stationCountLabel(int count) {
+        int mod100 = count % 100;
+        int mod10 = count % 10;
+        String word = mod100 >= 11 && mod100 <= 14 ? "станций"
+                : mod10 == 1 ? "станция"
+                : mod10 >= 2 && mod10 <= 4 ? "станции" : "станций";
+        return count + " " + word;
+    }
+
+    private void showRadioCatalogActions(MediaSettingsSnapshot.Catalog catalog, boolean active) {
+        if (mediaSettingsBusy || radioCatalogBusy || settingsTransferBusy) return;
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        if (!active) {
+            labels.add("Сделать активным");
+            actions.add(() -> manageRadioCatalog(MediaBridgeContract.CATALOG_ACTION_ACTIVATE,
+                    catalog, null, "Активен каталог «" + catalog.name + "»"));
+        }
+        labels.add("Экспортировать (ZIP)");
+        actions.add(() -> exportRadioCatalog(catalog));
+        if (!catalog.isBuiltIn()) {
+            labels.add("Заменить из ZIP");
+            actions.add(() -> chooseRadioCatalogImport(catalog.id));
+            labels.add("Переименовать");
+            actions.add(() -> showRenameRadioCatalog(catalog));
+            labels.add("Удалить");
+            actions.add(() -> confirmDeleteRadioCatalog(catalog, active));
+        }
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle(catalog.name)
+                .setItems(labels.toArray(new String[0]), (d, which) -> actions.get(which).run())
+                .setNegativeButton("Отмена", null));
+    }
+
+    private EditText catalogNameInput(String value) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(value);
+        input.setSelectAllOnFocus(true);
+        input.setTextColor(Ui.PRIMARY);
+        input.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(MAX_CATALOG_NAME_LENGTH)});
+        return input;
+    }
+
+    private View paddedDialogView(View content) {
+        android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+        int padding = Ui.dp(this, 20);
+        frame.setPadding(padding, Ui.dp(this, 8), padding, 0);
+        frame.addView(content);
+        return frame;
+    }
+
+    private void showRenameRadioCatalog(MediaSettingsSnapshot.Catalog catalog) {
+        EditText input = catalogNameInput(catalog.name);
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Переименовать каталог")
+                .setView(paddedDialogView(input))
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty() || name.equals(catalog.name)) return;
+                    manageRadioCatalog(MediaBridgeContract.CATALOG_ACTION_RENAME, catalog, name,
+                            "Каталог переименован");
+                }));
+    }
+
+    private void confirmDeleteRadioCatalog(MediaSettingsSnapshot.Catalog catalog, boolean active) {
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Удалить каталог «" + catalog.name + "»?")
+                .setMessage("Станции и обложки этого каталога будут удалены."
+                        + (active ? " Активным станет встроенный каталог." : ""))
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Удалить", (d, w) -> manageRadioCatalog(
+                        MediaBridgeContract.CATALOG_ACTION_DELETE, catalog, null,
+                        "Каталог «" + catalog.name + "» удалён")));
+    }
+
+    private void manageRadioCatalog(String action, MediaSettingsSnapshot.Catalog catalog,
+            String name, String successMessage) {
+        if (mediaBridgeClient == null || mediaSettingsBusy || radioCatalogBusy
+                || settingsTransferBusy || !mediaBridgeClient.isSettingsSupported()) return;
+        mediaSettingsBusy = true;
+        setMediaSettingsEnabled(false);
+        setSettingsTransferEnabled(false);
+        setRadioCatalogTransferEnabled(false);
+        mediaBridgeClient.manageRadioCatalog(action, catalog.id, name,
+                new MediaBridgeClient.ManageCatalogCallback() {
+                    @Override public void onCatalogManaged(MediaSettingsSnapshot snapshot) {
+                        mediaSettingsBusy = false;
+                        if (isDestroyed()) return;
+                        currentMediaSettings = snapshot;
+                        updateMediaSettingsUi(snapshot);
+                        setSettingsTransferEnabled(true);
+                        Toast.makeText(MainActivity.this, successMessage,
+                                Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override public void onError(int code, String message) {
+                        mediaSettingsBusy = false;
+                        if (isDestroyed()) return;
+                        AppLog.warn("Radio catalog " + action + " failed: " + code + " "
+                                + message, null);
+                        setSettingsTransferEnabled(true);
+                        loadMediaSettings();
+                        Toast.makeText(MainActivity.this, message == null || message.isBlank()
+                                        ? "Не удалось изменить каталог" : message,
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    /** The share-sheet name of an exported catalog, before the date prefix. */
+    static String radioCatalogExportFileName(MediaSettingsSnapshot.Catalog catalog) {
+        if (catalog == null || catalog.isBuiltIn()) return RADIO_ZIP_FILE_NAME;
+        String safe = catalog.name.replaceAll("[^\\p{L}\\p{N}._-]+", "_")
+                .replaceAll("^[._]+|_+$", "");
+        if (safe.length() > MAX_CATALOG_NAME_LENGTH) {
+            safe = safe.substring(0, MAX_CATALOG_NAME_LENGTH);
+        }
+        return safe.isEmpty() ? RADIO_ZIP_FILE_NAME
+                : RADIO_ZIP_FILE_NAME.replace(".zip", "-" + safe + ".zip");
+    }
+
+    /** Suggests a catalog name from a picked file, dropping our own export decoration. */
+    static String catalogNameFromFileName(String displayName) {
+        if (displayName == null) return "";
+        String name = displayName.trim();
+        if (name.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+            name = name.substring(0, name.length() - 4);
+        }
+        name = name.replaceFirst("^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}_", "");
+        String base = RADIO_ZIP_FILE_NAME.substring(0, RADIO_ZIP_FILE_NAME.length() - 4);
+        if (name.equals(base)) return "";
+        if (name.startsWith(base + "-")) name = name.substring(base.length() + 1);
+        name = name.replace('_', ' ').trim();
+        return name.length() > MAX_CATALOG_NAME_LENGTH
+                ? name.substring(0, MAX_CATALOG_NAME_LENGTH).trim() : name;
     }
 
     private LinearLayout createSourceTileRow(String[][] options) {
@@ -2775,14 +3012,13 @@ public final class MainActivity extends ScaledActivity {
             clusterReassertBurstSeekBar.setProgress((int) (snapshot.clusterReassertBurstIntervalMs / 10L));
         }
         if (radioCatalogInfoText != null) {
-            radioCatalogInfoText.setText("Тип каталога: " + snapshot.catalogType
-                    + " (" + snapshot.catalogStationCount + " станций)");
+            MediaSettingsSnapshot.Catalog active = snapshot.activeCatalog();
+            radioCatalogInfoText.setText(active != null
+                    ? "Активный каталог: «" + active.name + "», "
+                            + stationCountLabel(snapshot.catalogStationCount)
+                    : snapshot.catalogDescription);
         }
-        if (restoreDefaultRadioCatalogButton != null) {
-            boolean isCustom = "CUSTOM".equalsIgnoreCase(snapshot.catalogType);
-            restoreDefaultRadioCatalogButton.setEnabled(isCustom);
-            restoreDefaultRadioCatalogButton.setAlpha(isCustom ? 1f : 0.45f);
-        }
+        renderRadioCatalogs(snapshot);
     }
 
     private void updateOnlinePlayerUi(MediaSettingsSnapshot snapshot) {
@@ -2978,38 +3214,6 @@ public final class MainActivity extends ScaledActivity {
         });
     }
 
-    private void restoreDefaultRadioCatalog() {
-        if (mediaBridgeClient == null || mediaSettingsBusy || !mediaBridgeClient.isSettingsSupported()) return;
-        CompactDialog.show(new AlertDialog.Builder(this)
-                .setTitle("Восстановить стандартный каталог радио?")
-                .setMessage("Пользовательские названия и обложки радиостанций будут удалены.")
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Восстановить", (d, w) -> applyDefaultRadioCatalog()));
-    }
-
-    private void applyDefaultRadioCatalog() {
-        mediaSettingsBusy = true;
-        setMediaSettingsEnabled(false);
-        setSettingsTransferEnabled(false);
-        mediaBridgeClient.restoreDefaultCatalog(new MediaBridgeClient.RestoreCatalogCallback() {
-            @Override public void onCatalogRestored(MediaSettingsSnapshot snapshot) {
-                mediaSettingsBusy = false;
-                if (isDestroyed()) return;
-                currentMediaSettings = snapshot;
-                updateMediaSettingsUi(snapshot);
-                setSettingsTransferEnabled(true);
-                Toast.makeText(MainActivity.this, "Стандартный каталог радио восстановлен", Toast.LENGTH_SHORT).show();
-            }
-            @Override public void onError(int code, String message) {
-                mediaSettingsBusy = false;
-                if (isDestroyed()) return;
-                setSettingsTransferEnabled(true);
-                loadMediaSettings();
-                Toast.makeText(MainActivity.this, "Ошибка восстановления каталога: " + message, Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
     private void setStartupInternetTimeoutLabel(int seconds) {
         if (startupInternetTimeoutLabel == null) return;
         startupInternetTimeoutLabel.setText(seconds < 60 ? "Ждать не дольше " + seconds + " сек"
@@ -3081,7 +3285,6 @@ public final class MainActivity extends ScaledActivity {
                 && !settingsTransferBusy && !radioCatalogBusy && !mediaSettingsBusy
                 && mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()
                 && ImportJournal.checkPendingRecovery(this) == null;
-        if (exportRadioCatalogButton != null) exportRadioCatalogButton.setEnabled(enabled);
         if (importRadioCatalogButton != null) importRadioCatalogButton.setEnabled(enabled);
     }
 

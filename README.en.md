@@ -112,7 +112,8 @@ the background until you pick your own. The overlay uses the night colours.
 - Online player selection, optional switch to Online before session playback and background
   playback start without opening the player when the player supports it; otherwise the player opens
   and can be minimized automatically;
-- radio catalog with station artwork, favorites grid and saved-station navigation without scanning;
+- several radio catalogs with station artwork (for example, one per city) with a switchable active
+  catalog, favorites grid and saved-station navigation without scanning;
 - radio title and artwork broadcast to the Geely OneOS DIM; optional separate Online progress
   updates;
 - optional now-playing text in the OneOS status bar pill with a choice of text layout (station or
