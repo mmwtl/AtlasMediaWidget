@@ -34,31 +34,32 @@ final class MediaSettingsSnapshot {
     /** The active radio catalog and every catalog in order; set only from a Bridge snapshot. */
     String catalogActiveId = "";
     List<Catalog> catalogs = Collections.emptyList();
+    /** The selected city when the active entry is a pack. */
+    String catalogActiveCityKey = "";
+    String catalogActiveCityName = "";
+    String catalogActiveRegion = "";
 
     static final class Catalog {
         final String id;
         final String name;
         final int stationCount;
-        /** The pack this city belongs to; empty for a catalog imported on its own. */
+        /** The pack id from pack.json; empty for the built-in and single catalogs. */
         final String packId;
-        final String packName;
-        final String region;
+        final int cityCount;
 
         Catalog(String id, String name, int stationCount) {
-            this(id, name, stationCount, "", "", "");
+            this(id, name, stationCount, "", 0);
         }
 
-        Catalog(String id, String name, int stationCount, String packId, String packName,
-                String region) {
+        Catalog(String id, String name, int stationCount, String packId, int cityCount) {
             this.id = id;
             this.name = name;
             this.stationCount = stationCount;
             this.packId = packId != null ? packId : "";
-            this.packName = packName != null ? packName : "";
-            this.region = region != null ? region : "";
+            this.cityCount = cityCount;
         }
 
-        boolean isInPack() {
+        boolean isPack() {
             return !packId.isEmpty();
         }
 
@@ -190,6 +191,9 @@ final class MediaSettingsSnapshot {
                 DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC);
         snapshot.catalogActiveId = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_ID, "");
         snapshot.catalogs = readCatalogs(bundle);
+        snapshot.catalogActiveCityKey = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_KEY, "");
+        snapshot.catalogActiveCityName = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_NAME, "");
+        snapshot.catalogActiveRegion = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_REGION, "");
         return snapshot;
     }
 
@@ -229,16 +233,16 @@ final class MediaSettingsSnapshot {
         bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_NAMES, names);
         bundle.putIntArray(MediaBridgeContract.K_CATALOG_STATION_COUNTS, counts);
         ArrayList<String> packIds = new ArrayList<>(catalogs.size());
-        ArrayList<String> packNames = new ArrayList<>(catalogs.size());
-        ArrayList<String> regions = new ArrayList<>(catalogs.size());
-        for (Catalog catalog : catalogs) {
-            packIds.add(catalog.packId);
-            packNames.add(catalog.packName);
-            regions.add(catalog.region);
+        int[] cityCounts = new int[catalogs.size()];
+        for (int i = 0; i < catalogs.size(); i++) {
+            packIds.add(catalogs.get(i).packId);
+            cityCounts[i] = catalogs.get(i).cityCount;
         }
         bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_PACK_IDS, packIds);
-        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_PACK_NAMES, packNames);
-        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_REGIONS, regions);
+        bundle.putIntArray(MediaBridgeContract.K_CATALOG_CITY_COUNTS, cityCounts);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_KEY, catalogActiveCityKey);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_NAME, catalogActiveCityName);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_REGION, catalogActiveRegion);
         return bundle;
     }
 
@@ -256,8 +260,8 @@ final class MediaSettingsSnapshot {
             return Collections.emptyList();
         }
         ArrayList<String> packIds = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_PACK_IDS, ids.size());
-        ArrayList<String> packNames = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_PACK_NAMES, ids.size());
-        ArrayList<String> regions = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_REGIONS, ids.size());
+        int[] cityCounts = bundle.getIntArray(MediaBridgeContract.K_CATALOG_CITY_COUNTS);
+        if (cityCounts != null && cityCounts.length != ids.size()) cityCounts = null;
         ArrayList<Catalog> result = new ArrayList<>(ids.size());
         for (int i = 0; i < ids.size(); i++) {
             String id = ids.get(i);
@@ -265,8 +269,7 @@ final class MediaSettingsSnapshot {
             String name = names.get(i);
             result.add(new Catalog(id, name != null ? name : "", counts[i],
                     packIds == null ? "" : packIds.get(i),
-                    packNames == null ? "" : packNames.get(i),
-                    regions == null ? "" : regions.get(i)));
+                    cityCounts == null ? 0 : cityCounts[i]));
         }
         return Collections.unmodifiableList(result);
     }

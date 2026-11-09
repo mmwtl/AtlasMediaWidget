@@ -90,14 +90,22 @@ public class MediaBridgeContractTest {
                 MediaBridgeContract.CATALOG_ACTION_RENAME);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.DELETE,
                 MediaBridgeContract.CATALOG_ACTION_DELETE);
-        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.DELETE_PACK,
-                MediaBridgeContract.CATALOG_ACTION_DELETE_PACK);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_IDS,
                 MediaBridgeContract.K_CATALOG_PACK_IDS);
-        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_NAMES,
-                MediaBridgeContract.K_CATALOG_PACK_NAMES);
-        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_REGIONS,
-                MediaBridgeContract.K_CATALOG_REGIONS);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_CITY_COUNTS,
+                MediaBridgeContract.K_CATALOG_CITY_COUNTS);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_ACTIVE_CITY_KEY,
+                MediaBridgeContract.K_CATALOG_ACTIVE_CITY_KEY);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_ACTIVE_CITY_NAME,
+                MediaBridgeContract.K_CATALOG_ACTIVE_CITY_NAME);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_ACTIVE_REGION,
+                MediaBridgeContract.K_CATALOG_ACTIVE_REGION);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_CITY_KEY,
+                MediaBridgeContract.K_CATALOG_CITY_KEY);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ClientMessage.GET_RADIO_PACK_CITIES,
+                MediaBridgeContract.GET_RADIO_PACK_CITIES);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.ServerMessage.RADIO_PACK_CITIES,
+                MediaBridgeContract.RADIO_PACK_CITIES);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_ID,
                 MediaBridgeContract.K_CATALOG_PACK_ID);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_NAME,
@@ -117,23 +125,25 @@ public class MediaBridgeContractTest {
                         false, 1250L, 100L, "CUSTOM", 3, "", 15, "abc",
                         java.util.List.of(
                                 new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog(
-                                        "builtin", "Встроенный (Пенза)", 25, "", "", ""),
+                                        "builtin", "Встроенный (Пенза)", 25, "", 0),
                                 new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog(
-                                        "abc", "Москва", 3, "russia", "Россия",
-                                        "Москва и область"))));
+                                        "abc", "Россия", 12010, "russia", 3180)),
+                        "moscow", "Москва", "Москва и область"));
         MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(bundle);
         assertEquals("abc", snapshot.catalogActiveId);
         assertEquals(2, snapshot.catalogs.size());
-        assertEquals("Москва", snapshot.activeCatalog().name);
-        assertEquals(3, snapshot.activeCatalog().stationCount);
+        assertEquals("Россия", snapshot.activeCatalog().name);
+        assertEquals(12010, snapshot.activeCatalog().stationCount);
+        assertEquals("moscow", snapshot.catalogActiveCityKey);
+        assertEquals("Москва", snapshot.catalogActiveCityName);
         assertTrue(snapshot.catalogs.get(0).isBuiltIn());
 
         MediaSettingsSnapshot restored = MediaSettingsSnapshot.fromBundle(snapshot.toBundle());
         assertEquals("abc", restored.catalogActiveId);
         assertEquals("Встроенный (Пенза)", restored.catalogs.get(0).name);
-        assertTrue(snapshot.activeCatalog().isInPack());
-        assertEquals("Россия", restored.activeCatalog().packName);
-        assertEquals("Москва и область", restored.activeCatalog().region);
+        assertTrue(snapshot.activeCatalog().isPack());
+        assertEquals(3180, restored.activeCatalog().cityCount);
+        assertEquals("Москва и область", restored.catalogActiveRegion);
         assertEquals("", restored.catalogs.get(0).packId);
     }
 

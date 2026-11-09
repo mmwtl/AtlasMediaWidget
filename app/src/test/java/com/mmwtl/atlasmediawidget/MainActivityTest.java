@@ -302,17 +302,30 @@ public final class MainActivityTest {
         assertEquals(null, RadioPackPreview.read(single));
         assertEquals("", RadioPackPreview.parse("{broken").id);
 
-        MediaSettingsSnapshot.Catalog city = new MediaSettingsSnapshot.Catalog(
-                "a", "Пенза", 25, "russia", "Россия", "Пензенская область");
-        assertEquals("Пенза · Пензенская область", MainActivity.cityLabel(city));
-        assertEquals("AtlasMediaWidget-radio-Россия.zip",
-                MainActivity.radioCatalogExportFileName(city));
-        assertEquals("3 города в 2 регионах", MainActivity.packSizeLabel(java.util.List.of(city,
-                new MediaSettingsSnapshot.Catalog("b", "Кузнецк", 5, "russia", "Россия",
-                        "Пензенская область"),
-                new MediaSettingsSnapshot.Catalog("c", "Москва", 9, "russia", "Россия",
-                        "Москва"))));
+        assertEquals("Пенза · Пензенская область",
+                MainActivity.cityLabel("Пенза", "Пензенская область"));
+        assertEquals("Москва", MainActivity.cityLabel("Москва", ""));
+        assertEquals("AtlasMediaWidget-radio-Россия.zip", MainActivity.radioCatalogExportFileName(
+                new MediaSettingsSnapshot.Catalog("a", "Россия", 12010, "russia", 3180)));
         assertEquals("21 город", MainActivity.plural(21, "город", "города", "городов"));
+        assertEquals("3180 городов", MainActivity.plural(3180, "город", "города", "городов"));
+
+        List<RadioPackCities.City> cities = RadioPackCities.parse("[{\"key\":\"pugachev\","
+                + "\"name\":\"Пугачёв\",\"region\":\"Саратовская область\",\"stations\":3},"
+                + "{\"key\":\"penza\",\"name\":\"Пенза\",\"region\":\"Пензенская область\","
+                + "\"stations\":25},{\"key\":\"zarechny\",\"name\":\"Заречный\","
+                + "\"region\":\"Пензенская область\",\"stations\":9},"
+                + "{\"key\":\"minsk\",\"name\":\"Минск\",\"stations\":20}]");
+        assertEquals("pugachev", RadioPackCities.search(cities, "пугачев", 10).get(0).key);
+        List<RadioPackCities.City> found = RadioPackCities.search(cities, "ен", 10);
+        assertEquals(1, found.size());
+        assertEquals("penza", found.get(0).key);
+        assertEquals("penza", RadioPackCities.search(cities, "  ПЕН ", 10).get(0).key);
+        assertTrue(RadioPackCities.search(cities, "", 10).isEmpty());
+        assertEquals(1, RadioPackCities.search(cities, "р", 1).size());
+        assertEquals(java.util.List.of("Саратовская область", "Пензенская область", ""),
+                new ArrayList<>(RadioPackCities.byRegion(cities).keySet()));
+        assertEquals(2, RadioPackCities.byRegion(cities).get("Пензенская область").size());
     }
 
     private static ExecutorService io(MainActivity activity) throws Exception {

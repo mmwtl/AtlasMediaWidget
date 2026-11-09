@@ -47,8 +47,9 @@ final class MediaBridgeClient {
     }
 
     interface RadioCatalogImportCallback {
-        /** [packId] is empty for a single catalog; [catalogCount] counts the imported cities. */
-        void onCatalogImported(int stationCount, String packId, String packName, int catalogCount);
+        /** [packId] is empty for a single catalog; [catalogCount] counts a pack's cities. */
+        void onCatalogImported(int stationCount, String catalogId, String packId, String packName,
+                int catalogCount);
         void onError(int status, String message);
     }
 
@@ -89,6 +90,11 @@ final class MediaBridgeClient {
 
     interface RestoreCatalogCallback {
         void onCatalogRestored(MediaSettingsSnapshot snapshot);
+        void onError(int status, String message);
+    }
+
+    interface PackCitiesCallback {
+        void onPackCities(int cityCount);
         void onError(int status, String message);
     }
 
@@ -565,6 +571,14 @@ final class MediaBridgeClient {
                         main.post(() -> mcb.onCatalogManaged(snapshot));
                     }
                 }
+                case MediaBridgeContract.RADIO_PACK_CITIES -> {
+                    String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
+                    int count = data.getInt(MediaBridgeContract.K_CATALOG_COUNT, 0);
+                    Object cb = takePendingCallback(requestId);
+                    if (cb instanceof PackCitiesCallback pcb) {
+                        main.post(() -> pcb.onPackCities(count));
+                    }
+                }
                 case MediaBridgeContract.MEDIA_BACKUP_EXPORTED -> {
                     String requestId = data.getString(MediaBridgeContract.K_REQUEST_ID, "");
                     Object cb = takePendingCallback(requestId);
@@ -598,8 +612,9 @@ final class MediaBridgeClient {
                             String packId = data.getString(MediaBridgeContract.K_CATALOG_PACK_ID, "");
                             String packName = data.getString(MediaBridgeContract.K_CATALOG_PACK_NAME, "");
                             int catalogCount = data.getInt(MediaBridgeContract.K_CATALOG_COUNT, 1);
-                            main.post(() -> rcb.onCatalogImported(stationCount, packId, packName,
-                                    catalogCount));
+                            String catalogId = data.getString(MediaBridgeContract.K_CATALOG_ID, "");
+                            main.post(() -> rcb.onCatalogImported(stationCount, catalogId, packId,
+                                    packName, catalogCount));
                         } else {
                             dispatchError(rcb, status,
                                     data.getString(MediaBridgeContract.K_MESSAGE, ""));
@@ -727,8 +742,11 @@ final class MediaBridgeClient {
         sendSimple(MediaBridgeContract.RESTORE_DEFAULT_CATALOG, reqId, null);
     }
 
-    /** Sends [action] (ACTIVATE, RENAME or DELETE) for one radio catalog. */
-    void manageRadioCatalog(String action, String catalogId, String name,
+    /**
+     * Sends [action] (ACTIVATE, RENAME or DELETE) for one radio catalog or pack; ACTIVATE of a
+     * pack names its city with [cityKey].
+     */
+    void manageRadioCatalog(String action, String catalogId, String name, String cityKey,
             ManageCatalogCallback callback) {
         String reqId = requestId("manage-radio-catalog");
         if (callback != null) addPendingCallback(reqId, callback);
@@ -736,7 +754,30 @@ final class MediaBridgeClient {
         extra.putString(MediaBridgeContract.K_CATALOG_ACTION, action);
         extra.putString(MediaBridgeContract.K_CATALOG_ID, catalogId);
         if (name != null) extra.putString(MediaBridgeContract.K_CATALOG_NAME, name);
+        if (cityKey != null) extra.putString(MediaBridgeContract.K_CATALOG_CITY_KEY, cityKey);
         sendSimple(MediaBridgeContract.MANAGE_RADIO_CATALOG, reqId, extra);
+    }
+
+    /** Writes the city list of pack [catalogId] as JSON into [destinationFile]. */
+    void readPackCities(File destinationFile, String catalogId, PackCitiesCallback callback) {
+        try {
+            android.os.ParcelFileDescriptor pfd = android.os.ParcelFileDescriptor.open(
+                    destinationFile,
+                    android.os.ParcelFileDescriptor.MODE_WRITE_ONLY
+                            | android.os.ParcelFileDescriptor.MODE_CREATE
+                            | android.os.ParcelFileDescriptor.MODE_TRUNCATE);
+            String reqId = requestId("radio-pack-cities");
+            if (callback != null) addPendingCallback(reqId, callback);
+            Bundle extra = new Bundle();
+            extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
+            extra.putString(MediaBridgeContract.K_CATALOG_ID, catalogId);
+            sendSimple(MediaBridgeContract.GET_RADIO_PACK_CITIES, reqId, extra);
+        } catch (Exception e) {
+            if (callback != null) {
+                main.post(() -> callback.onError(MediaBridgeContract.STATUS_IO_ERROR,
+                        e.getMessage()));
+            }
+        }
     }
 
     void exportMediaBackup(File destinationFile, BackupCallback callback) {
@@ -935,6 +976,8 @@ final class MediaBridgeClient {
             } else if (callback instanceof RestoreCatalogCallback cb) {
                 cb.onError(status, message);
             } else if (callback instanceof ManageCatalogCallback cb) {
+                cb.onError(status, message);
+            } else if (callback instanceof PackCitiesCallback cb) {
                 cb.onError(status, message);
             }
         });

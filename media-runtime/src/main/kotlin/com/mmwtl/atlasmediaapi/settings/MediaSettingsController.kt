@@ -132,8 +132,11 @@ class MediaSettingsController(
             uiScaleTenths = preferences.uiScaleTenths,
             catalogActiveId = catalogInfo.activeId,
             catalogs = catalogInfo.catalogs.map {
-                MediaSettingsCatalog(it.id, it.name, it.stationCount, it.packId, it.packName, it.region)
+                MediaSettingsCatalog(it.id, it.name, it.stationCount, it.packId, it.cityCount)
             },
+            catalogActiveCityKey = catalogInfo.activeCityKey,
+            catalogActiveCityName = catalogInfo.activeCityName,
+            catalogActiveRegion = catalogInfo.activeRegion,
         )
     }
 
@@ -302,14 +305,21 @@ class MediaSettingsController(
     }
 
     /** Activates, renames or deletes one radio catalog; throws IllegalArgumentException if invalid. */
-    fun manageRadioCatalog(action: String, catalogId: String, name: String?): MediaSettingsSnapshot =
+    fun manageRadioCatalog(
+        action: String,
+        catalogId: String,
+        name: String?,
+        cityKey: String? = null,
+    ): MediaSettingsSnapshot =
         synchronized(importLock) {
             require(RadioCatalogRepository.isValidCatalogId(catalogId)) { "Недопустимый идентификатор каталога" }
+            require(cityKey.isNullOrEmpty() || RadioCatalogRepository.isValidCityKey(cityKey)) {
+                "Недопустимый ключ города"
+            }
             when (action) {
-                MediaBridgeContract.CatalogAction.ACTIVATE -> radioCatalogRepository.activateCatalog(catalogId)
+                MediaBridgeContract.CatalogAction.ACTIVATE -> radioCatalogRepository.activateCatalog(catalogId, cityKey)
                 MediaBridgeContract.CatalogAction.RENAME -> radioCatalogRepository.renameCatalog(catalogId, name.orEmpty())
                 MediaBridgeContract.CatalogAction.DELETE -> radioCatalogRepository.deleteCatalog(catalogId)
-                MediaBridgeContract.CatalogAction.DELETE_PACK -> radioCatalogRepository.deletePackOf(catalogId)
                 else -> throw IllegalArgumentException("Неизвестное действие с каталогом: $action")
             }
             nextRevision()

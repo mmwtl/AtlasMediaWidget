@@ -31,25 +31,35 @@ enum class RadioCatalogType {
     CUSTOM,
 }
 
-/** One catalog the user can activate: the built-in one, an imported ZIP or a city of a pack. */
+/**
+ * One entry of the catalog list: the built-in catalog, a catalog imported on its own, or a pack.
+ * A pack holds many cities; [stationCount] then counts the stations of all its cities.
+ */
 data class RadioCatalogEntry(
     val id: String,
     val name: String,
     val stationCount: Int,
     val builtIn: Boolean,
-    /** The pack this catalog came from, or empty for a catalog imported on its own. */
+    /** The pack id from pack.json; empty for the built-in and single catalogs. */
     val packId: String = "",
-    val packName: String = "",
-    val region: String = "",
+    val cityCount: Int = 0,
+) {
+    val isPack: Boolean get() = packId.isNotEmpty()
+}
+
+/** A city of a pack, as the city picker lists it. */
+data class RadioPackCity(
+    val key: String,
+    val name: String,
+    val region: String,
+    val stationCount: Int,
 )
 
-/** Catalogs created by one import: a single catalog, or every city of a pack. */
+/** The catalog or pack an import created or updated. */
 data class RadioCatalogImport(
-    val catalogs: List<RadioCatalogEntry>,
-    val packId: String = "",
-    val packName: String = "",
+    val entry: RadioCatalogEntry,
 ) {
-    val stationCount: Int get() = catalogs.sumOf(RadioCatalogEntry::stationCount)
+    val stationCount: Int get() = entry.stationCount
 }
 
 data class RadioCatalogInfo(
@@ -59,21 +69,27 @@ data class RadioCatalogInfo(
     val description: String,
     val activeId: String = RadioCatalogRepository.BUILT_IN_ID,
     val catalogs: List<RadioCatalogEntry> = emptyList(),
+    /** The selected city when the active entry is a pack. */
+    val activeCityKey: String = "",
+    val activeCityName: String = "",
+    val activeRegion: String = "",
 )
 
 /**
  * Keeps several named radio catalogs and serves the active one.
  *
  * Layout under filesDir:
- * - `radio_catalogs/index.json` (AtomicFile) names the catalogs, their order and the active one;
- * - `radio_catalogs/<id>/stations.csv` and `covers.json` (cover file name -> stored cover);
+ * - `radio_catalogs/index.json` (AtomicFile) lists the catalogs and packs, their order, the active
+ *   one and, for a pack, the active city;
+ * - `radio_catalogs/<id>/stations.csv` and `covers.json` (cover file name -> stored cover) for a
+ *   single catalog;
+ * - `radio_catalogs/<id>/cities.json`, the city CSV files and `covers.json` for a pack;
  * - `radio_covers/<sha256>.<ext>` holds every cover once, shared by all catalogs.
  *
- * A pack ZIP (`pack.json`, city CSV files, one shared `covers/`) becomes one catalog per city;
- * a pack is imported, updated and deleted as a whole.
- *
- * The index is the commit point: a catalog directory or cover that it does not reference is
- * removed at startup, so an interrupted import or delete leaves the previous state intact.
+ * A pack stays one entry however many cities it has, so the index and the settings snapshot stay
+ * small; the city list is read from `cities.json` on demand. The index is the commit point: a
+ * catalog directory or cover that it does not reference is removed at startup, so an interrupted
+ * import or delete leaves the previous state intact.
  */
 class RadioCatalogRepository(
     private val context: Context,
@@ -97,18 +113,20 @@ class RadioCatalogRepository(
         const val COVER_STORE_DIR = "radio_covers"
         const val INDEX_NAME = "index.json"
         const val COVER_MAP_NAME = "covers.json"
+        const val CITIES_NAME = "cities.json"
         const val LEGACY_DIR = "custom_radio"
 
         const val PACK_MANIFEST_NAME = "pack.json"
         const val PACK_FORMAT = "atlas-radio-pack"
         const val PACK_VERSION = 1
-        const val PACK_CITIES_DIR = "cities"
 
+        /** Catalogs and packs together; a pack counts once however many cities it has. */
         const val MAX_CUSTOM_CATALOGS = 64
+        const val MAX_PACK_CITIES = 5000
         const val MAX_CATALOG_NAME_LENGTH = 40
         const val MAX_COVER_STORE_BYTES = 128L * 1024L * 1024L // 128 MB
         const val MAX_ZIP_UNCOMPRESSED_BYTES = 64L * 1024L * 1024L // 64 MB
-        const val MAX_ZIP_ENTRIES = 600
+        const val MAX_ZIP_ENTRIES = 10_000
 
         private val CATALOG_ID = Regex("^[0-9a-f]{32}$")
         private val STORED_COVER = Regex("^[0-9a-f]{64}\\.(png|jpg|webp)$")
@@ -118,6 +136,8 @@ class RadioCatalogRepository(
 
         fun isValidCatalogId(id: String?): Boolean =
             id == BUILT_IN_ID || (id != null && CATALOG_ID.matches(id))
+
+        fun isValidCityKey(key: String?): Boolean = key != null && PACK_KEY.matches(key)
 
         /** Turns control characters into spaces, collapses spaces, trims and bounds the length. */
         fun normalizeName(raw: String?): String =
@@ -148,32 +168,44 @@ class RadioCatalogRepository(
         val name: String,
         val stationCount: Int,
         val packId: String = "",
-        val packName: String = "",
-        val key: String = "",
-        val region: String = "",
+        val cityCount: Int = 0,
     ) {
-        fun toEntry() = RadioCatalogEntry(id, name, stationCount, builtIn = false, packId, packName, region)
+        val isPack: Boolean get() = packId.isNotEmpty()
+
+        fun toEntry() = RadioCatalogEntry(id, name, stationCount, builtIn = false, packId, cityCount)
     }
 
-    private class PackCatalog(
+    /** A city as `cities.json` stores it; [file] is relative to the pack directory. */
+    private class StoredCity(
         val key: String,
         val name: String,
         val region: String,
-        val manifest: File,
-        val stations: List<RadioStation>,
+        val file: String,
+        val stationCount: Int,
     )
 
-    private class RadioCatalogPack(val id: String, val name: String, val catalogs: List<PackCatalog>)
+    private class ValidatedPack(
+        val id: String,
+        val name: String,
+        val cities: List<StoredCity>,
+        val stationCount: Int,
+        val referencedCovers: Set<String>,
+    )
 
-    private data class CatalogIndex(val activeId: String, val entries: List<IndexEntry>)
+    private data class CatalogIndex(
+        val activeId: String,
+        val entries: List<IndexEntry>,
+        val activeCityKey: String = "",
+    )
 
     private class ActiveCatalog(
         val id: String,
         val name: String,
         val type: RadioCatalogType,
         val stations: Map<Int, RadioStation>,
-        /** Cover file name from stations.csv -> stored cover name; empty for the built-in catalog. */
+        /** Cover file name from the CSV -> stored cover name; empty for the built-in catalog. */
         val storedCovers: Map<String, String>,
+        val city: StoredCity? = null,
     )
 
     private val prefs: SharedPreferences =
@@ -233,7 +265,11 @@ class RadioCatalogRepository(
         val current = index
         val entry = current.entries.firstOrNull { it.id == current.activeId }
         active = entry
-            ?.let { runCatching { loadCustom(it) }.onFailure(Timber::e).getOrNull() }
+            ?.let {
+                runCatching { if (it.isPack) loadPackCity(it, current.activeCityKey) else loadCustom(it) }
+                    .onFailure(Timber::e)
+                    .getOrNull()
+            }
             ?: loadBuiltIn()
         generation++
         _catalogInfoFlow.value = buildCatalogInfo()
@@ -307,13 +343,32 @@ class RadioCatalogRepository(
         activateCatalog(BUILT_IN_ID)
     }
 
+    /** Activates a catalog, or the city [cityKey] of a pack. */
     @Synchronized
-    fun activateCatalog(id: String) {
+    fun activateCatalog(id: String, cityKey: String? = null) {
         val current = index
-        require(id == BUILT_IN_ID || current.entries.any { it.id == id }) { "Каталог не найден" }
-        if (current.activeId == id && active.id == id) return
-        commitIndex(current.copy(activeId = id))
+        val entry = current.entries.firstOrNull { it.id == id }
+        require(id == BUILT_IN_ID || entry != null) { "Каталог не найден" }
+        val key = if (entry?.isPack == true) {
+            require(!cityKey.isNullOrEmpty()) { "Выберите город набора «${entry.name}»" }
+            require(readPackCities(entry).any { it.key == cityKey }) { "В наборе нет города «$cityKey»" }
+            cityKey
+        } else {
+            require(cityKey.isNullOrEmpty()) { "Город выбирается только в наборе" }
+            ""
+        }
+        if (current.activeId == id && current.activeCityKey == key && active.id == id &&
+            (active.city?.key ?: "") == key
+        ) return
+        commitIndex(current.copy(activeId = id, activeCityKey = key))
         reloadCatalog()
+    }
+
+    /** The cities of pack [id] in pack order. */
+    fun packCities(id: String): List<RadioPackCity> {
+        val entry = index.entries.firstOrNull { it.id == id && it.isPack }
+            ?: throw IllegalArgumentException("Набор не найден")
+        return readPackCities(entry).map { RadioPackCity(it.key, it.name, it.region, it.stationCount) }
     }
 
     @Synchronized
@@ -321,7 +376,7 @@ class RadioCatalogRepository(
         require(id != BUILT_IN_ID) { "Встроенный каталог нельзя переименовать" }
         val current = index
         val entry = current.entries.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Каталог не найден")
-        require(entry.packId.isEmpty()) { "Названия городов задаёт набор «${entry.packName}»" }
+        require(!entry.isPack) { "Название набора задаёт его pack.json" }
         val normalized = normalizeName(name)
         require(normalized.isNotEmpty()) { "Название каталога не может быть пустым" }
         val taken = singleNames(current, exceptId = id)
@@ -339,39 +394,27 @@ class RadioCatalogRepository(
         }
     }
 
-    /** Deletes an imported catalog; deleting the active one makes the built-in catalog active. */
+    /** Deletes a catalog or a whole pack; deleting the active one activates the built-in one. */
     @Synchronized
     fun deleteCatalog(id: String) {
         require(id != BUILT_IN_ID) { "Встроенный каталог нельзя удалить" }
-        val entry = index.entries.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Каталог не найден")
-        require(entry.packId.isEmpty()) { "Город удаляется вместе с набором «${entry.packName}»" }
-        removeEntries { it.id == id }
-    }
-
-    /** Deletes the whole pack that the catalog [id] belongs to. */
-    @Synchronized
-    fun deletePackOf(id: String) {
-        val entry = index.entries.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Каталог не найден")
-        require(entry.packId.isNotEmpty()) { "Каталог не входит в набор" }
-        removeEntries { it.packId == entry.packId }
-    }
-
-    private fun removeEntries(predicate: (IndexEntry) -> Boolean) {
         val current = index
-        val wasActive = current.entries.any { it.id == current.activeId && predicate(it) }
+        require(current.entries.any { it.id == id }) { "Каталог не найден" }
+        val wasActive = current.activeId == id
         commitIndex(
             CatalogIndex(
                 activeId = if (wasActive) BUILT_IN_ID else current.activeId,
-                entries = current.entries.filterNot(predicate),
+                entries = current.entries.filter { it.id != id },
+                activeCityKey = if (wasActive) "" else current.activeCityKey,
             ),
         )
         removeUnreferencedFiles()
         if (wasActive) reloadCatalog() else _catalogInfoFlow.value = buildCatalogInfo()
     }
 
-    /** Names a catalog imported on its own must not repeat; pack cities keep their pack's names. */
+    /** Names a single catalog must not repeat; a pack keeps the name from its pack.json. */
     private fun singleNames(current: CatalogIndex, exceptId: String? = null): List<String> =
-        current.entries.filter { it.packId.isEmpty() && it.id != exceptId }.map { it.name } + BUILT_IN_NAME
+        current.entries.filter { !it.isPack && it.id != exceptId }.map { it.name } + BUILT_IN_NAME
 
     private fun validateCoverFile(coverFile: File, coverName: String) {
         if (!SAFE_COVER_NAME.matches(coverName) || coverName == "." || coverName == "..") {
@@ -405,9 +448,7 @@ class RadioCatalogRepository(
         if (!sourceDir.isDirectory) throw IllegalArgumentException("Каталог radio отсутствует")
         val manifestFile = File(sourceDir, MANIFEST_NAME)
         if (!manifestFile.isFile) throw IllegalArgumentException("В каталоге отсутствует $MANIFEST_NAME")
-        val parsedStations = InputStreamReader(FileInputStream(manifestFile), StandardCharsets.UTF_8).use {
-            RadioCatalogCsv.read(it)
-        }
+        val parsedStations = readStations(manifestFile)
         val coversDir = File(sourceDir, COVERS_DIR)
         for (station in parsedStations) {
             val coverName = station.coverFileName
@@ -447,7 +488,7 @@ class RadioCatalogRepository(
         replaceId: String? = null,
         activate: Boolean = true,
     ): Result<RadioCatalogEntry> =
-        importZip(inputStream, name, replaceId, activate).map { it.catalogs.first() }
+        importZip(inputStream, name, replaceId, activate).map(RadioCatalogImport::entry)
 
     /**
      * Imports a catalog ZIP or a pack ZIP (one with `pack.json`).
@@ -456,8 +497,8 @@ class RadioCatalogRepository(
      * catalog's stations and covers and keeps its name unless [name] is given. It becomes active
      * when [activate] is set or when it replaces the active one.
      *
-     * A pack adds one catalog per city, or replaces every city of the installed pack with the same
-     * id. The active city stays active by its key; a new pack does not change the active catalog.
+     * A pack becomes one entry, or replaces the installed pack with the same id in place. Its
+     * active city stays active by key; a new pack does not change the active catalog.
      */
     @Synchronized
     fun importZip(
@@ -473,9 +514,9 @@ class RadioCatalogRepository(
             extractZip(inputStream, stagingDir)
             if (File(stagingDir, PACK_MANIFEST_NAME).exists()) {
                 require(replaceId == null) { "Набор нельзя загрузить вместо отдельного каталога" }
-                importPack(stagingDir)
+                RadioCatalogImport(importPack(stagingDir))
             } else {
-                RadioCatalogImport(listOf(importSingle(stagingDir, name, replaceId, activate)))
+                RadioCatalogImport(importSingle(stagingDir, name, replaceId, activate))
             }
         } finally {
             stagingDir.deleteRecursively()
@@ -492,7 +533,7 @@ class RadioCatalogRepository(
         val replaced = replaceId?.let { id ->
             require(id != BUILT_IN_ID) { "Встроенный каталог нельзя заменить" }
             val entry = current.entries.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Каталог не найден")
-            require(entry.packId.isEmpty()) { "Город обновляется вместе с набором «${entry.packName}»" }
+            require(!entry.isPack) { "Набор обновляется загрузкой его нового pack ZIP" }
             entry
         }
         if (replaced == null && current.entries.size >= MAX_CUSTOM_CATALOGS) {
@@ -513,62 +554,76 @@ class RadioCatalogRepository(
         } else {
             current.entries + entry
         }
-        val activeId = when {
-            activate -> entry.id
-            replaced != null && current.activeId == replaced.id -> entry.id
-            else -> current.activeId
+        val next = when {
+            activate -> CatalogIndex(entry.id, entries)
+            replaced != null && current.activeId == replaced.id -> CatalogIndex(entry.id, entries)
+            else -> current.copy(entries = entries)
         }
-        commitImported(CatalogIndex(activeId, entries), listOf(entry), reload = replaced?.id == active.id)
+        commitImported(next, entry, reload = replaced?.id == active.id)
         return entry.toEntry()
     }
 
-    private fun importPack(stagingDir: File): RadioCatalogImport {
+    private fun importPack(stagingDir: File): RadioCatalogEntry {
         val pack = validatePackDirectory(stagingDir)
         val current = index
-        val firstOld = current.entries.indexOfFirst { it.packId == pack.id }
-        val kept = current.entries.filter { it.packId != pack.id }
-        if (kept.size + pack.catalogs.size > MAX_CUSTOM_CATALOGS) {
+        val replaced = current.entries.firstOrNull { it.packId == pack.id }
+        if (replaced == null && current.entries.size >= MAX_CUSTOM_CATALOGS) {
             throw IllegalStateException(catalogLimitMessage())
         }
-        val coverMap = storeCovers(File(stagingDir, COVERS_DIR))
-        val created = ArrayList<IndexEntry>(pack.catalogs.size)
+        val coverMap = storeCovers(File(stagingDir, COVERS_DIR)).filterKeys(pack.referencedCovers::contains)
+
+        // The extracted tree becomes the pack directory as is: the city CSV files are not copied.
+        val id = UUID.randomUUID().toString().replace("-", "")
+        val temporary = File(catalogsDirectory, ".$id.tmp")
+        temporary.deleteRecursively()
+        File(stagingDir, COVERS_DIR).deleteRecursively()
+        File(stagingDir, PACK_MANIFEST_NAME).delete()
+        check(stagingDir.renameTo(temporary)) { "Не удалось сохранить набор" }
         try {
-            pack.catalogs.forEach { city ->
-                val referenced = city.stations.mapNotNull { station ->
-                    station.coverFileName.takeIf(String::isNotBlank)?.let { it to coverMap.getValue(it) }
-                }.toMap()
-                created += IndexEntry(
-                    id = writeCatalogDirectory(city.manifest, referenced),
-                    name = city.name,
-                    stationCount = city.stations.size,
-                    packId = pack.id,
-                    packName = pack.name,
-                    key = city.key,
-                    region = city.region,
-                )
+            writeCoverMap(temporary, coverMap)
+            val cities = JSONArray()
+            pack.cities.forEach { city ->
+                cities.put(JSONObject().apply {
+                    put("key", city.key)
+                    put("name", city.name)
+                    if (city.region.isNotEmpty()) put("region", city.region)
+                    put("file", city.file)
+                    put("stations", city.stationCount)
+                })
             }
+            File(temporary, CITIES_NAME).writeText(
+                JSONObject().put("id", pack.id).put("name", pack.name).put("cities", cities).toString(),
+                StandardCharsets.UTF_8,
+            )
+            check(temporary.renameTo(File(catalogsDirectory, id))) { "Не удалось сохранить набор" }
         } catch (error: Exception) {
-            created.forEach { File(catalogsDirectory, it.id).deleteRecursively() }
-            removeUnreferencedFiles()
+            temporary.deleteRecursively()
             throw error
         }
-        val entries = if (firstOld < 0) kept + created else {
-            kept.subList(0, firstOld) + created + kept.subList(firstOld, kept.size)
+
+        val entry = IndexEntry(id, pack.name, pack.stationCount, pack.id, pack.cities.size)
+        val entries = if (replaced != null) {
+            current.entries.map { if (it.id == replaced.id) entry else it }
+        } else {
+            current.entries + entry
         }
-        val previousActive = current.entries.firstOrNull { it.id == current.activeId }
-        val activeId = if (previousActive?.packId == pack.id) {
-            created.firstOrNull { it.key == previousActive.key }?.id ?: BUILT_IN_ID
-        } else current.activeId
-        commitImported(CatalogIndex(activeId, entries), created, reload = previousActive?.packId == pack.id)
-        return RadioCatalogImport(created.map(IndexEntry::toEntry), pack.id, pack.name)
+        val wasActive = replaced != null && current.activeId == replaced.id
+        val next = when {
+            !wasActive -> current.copy(entries = entries)
+            pack.cities.any { it.key == current.activeCityKey } ->
+                CatalogIndex(id, entries, current.activeCityKey)
+            else -> CatalogIndex(BUILT_IN_ID, entries)
+        }
+        commitImported(next, entry, reload = wasActive)
+        return entry.toEntry()
     }
 
-    /** Commits an index that references the freshly written [created] catalogs. */
-    private fun commitImported(next: CatalogIndex, created: List<IndexEntry>, reload: Boolean) {
+    /** Commits an index that references the freshly written [created] catalog. */
+    private fun commitImported(next: CatalogIndex, created: IndexEntry, reload: Boolean) {
         try {
             commitIndex(next)
         } catch (error: Exception) {
-            created.forEach { File(catalogsDirectory, it.id).deleteRecursively() }
+            File(catalogsDirectory, created.id).deleteRecursively()
             removeUnreferencedFiles()
             throw error
         }
@@ -581,11 +636,11 @@ class RadioCatalogRepository(
     }
 
     private fun catalogLimitMessage() =
-        "Можно хранить не больше $MAX_CUSTOM_CATALOGS каталогов вместе с городами наборов. " +
+        "Можно хранить не больше $MAX_CUSTOM_CATALOGS каталогов и наборов. " +
             "Удалите ненужный каталог или набор."
 
     /** Validates an extracted pack: its manifest, every city CSV and every cover. */
-    private fun validatePackDirectory(dir: File): RadioCatalogPack {
+    private fun validatePackDirectory(dir: File): ValidatedPack {
         val json = runCatching {
             JSONObject(File(dir, PACK_MANIFEST_NAME).readText(StandardCharsets.UTF_8))
         }.getOrElse { throw IllegalArgumentException("$PACK_MANIFEST_NAME повреждён: ${it.message}") }
@@ -598,15 +653,17 @@ class RadioCatalogRepository(
         val name = normalizeName(json.optString("name"))
         require(name.isNotEmpty()) { "$PACK_MANIFEST_NAME: не указано название набора" }
         val array = json.optJSONArray("catalogs")
-        require(array != null && array.length() in 1..MAX_CUSTOM_CATALOGS) {
-            "$PACK_MANIFEST_NAME: в наборе должно быть от 1 до $MAX_CUSTOM_CATALOGS городов"
+        require(array != null && array.length() in 1..MAX_PACK_CITIES) {
+            "$PACK_MANIFEST_NAME: в наборе должно быть от 1 до $MAX_PACK_CITIES городов"
         }
 
         val root = dir.canonicalFile
-        val coversDir = File(dir, COVERS_DIR)
+        val coversDir = File(root, COVERS_DIR)
         val keys = HashSet<String>()
         val manifests = HashSet<File>()
-        val catalogs = ArrayList<PackCatalog>(array.length())
+        val referenced = HashSet<String>()
+        val cities = ArrayList<StoredCity>(array.length())
+        var stationCount = 0
         for (position in 0 until array.length()) {
             val item = array.optJSONObject(position)
                 ?: throw IllegalArgumentException("$PACK_MANIFEST_NAME: город ${position + 1} описан неверно")
@@ -619,14 +676,13 @@ class RadioCatalogRepository(
             require(cityName.isNotEmpty()) { "$PACK_MANIFEST_NAME: у города «$key» нет названия" }
             val path = item.optString("file")
             require(PACK_CSV_PATH.matches(path)) { "$PACK_MANIFEST_NAME: недопустимый путь «$path» у города «$key»" }
-            val manifest = File(dir, path).canonicalFile
+            val manifest = File(root, path).canonicalFile
             require(manifest.path.startsWith(root.path + File.separator) && manifest.isFile) {
                 "В наборе нет файла $path"
             }
             require(manifests.add(manifest)) { "$PACK_MANIFEST_NAME: файл $path указан у нескольких городов" }
-            val stations = runCatching {
-                InputStreamReader(FileInputStream(manifest), StandardCharsets.UTF_8).use { RadioCatalogCsv.read(it) }
-            }.getOrElse { throw IllegalArgumentException("$path: ${it.message}") }
+            val stations = runCatching { readStations(manifest) }
+                .getOrElse { throw IllegalArgumentException("$path: ${it.message}") }
             require(stations.isNotEmpty()) { "$path: нет станций" }
             stations.forEach { station ->
                 val cover = station.coverFileName
@@ -634,25 +690,30 @@ class RadioCatalogRepository(
                     require(SAFE_COVER_NAME.matches(cover) && File(coversDir, cover).isFile) {
                         "$path: нет обложки $cover в папке $COVERS_DIR"
                     }
+                    referenced += cover
                 }
             }
-            catalogs += PackCatalog(key, cityName, normalizeName(item.optString("region")), manifest, stations)
+            stationCount += stations.size
+            cities += StoredCity(key, cityName, normalizeName(item.optString("region")), path, stations.size)
         }
 
-        val canonicalCovers = coversDir.canonicalFile
-        dir.walkTopDown().filter(File::isFile).forEach { file ->
+        val manifestFile = File(root, PACK_MANIFEST_NAME)
+        root.walkTopDown().filter(File::isFile).forEach { file ->
             val canonical = file.canonicalFile
             when {
-                canonical == File(root, PACK_MANIFEST_NAME) -> Unit
+                canonical == manifestFile -> Unit
                 canonical in manifests -> Unit
-                canonical.parentFile == canonicalCovers -> validateCoverFile(canonical, canonical.name)
+                canonical.parentFile == coversDir -> validateCoverFile(canonical, canonical.name)
                 else -> throw IllegalArgumentException(
                     "Недопустимый файл в наборе: ${canonical.relativeTo(root).path}",
                 )
             }
         }
-        return RadioCatalogPack(id, name, catalogs)
+        return ValidatedPack(id, name, cities, stationCount, referenced)
     }
+
+    private fun readStations(manifest: File): List<RadioStation> =
+        InputStreamReader(FileInputStream(manifest), StandardCharsets.UTF_8).use { RadioCatalogCsv.read(it) }
 
     private fun extractZip(inputStream: InputStream, targetDir: File) {
         var totalExtractedBytes = 0L
@@ -713,11 +774,22 @@ class RadioCatalogRepository(
     /** Stores a single-catalog directory (stations.csv and covers/) under a new catalog id. */
     private fun storeCatalog(sourceDir: File, name: String): IndexEntry {
         val manifest = File(sourceDir, MANIFEST_NAME)
-        val stations = InputStreamReader(FileInputStream(manifest), StandardCharsets.UTF_8)
-            .use { RadioCatalogCsv.read(it) }
+        val stations = readStations(manifest)
         require(stations.isNotEmpty()) { "Каталог не содержит станций" }
         val coverMap = storeCovers(File(sourceDir, COVERS_DIR))
-        return IndexEntry(writeCatalogDirectory(manifest, coverMap), name, stations.size)
+        val id = UUID.randomUUID().toString().replace("-", "")
+        val temporary = File(catalogsDirectory, ".$id.tmp")
+        temporary.deleteRecursively()
+        check(temporary.mkdirs()) { "Не удалось подготовить каталог" }
+        try {
+            manifest.copyTo(File(temporary, MANIFEST_NAME))
+            writeCoverMap(temporary, coverMap)
+            check(temporary.renameTo(File(catalogsDirectory, id))) { "Не удалось сохранить каталог" }
+        } catch (error: Exception) {
+            temporary.deleteRecursively()
+            throw error
+        }
+        return IndexEntry(id, name, stations.size)
     }
 
     /**
@@ -751,23 +823,10 @@ class RadioCatalogRepository(
         return coverMap
     }
 
-    /** Writes a catalog directory under a new id and returns the id. */
-    private fun writeCatalogDirectory(manifest: File, coverMap: Map<String, String>): String {
-        val id = UUID.randomUUID().toString().replace("-", "")
-        val temporary = File(catalogsDirectory, ".$id.tmp")
-        temporary.deleteRecursively()
-        check(temporary.mkdirs()) { "Не удалось подготовить каталог" }
-        try {
-            manifest.copyTo(File(temporary, MANIFEST_NAME))
-            val map = JSONObject()
-            coverMap.forEach { (coverName, stored) -> map.put(coverName, stored) }
-            File(temporary, COVER_MAP_NAME).writeText(map.toString(), StandardCharsets.UTF_8)
-            check(temporary.renameTo(File(catalogsDirectory, id))) { "Не удалось сохранить каталог" }
-        } catch (error: Exception) {
-            temporary.deleteRecursively()
-            throw error
-        }
-        return id
+    private fun writeCoverMap(directory: File, coverMap: Map<String, String>) {
+        val map = JSONObject()
+        coverMap.forEach { (coverName, stored) -> map.put(coverName, stored) }
+        File(directory, COVER_MAP_NAME).writeText(map.toString(), StandardCharsets.UTF_8)
     }
 
     private fun storeCover(source: File, storedName: String) {
@@ -805,7 +864,7 @@ class RadioCatalogRepository(
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
-    /** Exports [id] (the active catalog by default) in the original ZIP layout. */
+    /** Exports [id] (the active catalog by default) in the format it was imported in. */
     @Synchronized
     fun exportCatalogZip(outputStream: OutputStream, id: String = active.id) {
         if (id == BUILT_IN_ID) {
@@ -813,60 +872,40 @@ class RadioCatalogRepository(
             return
         }
         val entry = index.entries.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Каталог не найден")
-        if (entry.packId.isNotEmpty()) {
-            exportPackZip(outputStream, entry.packId)
-            return
-        }
         val directory = File(catalogsDirectory, entry.id)
-        val storedCovers = readCoverMap(directory)
         ZipOutputStream(BufferedOutputStream(outputStream)).use { zos ->
-            zos.putNextEntry(ZipEntry(MANIFEST_NAME))
-            File(directory, MANIFEST_NAME).inputStream().use { it.copyTo(zos) }
-            zos.closeEntry()
-            storedCovers.forEach { (coverName, stored) ->
-                val file = File(coverStore, stored)
-                if (STORED_COVER.matches(stored) && file.isFile && file.length() > 0L) {
-                    zos.putNextEntry(ZipEntry("$COVERS_DIR/$coverName"))
-                    file.inputStream().use { it.copyTo(zos) }
-                    zos.closeEntry()
-                }
-            }
-        }
-    }
-
-    /** Rebuilds the pack ZIP: pack.json, one CSV per city and the covers they use. */
-    private fun exportPackZip(outputStream: OutputStream, packId: String) {
-        val cities = index.entries.filter { it.packId == packId }
-        val covers = linkedMapOf<String, String>()
-        cities.forEach { city ->
-            readCoverMap(File(catalogsDirectory, city.id)).forEach { (name, stored) -> covers.putIfAbsent(name, stored) }
-        }
-        val manifest = JSONObject().apply {
-            put("format", PACK_FORMAT)
-            put("version", PACK_VERSION)
-            put("id", packId)
-            put("name", cities.first().packName)
-            put("catalogs", JSONArray().apply {
-                cities.forEach { city ->
-                    put(JSONObject().apply {
-                        put("key", city.key)
-                        put("name", city.name)
-                        if (city.region.isNotEmpty()) put("region", city.region)
-                        put("file", "$PACK_CITIES_DIR/${city.key}.csv")
+            if (entry.isPack) {
+                val cities = readPackCities(entry)
+                val manifest = JSONObject().apply {
+                    put("format", PACK_FORMAT)
+                    put("version", PACK_VERSION)
+                    put("id", entry.packId)
+                    put("name", entry.name)
+                    put("catalogs", JSONArray().apply {
+                        cities.forEach { city ->
+                            put(JSONObject().apply {
+                                put("key", city.key)
+                                put("name", city.name)
+                                if (city.region.isNotEmpty()) put("region", city.region)
+                                put("file", city.file)
+                            })
+                        }
                     })
                 }
-            })
-        }
-        ZipOutputStream(BufferedOutputStream(outputStream)).use { zos ->
-            zos.putNextEntry(ZipEntry(PACK_MANIFEST_NAME))
-            zos.write(manifest.toString(2).toByteArray(StandardCharsets.UTF_8))
-            zos.closeEntry()
-            cities.forEach { city ->
-                zos.putNextEntry(ZipEntry("$PACK_CITIES_DIR/${city.key}.csv"))
-                File(catalogsDirectory, "${city.id}/$MANIFEST_NAME").inputStream().use { it.copyTo(zos) }
+                zos.putNextEntry(ZipEntry(PACK_MANIFEST_NAME))
+                zos.write(manifest.toString(2).toByteArray(StandardCharsets.UTF_8))
+                zos.closeEntry()
+                cities.forEach { city ->
+                    zos.putNextEntry(ZipEntry(city.file))
+                    File(directory, city.file).inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+            } else {
+                zos.putNextEntry(ZipEntry(MANIFEST_NAME))
+                File(directory, MANIFEST_NAME).inputStream().use { it.copyTo(zos) }
                 zos.closeEntry()
             }
-            covers.forEach { (coverName, stored) ->
+            readCoverMap(directory).forEach { (coverName, stored) ->
                 val file = File(coverStore, stored)
                 if (STORED_COVER.matches(stored) && file.isFile && file.length() > 0L) {
                     zos.putNextEntry(ZipEntry("$COVERS_DIR/$coverName"))
@@ -923,8 +962,7 @@ class RadioCatalogRepository(
 
     private fun loadCustom(entry: IndexEntry): ActiveCatalog? {
         val directory = File(catalogsDirectory, entry.id)
-        val stations = InputStreamReader(FileInputStream(File(directory, MANIFEST_NAME)), StandardCharsets.UTF_8)
-            .use { RadioCatalogCsv.read(it) }
+        val stations = readStations(File(directory, MANIFEST_NAME))
         if (stations.isEmpty()) return null
         return ActiveCatalog(
             entry.id,
@@ -933,6 +971,41 @@ class RadioCatalogRepository(
             stations.associateBy { it.frequencyKHz },
             readCoverMap(directory),
         )
+    }
+
+    private fun loadPackCity(entry: IndexEntry, cityKey: String): ActiveCatalog? {
+        val city = readPackCities(entry).firstOrNull { it.key == cityKey } ?: return null
+        val directory = File(catalogsDirectory, entry.id)
+        val stations = readStations(packFile(directory, city.file))
+        if (stations.isEmpty()) return null
+        return ActiveCatalog(
+            entry.id,
+            entry.name,
+            RadioCatalogType.CUSTOM,
+            stations.associateBy { it.frequencyKHz },
+            readCoverMap(directory),
+            city,
+        )
+    }
+
+    private fun readPackCities(entry: IndexEntry): List<StoredCity> {
+        val json = JSONObject(File(catalogsDirectory, "${entry.id}/$CITIES_NAME").readText(StandardCharsets.UTF_8))
+        val array = json.getJSONArray("cities")
+        return List(array.length()) { position ->
+            val item = array.getJSONObject(position)
+            StoredCity(
+                key = item.getString("key"),
+                name = item.getString("name"),
+                region = item.optString("region"),
+                file = item.getString("file"),
+                stationCount = item.optInt("stations"),
+            )
+        }
+    }
+
+    private fun packFile(directory: File, path: String): File {
+        require(PACK_CSV_PATH.matches(path)) { "Недопустимый путь $path" }
+        return File(directory, path)
     }
 
     private fun readCoverMap(directory: File): Map<String, String> {
@@ -954,16 +1027,10 @@ class RadioCatalogRepository(
             // A damaged index must not drop the catalogs it described: recover them unnamed.
             Timber.e(stored.exceptionOrNull(), "Radio catalog index is unreadable; rebuilding")
             val recovered = catalogsDirectory.listFiles().orEmpty()
-                .filter { it.isDirectory && CATALOG_ID.matches(it.name) && File(it, MANIFEST_NAME).isFile }
+                .filter { it.isDirectory && CATALOG_ID.matches(it.name) }
                 .sortedBy(File::lastModified)
                 .take(MAX_CUSTOM_CATALOGS)
-                .mapIndexedNotNull { position, directory ->
-                    runCatching {
-                        val count = InputStreamReader(FileInputStream(File(directory, MANIFEST_NAME)), StandardCharsets.UTF_8)
-                            .use { RadioCatalogCsv.read(it).size }
-                        IndexEntry(directory.name, "$DEFAULT_CATALOG_NAME ${position + 1}", count)
-                    }.getOrNull()
-                }
+                .mapIndexedNotNull { position, directory -> recoverEntry(directory, position) }
             return CatalogIndex(BUILT_IN_ID, recovered).also(::commitIndex)
         }
 
@@ -994,6 +1061,19 @@ class RadioCatalogRepository(
         return migratedIndex
     }
 
+    private fun recoverEntry(directory: File, position: Int): IndexEntry? = runCatching {
+        val cities = File(directory, CITIES_NAME)
+        if (cities.isFile) {
+            val json = JSONObject(cities.readText(StandardCharsets.UTF_8))
+            val array = json.getJSONArray("cities")
+            val stations = (0 until array.length()).sumOf { array.getJSONObject(it).optInt("stations") }
+            IndexEntry(directory.name, json.getString("name"), stations, json.getString("id"), array.length())
+        } else {
+            val count = readStations(File(directory, MANIFEST_NAME)).size
+            IndexEntry(directory.name, "$DEFAULT_CATALOG_NAME ${position + 1}", count)
+        }
+    }.getOrNull()
+
     /** Finishes an interrupted legacy swap and returns the single custom catalog, if any. */
     private fun recoverLegacyDirectory(): File? {
         val current = File(context.filesDir, LEGACY_DIR)
@@ -1018,39 +1098,44 @@ class RadioCatalogRepository(
             val item = catalogs.getJSONObject(position)
             val id = item.getString("id")
             if (!CATALOG_ID.matches(id) || entries.any { it.id == id }) continue
-            val packId = item.optString("pack").takeIf(PACK_KEY::matches).orEmpty()
+            val isPack = item.optString("type") == "pack"
+            // An entry with a pack id but no pack type was a city of the earlier per-city layout;
+            // dropping it lets startup clean up its directory.
+            if (!isPack && item.has("pack")) continue
+            val packId = if (isPack) item.optString("pack").takeIf(PACK_KEY::matches) ?: continue else ""
             entries += IndexEntry(
                 id = id,
                 name = normalizeName(item.optString("name")).ifEmpty { DEFAULT_CATALOG_NAME },
                 stationCount = item.optInt("stations", 0),
                 packId = packId,
-                packName = if (packId.isEmpty()) "" else normalizeName(item.optString("packName")).ifEmpty { packId },
-                key = if (packId.isEmpty()) "" else item.optString("key"),
-                region = if (packId.isEmpty()) "" else normalizeName(item.optString("region")),
+                cityCount = if (isPack) item.optInt("cities", 0) else 0,
             )
         }
         val activeId = json.optString("active", BUILT_IN_ID)
             .takeIf { id -> id == BUILT_IN_ID || entries.any { it.id == id } }
             ?: BUILT_IN_ID
-        return CatalogIndex(activeId, entries)
+        val activeCity = json.optString("activeCity")
+            .takeIf { activeId != BUILT_IN_ID && entries.first { it.id == activeId }.isPack }
+            .orEmpty()
+        return CatalogIndex(activeId, entries, activeCity)
     }
 
     /** Writes [next] atomically and makes it current; the write is the commit point. */
     private fun commitIndex(next: CatalogIndex) {
         val json = JSONObject().apply {
-            put("version", 1)
+            put("version", 2)
             put("active", next.activeId)
+            if (next.activeCityKey.isNotEmpty()) put("activeCity", next.activeCityKey)
             put("catalogs", JSONArray().apply {
                 next.entries.forEach { entry ->
                     put(JSONObject().apply {
                         put("id", entry.id)
                         put("name", entry.name)
                         put("stations", entry.stationCount)
-                        if (entry.packId.isNotEmpty()) {
+                        if (entry.isPack) {
+                            put("type", "pack")
                             put("pack", entry.packId)
-                            put("packName", entry.packName)
-                            put("key", entry.key)
-                            put("region", entry.region)
+                            put("cities", entry.cityCount)
                         }
                     })
                 }
@@ -1091,12 +1176,11 @@ class RadioCatalogRepository(
     private fun buildCatalogInfo(): RadioCatalogInfo {
         val catalog = active
         val count = catalog.stations.size
-        val description = when (catalog.type) {
-            RadioCatalogType.BUILT_IN -> "Встроенный каталог (Пенза, $count станций)"
-            RadioCatalogType.CUSTOM -> index.entries.firstOrNull { it.id == catalog.id }
-                ?.takeIf { it.packId.isNotEmpty() }
-                ?.let { "«${it.name}» (${it.packName}, $count станций)" }
-                ?: "«${catalog.name}» ($count станций)"
+        val city = catalog.city
+        val description = when {
+            catalog.type == RadioCatalogType.BUILT_IN -> "Встроенный каталог (Пенза, $count станций)"
+            city != null -> "«${city.name}» (${catalog.name}, $count станций)"
+            else -> "«${catalog.name}» ($count станций)"
         }
         val builtInCount = if (catalog.type == RadioCatalogType.BUILT_IN) count else builtInStationCount
         val catalogs = buildList {
@@ -1110,6 +1194,9 @@ class RadioCatalogRepository(
             description = description,
             activeId = catalog.id,
             catalogs = catalogs,
+            activeCityKey = city?.key.orEmpty(),
+            activeCityName = city?.name.orEmpty(),
+            activeRegion = city?.region.orEmpty(),
         )
     }
 }

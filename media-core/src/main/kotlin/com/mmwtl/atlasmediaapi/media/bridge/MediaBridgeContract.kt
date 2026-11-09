@@ -38,6 +38,8 @@ object MediaBridgeContract {
         const val IMPORT_RADIO_CATALOG = 15
         /** Activates, renames or deletes one radio catalog ([Key.CATALOG_ACTION]). */
         const val MANAGE_RADIO_CATALOG = 16
+        /** Writes the cities of one pack as JSON into [Key.FILE_DESCRIPTOR]. */
+        const val GET_RADIO_PACK_CITIES = 17
     }
 
     object ServerMessage {
@@ -57,6 +59,7 @@ object MediaBridgeContract {
         const val RADIO_CATALOG_EXPORTED = 114
         const val RADIO_CATALOG_IMPORTED = 115
         const val RADIO_CATALOG_MANAGED = 116
+        const val RADIO_PACK_CITIES = 117
     }
 
     object Key {
@@ -163,11 +166,16 @@ object MediaBridgeContract {
         const val CATALOG_IDS = "catalogIds"
         const val CATALOG_NAMES = "catalogNames"
         const val CATALOG_STATION_COUNTS = "catalogStationCounts"
-        /** Pack id, pack name and region of every listed catalog; empty for single catalogs. */
+        /** Pack id and city count of every listed entry; empty and 0 for single catalogs. */
         const val CATALOG_PACK_IDS = "catalogPackIds"
-        const val CATALOG_PACK_NAMES = "catalogPackNames"
-        const val CATALOG_REGIONS = "catalogRegions"
-        /** IMPORT_RADIO_CATALOG reply: the imported pack (empty for a single catalog) and its size. */
+        const val CATALOG_CITY_COUNTS = "catalogCityCounts"
+        /** The selected city when the active entry is a pack. */
+        const val CATALOG_ACTIVE_CITY_KEY = "catalogActiveCityKey"
+        const val CATALOG_ACTIVE_CITY_NAME = "catalogActiveCityName"
+        const val CATALOG_ACTIVE_REGION = "catalogActiveRegion"
+        /** MANAGE_RADIO_CATALOG ACTIVATE: the city of the pack named by [CATALOG_ID]. */
+        const val CATALOG_CITY_KEY = "catalogCityKey"
+        /** IMPORT_RADIO_CATALOG reply: the imported pack (empty for a single catalog) and its cities. */
         const val CATALOG_PACK_ID = "catalogPackId"
         const val CATALOG_PACK_NAME = "catalogPackName"
         const val CATALOG_COUNT = "catalogCount"
@@ -181,8 +189,6 @@ object MediaBridgeContract {
         const val ACTIVATE = "ACTIVATE"
         const val RENAME = "RENAME"
         const val DELETE = "DELETE"
-        /** Deletes the whole pack of the catalog named by [Key.CATALOG_ID]. */
-        const val DELETE_PACK = "DELETE_PACK"
     }
 
     object Status {

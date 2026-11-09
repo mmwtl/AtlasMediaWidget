@@ -18,7 +18,8 @@ import java.util.zip.ZipFile;
  */
 final class RadioPackPreview {
     static final String MANIFEST = "pack.json";
-    private static final int MAX_MANIFEST_BYTES = 256 * 1024;
+    /** pack.json of a pack with thousands of cities is several hundred kilobytes. */
+    private static final int MAX_MANIFEST_BYTES = 8 * 1024 * 1024;
 
     final String id;
     final String name;

@@ -22,6 +22,7 @@ final class MediaBridgeContract {
     static final int EXPORT_RADIO_CATALOG = 14;
     static final int IMPORT_RADIO_CATALOG = 15;
     static final int MANAGE_RADIO_CATALOG = 16;
+    static final int GET_RADIO_PACK_CITIES = 17;
 
     static final int REGISTERED = 100;
     static final int SNAPSHOT = 101;
@@ -39,6 +40,7 @@ final class MediaBridgeContract {
     static final int RADIO_CATALOG_EXPORTED = 114;
     static final int RADIO_CATALOG_IMPORTED = 115;
     static final int RADIO_CATALOG_MANAGED = 116;
+    static final int RADIO_PACK_CITIES = 117;
 
     static final long CAP_PLAY = 0x01L;
     static final long CAP_PAUSE = 0x02L;
@@ -160,8 +162,11 @@ final class MediaBridgeContract {
     static final String K_CATALOG_NAMES = "catalogNames";
     static final String K_CATALOG_STATION_COUNTS = "catalogStationCounts";
     static final String K_CATALOG_PACK_IDS = "catalogPackIds";
-    static final String K_CATALOG_PACK_NAMES = "catalogPackNames";
-    static final String K_CATALOG_REGIONS = "catalogRegions";
+    static final String K_CATALOG_CITY_COUNTS = "catalogCityCounts";
+    static final String K_CATALOG_ACTIVE_CITY_KEY = "catalogActiveCityKey";
+    static final String K_CATALOG_ACTIVE_CITY_NAME = "catalogActiveCityName";
+    static final String K_CATALOG_ACTIVE_REGION = "catalogActiveRegion";
+    static final String K_CATALOG_CITY_KEY = "catalogCityKey";
     static final String K_CATALOG_PACK_ID = "catalogPackId";
     static final String K_CATALOG_PACK_NAME = "catalogPackName";
     static final String K_CATALOG_COUNT = "catalogCount";
@@ -171,7 +176,6 @@ final class MediaBridgeContract {
     static final String CATALOG_ACTION_ACTIVATE = "ACTIVATE";
     static final String CATALOG_ACTION_RENAME = "RENAME";
     static final String CATALOG_ACTION_DELETE = "DELETE";
-    static final String CATALOG_ACTION_DELETE_PACK = "DELETE_PACK";
     static final String BUILT_IN_CATALOG_ID = "builtin";
 
     private MediaBridgeContract() {}

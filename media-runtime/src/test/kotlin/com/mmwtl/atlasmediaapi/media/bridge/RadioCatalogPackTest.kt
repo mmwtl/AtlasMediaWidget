@@ -48,65 +48,97 @@ class RadioCatalogPackTest {
     }
 
     @Test
-    fun `a pack becomes one catalog per city with shared covers and keeps the active catalog`() {
-        val imported = repository.importZip(ByteArrayInputStream(pack(penza, kuznetsk, moscow))).getOrThrow()
+    fun `a pack is one entry with its cities and keeps the active catalog`() {
+        val pack = repository.importZip(ByteArrayInputStream(pack(penza, kuznetsk, moscow))).getOrThrow().entry
 
-        assertEquals("russia", imported.packId)
-        assertEquals("Россия", imported.packName)
-        assertEquals(listOf("Пенза", "Кузнецк", "Москва"), imported.catalogs.map { it.name })
-        assertEquals(4, imported.stationCount)
+        assertEquals("russia", pack.packId)
+        assertEquals("Россия", pack.name)
+        assertEquals(3, pack.cityCount)
+        assertEquals(4, pack.stationCount)
         val info = repository.getCatalogInfo()
         assertEquals(RadioCatalogRepository.BUILT_IN_ID, info.activeId)
-        val cities = info.catalogs.filter { it.packId == "russia" }
-        assertEquals(listOf("Пензенская область", "Пензенская область", "Москва и область"), cities.map { it.region })
-        assertTrue(cities.all { it.packName == "Россия" })
+        assertEquals(listOf(RadioCatalogRepository.BUILT_IN_ID, pack.id), info.catalogs.map { it.id })
+        assertEquals(
+            listOf(
+                RadioPackCity("penza", "Пенза", "Пензенская область", 2),
+                RadioPackCity("kuznetsk", "Кузнецк", "Пензенская область", 1),
+                RadioPackCity("moscow", "Москва", "Москва и область", 1),
+            ),
+            repository.packCities(pack.id),
+        )
         assertEquals(2, storedCovers().size)
+    }
 
-        repository.activateCatalog(cities.last().id)
+    @Test
+    fun `activating a city of a pack serves its stations and covers`() {
+        val pack = importPack(penza, moscow)
+
+        repository.activateCatalog(pack.id, "moscow")
+
+        val info = repository.getCatalogInfo()
+        assertEquals(pack.id, info.activeId)
+        assertEquals("moscow", info.activeCityKey)
+        assertEquals("Москва", info.activeCityName)
+        assertEquals("Москва и область", info.activeRegion)
+        assertEquals(1, info.stationCount)
+        assertTrue(info.description.contains("Россия"))
         assertArrayEquals(radio7, cover(104700))
         assertNull(repository.lookup(100100))
-        assertTrue(repository.getCatalogInfo().description.contains("Россия"))
+
+        val generation = repository.generation
+        repository.activateCatalog(pack.id, "penza")
+        assertTrue(repository.generation > generation)
+        assertArrayEquals(vera, cover(94700))
+    }
+
+    @Test
+    fun `a pack needs a known city and a single catalog takes none`() {
+        val pack = importPack(penza)
+        val single = repository.importCatalogZip(ByteArrayInputStream(single("90000,A,FM,\n")), name = "A").getOrThrow()
+
+        assertTrue(runCatching { repository.activateCatalog(pack.id) }.isFailure)
+        assertTrue(runCatching { repository.activateCatalog(pack.id, "moscow") }.isFailure)
+        assertTrue(runCatching { repository.activateCatalog(single.id, "penza") }.isFailure)
+        assertEquals(single.id, repository.getCatalogInfo().activeId)
     }
 
     @Test
     fun `updating a pack keeps the active city by key and the pack position`() {
         val own = repository.importCatalogZip(ByteArrayInputStream(single("90000,Своя,FM,\n")), name = "Свой").getOrThrow()
-        val first = repository.importZip(ByteArrayInputStream(pack(penza, kuznetsk))).getOrThrow()
+        val first = importPack(penza, kuznetsk)
         val tail = repository.importCatalogZip(ByteArrayInputStream(single("91000,Ещё,FM,\n")), name = "Ещё").getOrThrow()
-        repository.activateCatalog(first.catalogs.first { it.name == "Кузнецк" }.id)
+        repository.activateCatalog(first.id, "kuznetsk")
 
         val updated = repository.importZip(
             ByteArrayInputStream(pack(kuznetsk.copy(rows = "101600,Радио 7,FM,radio7.png\n"), moscow)),
-        ).getOrThrow()
+        ).getOrThrow().entry
 
         val info = repository.getCatalogInfo()
-        val kuznetskId = updated.catalogs.first { it.name == "Кузнецк" }.id
-        assertEquals(kuznetskId, info.activeId)
+        assertEquals(updated.id, info.activeId)
+        assertEquals("kuznetsk", info.activeCityKey)
         assertNull(repository.lookup(101500))
         assertNotNull(repository.lookup(101600))
-        assertEquals(
-            listOf(RadioCatalogRepository.BUILT_IN_ID, own.id) + updated.catalogs.map { it.id } + tail.id,
-            info.catalogs.map { it.id },
-        )
-        assertFalse(info.catalogs.any { it.name == "Пенза" })
-        assertTrue(first.catalogs.none { old -> File(context.filesDir, "radio_catalogs/${old.id}").exists() })
+        assertEquals(listOf(RadioCatalogRepository.BUILT_IN_ID, own.id, updated.id, tail.id), info.catalogs.map { it.id })
+        assertEquals(listOf("kuznetsk", "moscow"), repository.packCities(updated.id).map { it.key })
+        assertFalse(File(context.filesDir, "radio_catalogs/${first.id}").exists())
         assertEquals(1, storedCovers().size)
     }
 
     @Test
     fun `an update without the active city activates the built-in catalog`() {
-        val first = repository.importZip(ByteArrayInputStream(pack(penza, moscow))).getOrThrow()
-        repository.activateCatalog(first.catalogs.first { it.name == "Пенза" }.id)
+        val first = importPack(penza, moscow)
+        repository.activateCatalog(first.id, "penza")
 
         repository.importZip(ByteArrayInputStream(pack(moscow))).getOrThrow()
 
         assertEquals(RadioCatalogRepository.BUILT_IN_ID, repository.getCatalogInfo().activeId)
+        assertEquals("", repository.getCatalogInfo().activeCityKey)
     }
 
     @Test
     fun `an invalid pack is rejected without changing anything`() {
-        val installed = repository.importZip(ByteArrayInputStream(pack(penza))).getOrThrow()
-        repository.activateCatalog(installed.catalogs.single().id)
+        val installed = importPack(penza)
+        repository.activateCatalog(installed.id, "penza")
         val before = repository.getCatalogInfo()
 
         listOf(
@@ -125,16 +157,15 @@ class RadioCatalogPackTest {
     }
 
     @Test
-    fun `pack cities are only changed together with their pack`() {
-        val city = repository.importZip(ByteArrayInputStream(pack(penza, moscow))).getOrThrow().catalogs.first()
+    fun `a pack is renamed by its pack json and replaced only by a pack`() {
+        val pack = importPack(penza, moscow)
 
-        assertTrue(runCatching { repository.renameCatalog(city.id, "Другое") }.isFailure)
-        assertTrue(runCatching { repository.deleteCatalog(city.id) }.isFailure)
-        assertTrue(repository.importZip(ByteArrayInputStream(single("90000,A,FM,\n")), replaceId = city.id).isFailure)
-        assertTrue(repository.importZip(ByteArrayInputStream(pack(moscow)), replaceId = city.id).isFailure)
+        assertTrue(runCatching { repository.renameCatalog(pack.id, "Другое") }.isFailure)
+        assertTrue(repository.importZip(ByteArrayInputStream(single("90000,A,FM,\n")), replaceId = pack.id).isFailure)
+        assertTrue(repository.importZip(ByteArrayInputStream(pack(moscow)), replaceId = pack.id).isFailure)
 
-        repository.activateCatalog(city.id)
-        repository.deletePackOf(city.id)
+        repository.activateCatalog(pack.id, "moscow")
+        repository.deleteCatalog(pack.id)
 
         val info = repository.getCatalogInfo()
         assertEquals(RadioCatalogRepository.BUILT_IN_ID, info.activeId)
@@ -143,30 +174,11 @@ class RadioCatalogPackTest {
     }
 
     @Test
-    fun `a pack city name may repeat a single catalog name`() {
-        repository.importCatalogZip(ByteArrayInputStream(single("90000,A,FM,\n")), name = "Пенза").getOrThrow()
-
-        val imported = repository.importZip(ByteArrayInputStream(pack(penza))).getOrThrow()
-
-        assertEquals("Пенза", imported.catalogs.single().name)
-    }
-
-    @Test
-    fun `the pack limit counts the cities of every catalog`() {
-        repeat(RadioCatalogRepository.MAX_CUSTOM_CATALOGS - 1) {
-            repository.importCatalogZip(ByteArrayInputStream(single("90000,S,FM,\n")), name = "C$it").getOrThrow()
-        }
-
-        assertTrue(repository.importZip(ByteArrayInputStream(pack(penza, moscow))).isFailure)
-        assertTrue(repository.importZip(ByteArrayInputStream(pack(penza))).isSuccess)
-    }
-
-    @Test
     fun `an exported pack imports back as an update of the same pack`() {
-        val imported = repository.importZip(ByteArrayInputStream(pack(penza, moscow))).getOrThrow()
+        val imported = importPack(penza, moscow)
 
         val output = ByteArrayOutputStream()
-        repository.exportCatalogZip(output, imported.catalogs.last().id)
+        repository.exportCatalogZip(output, imported.id)
 
         val entries = unzip(output.toByteArray())
         assertEquals(
@@ -177,28 +189,58 @@ class RadioCatalogPackTest {
         assertEquals("Россия", manifest.getString("name"))
         assertEquals("Москва и область", manifest.getJSONArray("catalogs").getJSONObject(1).getString("region"))
 
-        val again = repository.importZip(ByteArrayInputStream(output.toByteArray())).getOrThrow()
-        assertEquals(listOf("Пенза", "Москва"), again.catalogs.map { it.name })
-        assertEquals(3, repository.getCatalogInfo().catalogs.size)
+        val again = repository.importZip(ByteArrayInputStream(output.toByteArray())).getOrThrow().entry
+        assertEquals(listOf("penza", "moscow"), repository.packCities(again.id).map { it.key })
+        assertEquals(2, repository.getCatalogInfo().catalogs.size)
     }
 
     @Test
-    fun `pack details survive a restart`() {
-        val imported = repository.importZip(ByteArrayInputStream(pack(penza, moscow))).getOrThrow()
-        repository.activateCatalog(imported.catalogs.first().id)
+    fun `the active city survives a restart`() {
+        val imported = importPack(penza, moscow)
+        repository.activateCatalog(imported.id, "penza")
 
         val restarted = RadioCatalogRepository(context)
 
-        val cities = restarted.getCatalogInfo().catalogs.filter { it.packId.isNotEmpty() }
-        assertEquals(listOf("Пенза", "Москва"), cities.map { it.name })
-        assertEquals(listOf("Пензенская область", "Москва и область"), cities.map { it.region })
+        val info = restarted.getCatalogInfo()
+        assertEquals(imported.id, info.activeId)
+        assertEquals("Пенза", info.activeCityName)
+        assertEquals(2, info.catalogs.last().cityCount)
         assertArrayEquals(vera, restarted.openCoverStream(restarted.lookup(94700)!!)!!.use { it.readBytes() })
     }
+
+    @Test
+    fun `a pack with thousands of cities and covers stays one small index entry`() {
+        val covers = (0 until 500).associate { "logo$it.png" to png(0xFF000000.toInt() or it * 7919) }
+        val cities = (0 until 3200).map { position ->
+            val rows = (0 until 4).joinToString("") { station ->
+                val logo = (position * 4 + station) % covers.size
+                "${88000 + station * 100},Станция $logo,FM,logo$logo.png\n"
+            }
+            City("c$position", "Город $position", "Регион ${position % 85}", rows)
+        }
+        val archive = pack(*cities.toTypedArray(), coverFiles = covers)
+
+        val started = System.nanoTime()
+        val pack = repository.importZip(ByteArrayInputStream(archive)).getOrThrow().entry
+        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+
+        assertEquals(3200, pack.cityCount)
+        assertEquals(500, storedCovers().size)
+        assertTrue("index.json stays small", File(context.filesDir, "radio_catalogs/index.json").length() < 4_096)
+        repository.activateCatalog(pack.id, "c3199")
+        assertEquals(4, repository.getCatalogInfo().stationCount)
+        assertEquals(3200, repository.packCities(pack.id).size)
+        println("3200-city pack imported in $elapsedMs ms")
+    }
+
+    private fun importPack(vararg cities: City): RadioCatalogEntry =
+        repository.importZip(ByteArrayInputStream(pack(*cities))).getOrThrow().entry
 
     private fun pack(
         vararg cities: City,
         manifest: (JSONObject) -> Unit = {},
         extra: Map<String, ByteArray> = emptyMap(),
+        coverFiles: Map<String, ByteArray> = mapOf("radio7.png" to radio7, "vera.png" to vera),
     ): ByteArray {
         val json = JSONObject().apply {
             put("format", "atlas-radio-pack")
@@ -221,8 +263,7 @@ class RadioCatalogPackTest {
         cities.forEach { city ->
             files["cities/${city.key}.csv"] = ("frequency_khz,name,band,cover\n" + city.rows).toByteArray(StandardCharsets.UTF_8)
         }
-        files["covers/radio7.png"] = radio7
-        files["covers/vera.png"] = vera
+        coverFiles.forEach { (name, bytes) -> files["covers/$name"] = bytes }
         files.putAll(extra)
         return zip(files)
     }

@@ -88,7 +88,7 @@ class MediaBridgeService : Service() {
                 MediaBridgeContract.ClientMessage.GET_RADIO_STATIONS ->
                     handleGetRadioStations(message)
 
-                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.MANAGE_RADIO_CATALOG -> {
+                in MediaBridgeContract.ClientMessage.GET_SETTINGS..MediaBridgeContract.ClientMessage.GET_RADIO_PACK_CITIES -> {
                     // Handler recycles the incoming Message after returning; retain a copy for IO work.
                     val request = Message.obtain(message)
                     scope.launch(Dispatchers.IO) {
@@ -150,6 +150,9 @@ class MediaBridgeService : Service() {
 
             MediaBridgeContract.ClientMessage.MANAGE_RADIO_CATALOG ->
                 handleManageRadioCatalog(message)
+
+            MediaBridgeContract.ClientMessage.GET_RADIO_PACK_CITIES ->
+                handleGetRadioPackCities(message)
         }
     }
 
@@ -506,6 +509,7 @@ class MediaBridgeService : Service() {
                 action = data.getString(MediaBridgeContract.Key.CATALOG_ACTION).orEmpty(),
                 catalogId = data.getString(MediaBridgeContract.Key.CATALOG_ID).orEmpty(),
                 name = data.getString(MediaBridgeContract.Key.CATALOG_NAME),
+                cityKey = data.getString(MediaBridgeContract.Key.CATALOG_CITY_KEY),
             )
         } catch (error: IllegalArgumentException) {
             sendError(replyTo, requestId, MediaBridgeContract.Status.VALIDATION_ERROR,
@@ -517,6 +521,62 @@ class MediaBridgeService : Service() {
             putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
         }
         send(replyTo, MediaBridgeContract.ServerMessage.RADIO_CATALOG_MANAGED, bundle)
+    }
+
+    /** Writes `[{"key","name","region","stations"}]` for one pack into the client's file. */
+    private fun handleGetRadioPackCities(message: Message) {
+        val data = message.data ?: return
+        val requestId = data.getString(MediaBridgeContract.Key.REQUEST_ID).orEmpty()
+        @Suppress("DEPRECATION")
+        val pfd = data.getParcelable<android.os.ParcelFileDescriptor>(MediaBridgeContract.Key.FILE_DESCRIPTOR)
+        val replyTo = message.replyTo
+        if (replyTo == null) {
+            runCatching { pfd?.close() }
+            return
+        }
+        if (!isSettingsAllowed(message)) {
+            runCatching { pfd?.close() }
+            sendError(replyTo, requestId, MediaBridgeContract.Status.UNAUTHORIZED, "Radio catalog IPC restricted")
+            return
+        }
+        if (pfd == null) {
+            sendError(replyTo, requestId, MediaBridgeContract.Status.INVALID_REQUEST, "FileDescriptor missing")
+            return
+        }
+        val catalogId = data.getString(MediaBridgeContract.Key.CATALOG_ID).orEmpty()
+        try {
+            val cities = coordinator.radioCatalogRepository.packCities(catalogId)
+            android.os.ParcelFileDescriptor.AutoCloseOutputStream(pfd).use { out ->
+                val array = org.json.JSONArray()
+                cities.forEach { city ->
+                    array.put(org.json.JSONObject().apply {
+                        put("key", city.key)
+                        put("name", city.name)
+                        if (city.region.isNotEmpty()) put("region", city.region)
+                        put("stations", city.stationCount)
+                    })
+                }
+                out.write(array.toString().toByteArray(Charsets.UTF_8))
+            }
+            send(
+                replyTo,
+                MediaBridgeContract.ServerMessage.RADIO_PACK_CITIES,
+                Bundle().apply {
+                    putString(MediaBridgeContract.Key.REQUEST_ID, requestId)
+                    putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
+                    putInt(MediaBridgeContract.Key.CATALOG_COUNT, cities.size)
+                },
+            )
+        } catch (error: IllegalArgumentException) {
+            runCatching { pfd.close() }
+            sendError(replyTo, requestId, MediaBridgeContract.Status.VALIDATION_ERROR,
+                error.message ?: "Pack not found")
+        } catch (error: Exception) {
+            runCatching { pfd.close() }
+            Timber.e(error, "Reading radio pack cities failed")
+            sendError(replyTo, requestId, MediaBridgeContract.Status.IO_ERROR,
+                error.message ?: "Reading radio pack cities failed")
+        }
     }
 
     private fun handleExportMediaBackup(message: Message) {
@@ -644,11 +704,13 @@ class MediaBridgeService : Service() {
                     putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
                     putString(MediaBridgeContract.Key.MESSAGE, "Radio catalog imported")
                     putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, count)
-                    putString(MediaBridgeContract.Key.CATALOG_ID, imported.catalogs.first().id)
-                    putString(MediaBridgeContract.Key.CATALOG_NAME, imported.catalogs.first().name)
-                    putString(MediaBridgeContract.Key.CATALOG_PACK_ID, imported.packId)
-                    putString(MediaBridgeContract.Key.CATALOG_PACK_NAME, imported.packName)
-                    putInt(MediaBridgeContract.Key.CATALOG_COUNT, imported.catalogs.size)
+                    putString(MediaBridgeContract.Key.CATALOG_ID, imported.entry.id)
+                    putString(MediaBridgeContract.Key.CATALOG_NAME, imported.entry.name)
+                    putString(MediaBridgeContract.Key.CATALOG_PACK_ID, imported.entry.packId)
+                    putString(MediaBridgeContract.Key.CATALOG_PACK_NAME,
+                        if (imported.entry.isPack) imported.entry.name else "")
+                    putInt(MediaBridgeContract.Key.CATALOG_COUNT,
+                        if (imported.entry.isPack) imported.entry.cityCount else 1)
                     putLong(MediaBridgeContract.Key.SETTINGS_REVISION, snapshot.revision)
                 },
             )
