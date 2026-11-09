@@ -11,7 +11,8 @@
       "separate_city_archives",
       "national_pack"
     ],
-    "numbered_Radio_images_used": false
+    "numbered_Radio_images_used": false,
+    "cover_identity_scope": "Shared across city/country source IDs by normalized station name and explicit aliases"
   },
   "full_pack": {
     "filename": "atlas-radio-all.zip",
@@ -19,20 +20,25 @@
     "regions": 86,
     "station_rows": 12010,
     "station_brands": 491,
-    "covers": 486,
-    "entries": 3667,
-    "uncompressed_bytes": 7598497,
-    "zip_bytes": 7287142,
-    "sha256": "fa3eba9912101a1d1bc493d978b96049edba223fd24704a5ca5f99e1ab436412",
+    "covers": 481,
+    "entries": 3662,
+    "uncompressed_bytes": 7529317,
+    "zip_bytes": 7218116,
+    "sha256": "2f02e985adf0f7c187342e35ddb680001a9cb86795b72fb4b789dadc9bacc02f",
     "max_stations_per_city": 54,
     "oirt_rows": 2099,
     "uncertain_rows": 9,
-    "text_placeholder_brands": 151,
+    "text_placeholder_brands": 150,
     "radio_logo_brands": 0,
     "cover_source_tiers": {
-      "national": 394,
-      "city_archive": 69,
-      "penza": 25
+      "national": 392,
+      "city_archive": 68,
+      "penza": 28
+    },
+    "unique_cover_source_tiers": {
+      "penza": 25,
+      "city_archive": 66,
+      "national": 390
     },
     "curated_rows_not_merged": 15,
     "source_national_rows": 11984,
@@ -46,25 +52,30 @@
     "catalogs": 462,
     "station_rows": 6686,
     "regions": 85,
-    "covers": 401,
-    "entries": 864,
-    "zip_bytes": 5887795,
-    "uncompressed_bytes": 6070299,
+    "covers": 396,
+    "entries": 859,
+    "zip_bytes": 5818764,
+    "uncompressed_bytes": 6001114,
     "min_stations_per_city": 6,
     "max_stations_per_city": 54,
     "oirt_rows": 584,
     "uncertain_rows": 1,
-    "text_placeholder_brands": 93,
+    "text_placeholder_brands": 92,
     "cover_source_tiers": {
-      "national": 309,
-      "city_archive": 69,
-      "penza": 25
+      "national": 307,
+      "city_archive": 68,
+      "penza": 28
+    },
+    "unique_cover_source_tiers": {
+      "penza": 25,
+      "city_archive": 66,
+      "national": 305
     },
     "pack_id": "atlas-radio-all",
-    "sha256": "6605eabb5e9258c36f9ad8fb8fe447fb14eda106223ff7eebfb0b2324908b6bd",
-    "source_sha256": "fa3eba9912101a1d1bc493d978b96049edba223fd24704a5ca5f99e1ab436412",
-    "status": "PASS",
-    "repository_path": "docs/assets/radio-packs/atlas-radio-6plus.zip"
+    "sha256": "530014604af824292f990208d073c8bee3a92547f514996475d739ba1e8dc5ab",
+    "source_sha256": "2f02e985adf0f7c187342e35ddb680001a9cb86795b72fb4b789dadc9bacc02f",
+    "repository_path": "docs/assets/radio-packs/atlas-radio-6plus.zip",
+    "status": "PASS"
   },
   "full_pack_distribution": [
     {
@@ -3947,6 +3958,7 @@
     "1": {
       "name": "Радио 1",
       "cover": "1.webp",
+      "cover_identity": "1",
       "source": "radio_covers_russia/covers/96700_1.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -3960,6 +3972,7 @@
     "10": {
       "name": "Радио 10",
       "cover": "10.webp",
+      "cover_identity": "10",
       "source": "radio_covers_russia/covers/100000_10.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -3973,6 +3986,7 @@
     "100": {
       "name": "Радио 100",
       "cover": "100.webp",
+      "cover_identity": "100",
       "source": "radio_covers_russia/covers/100000_100.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -3986,6 +4000,7 @@
     "100_radio": {
       "name": "100% Радио",
       "cover": "100_radio.webp",
+      "cover_identity": "100_radio",
       "source": "Радио/stations_moscow_v2.zip!/covers/71300_100Radio.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -4001,6 +4016,7 @@
     "101_8": {
       "name": "Радио 101.8",
       "cover": "101_8.webp",
+      "cover_identity": "101_8",
       "source": "media-runtime/src/main/assets/radio/covers/101800_radio_101_8.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -4016,6 +4032,7 @@
     "107": {
       "name": "Радио 107",
       "cover": "107.webp",
+      "cover_identity": "107",
       "source": "radio_covers_russia/covers/99400_107.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4029,6 +4046,7 @@
     "1_y_kanal": {
       "name": "Радио 1-й Канал",
       "cover": "1_y_kanal.webp",
+      "cover_identity": "1_y_kanal",
       "source": "radio_covers_russia/covers/101600_1_y_kanal.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4042,6 +4060,7 @@
     "2": {
       "name": "Радио 2",
       "cover": "2.webp",
+      "cover_identity": "2",
       "source": "radio_covers_russia/covers/106300_2.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4055,6 +4074,7 @@
     "25_region": {
       "name": "25 регион",
       "cover": "25_region.webp",
+      "cover_identity": "25_region",
       "source": "radio_covers_russia/covers/99800_25_region.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4068,6 +4088,7 @@
     "29": {
       "name": "Радио 29",
       "cover": "29.webp",
+      "cover_identity": "29",
       "source": "radio_covers_russia/covers/107400_29.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4081,6 +4102,7 @@
     "2kh2_radio": {
       "name": "2х2 Радио",
       "cover": "2kh2_radio.webp",
+      "cover_identity": "2kh2_radio",
       "source": "radio_covers_russia/covers/104500_2kh2_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4094,6 +4116,7 @@
     "3": {
       "name": "Радио 3",
       "cover": "3.webp",
+      "cover_identity": "3",
       "source": "radio_covers_russia/covers/105800_3.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4107,6 +4130,7 @@
     "32_radio": {
       "name": "32 радио",
       "cover": "32_radio.webp",
+      "cover_identity": "32_radio",
       "source": "radio_covers_russia/covers/87900_32_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4120,6 +4144,7 @@
     "40_rok": {
       "name": "Радио 40 рок",
       "cover": "40_rok.webp",
+      "cover_identity": "40_rok",
       "source": "radio_covers_russia/covers/105100_40_rok.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4133,6 +4158,7 @@
     "450": {
       "name": "Радио 450",
       "cover": "450.webp",
+      "cover_identity": "450",
       "source": "radio_covers_russia/covers/99300_450.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4146,6 +4172,7 @@
     "50": {
       "name": "Радио 50",
       "cover": "50.webp",
+      "cover_identity": "50",
       "source": "radio_covers_russia/covers/107900_50.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4159,6 +4186,7 @@
     "53": {
       "name": "Радио 53",
       "cover": "53.webp",
+      "cover_identity": "53",
       "source": "radio_covers_russia/covers/99600_53.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4172,6 +4200,7 @@
     "54": {
       "name": "Радио 54",
       "cover": "54.webp",
+      "cover_identity": "54",
       "source": "radio_covers_russia/covers/91300_54.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4185,6 +4214,7 @@
     "7": {
       "name": "Радио 7",
       "cover": "7.webp",
+      "cover_identity": "7",
       "source": "media-runtime/src/main/assets/radio/covers/100100_radio_7.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -4200,6 +4230,7 @@
     "99_1_fm": {
       "name": "Радио 99.1 FM",
       "cover": "99_1_fm.webp",
+      "cover_identity": "99_1_fm",
       "source": "radio_covers_russia/covers/99100_99_1_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4213,6 +4244,7 @@
     "abakan_24": {
       "name": "Абакан 24",
       "cover": "abakan_24.webp",
+      "cover_identity": "abakan_24",
       "source": "radio_covers_russia/covers/71060_abakan_24.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4226,6 +4258,7 @@
     "adam": {
       "name": "Радио Адам",
       "cover": "adam.webp",
+      "cover_identity": "adam",
       "source": "radio_covers_russia/covers/104500_adam.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4239,6 +4272,7 @@
     "aktivnoe": {
       "name": "Радио Активное",
       "cover": "aktivnoe.webp",
+      "cover_identity": "aktivnoe",
       "source": "radio_covers_russia/covers/99600_aktivnoe.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4252,6 +4286,7 @@
     "alaniya": {
       "name": "Радио Алания",
       "cover": "alaniya.webp",
+      "cover_identity": "alaniya",
       "source": "radio_covers_russia/covers/107000_alaniya.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4265,6 +4300,7 @@
     "aleksin": {
       "name": "Радио Алексин",
       "cover": "aleksin.webp",
+      "cover_identity": "aleksin",
       "source": "radio_covers_russia/covers/107300_aleksin.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4278,6 +4314,7 @@
     "alfa": {
       "name": "Радио Альфа",
       "cover": "alfa.webp",
+      "cover_identity": "alfa",
       "source": "radio_covers_russia/covers/104100_alfa.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4291,6 +4328,7 @@
     "almaznyy_kray": {
       "name": "Алмазный край",
       "cover": "almaznyy_kray.webp",
+      "cover_identity": "almaznyy_kray",
       "source": "radio_covers_russia/covers/105000_almaznyy_kray.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4304,6 +4342,7 @@
     "altay_fm": {
       "name": "Алтай FM",
       "cover": "altay_fm.webp",
+      "cover_identity": "altay_fm",
       "source": "radio_covers_russia/covers/87900_altay_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4317,6 +4356,7 @@
     "alyng": {
       "name": "Радио Алынг",
       "cover": "alyng.webp",
+      "cover_identity": "alyng",
       "source": "radio_covers_russia/covers/100900_alyng.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4330,6 +4370,7 @@
     "anapa": {
       "name": "Радио Анапа",
       "cover": "anapa.webp",
+      "cover_identity": "anapa",
       "source": "radio_covers_russia/covers/104500_anapa.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4343,6 +4384,7 @@
     "apeks_radio": {
       "name": "Апекс-Радио",
       "cover": "apeks_radio.webp",
+      "cover_identity": "apeks_radio",
       "source": "radio_covers_russia/covers/104800_apeks_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4356,6 +4398,7 @@
     "aris": {
       "name": "Радио Арис",
       "cover": "aris.webp",
+      "cover_identity": "aris",
       "source": "radio_covers_russia/covers/70970_aris.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4369,6 +4412,7 @@
     "arti_fm": {
       "name": "Арти FM",
       "cover": "arti_fm.webp",
+      "cover_identity": "arti_fm",
       "source": "radio_covers_russia/covers/103500_arti_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4382,6 +4426,7 @@
     "ashkadar": {
       "name": "Радио Ашкадар",
       "cover": "ashkadar.webp",
+      "cover_identity": "ashkadar",
       "source": "radio_covers_russia/covers/95100_ashkadar.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4395,6 +4440,7 @@
     "astv": {
       "name": "Радио АСТВ",
       "cover": "astv.webp",
+      "cover_identity": "astv",
       "source": "radio_covers_russia/covers/107900_astv.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4408,6 +4454,7 @@
     "ataman_fm": {
       "name": "Атаман FM",
       "cover": "ataman_fm.webp",
+      "cover_identity": "ataman_fm",
       "source": "radio_covers_russia/covers/88000_ataman_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4421,6 +4468,7 @@
     "atmosfera": {
       "name": "Радио Атмосфера",
       "cover": "atmosfera.webp",
+      "cover_identity": "atmosfera",
       "source": "radio_covers_russia/covers/106700_atmosfera.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4434,6 +4482,7 @@
     "avantazh": {
       "name": "Радио Авантаж",
       "cover": "avantazh.webp",
+      "cover_identity": "avantazh",
       "source": "radio_covers_russia/covers/100200_avantazh.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4447,6 +4496,7 @@
     "avgust": {
       "name": "Радио Август",
       "cover": "avgust.webp",
+      "cover_identity": "avgust",
       "source": "radio_covers_russia/covers/102300_avgust.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4460,6 +4510,7 @@
     "avn": {
       "name": "Радио AVN",
       "cover": "avn.webp",
+      "cover_identity": "avn",
       "source": "radio_covers_russia/covers/101000_avn.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -4473,6 +4524,7 @@
     "avtoradio": {
       "name": "Авторадио",
       "cover": "avtoradio.webp",
+      "cover_identity": "avtoradio",
       "source": "media-runtime/src/main/assets/radio/covers/102300_avtoradio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -4488,6 +4540,7 @@
     "baltik_plyus": {
       "name": "Балтик плюс",
       "cover": "baltik_plyus.webp",
+      "cover_identity": "baltik_plyus",
       "source": "Радио/kaliningrad_radio_covers.zip!/covers/97400_radio_baltik_plyus.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d289afca709ca4191fabab0a16b524dc5173bec0c7948bbfd9f8ca949cc4682a",
@@ -4503,6 +4556,7 @@
     "baltiyskiy_bereg": {
       "name": "Балтийский берег",
       "cover": "baltiyskiy_bereg.webp",
+      "cover_identity": "baltiyskiy_bereg",
       "source": "radio_covers_russia/covers/103000_baltiyskiy_bereg.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4516,6 +4570,7 @@
     "barguzin_fm": {
       "name": "Баргузин FM",
       "cover": "barguzin_fm.webp",
+      "cover_identity": "barguzin_fm",
       "source": "radio_covers_russia/covers/104600_barguzin_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4529,6 +4584,7 @@
     "beloe_radio": {
       "name": "Белое радио",
       "cover": "beloe_radio.webp",
+      "cover_identity": "beloe_radio",
       "source": "radio_covers_russia/covers/96600_beloe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4542,6 +4598,7 @@
     "belyy_lebed": {
       "name": "Белый лебедь",
       "cover": "belyy_lebed.webp",
+      "cover_identity": "belyy_lebed",
       "source": "radio_covers_russia/covers/106100_belyy_lebed.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4555,6 +4612,7 @@
     "beskonechnost": {
       "name": "Радио Бесконечность",
       "cover": "beskonechnost.webp",
+      "cover_identity": "beskonechnost",
       "source": "radio_covers_russia/covers/88800_beskonechnost.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4568,6 +4626,7 @@
     "bim_radio": {
       "name": "БИМ-Радио",
       "cover": "bim_radio.webp",
+      "cover_identity": "bim_radio",
       "source": "radio_covers_russia/covers/99000_bim_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -4581,6 +4640,7 @@
     "bir": {
       "name": "Радио Бирь",
       "cover": "bir.webp",
+      "cover_identity": "bir",
       "source": "radio_covers_russia/covers/102300_bir.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4594,6 +4654,7 @@
     "birobidzhan": {
       "name": "FM-Биробиджан",
       "cover": "birobidzhan.webp",
+      "cover_identity": "birobidzhan",
       "source": "radio_covers_russia/covers/87700_birobidzhan.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4607,6 +4668,7 @@
     "biznes_fm": {
       "name": "Business FM",
       "cover": "biznes_fm.webp",
+      "cover_identity": "biznes_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/87500_Businessfm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -4622,6 +4684,7 @@
     "blago": {
       "name": "Радио Благо",
       "cover": "blago.webp",
+      "cover_identity": "blago",
       "source": "radio_covers_russia/covers/102300_blago.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4635,6 +4698,7 @@
     "blagodat_fm": {
       "name": "Благодать FM",
       "cover": "blagodat_fm.webp",
+      "cover_identity": "blagodat_fm",
       "source": "radio_covers_russia/covers/93800_blagodat_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4648,6 +4712,7 @@
     "blagovestie": {
       "name": "Радио Благовестие",
       "cover": "blagovestie.webp",
+      "cover_identity": "blagovestie",
       "source": "radio_covers_russia/covers/73550_blagovestie.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4661,6 +4726,7 @@
     "bolgar": {
       "name": "Радио Болгар",
       "cover": "bolgar.webp",
+      "cover_identity": "bolgar",
       "source": "radio_covers_russia/covers/98900_bolgar.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4674,6 +4740,7 @@
     "bolid_fm": {
       "name": "Болид FM",
       "cover": "bolid_fm.webp",
+      "cover_identity": "bolid_fm",
       "source": "radio_covers_russia/covers/94300_bolid_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4687,6 +4754,7 @@
     "bolshoe_radio": {
       "name": "Большое радио",
       "cover": "bolshoe_radio.webp",
+      "cover_identity": "bolshoe_radio",
       "source": "radio_covers_russia/covers/106900_bolshoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4700,6 +4768,7 @@
     "buraevo": {
       "name": "Радио Бураево",
       "cover": "buraevo.webp",
+      "cover_identity": "buraevo",
       "source": "radio_covers_russia/covers/101200_buraevo.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4713,6 +4782,7 @@
     "buryaad_fm": {
       "name": "Буряад FM",
       "cover": "buryaad_fm.webp",
+      "cover_identity": "buryaad_fm",
       "source": "radio_covers_russia/covers/90800_buryaad_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -4726,6 +4796,7 @@
     "by_alfa_radio": {
       "name": "Альфа радио",
       "cover": "by_alfa_radio.webp",
+      "cover_identity": "by_alfa_radio",
       "source": "Радио/minsk-radio.zip!/covers/107900_alfa_radio.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4740,6 +4811,7 @@
     "by_energy_fm": {
       "name": "Energy FM",
       "cover": "by_energy_fm.webp",
+      "cover_identity": "by_energy_fm",
       "source": "Радио/minsk-radio.zip!/covers/100400_energy_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4754,6 +4826,7 @@
     "by_kanal_kultura": {
       "name": "Канал «Культура»",
       "cover": "by_kanal_kultura.webp",
+      "cover_identity": "by_kanal_kultura",
       "source": "Радио/minsk-radio.zip!/covers/102900_kanal_kultura.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4768,6 +4841,7 @@
     "by_kompas_fm": {
       "name": "Компас FM",
       "cover": "by_kompas_fm.webp",
+      "cover_identity": "by_kompas_fm",
       "source": "Радио/minsk-radio.zip!/covers/102500_kompas_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4782,6 +4856,7 @@
     "by_legendy_fm": {
       "name": "Легенды FM",
       "cover": "by_legendy_fm.webp",
+      "cover_identity": "by_legendy_fm",
       "source": "Радио/minsk-radio.zip!/covers/094100_legendy_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4796,6 +4871,7 @@
     "by_minskaya_volna": {
       "name": "Минская волна",
       "cover": "by_minskaya_volna.webp",
+      "cover_identity": "by_minskaya_volna",
       "source": "Радио/minsk-radio.zip!/covers/097400_minskaya_volna.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4810,6 +4886,7 @@
     "by_narodnoe_radio": {
       "name": "Народное радио",
       "cover": "by_narodnoe_radio.webp",
+      "cover_identity": "by_narodnoe_radio",
       "source": "Радио/minsk-radio.zip!/covers/087900_narodnoe_radio.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4823,21 +4900,24 @@
     },
     "by_novoe_radio": {
       "name": "Новое Радио",
-      "cover": "by_novoe_radio.webp",
-      "source": "Радио/minsk-radio.zip!/covers/098400_novoe_radio.webp",
-      "source_tier": "city_archive",
-      "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
-      "source_kind": "city_archive:minsk-radio.zip",
-      "chosen_priority": 60,
+      "cover": "novoe_radio.webp",
+      "cover_identity": "novoe_radio",
+      "source": "media-runtime/src/main/assets/radio/covers/105600_novoe_radio.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
       "available_priorities": [
-        60
+        100,
+        60,
+        30
       ],
-      "source_sha256": "7636c31dd8b793913e90d0afff0b3f9962c863f8839f151023e06477872fc503",
-      "output_sha256": "7636c31dd8b793913e90d0afff0b3f9962c863f8839f151023e06477872fc503"
+      "source_sha256": "1582bc274a88d02c41629b60cfa62b848adb3579aa0ddbaaabf5626e80c7ac94",
+      "output_sha256": "1582bc274a88d02c41629b60cfa62b848adb3579aa0ddbaaabf5626e80c7ac94"
     },
     "by_pervyy_natsionalnyy_kanal": {
       "name": "Первый Национальный канал",
       "cover": "by_pervyy_natsionalnyy_kanal.webp",
+      "cover_identity": "by_pervyy_natsionalnyy_kanal",
       "source": "Радио/minsk-radio.zip!/covers/106200_pervy_kanal.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4852,6 +4932,7 @@
     "by_plot_fm": {
       "name": "Пілот FM",
       "cover": "by_plot_fm.webp",
+      "cover_identity": "by_plot_fm",
       "source": "Радио/minsk-radio.zip!/covers/101200_pilot_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4866,6 +4947,7 @@
     "by_radio_minsk": {
       "name": "Радио-Минск",
       "cover": "by_radio_minsk.webp",
+      "cover_identity": "by_radio_minsk",
       "source": "Радио/minsk-radio.zip!/covers/092400_radio_minsk.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4880,6 +4962,7 @@
     "by_radio_pobeda": {
       "name": "Радио Победа",
       "cover": "by_radio_pobeda.webp",
+      "cover_identity": "by_radio_pobeda",
       "source": "Радио/minsk-radio.zip!/covers/096200_radio_pobeda.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4894,6 +4977,7 @@
     "by_radio_retro": {
       "name": "Радио Ретро",
       "cover": "by_radio_retro.webp",
+      "cover_identity": "by_radio_retro",
       "source": "Радио/minsk-radio.zip!/covers/096900_radio_retro.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4908,6 +4992,7 @@
     "by_radio_roks": {
       "name": "Радио РОКС",
       "cover": "by_radio_roks.webp",
+      "cover_identity": "by_radio_roks",
       "source": "Радио/minsk-radio.zip!/covers/102100_radio_roks.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4921,21 +5006,24 @@
     },
     "by_radio_shanson": {
       "name": "Радио Шансон",
-      "cover": "by_radio_shanson.webp",
-      "source": "Радио/minsk-radio.zip!/covers/090900_radio_shanson.webp",
+      "cover": "shanson.webp",
+      "cover_identity": "shanson",
+      "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/105900_sanson.webp",
       "source_tier": "city_archive",
-      "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
-      "source_kind": "city_archive:minsk-radio.zip",
+      "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
+      "source_kind": "city_archive:stations_ryazan1.zip",
       "chosen_priority": 60,
       "available_priorities": [
-        60
+        60,
+        30
       ],
-      "source_sha256": "dab1ed0710c5c70ec59dce440d981522bc90a1a39ea736af82f886fec3fe6bb8",
-      "output_sha256": "dab1ed0710c5c70ec59dce440d981522bc90a1a39ea736af82f886fec3fe6bb8"
+      "source_sha256": "17c5be17b4e2b2c4a34511c20b1ff978fb1a21f90ce9d54738c2738fa614745d",
+      "output_sha256": "17c5be17b4e2b2c4a34511c20b1ff978fb1a21f90ce9d54738c2738fa614745d"
     },
     "by_radio_yunistar": {
       "name": "Радио Юнистар",
       "cover": "by_radio_yunistar.webp",
+      "cover_identity": "by_radio_yunistar",
       "source": "Радио/minsk-radio.zip!/covers/099500_unistar.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4950,6 +5038,7 @@
     "by_radius_fm": {
       "name": "Радиус FM",
       "cover": "by_radius_fm.webp",
+      "cover_identity": "by_radius_fm",
       "source": "Радио/minsk-radio.zip!/covers/103700_radius_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4964,6 +5053,7 @@
     "by_radyyo_relax": {
       "name": "Радыё Relax",
       "cover": "by_radyyo_relax.webp",
+      "cover_identity": "by_radyyo_relax",
       "source": "Радио/minsk-radio.zip!/covers/087500_radio_relax.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -4977,21 +5067,24 @@
     },
     "by_russkoe_radio": {
       "name": "Русское Радио",
-      "cover": "by_russkoe_radio.webp",
-      "source": "Радио/minsk-radio.zip!/covers/098900_russkoe_radio.webp",
-      "source_tier": "city_archive",
-      "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
-      "source_kind": "city_archive:minsk-radio.zip",
-      "chosen_priority": 60,
+      "cover": "russkoe_radio.webp",
+      "cover_identity": "russkoe_radio",
+      "source": "media-runtime/src/main/assets/radio/covers/104800_russkoe_radio.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
       "available_priorities": [
-        60
+        100,
+        60,
+        30
       ],
-      "source_sha256": "05825f5c89afa1e032229c4ed14c50a54b2d955d53b720ba7fbf39541e7b1eaa",
-      "output_sha256": "05825f5c89afa1e032229c4ed14c50a54b2d955d53b720ba7fbf39541e7b1eaa"
+      "source_sha256": "490d2cdf0f9d1f06018372cb1f76d99cd750db2dcb3e4bfd06388c454ef6df7b",
+      "output_sha256": "490d2cdf0f9d1f06018372cb1f76d99cd750db2dcb3e4bfd06388c454ef6df7b"
     },
     "by_staltsa": {
       "name": "Сталіца",
       "cover": "by_staltsa.webp",
+      "cover_identity": "by_staltsa",
       "source": "Радио/minsk-radio.zip!/covers/105100_stalitsa.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -5006,6 +5099,7 @@
     "by_super_fm": {
       "name": "Супер FM",
       "cover": "by_super_fm.webp",
+      "cover_identity": "by_super_fm",
       "source": "Радио/minsk-radio.zip!/covers/104600_super_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -5020,6 +5114,7 @@
     "by_tsentr_fm": {
       "name": "Центр FM",
       "cover": "by_tsentr_fm.webp",
+      "cover_identity": "by_tsentr_fm",
       "source": "Радио/minsk-radio.zip!/covers/101700_centr_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -5034,6 +5129,7 @@
     "chistaya_volna": {
       "name": "Чистая волна",
       "cover": "chistaya_volna.webp",
+      "cover_identity": "chistaya_volna",
       "source": "radio_covers_russia/covers/96500_chistaya_volna.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5047,6 +5143,7 @@
     "comedy_radio": {
       "name": "Comedy Radio",
       "cover": "comedy_radio.webp",
+      "cover_identity": "comedy_radio",
       "source": "media-runtime/src/main/assets/radio/covers/102800_comedy_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5062,6 +5159,7 @@
     "dacha": {
       "name": "Радио Дача",
       "cover": "dacha.webp",
+      "cover_identity": "dacha",
       "source": "media-runtime/src/main/assets/radio/covers/097500_radio_dacha.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5077,6 +5175,7 @@
     "den": {
       "name": "Радио День",
       "cover": "den.webp",
+      "cover_identity": "den",
       "source": "radio_covers_russia/covers/97200_den.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5090,6 +5189,7 @@
     "detskoe_radio": {
       "name": "Детское радио",
       "cover": "detskoe_radio.webp",
+      "cover_identity": "detskoe_radio",
       "source": "media-runtime/src/main/assets/radio/covers/099100_detskoe_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5105,6 +5205,7 @@
     "dfm": {
       "name": "DFM",
       "cover": "dfm.webp",
+      "cover_identity": "dfm",
       "source": "Радио/voronezh-radio.zip!/covers/104300_dfm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -5120,6 +5221,7 @@
     "dialog_fm": {
       "name": "Диалог FM",
       "cover": "dialog_fm.webp",
+      "cover_identity": "dialog_fm",
       "source": "radio_covers_russia/covers/96900_dialog_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5133,6 +5235,7 @@
     "dikaya_myata": {
       "name": "Радио Дикая мята",
       "cover": "dikaya_myata.webp",
+      "cover_identity": "dikaya_myata",
       "source": "radio_covers_russia/covers/95300_dikaya_myata.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5146,6 +5249,7 @@
     "diksi": {
       "name": "Радио Дикси",
       "cover": "diksi.webp",
+      "cover_identity": "diksi",
       "source": "radio_covers_russia/covers/102800_diksi.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5159,6 +5263,7 @@
     "dim_fm": {
       "name": "DIM FM",
       "cover": "dim_fm.webp",
+      "cover_identity": "dim_fm",
       "source": "radio_covers_russia/covers/101900_dim_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5172,6 +5277,7 @@
     "dipol_fm": {
       "name": "Диполь FM",
       "cover": "dipol_fm.webp",
+      "cover_identity": "dipol_fm",
       "source": "radio_covers_russia/covers/105600_dipol_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5184,7 +5290,8 @@
     },
     "dlya_dvoikh": {
       "name": "Радио Для Двоих",
-      "cover": "dlya_dvoikh.webp",
+      "cover": "dlya_dvoikh_0f30.webp",
+      "cover_identity": "dlya_dvoikh_0f30",
       "source": "Радио/AtlasMediaWidget_smolensk-radio.zip!/covers/radio_dlya_dvoih.webp",
       "source_tier": "city_archive",
       "archive_sha256": "aac51ef340cf5a85822079823010083168a5b340368ad3f16a2dcf2b22270860",
@@ -5200,19 +5307,23 @@
     "dlya_dvoikh_0f30": {
       "name": "Радио Для Двоих",
       "cover": "dlya_dvoikh_0f30.webp",
-      "source": "radio_covers_russia/covers/92300_dlya_dvoikh_0f30.webp",
-      "source_tier": "national",
-      "source_kind": "fmplay",
-      "chosen_priority": 30,
+      "cover_identity": "dlya_dvoikh_0f30",
+      "source": "Радио/AtlasMediaWidget_smolensk-radio.zip!/covers/radio_dlya_dvoih.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "aac51ef340cf5a85822079823010083168a5b340368ad3f16a2dcf2b22270860",
+      "source_kind": "city_archive:AtlasMediaWidget_smolensk-radio.zip",
+      "chosen_priority": 60,
       "available_priorities": [
+        60,
         30
       ],
-      "source_sha256": "c71f0919671bef21e4770439c4d761c2647622bc9f9074e24795091191734a86",
-      "output_sha256": "c71f0919671bef21e4770439c4d761c2647622bc9f9074e24795091191734a86"
+      "source_sha256": "54769038973c34cd79ba91bbf3e1f523b3516be435725ca89549f8a2e671403a",
+      "output_sha256": "109c921c90f8ca28a04824872e60ac1d1506a25db309f868532ff892af15e682"
     },
     "dobroe_radio": {
       "name": "Доброе радио",
       "cover": "dobroe_radio.webp",
+      "cover_identity": "dobroe_radio",
       "source": "radio_covers_russia/covers/90900_dobroe_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5226,6 +5337,7 @@
     "domashnee_radio": {
       "name": "Домашнее радио",
       "cover": "domashnee_radio.webp",
+      "cover_identity": "domashnee_radio",
       "source": "radio_covers_russia/covers/100200_domashnee_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5239,6 +5351,7 @@
     "donskoe_radio": {
       "name": "Донское радио",
       "cover": "donskoe_radio.webp",
+      "cover_identity": "donskoe_radio",
       "source": "radio_covers_russia/covers/106300_donskoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5252,6 +5365,7 @@
     "dorozhnoe_radio": {
       "name": "Дорожное радио",
       "cover": "dorozhnoe_radio.webp",
+      "cover_identity": "dorozhnoe_radio",
       "source": "media-runtime/src/main/assets/radio/covers/104300_dorozhnoe_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5267,6 +5381,7 @@
     "dulkyn_radiosy": {
       "name": "Дулкын радиосы",
       "cover": "dulkyn_radiosy.webp",
+      "cover_identity": "dulkyn_radiosy",
       "source": "radio_covers_russia/covers/105600_dulkyn_radiosy.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5280,6 +5395,7 @@
     "dushevnoe_radio": {
       "name": "Душевное радио",
       "cover": "dushevnoe_radio.webp",
+      "cover_identity": "dushevnoe_radio",
       "source": "Радио/minsk-radio.zip!/covers/105700_dushevnoe_radio.webp",
       "source_tier": "city_archive",
       "archive_sha256": "dfe7fbbd49824f7261501194fb258fd135902f460da498fad571c2de654abf5d",
@@ -5295,6 +5411,7 @@
     "dyurtyuli_fm": {
       "name": "Дюртюли FM",
       "cover": "dyurtyuli_fm.webp",
+      "cover_identity": "dyurtyuli_fm",
       "source": "radio_covers_russia/covers/104400_dyurtyuli_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5308,6 +5425,7 @@
     "dzhaz": {
       "name": "Радио JAZZ",
       "cover": "dzhaz.webp",
+      "cover_identity": "dzhaz",
       "source": "Радио/stations_moscow_v2.zip!/covers/89100_jazz.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -5323,6 +5441,7 @@
     "dzhem_fm": {
       "name": "Джем FM",
       "cover": "dzhem_fm.webp",
+      "cover_identity": "dzhem_fm",
       "source": "radio_covers_russia/covers/97700_dzhem_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5336,6 +5455,7 @@
     "eko_radio": {
       "name": "Эко Радио",
       "cover": "eko_radio.webp",
+      "cover_identity": "eko_radio",
       "source": "radio_covers_russia/covers/107900_eko_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5349,6 +5469,7 @@
     "ekspress": {
       "name": "Радио Экспресс",
       "cover": "ekspress.webp",
+      "cover_identity": "ekspress",
       "source": "media-runtime/src/main/assets/radio/covers/105200_radio_express.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5364,6 +5485,7 @@
     "ekspress_radio": {
       "name": "Экспресс Радио",
       "cover": "ekspress_radio.webp",
+      "cover_identity": "ekspress_radio",
       "source": "radio_covers_russia/covers/100800_ekspress_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5377,6 +5499,7 @@
     "eldoradio": {
       "name": "Эльдорадио",
       "cover": "eldoradio.webp",
+      "cover_identity": "eldoradio",
       "source": "radio_covers_russia/covers/101400_eldoradio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5390,6 +5513,7 @@
     "elektron": {
       "name": "Радио Электрон",
       "cover": "elektron.webp",
+      "cover_identity": "elektron",
       "source": "radio_covers_russia/covers/96000_elektron.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5403,6 +5527,7 @@
     "elit_fm": {
       "name": "Элит FM",
       "cover": "elit_fm.webp",
+      "cover_identity": "elit_fm",
       "source": "radio_covers_russia/covers/99900_elit_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5415,20 +5540,25 @@
     },
     "enerdzhi": {
       "name": "Радио Энерджи",
-      "cover": "enerdzhi.webp",
-      "source": "radio_covers_russia/covers/100800_enerdzhi.webp",
-      "source_tier": "national",
-      "source_kind": "generated",
-      "chosen_priority": 5,
+      "cover": "nrj.webp",
+      "cover_identity": "nrj",
+      "source": "media-runtime/src/main/assets/radio/covers/099600_radio_energy.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
       "available_priorities": [
+        100,
+        60,
+        30,
         5
       ],
-      "source_sha256": "98b0d7e3b540318c677931133ac714a639fc81c68ba84e9b3b147b8c8d00cb7f",
-      "output_sha256": "98b0d7e3b540318c677931133ac714a639fc81c68ba84e9b3b147b8c8d00cb7f"
+      "source_sha256": "f203c2c448e91fdb4251fb62b2396884eddde9e3ae47ce796b684af4d896c6c0",
+      "output_sha256": "f203c2c448e91fdb4251fb62b2396884eddde9e3ae47ce796b684af4d896c6c0"
     },
     "ermak_kungur": {
       "name": "Радио Ермак Кунгур",
       "cover": "ermak_kungur.webp",
+      "cover_identity": "ermak_kungur",
       "source": "radio_covers_russia/covers/89100_ermak_kungur.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5442,6 +5572,7 @@
     "ermak_ural": {
       "name": "Радио Ермак Урал",
       "cover": "ermak_kungur.webp",
+      "cover_identity": "ermak_ural",
       "source": "radio_covers_russia/covers/89300_ermak_ural.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5455,6 +5586,7 @@
     "ermitazh": {
       "name": "Радио Эрмитаж",
       "cover": "ermitazh.webp",
+      "cover_identity": "ermitazh",
       "source": "radio_covers_russia/covers/90100_ermitazh.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5468,6 +5600,7 @@
     "evropa": {
       "name": "Европа Плюс",
       "cover": "evropa.webp",
+      "cover_identity": "evropa",
       "source": "media-runtime/src/main/assets/radio/covers/103800_europa_plus.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5483,6 +5616,7 @@
     "festival": {
       "name": "Радио Фестиваль",
       "cover": "festival.webp",
+      "cover_identity": "festival",
       "source": "radio_covers_russia/covers/106000_festival.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5496,6 +5630,7 @@
     "fresh_fm": {
       "name": "Fresh FM",
       "cover": "fresh_fm.webp",
+      "cover_identity": "fresh_fm",
       "source": "radio_covers_russia/covers/96500_fresh_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5509,6 +5644,7 @@
     "gelendzhik_fm": {
       "name": "Геленджик FM",
       "cover": "gelendzhik_fm.webp",
+      "cover_identity": "gelendzhik_fm",
       "source": "radio_covers_russia/covers/95700_gelendzhik_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5522,6 +5658,7 @@
     "global_fm": {
       "name": "Global FM",
       "cover": "global_fm.webp",
+      "cover_identity": "global_fm",
       "source": "radio_covers_russia/covers/99500_global_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5535,6 +5672,7 @@
     "gold_fm": {
       "name": "Gold FM",
       "cover": "gold_fm.webp",
+      "cover_identity": "gold_fm",
       "source": "radio_covers_russia/covers/98100_gold_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5548,6 +5686,7 @@
     "golos_angary": {
       "name": "Голос Ангары",
       "cover": "golos_angary.webp",
+      "cover_identity": "golos_angary",
       "source": "radio_covers_russia/covers/103500_golos_angary.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5561,6 +5700,7 @@
     "golos_azii": {
       "name": "Голос Азии",
       "cover": "golos_azii.webp",
+      "cover_identity": "golos_azii",
       "source": "radio_covers_russia/covers/103700_golos_azii.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5574,6 +5714,7 @@
     "gordost": {
       "name": "Радио Гордость",
       "cover": "gordost.webp",
+      "cover_identity": "gordost",
       "source": "media-runtime/src/main/assets/radio/covers/098000_radio_gordost.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -5589,6 +5730,7 @@
     "gorod_fm": {
       "name": "Город FM",
       "cover": "gorod_fm.webp",
+      "cover_identity": "gorod_fm",
       "source": "radio_covers_russia/covers/107600_gorod_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5602,6 +5744,7 @@
     "gorodskaya_volna": {
       "name": "Городская волна",
       "cover": "gorodskaya_volna.webp",
+      "cover_identity": "gorodskaya_volna",
       "source": "radio_covers_russia/covers/101400_gorodskaya_volna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5615,6 +5758,7 @@
     "govorit_maykop": {
       "name": "Говорит Майкоп",
       "cover": "govorit_maykop.webp",
+      "cover_identity": "govorit_maykop",
       "source": "radio_covers_russia/covers/99000_govorit_maykop.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5628,6 +5772,7 @@
     "govorit_moskva": {
       "name": "Говорит Москва",
       "cover": "govorit_moskva.webp",
+      "cover_identity": "govorit_moskva",
       "source": "Радио/stations_moscow_v2.zip!/covers/94800_govorit_moskva.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -5643,6 +5788,7 @@
     "govorit_sarov": {
       "name": "Говорит Саров",
       "cover": "govorit_sarov.webp",
+      "cover_identity": "govorit_sarov",
       "source": "radio_covers_russia/covers/107400_govorit_sarov.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5656,6 +5802,7 @@
     "grad_petrov": {
       "name": "Град Петров",
       "cover": "grad_petrov.webp",
+      "cover_identity": "grad_petrov",
       "source": "radio_covers_russia/covers/73100_grad_petrov.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5669,6 +5816,7 @@
     "groznyy": {
       "name": "Радио Грозный",
       "cover": "groznyy.webp",
+      "cover_identity": "groznyy",
       "source": "radio_covers_russia/covers/105400_groznyy.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5682,6 +5830,7 @@
     "h": {
       "name": "Радио H",
       "cover": "h.webp",
+      "cover_identity": "h",
       "source": "radio_covers_russia/covers/69680_h.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5695,6 +5844,7 @@
     "heart_fm": {
       "name": "Heart FM",
       "cover": "heart_fm.webp",
+      "cover_identity": "heart_fm",
       "source": "Радио/barnaul-radio-radiobells.zip!/covers/105900_heartfm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "97e3172dfb861299fb233f698a62c94c84d4787187148220f9c4c7bf01349ce1",
@@ -5710,6 +5860,7 @@
     "impuls_fm": {
       "name": "Импульс FM",
       "cover": "impuls_fm.webp",
+      "cover_identity": "impuls_fm",
       "source": "radio_covers_russia/covers/99800_impuls_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5723,6 +5874,7 @@
     "infiniti": {
       "name": "Радио Инфинити",
       "cover": "infiniti.webp",
+      "cover_identity": "infiniti",
       "source": "radio_covers_russia/covers/101800_infiniti.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5736,6 +5888,7 @@
     "ingushetiya": {
       "name": "Радио Ингушетия",
       "cover": "ingushetiya.webp",
+      "cover_identity": "ingushetiya",
       "source": "radio_covers_russia/covers/88800_ingushetiya.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5749,6 +5902,7 @@
     "interra_fm": {
       "name": "Интерра FM",
       "cover": "interra_fm.webp",
+      "cover_identity": "interra_fm",
       "source": "radio_covers_russia/covers/97600_interra_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5762,6 +5916,7 @@
     "intervolna": {
       "name": "Интерволна",
       "cover": "intervolna.webp",
+      "cover_identity": "intervolna",
       "source": "radio_covers_russia/covers/97000_intervolna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5775,6 +5930,7 @@
     "iskatel": {
       "name": "Радио Искатель",
       "cover": "iskatel.webp",
+      "cover_identity": "iskatel",
       "source": "Радио/barnaul-radio-radiobells.zip!/covers/92900_radioiskatel.webp",
       "source_tier": "city_archive",
       "archive_sha256": "97e3172dfb861299fb233f698a62c94c84d4787187148220f9c4c7bf01349ce1",
@@ -5790,6 +5946,7 @@
     "ivanovo_fm": {
       "name": "Иваново FM",
       "cover": "ivanovo_fm.webp",
+      "cover_identity": "ivanovo_fm",
       "source": "radio_covers_russia/covers/106700_ivanovo_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5803,6 +5960,7 @@
     "iyul": {
       "name": "Радио Июль",
       "cover": "iyul.webp",
+      "cover_identity": "iyul",
       "source": "radio_covers_russia/covers/98200_iyul.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5816,6 +5974,7 @@
     "kabardino_balkariya": {
       "name": "Радио Кабардино-Балкария",
       "cover": "kabardino_balkariya.webp",
+      "cover_identity": "kabardino_balkariya",
       "source": "radio_covers_russia/covers/99900_kabardino_balkariya.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -5829,6 +5988,7 @@
     "kalina_krasnaya": {
       "name": "Калина красная",
       "cover": "kalina_krasnaya.webp",
+      "cover_identity": "kalina_krasnaya",
       "source": "Радио/stations_moscow_v2.zip!/covers/89500_kalina_krasnaya.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -5844,6 +6004,7 @@
     "kamchatka": {
       "name": "Радио Камчатка",
       "cover": "kamchatka.webp",
+      "cover_identity": "kamchatka",
       "source": "radio_covers_russia/covers/105500_kamchatka.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5857,6 +6018,7 @@
     "kamyshin_fm": {
       "name": "Камышин ФМ",
       "cover": "kamyshin_fm.webp",
+      "cover_identity": "kamyshin_fm",
       "source": "radio_covers_russia/covers/88200_kamyshin_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5870,6 +6032,7 @@
     "kanal_melodiya_voronezh": {
       "name": "Радио Мелодия — Воронеж",
       "cover": "kanal_melodiya_voronezh.webp",
+      "cover_identity": "kanal_melodiya_voronezh",
       "source": "Радио/voronezh-radio.zip!/covers/106800_radio_melodiya.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -5885,6 +6048,7 @@
     "kanal_voskresenie": {
       "name": "Канал Воскресение",
       "cover": "kanal_voskresenie.webp",
+      "cover_identity": "kanal_voskresenie",
       "source": "radio_covers_russia/covers/99800_kanal_voskresenie.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5898,6 +6062,7 @@
     "karibu": {
       "name": "Радио Карибу",
       "cover": "karibu.webp",
+      "cover_identity": "karibu",
       "source": "radio_covers_russia/covers/88300_karibu.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5911,6 +6076,7 @@
     "katyusha": {
       "name": "Радио Катюша",
       "cover": "katyusha.webp",
+      "cover_identity": "katyusha",
       "source": "radio_covers_russia/covers/101500_katyusha.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5924,6 +6090,7 @@
     "katyusha_fm": {
       "name": "Катюша FM",
       "cover": "katyusha.webp",
+      "cover_identity": "katyusha_fm",
       "source": "radio_covers_russia/covers/93800_katyusha_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5937,6 +6104,7 @@
     "kavkaz_khit": {
       "name": "Радио Кавказ Хит",
       "cover": "kavkaz_khit.webp",
+      "cover_identity": "kavkaz_khit",
       "source": "radio_covers_russia/covers/99400_kavkaz_khit.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5950,6 +6118,7 @@
     "kavkaz_radio": {
       "name": "Кавказ радио",
       "cover": "kavkaz_radio.webp",
+      "cover_identity": "kavkaz_radio",
       "source": "radio_covers_russia/covers/90800_kavkaz_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5963,6 +6132,7 @@
     "kazak_fm": {
       "name": "Казак FM",
       "cover": "kazak_fm.webp",
+      "cover_identity": "kazak_fm",
       "source": "radio_covers_russia/covers/99200_kazak_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -5976,6 +6146,7 @@
     "kchr_fm": {
       "name": "КЧР FM",
       "cover": "kchr_fm.webp",
+      "cover_identity": "kchr_fm",
       "source": "radio_covers_russia/covers/105100_kchr_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -5989,6 +6160,7 @@
     "khakasiya_fm": {
       "name": "Хакасия FM",
       "cover": "khakasiya_fm.webp",
+      "cover_identity": "khakasiya_fm",
       "source": "radio_covers_russia/covers/91500_khakasiya_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6002,6 +6174,7 @@
     "khit": {
       "name": "Радио Хит",
       "cover": "khit.webp",
+      "cover_identity": "khit",
       "source": "radio_covers_russia/covers/96500_khit.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6015,6 +6188,7 @@
     "khit_fm": {
       "name": "Хит FM",
       "cover": "khit_fm.webp",
+      "cover_identity": "khit_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/107400_hit_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -6030,6 +6204,7 @@
     "khit_kungur": {
       "name": "Радио Хит Кунгур",
       "cover": "khit_kungur.webp",
+      "cover_identity": "khit_kungur",
       "source": "radio_covers_russia/covers/103800_khit_kungur.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6043,6 +6218,7 @@
     "khit_lysva": {
       "name": "Радио Хит Лысьва",
       "cover": "khit_lysva.webp",
+      "cover_identity": "khit_lysva",
       "source": "radio_covers_russia/covers/104900_khit_lysva.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6056,6 +6232,7 @@
     "kingisepp_segodnya": {
       "name": "Кингисепп сегодня",
       "cover": "kingisepp_segodnya.webp",
+      "cover_identity": "kingisepp_segodnya",
       "source": "radio_covers_russia/covers/90200_kingisepp_segodnya.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6069,6 +6246,7 @@
     "kirishi": {
       "name": "Радио Кириши",
       "cover": "kirishi.webp",
+      "cover_identity": "kirishi",
       "source": "radio_covers_russia/covers/105500_kirishi.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6082,6 +6260,7 @@
     "kiselevsk_fm": {
       "name": "Киселевск FM",
       "cover": "kiselevsk_fm.webp",
+      "cover_identity": "kiselevsk_fm",
       "source": "radio_covers_russia/covers/89000_kiselevsk_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6095,6 +6274,7 @@
     "kitap": {
       "name": "Радио Китап",
       "cover": "kitap.webp",
+      "cover_identity": "kitap",
       "source": "radio_covers_russia/covers/98600_kitap.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6108,6 +6288,7 @@
     "klass_fm": {
       "name": "Klass FM",
       "cover": "klass_fm.webp",
+      "cover_identity": "klass_fm",
       "source": "radio_covers_russia/covers/89200_klass_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6121,6 +6302,7 @@
     "kolyma": {
       "name": "Радио Колыма",
       "cover": "kolyma.webp",
+      "cover_identity": "kolyma",
       "source": "radio_covers_russia/covers/107500_kolyma.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6134,6 +6316,7 @@
     "kommersant_fm": {
       "name": "Коммерсантъ FM",
       "cover": "kommersant_fm.webp",
+      "cover_identity": "kommersant_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/93600_kommersant_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -6149,6 +6332,7 @@
     "kontinental": {
       "name": "Радио Континенталь",
       "cover": "kontinental.webp",
+      "cover_identity": "kontinental",
       "source": "radio_covers_russia/covers/88300_kontinental.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6162,6 +6346,7 @@
     "korenovsk_fm": {
       "name": "Кореновск ФМ",
       "cover": "korenovsk_fm.webp",
+      "cover_identity": "korenovsk_fm",
       "source": "radio_covers_russia/covers/87700_korenovsk_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6175,6 +6360,7 @@
     "kostroma_fm": {
       "name": "Кострома FM",
       "cover": "kostroma_fm.webp",
+      "cover_identity": "kostroma_fm",
       "source": "radio_covers_russia/covers/90600_kostroma_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6188,6 +6374,7 @@
     "kp": {
       "name": "Радио Комсомольская правда",
       "cover": "kp.webp",
+      "cover_identity": "kp",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/92300_kom_pravda.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -6203,6 +6390,7 @@
     "krasnaya_armiya": {
       "name": "Красная Армия",
       "cover": "krasnaya_armiya.webp",
+      "cover_identity": "krasnaya_armiya",
       "source": "radio_covers_russia/covers/104600_krasnaya_armiya.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6216,6 +6404,7 @@
     "krasnodar": {
       "name": "Радио Краснодар",
       "cover": "krasnodar.webp",
+      "cover_identity": "krasnodar",
       "source": "radio_covers_russia/covers/99800_krasnodar.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6229,6 +6418,7 @@
     "krasnoyarsk_fm": {
       "name": "Красноярск FM",
       "cover": "krasnoyarsk_fm.webp",
+      "cover_identity": "krasnoyarsk_fm",
       "source": "radio_covers_russia/covers/96200_krasnoyarsk_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6242,6 +6432,7 @@
     "krasnoyarsk_glavnyy": {
       "name": "Красноярск главный",
       "cover": "krasnoyarsk_glavnyy.webp",
+      "cover_identity": "krasnoyarsk_glavnyy",
       "source": "radio_covers_russia/covers/102800_krasnoyarsk_glavnyy.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6255,6 +6446,7 @@
     "krym": {
       "name": "Радио Крым",
       "cover": "krym.webp",
+      "cover_identity": "krym",
       "source": "radio_covers_russia/covers/99300_krym.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6268,6 +6460,7 @@
     "krym_tochka": {
       "name": "Радио Крым Точка",
       "cover": "krym_tochka.webp",
+      "cover_identity": "krym_tochka",
       "source": "radio_covers_russia/covers/99500_krym_tochka.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6281,6 +6474,7 @@
     "kuban_24": {
       "name": "Кубань 24",
       "cover": "kuban_24.webp",
+      "cover_identity": "kuban_24",
       "source": "radio_covers_russia/covers/99400_kuban_24.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6294,6 +6488,7 @@
     "kultura": {
       "name": "Радио Культура",
       "cover": "kultura.webp",
+      "cover_identity": "kultura",
       "source": "Радио/stations_moscow_v2.zip!/covers/91600_kultura.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -6309,6 +6504,7 @@
     "kunel": {
       "name": "Радио Кунел",
       "cover": "kunel.webp",
+      "cover_identity": "kunel",
       "source": "radio_covers_russia/covers/95700_kunel.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6322,6 +6518,7 @@
     "kurganinsk": {
       "name": "Радио Курганинск",
       "cover": "kurganinsk.webp",
+      "cover_identity": "kurganinsk",
       "source": "radio_covers_russia/covers/88400_kurganinsk.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6335,6 +6532,7 @@
     "kurort_fm": {
       "name": "Курорт FM",
       "cover": "kurort_fm.webp",
+      "cover_identity": "kurort_fm",
       "source": "radio_covers_russia/covers/105500_kurort_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6348,6 +6546,7 @@
     "kurs": {
       "name": "Радио Курс",
       "cover": "kurs.webp",
+      "cover_identity": "kurs",
       "source": "radio_covers_russia/covers/107800_kurs.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6361,6 +6560,7 @@
     "kuzbass_fm": {
       "name": "Кузбасс FM",
       "cover": "kuzbass_fm.webp",
+      "cover_identity": "kuzbass_fm",
       "source": "radio_covers_russia/covers/91000_kuzbass_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6374,6 +6574,7 @@
     "l_radio": {
       "name": "L-радио",
       "cover": "l_radio.webp",
+      "cover_identity": "l_radio",
       "source": "radio_covers_russia/covers/99700_l_radio.webp",
       "source_tier": "national",
       "source_kind": "site",
@@ -6387,6 +6588,7 @@
     "la": {
       "name": "Радио ЛА",
       "cover": "la.webp",
+      "cover_identity": "la",
       "source": "radio_covers_russia/covers/97400_la.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6400,6 +6602,7 @@
     "labinsk": {
       "name": "Радио Лабинск",
       "cover": "labinsk.webp",
+      "cover_identity": "labinsk",
       "source": "radio_covers_russia/covers/88600_labinsk.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6413,6 +6616,7 @@
     "layt": {
       "name": "Радио Лайт",
       "cover": "layt.webp",
+      "cover_identity": "layt",
       "source": "radio_covers_russia/covers/102200_layt.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6426,6 +6630,7 @@
     "lena_fm": {
       "name": "Лена FM",
       "cover": "lena_fm.webp",
+      "cover_identity": "lena_fm",
       "source": "radio_covers_russia/covers/105500_lena_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6439,6 +6644,7 @@
     "lena_radio": {
       "name": "Лена Радио",
       "cover": "lena_radio.webp",
+      "cover_identity": "lena_radio",
       "source": "radio_covers_russia/covers/106500_lena_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6452,6 +6658,7 @@
     "leto": {
       "name": "Радио Лето",
       "cover": "leto.webp",
+      "cover_identity": "leto",
       "source": "radio_covers_russia/covers/98900_leto.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6465,6 +6672,7 @@
     "like_fm": {
       "name": "Like FM",
       "cover": "like_fm.webp",
+      "cover_identity": "like_fm",
       "source": "media-runtime/src/main/assets/radio/covers/098700_like_fm.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -6480,6 +6688,7 @@
     "lipetsk_fm": {
       "name": "Липецк FM",
       "cover": "lipetsk_fm.webp",
+      "cover_identity": "lipetsk_fm",
       "source": "radio_covers_russia/covers/90700_lipetsk_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6493,6 +6702,7 @@
     "livny": {
       "name": "Радио Ливны",
       "cover": "livny.webp",
+      "cover_identity": "livny",
       "source": "radio_covers_russia/covers/105200_livny.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6506,6 +6716,7 @@
     "love_radio": {
       "name": "Love Radio",
       "cover": "love_radio.webp",
+      "cover_identity": "love_radio",
       "source": "media-runtime/src/main/assets/radio/covers/096400_love_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -6521,6 +6732,7 @@
     "m_radio_sterlitamak": {
       "name": "М Радио Стерлитамак",
       "cover": "m_radio_sterlitamak.webp",
+      "cover_identity": "m_radio_sterlitamak",
       "source": "radio_covers_russia/covers/103300_m_radio_sterlitamak.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6534,6 +6746,7 @@
     "mae_radio": {
       "name": "Маё радио",
       "cover": "mae_radio.webp",
+      "cover_identity": "mae_radio",
       "source": "radio_covers_russia/covers/104400_mae_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6547,6 +6760,7 @@
     "maks_fm": {
       "name": "Макс FM",
       "cover": "maks_fm.webp",
+      "cover_identity": "maks_fm",
       "source": "radio_covers_russia/covers/107400_maks_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6560,6 +6774,7 @@
     "maksima_fm": {
       "name": "Максима FM",
       "cover": "maksima_fm.webp",
+      "cover_identity": "maksima_fm",
       "source": "radio_covers_russia/covers/106600_maksima_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6573,6 +6788,7 @@
     "maksimum": {
       "name": "Радио MAXIMUM",
       "cover": "maksimum.webp",
+      "cover_identity": "maksimum",
       "source": "Радио/voronezh-radio.zip!/covers/106100_maximum.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -6588,6 +6804,7 @@
     "malina_fm": {
       "name": "Малина FM",
       "cover": "malina_fm.webp",
+      "cover_identity": "malina_fm",
       "source": "radio_covers_russia/covers/104200_malina_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6601,6 +6818,7 @@
     "mariy_el": {
       "name": "Радио Марий Эл",
       "cover": "mariy_el.webp",
+      "cover_identity": "mariy_el",
       "source": "radio_covers_russia/covers/96600_mariy_el.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6614,6 +6832,7 @@
     "mariya": {
       "name": "Радио Мария",
       "cover": "mariya.webp",
+      "cover_identity": "mariya",
       "source": "radio_covers_russia/covers/92600_mariya.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6627,6 +6846,7 @@
     "mariya_fm": {
       "name": "Мария FM",
       "cover": "mariya_fm.webp",
+      "cover_identity": "mariya_fm",
       "source": "radio_covers_russia/covers/98700_mariya_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6640,6 +6860,7 @@
     "marusya_fm": {
       "name": "Маруся FM",
       "cover": "marusya_fm.webp",
+      "cover_identity": "marusya_fm",
       "source": "Радио/voronezh-radio.zip!/covers/088300_marusya_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -6655,6 +6876,7 @@
     "massiv": {
       "name": "Радио Массив",
       "cover": "massiv.webp",
+      "cover_identity": "massiv",
       "source": "radio_covers_russia/covers/101900_massiv.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6668,6 +6890,7 @@
     "master_fm": {
       "name": "Мастер FM",
       "cover": "master_fm.webp",
+      "cover_identity": "master_fm",
       "source": "radio_covers_russia/covers/102800_master_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6681,6 +6904,7 @@
     "mayak": {
       "name": "Радио Маяк",
       "cover": "mayak.webp",
+      "cover_identity": "mayak",
       "source": "media-runtime/src/main/assets/radio/covers/095200_radio_mayak.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -6696,6 +6920,7 @@
     "mega_fm_arkhangelsk": {
       "name": "Мега FM Архангельск",
       "cover": "mega_fm_arkhangelsk.webp",
+      "cover_identity": "mega_fm_arkhangelsk",
       "source": "radio_covers_russia/covers/106400_mega_fm_arkhangelsk.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6709,6 +6934,7 @@
     "mega_plyus": {
       "name": "Радио Мега плюс",
       "cover": "mega_plyus.webp",
+      "cover_identity": "mega_plyus",
       "source": "radio_covers_russia/covers/71000_mega_plyus.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6722,6 +6948,7 @@
     "megapolis": {
       "name": "Радио Мегаполис",
       "cover": "megapolis.webp",
+      "cover_identity": "megapolis",
       "source": "radio_covers_russia/covers/103600_megapolis.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6735,6 +6962,7 @@
     "mestnoe_radio": {
       "name": "Местное радио",
       "cover": "mestnoe_radio.webp",
+      "cover_identity": "mestnoe_radio",
       "source": "radio_covers_russia/covers/100400_mestnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6748,6 +6976,7 @@
     "metr_fm": {
       "name": "МЭТР FM",
       "cover": "metr_fm.webp",
+      "cover_identity": "metr_fm",
       "source": "radio_covers_russia/covers/107200_metr_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6761,6 +6990,7 @@
     "metro": {
       "name": "Radio Metro",
       "cover": "metro.webp",
+      "cover_identity": "metro",
       "source": "radio_covers_russia/covers/102400_metro.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6774,6 +7004,7 @@
     "miks": {
       "name": "Радио Микс",
       "cover": "miks.webp",
+      "cover_identity": "miks",
       "source": "radio_covers_russia/covers/106000_miks.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6787,6 +7018,7 @@
     "militseyskaya_volna": {
       "name": "Милицейская волна",
       "cover": "militseyskaya_volna.webp",
+      "cover_identity": "militseyskaya_volna",
       "source": "Радио/stations_moscow_v2.zip!/covers/107800_militseyskaya_volna.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -6802,6 +7034,7 @@
     "mir": {
       "name": "Радио МИР",
       "cover": "mir.webp",
+      "cover_identity": "mir",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/106300_mir.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -6817,6 +7050,7 @@
     "mir_belogorya": {
       "name": "Мир Белогорья",
       "cover": "mir_belogorya.webp",
+      "cover_identity": "mir_belogorya",
       "source": "radio_covers_russia/covers/99900_mir_belogorya.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -6830,6 +7064,7 @@
     "mix_fm": {
       "name": "Mix FM",
       "cover": "mix_fm.webp",
+      "cover_identity": "mix_fm",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/107200_mixfm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -6845,6 +7080,7 @@
     "modern": {
       "name": "Радио Модерн",
       "cover": "modern.webp",
+      "cover_identity": "modern",
       "source": "radio_covers_russia/covers/102400_modern.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6858,6 +7094,7 @@
     "molodezhnoe_radio": {
       "name": "Молодёжное радио",
       "cover": "molodezhnoe_radio.webp",
+      "cover_identity": "molodezhnoe_radio",
       "source": "radio_covers_russia/covers/101900_molodezhnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6871,6 +7108,7 @@
     "monte_karlo": {
       "name": "Radio Monte Carlo",
       "cover": "monte_karlo.webp",
+      "cover_identity": "monte_karlo",
       "source": "media-runtime/src/main/assets/radio/covers/107500_monte_carlo.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -6886,6 +7124,7 @@
     "more": {
       "name": "Радио Море",
       "cover": "more.webp",
+      "cover_identity": "more",
       "source": "radio_covers_russia/covers/99200_more.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6899,6 +7138,7 @@
     "moskva_fm": {
       "name": "Москва FM",
       "cover": "moskva_fm.webp",
+      "cover_identity": "moskva_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/92000_moskva-fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -6914,6 +7154,7 @@
     "moskvy": {
       "name": "Радио Москвы",
       "cover": "moskvy.webp",
+      "cover_identity": "moskvy",
       "source": "Радио/stations_moscow_v2.zip!/covers/105300_radio_moskvy.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -6929,6 +7170,7 @@
     "moya_udmurtiya": {
       "name": "Моя Удмуртия",
       "cover": "moya_udmurtiya.webp",
+      "cover_identity": "moya_udmurtiya",
       "source": "radio_covers_russia/covers/99700_moya_udmurtiya.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6942,6 +7184,7 @@
     "msm": {
       "name": "Радио МСМ",
       "cover": "msm.webp",
+      "cover_identity": "msm",
       "source": "radio_covers_russia/covers/93900_msm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6955,6 +7198,7 @@
     "mss": {
       "name": "Радио МСС",
       "cover": "mss.webp",
+      "cover_identity": "mss",
       "source": "radio_covers_russia/covers/104900_mss.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -6968,6 +7212,7 @@
     "n_radio": {
       "name": "Н-Радио",
       "cover": "n_radio.webp",
+      "cover_identity": "n_radio",
       "source": "radio_covers_russia/covers/107900_n_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6981,6 +7226,7 @@
     "n_studio": {
       "name": "Н-Студио",
       "cover": "n_studio.webp",
+      "cover_identity": "n_studio",
       "source": "radio_covers_russia/covers/96800_n_studio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -6994,6 +7240,7 @@
     "na_donu": {
       "name": "ФМ-на-Дону",
       "cover": "na_donu.webp",
+      "cover_identity": "na_donu",
       "source": "Радио/radio_rostov.zip!/covers/100700_fm_na_donu.webp",
       "source_tier": "city_archive",
       "archive_sha256": "bf637c027693a5c1510b9d2f45fa3dcd6c41e0c2dcc7087f393b1fb74bb05fb6",
@@ -7009,6 +7256,7 @@
     "nadezhd": {
       "name": "Радио Надежд",
       "cover": "nadezhd.webp",
+      "cover_identity": "nadezhd",
       "source": "radio_covers_russia/covers/101100_nadezhd.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7022,6 +7270,7 @@
     "nadyma": {
       "name": "Радио Надыма",
       "cover": "nadyma.webp",
+      "cover_identity": "nadyma",
       "source": "radio_covers_russia/covers/68300_nadyma.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7035,6 +7284,7 @@
     "nashe_radio": {
       "name": "НАШЕ Радио",
       "cover": "nashe_radio.webp",
+      "cover_identity": "nashe_radio",
       "source": "Радио/voronezh-radio.zip!/covers/100700_nashe_radio.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -7050,6 +7300,7 @@
     "natsionalnoe_radio_chuvashii_chăvash_en": {
       "name": "Национальное радио Чувашии - Чăваш Ен",
       "cover": "natsionalnoe_radio_chuvashii_chavash_en.webp",
+      "cover_identity": "natsionalnoe_radio_chuvashii_chăvash_en",
       "source": "radio_covers_russia/covers/98300_natsionalnoe_radio_chuvashii_chăvash_en.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7063,6 +7314,7 @@
     "next": {
       "name": "Радио Next",
       "cover": "next.webp",
+      "cover_identity": "next",
       "source": "radio_covers_russia/covers/101800_next.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7076,6 +7328,7 @@
     "nika_fm": {
       "name": "Ника FM",
       "cover": "nika_fm.webp",
+      "cover_identity": "nika_fm",
       "source": "radio_covers_russia/covers/98400_nika_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7089,6 +7342,7 @@
     "nord_fm": {
       "name": "Норд FM",
       "cover": "nord_fm.webp",
+      "cover_identity": "nord_fm",
       "source": "radio_covers_russia/covers/106800_nord_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7102,6 +7356,7 @@
     "nostalgie": {
       "name": "Radio Nostalgie",
       "cover": "nostalgie.webp",
+      "cover_identity": "nostalgie",
       "source": "radio_covers_russia/covers/97400_nostalgie.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7115,6 +7370,7 @@
     "nostalzhi": {
       "name": "Радио Ностальжи",
       "cover": "nostalzhi.webp",
+      "cover_identity": "nostalzhi",
       "source": "radio_covers_russia/covers/99500_nostalzhi.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7128,6 +7384,7 @@
     "novaya_rossiya": {
       "name": "Новая Россия",
       "cover": "novaya_rossiya.webp",
+      "cover_identity": "novaya_rossiya",
       "source": "radio_covers_russia/covers/104000_novaya_rossiya.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7141,6 +7398,7 @@
     "novaya_volna": {
       "name": "Новая волна",
       "cover": "novaya_volna.webp",
+      "cover_identity": "novaya_volna",
       "source": "radio_covers_russia/covers/99800_novaya_volna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7154,6 +7412,7 @@
     "novaya_zhizn": {
       "name": "Новая жизнь",
       "cover": "novaya_zhizn.webp",
+      "cover_identity": "novaya_zhizn",
       "source": "radio_covers_russia/covers/89100_novaya_zhizn.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7167,6 +7426,7 @@
     "novoe_radio": {
       "name": "Новое Радио",
       "cover": "novoe_radio.webp",
+      "cover_identity": "novoe_radio",
       "source": "media-runtime/src/main/assets/radio/covers/105600_novoe_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -7182,6 +7442,7 @@
     "novyy_mir": {
       "name": "Радио Новый мир",
       "cover": "novyy_mir.webp",
+      "cover_identity": "novyy_mir",
       "source": "radio_covers_russia/covers/103600_novyy_mir.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7195,6 +7456,7 @@
     "noyabrsk": {
       "name": "Радио Ноябрьск",
       "cover": "noyabrsk.webp",
+      "cover_identity": "noyabrsk",
       "source": "radio_covers_russia/covers/103000_noyabrsk.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7208,6 +7470,7 @@
     "nrj": {
       "name": "Радио ENERGY",
       "cover": "nrj.webp",
+      "cover_identity": "nrj",
       "source": "media-runtime/src/main/assets/radio/covers/099600_radio_energy.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -7215,7 +7478,8 @@
       "available_priorities": [
         100,
         60,
-        30
+        30,
+        5
       ],
       "source_sha256": "f203c2c448e91fdb4251fb62b2396884eddde9e3ae47ce796b684af4d896c6c0",
       "output_sha256": "f203c2c448e91fdb4251fb62b2396884eddde9e3ae47ce796b684af4d896c6c0"
@@ -7223,6 +7487,7 @@
     "nvk_fm": {
       "name": "НВК FM",
       "cover": "nvk_fm.webp",
+      "cover_identity": "nvk_fm",
       "source": "radio_covers_russia/covers/105300_nvk_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7236,6 +7501,7 @@
     "obraz": {
       "name": "Радио Образ",
       "cover": "obraz.webp",
+      "cover_identity": "obraz",
       "source": "radio_covers_russia/covers/98000_obraz.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7249,6 +7515,7 @@
     "okrug_fm": {
       "name": "Округ FM",
       "cover": "okrug_fm.webp",
+      "cover_identity": "okrug_fm",
       "source": "radio_covers_russia/covers/100900_okrug_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7262,6 +7529,7 @@
     "olimp": {
       "name": "Радио Олимп",
       "cover": "olimp.webp",
+      "cover_identity": "olimp",
       "source": "radio_covers_russia/covers/96200_olimp.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7275,6 +7543,7 @@
     "omega": {
       "name": "Радио Омега",
       "cover": "omega.webp",
+      "cover_identity": "omega",
       "source": "radio_covers_russia/covers/106900_omega.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7288,6 +7557,7 @@
     "ongusht": {
       "name": "Радио Онгушт",
       "cover": "ongusht.webp",
+      "cover_identity": "ongusht",
       "source": "radio_covers_russia/covers/88400_ongusht.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7301,6 +7571,7 @@
     "orfey": {
       "name": "Радио Орфей",
       "cover": "orfey.webp",
+      "cover_identity": "orfey",
       "source": "Радио/stations_moscow_v2.zip!/covers/99200_orfey.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -7316,6 +7587,7 @@
     "otlichnoe_radio": {
       "name": "Отличное радио",
       "cover": "otlichnoe_radio.webp",
+      "cover_identity": "otlichnoe_radio",
       "source": "radio_covers_russia/covers/105600_otlichnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7329,6 +7601,7 @@
     "parnas": {
       "name": "Радио Парнас",
       "cover": "parnas.webp",
+      "cover_identity": "parnas",
       "source": "radio_covers_russia/covers/101800_parnas.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7342,6 +7615,7 @@
     "perets_fm": {
       "name": "Перец FM",
       "cover": "perets_fm.webp",
+      "cover_identity": "perets_fm",
       "source": "radio_covers_russia/covers/101300_perets_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7355,6 +7629,7 @@
     "permyak": {
       "name": "Радио Пермяк",
       "cover": "permyak.webp",
+      "cover_identity": "permyak",
       "source": "radio_covers_russia/covers/97200_permyak.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7368,6 +7643,7 @@
     "pervoe_kungurskoe_radio": {
       "name": "Первое Кунгурское радио",
       "cover": "pervoe_kungurskoe_radio.webp",
+      "cover_identity": "pervoe_kungurskoe_radio",
       "source": "radio_covers_russia/covers/100300_pervoe_kungurskoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7381,6 +7657,7 @@
     "pervoe_radio": {
       "name": "Первое радио",
       "cover": "pervoe_radio.webp",
+      "cover_identity": "pervoe_radio",
       "source": "radio_covers_russia/covers/96100_pervoe_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7394,6 +7671,7 @@
     "pervoe_setevoe": {
       "name": "Первое Сетевое",
       "cover": "pervoe_setevoe.webp",
+      "cover_identity": "pervoe_setevoe",
       "source": "radio_covers_russia/covers/93200_pervoe_setevoe.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7407,6 +7685,7 @@
     "pervoe_sportivnoe_radio": {
       "name": "Первое Спортивное радио",
       "cover": "pervoe_sportivnoe_radio.webp",
+      "cover_identity": "pervoe_sportivnoe_radio",
       "source": "Радио/stations_moscow_v2.zip!/covers/94400_pervoe_sportivnoe.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -7422,6 +7701,7 @@
     "pesni_ot_vsey_dushi": {
       "name": "Песни от всей души",
       "cover": "pesni_ot_vsey_dushi.webp",
+      "cover_identity": "pesni_ot_vsey_dushi",
       "source": "radio_covers_russia/covers/106800_pesni_ot_vsey_dushi.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7435,6 +7715,7 @@
     "peterburg": {
       "name": "Радио Петербург",
       "cover": "peterburg.webp",
+      "cover_identity": "peterburg",
       "source": "radio_covers_russia/covers/69470_peterburg.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7448,6 +7729,7 @@
     "pi_fm": {
       "name": "Пи FM",
       "cover": "pi_fm.webp",
+      "cover_identity": "pi_fm",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/098100_pifm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -7463,6 +7745,7 @@
     "pilot": {
       "name": "Радио Пилот",
       "cover": "pilot.webp",
+      "cover_identity": "pilot",
       "source": "radio_covers_russia/covers/95000_pilot.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7476,6 +7759,7 @@
     "pilot_radio": {
       "name": "Пилот Радио",
       "cover": "pilot_radio.webp",
+      "cover_identity": "pilot_radio",
       "source": "radio_covers_russia/covers/97800_pilot_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7489,6 +7773,7 @@
     "pioner_fm": {
       "name": "Пионер FM",
       "cover": "pioner_fm.webp",
+      "cover_identity": "pioner_fm",
       "source": "radio_covers_russia/covers/98700_pioner_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7502,6 +7787,7 @@
     "piramida": {
       "name": "Радио Пирамида",
       "cover": "piramida.webp",
+      "cover_identity": "piramida",
       "source": "radio_covers_russia/covers/105000_piramida.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7515,6 +7801,7 @@
     "piter_fm": {
       "name": "Питер FM",
       "cover": "piter_fm.webp",
+      "cover_identity": "piter_fm",
       "source": "radio_covers_russia/covers/96700_piter_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7528,6 +7815,7 @@
     "planeta_fm": {
       "name": "Планета FM",
       "cover": "planeta_fm.webp",
+      "cover_identity": "planeta_fm",
       "source": "radio_covers_russia/covers/87900_planeta_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7541,6 +7829,7 @@
     "power_hit_radio": {
       "name": "Power Hit Radio",
       "cover": "power_hit_radio.webp",
+      "cover_identity": "power_hit_radio",
       "source": "radio_covers_russia/covers/104500_power_hit_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7554,6 +7843,7 @@
     "priboy": {
       "name": "Радио Прибой",
       "cover": "priboy.webp",
+      "cover_identity": "priboy",
       "source": "radio_covers_russia/covers/73100_priboy.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7567,6 +7857,7 @@
     "primorskaya_volna": {
       "name": "Приморская волна",
       "cover": "primorskaya_volna.webp",
+      "cover_identity": "primorskaya_volna",
       "source": "radio_covers_russia/covers/99300_primorskaya_volna.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7580,6 +7871,7 @@
     "provintsiya": {
       "name": "Радио Провинция",
       "cover": "provintsiya.webp",
+      "cover_identity": "provintsiya",
       "source": "radio_covers_russia/covers/100900_provintsiya.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7593,6 +7885,7 @@
     "puls_radio": {
       "name": "Пульс Радио",
       "cover": "puls_radio.webp",
+      "cover_identity": "puls_radio",
       "source": "radio_covers_russia/covers/103800_puls_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7606,6 +7899,7 @@
     "put_islama": {
       "name": "Путь ислама",
       "cover": "put_islama.webp",
+      "cover_identity": "put_islama",
       "source": "radio_covers_russia/covers/91000_put_islama.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7619,6 +7913,7 @@
     "radiogora": {
       "name": "Радиогора",
       "cover": "radiogora.webp",
+      "cover_identity": "radiogora",
       "source": "radio_covers_russia/covers/99500_radiogora.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7632,6 +7927,7 @@
     "radonezh": {
       "name": "Радио Радонеж",
       "cover": "radonezh.webp",
+      "cover_identity": "radonezh",
       "source": "Радио/stations_moscow_v2.zip!/covers/72920_radio_radonezh.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -7647,6 +7943,7 @@
     "randevu": {
       "name": "Радио Рандеву",
       "cover": "randevu.webp",
+      "cover_identity": "randevu",
       "source": "radio_covers_russia/covers/103400_randevu.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7660,6 +7957,7 @@
     "rassvet": {
       "name": "Радио Рассвет",
       "cover": "rassvet.webp",
+      "cover_identity": "rassvet",
       "source": "radio_covers_russia/covers/101400_rassvet.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7673,6 +7971,7 @@
     "rbk": {
       "name": "Радио РБК",
       "cover": "rbk.webp",
+      "cover_identity": "rbk",
       "source": "Радио/voronezh-radio.zip!/covers/101100_radio_rbk.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -7688,6 +7987,7 @@
     "real_fm": {
       "name": "Реал ФМ",
       "cover": "real_fm.webp",
+      "cover_identity": "real_fm",
       "source": "radio_covers_russia/covers/95700_real_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7701,6 +8001,7 @@
     "rebyachya_respublika": {
       "name": "Ребячья республика",
       "cover": "rebyachya_respublika.webp",
+      "cover_identity": "rebyachya_respublika",
       "source": "radio_covers_russia/covers/89200_rebyachya_respublika.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7714,6 +8015,7 @@
     "red_fm": {
       "name": "RED FM",
       "cover": "red_fm.webp",
+      "cover_identity": "red_fm",
       "source": "radio_covers_russia/covers/101300_red_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7727,6 +8029,7 @@
     "rekord": {
       "name": "Радио Record",
       "cover": "rekord.webp",
+      "cover_identity": "rekord",
       "source": "media-runtime/src/main/assets/radio/covers/097000_radio_record.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -7742,6 +8045,7 @@
     "relaks_fm": {
       "name": "Relax FM",
       "cover": "relaks_fm.webp",
+      "cover_identity": "relaks_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/90800_relax_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -7757,6 +8061,7 @@
     "remix_fm": {
       "name": "Remix FM",
       "cover": "remix_fm.webp",
+      "cover_identity": "remix_fm",
       "source": "radio_covers_russia/covers/104400_remix_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7770,6 +8075,7 @@
     "retro_fm": {
       "name": "Ретро FM",
       "cover": "retro_fm.webp",
+      "cover_identity": "retro_fm",
       "source": "media-runtime/src/main/assets/radio/covers/095600_retro_fm.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -7785,6 +8091,7 @@
     "rezh_radio": {
       "name": "Реж радио",
       "cover": "rezh_radio.webp",
+      "cover_identity": "rezh_radio",
       "source": "radio_covers_russia/covers/102800_rezh_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7798,6 +8105,7 @@
     "rfm": {
       "name": "RFM",
       "cover": "rfm.webp",
+      "cover_identity": "rfm",
       "source": "radio_covers_russia/covers/99400_rfm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7811,6 +8119,7 @@
     "rock_fm": {
       "name": "Rock FM",
       "cover": "rock_fm.webp",
+      "cover_identity": "rock_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/95200_rock_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -7826,6 +8135,7 @@
     "rodina_fm": {
       "name": "Родина FM",
       "cover": "rodina_fm.webp",
+      "cover_identity": "rodina_fm",
       "source": "radio_covers_russia/covers/95200_rodina_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7839,6 +8149,7 @@
     "rodniki": {
       "name": "Радио Родники",
       "cover": "rodniki.webp",
+      "cover_identity": "rodniki",
       "source": "radio_covers_russia/covers/91500_rodniki.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7852,6 +8163,7 @@
     "rodnoe_radio": {
       "name": "Родное радио",
       "cover": "rodnoe_radio.webp",
+      "cover_identity": "rodnoe_radio",
       "source": "media-runtime/src/main/assets/radio/covers/103300_rodnoe_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -7867,6 +8179,7 @@
     "rodnykh_dorog": {
       "name": "Радио Родных дорог",
       "cover": "rodnykh_dorog.webp",
+      "cover_identity": "rodnykh_dorog",
       "source": "Радио/kaliningrad_radio_covers.zip!/covers/89600_radio_rodnykh_dorog.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d289afca709ca4191fabab0a16b524dc5173bec0c7948bbfd9f8ca949cc4682a",
@@ -7882,6 +8195,7 @@
     "rok_arsenal": {
       "name": "Рок-Арсенал",
       "cover": "rok_arsenal.webp",
+      "cover_identity": "rok_arsenal",
       "source": "radio_covers_russia/covers/104500_rok_arsenal.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7895,6 +8209,7 @@
     "rok_n_roll_fm": {
       "name": "Рок-н-Ролл FM",
       "cover": "rok_n_roll_fm.webp",
+      "cover_identity": "rok_n_roll_fm",
       "source": "radio_covers_russia/covers/99400_rok_n_roll_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -7908,6 +8223,7 @@
     "roksana": {
       "name": "Радио Роксана",
       "cover": "roksana.webp",
+      "cover_identity": "roksana",
       "source": "radio_covers_russia/covers/98600_roksana.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7921,6 +8237,7 @@
     "romantika": {
       "name": "Радио Romantika",
       "cover": "romantika.webp",
+      "cover_identity": "romantika",
       "source": "Радио/stations_moscow_v2.zip!/covers/98800_romantika.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -7936,6 +8253,7 @@
     "rossii": {
       "name": "Радио России",
       "cover": "rossii.webp",
+      "cover_identity": "rossii",
       "source": "media-runtime/src/main/assets/radio/covers/094200_radio_rossii.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -7951,6 +8269,7 @@
     "royal_radio": {
       "name": "Royal Radio",
       "cover": "royal_radio.webp",
+      "cover_identity": "royal_radio",
       "source": "radio_covers_russia/covers/98600_royal_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -7964,6 +8283,7 @@
     "rus": {
       "name": "Радио Русь",
       "cover": "rus.webp",
+      "cover_identity": "rus",
       "source": "radio_covers_russia/covers/99500_rus.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7977,6 +8297,7 @@
     "russkaya_volna": {
       "name": "Русская волна",
       "cover": "russkaya_volna.webp",
+      "cover_identity": "russkaya_volna",
       "source": "radio_covers_russia/covers/95100_russkaya_volna.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -7990,6 +8311,7 @@
     "russkiy_khit": {
       "name": "Русский Хит",
       "cover": "russkiy_khit.webp",
+      "cover_identity": "russkiy_khit",
       "source": "Радио/voronezh-radio.zip!/covers/098100_russkiy_hit.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -8005,6 +8327,7 @@
     "russkoe_radio": {
       "name": "Русское Радио",
       "cover": "russkoe_radio.webp",
+      "cover_identity": "russkoe_radio",
       "source": "media-runtime/src/main/assets/radio/covers/104800_russkoe_radio.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -8020,6 +8343,7 @@
     "sakha": {
       "name": "Радио Саха",
       "cover": "sakha.webp",
+      "cover_identity": "sakha",
       "source": "radio_covers_russia/covers/107100_sakha.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8033,6 +8357,7 @@
     "samara_maksimum": {
       "name": "Самара-Максимум",
       "cover": "samara_maksimum.webp",
+      "cover_identity": "samara_maksimum",
       "source": "radio_covers_russia/covers/104300_samara_maksimum.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8046,6 +8371,7 @@
     "sedmoe_nebo": {
       "name": "Седьмое небо",
       "cover": "sedmoe_nebo.webp",
+      "cover_identity": "sedmoe_nebo",
       "source": "radio_covers_russia/covers/95800_sedmoe_nebo.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8059,6 +8385,7 @@
     "semerka": {
       "name": "Семёрка",
       "cover": "semerka.webp",
+      "cover_identity": "semerka",
       "source": "radio_covers_russia/covers/99400_semerka.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8072,6 +8399,7 @@
     "serebryanyy_dozhd": {
       "name": "Серебряный дождь",
       "cover": "serebryanyy_dozhd.webp",
+      "cover_identity": "serebryanyy_dozhd",
       "source": "media-runtime/src/main/assets/radio/covers/101400_silver_rain.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -8087,6 +8415,7 @@
     "sevastopol_fm": {
       "name": "Севастополь FM",
       "cover": "sevastopol_fm.webp",
+      "cover_identity": "sevastopol_fm",
       "source": "radio_covers_russia/covers/102000_sevastopol_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8100,6 +8429,7 @@
     "sever_fm": {
       "name": "Север FM",
       "cover": "sever_fm.webp",
+      "cover_identity": "sever_fm",
       "source": "radio_covers_russia/covers/87500_sever_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8113,6 +8443,7 @@
     "seybl": {
       "name": "Радио Сейбл",
       "cover": "seybl.webp",
+      "cover_identity": "seybl",
       "source": "radio_covers_russia/covers/89400_seybl.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8126,6 +8457,7 @@
     "shanson": {
       "name": "Радио Шансон",
       "cover": "shanson.webp",
+      "cover_identity": "shanson",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/105900_sanson.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -8141,6 +8473,7 @@
     "shkiper": {
       "name": "Радио Шкипер",
       "cover": "shkiper.webp",
+      "cover_identity": "shkiper",
       "source": "radio_covers_russia/covers/100000_shkiper.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8154,6 +8487,7 @@
     "shokolad": {
       "name": "Радио Шоколад",
       "cover": "shokolad.webp",
+      "cover_identity": "shokolad",
       "source": "Радио/stations_moscow_v2.zip!/covers/98000_radio_shokolad.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -8169,6 +8503,7 @@
     "shokolad_fm": {
       "name": "Шоколад FM",
       "cover": "shokolad_fm.webp",
+      "cover_identity": "shokolad_fm",
       "source": "radio_covers_russia/covers/103100_shokolad_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8182,6 +8517,7 @@
     "si": {
       "name": "Радио Си",
       "cover": "si.webp",
+      "cover_identity": "si",
       "source": "radio_covers_russia/covers/91200_si.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8195,6 +8531,7 @@
     "sibir": {
       "name": "Радио Сибирь",
       "cover": "sibir.webp",
+      "cover_identity": "sibir",
       "source": "radio_covers_russia/covers/99100_sibir.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8208,6 +8545,7 @@
     "sigma": {
       "name": "Радио Сигма",
       "cover": "sigma.webp",
+      "cover_identity": "sigma",
       "source": "radio_covers_russia/covers/105300_sigma.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8221,6 +8559,7 @@
     "siti": {
       "name": "Радио Сити",
       "cover": "siti.webp",
+      "cover_identity": "siti",
       "source": "radio_covers_russia/covers/99200_siti.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8234,6 +8573,7 @@
     "sk_fm": {
       "name": "SK FM",
       "cover": "sk_fm.webp",
+      "cover_identity": "sk_fm",
       "source": "radio_covers_russia/covers/100500_sk_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8247,6 +8587,7 @@
     "skay": {
       "name": "Радио Скай",
       "cover": "skay.webp",
+      "cover_identity": "skay",
       "source": "radio_covers_russia/covers/105500_skay.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8260,6 +8601,7 @@
     "skit": {
       "name": "Радио Скит",
       "cover": "skit.webp",
+      "cover_identity": "skit",
       "source": "radio_covers_russia/covers/107500_skit.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8273,6 +8615,7 @@
     "slog_fm": {
       "name": "Слог FM",
       "cover": "slog_fm.webp",
+      "cover_identity": "slog_fm",
       "source": "radio_covers_russia/covers/93500_slog_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8286,6 +8629,7 @@
     "smorodina": {
       "name": "Радио Смородина",
       "cover": "smorodina.webp",
+      "cover_identity": "smorodina",
       "source": "radio_covers_russia/covers/106800_smorodina.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8299,6 +8643,7 @@
     "sol_fm": {
       "name": "Соль FM",
       "cover": "sol_fm.webp",
+      "cover_identity": "sol_fm",
       "source": "radio_covers_russia/covers/99800_sol_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8312,6 +8657,7 @@
     "spetsialnoe_radio": {
       "name": "Специальное радио",
       "cover": "spetsialnoe_radio.webp",
+      "cover_identity": "spetsialnoe_radio",
       "source": "radio_covers_russia/covers/88700_spetsialnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8325,6 +8671,7 @@
     "sputnik": {
       "name": "Радио Sputnik",
       "cover": "sputnik.webp",
+      "cover_identity": "sputnik",
       "source": "Радио/voronezh-radio.zip!/covers/089800_radio_sputnik.webp",
       "source_tier": "city_archive",
       "archive_sha256": "df93c19f274fac71b7787eb4f65d4f544a5c06ebbbab29ca180d832a584efdeb",
@@ -8340,6 +8687,7 @@
     "sputnik_107_fm": {
       "name": "Спутник 107 FM",
       "cover": "sputnik_107_fm.webp",
+      "cover_identity": "sputnik_107_fm",
       "source": "radio_covers_russia/covers/107000_sputnik_107_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8353,6 +8701,7 @@
     "sputnik_fm": {
       "name": "Спутник FM",
       "cover": "sputnik_fm.webp",
+      "cover_identity": "sputnik_fm",
       "source": "radio_covers_russia/covers/98500_sputnik_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8366,6 +8715,7 @@
     "staroe_dobroe_radio": {
       "name": "Старое доброе радио",
       "cover": "staroe_dobroe_radio.webp",
+      "cover_identity": "staroe_dobroe_radio",
       "source": "radio_covers_russia/covers/105300_staroe_dobroe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8379,6 +8729,7 @@
     "start_fm": {
       "name": "Старт FM",
       "cover": "start_fm.webp",
+      "cover_identity": "start_fm",
       "source": "radio_covers_russia/covers/104500_start_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8392,6 +8743,7 @@
     "strana_gor": {
       "name": "Радио Страна гор",
       "cover": "strana_gor.webp",
+      "cover_identity": "strana_gor",
       "source": "radio_covers_russia/covers/99300_strana_gor.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8405,6 +8757,7 @@
     "strim_fm": {
       "name": "Стрим FM",
       "cover": "strim_fm.webp",
+      "cover_identity": "strim_fm",
       "source": "radio_covers_russia/covers/97100_strim_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8418,6 +8771,7 @@
     "studio_21": {
       "name": "Studio 21",
       "cover": "studio_21.webp",
+      "cover_identity": "studio_21",
       "source": "Радио/stations_moscow_v2.zip!/covers/93200_studio_21.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -8433,6 +8787,7 @@
     "stv_radio": {
       "name": "СТВ-Радио",
       "cover": "stv_radio.webp",
+      "cover_identity": "stv_radio",
       "source": "radio_covers_russia/covers/105700_stv_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8446,6 +8801,7 @@
     "suzun_fm": {
       "name": "Сузун FM",
       "cover": "suzun_fm.webp",
+      "cover_identity": "suzun_fm",
       "source": "radio_covers_russia/covers/101300_suzun_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8459,6 +8815,7 @@
     "svobodnaya_nakhodka": {
       "name": "Радио Свободная Находка",
       "cover": "svobodnaya_nakhodka.webp",
+      "cover_identity": "svobodnaya_nakhodka",
       "source": "radio_covers_russia/covers/104500_svobodnaya_nakhodka.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8472,6 +8829,7 @@
     "svoe_fm": {
       "name": "Своё FM",
       "cover": "svoe_fm.webp",
+      "cover_identity": "svoe_fm",
       "source": "radio_covers_russia/covers/97000_svoe_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8485,6 +8843,7 @@
     "taksi_fm": {
       "name": "Такси FM",
       "cover": "taksi_fm.webp",
+      "cover_identity": "taksi_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/96400_taxifm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -8500,6 +8859,7 @@
     "tartip": {
       "name": "Радио Тартип",
       "cover": "tartip.webp",
+      "cover_identity": "tartip",
       "source": "radio_covers_russia/covers/93100_tartip.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8513,6 +8873,7 @@
     "tatarskoe_radio": {
       "name": "Татарское радио",
       "cover": "tatarskoe_radio.webp",
+      "cover_identity": "tatarskoe_radio",
       "source": "radio_covers_russia/covers/99800_tatarskoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8526,6 +8887,7 @@
     "terra_fm": {
       "name": "Terra FM",
       "cover": "terra_fm.webp",
+      "cover_identity": "terra_fm",
       "source": "radio_covers_russia/covers/87500_terra_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8539,6 +8901,7 @@
     "tkr_fm": {
       "name": "ТКР FM",
       "cover": "tkr_fm.webp",
+      "cover_identity": "tkr_fm",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/093200_tkr_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -8554,6 +8917,7 @@
     "tm_26": {
       "name": "Радио ТМ-26",
       "cover": "tm_26.webp",
+      "cover_identity": "tm_26",
       "source": "radio_covers_russia/covers/107800_tm_26.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8567,6 +8931,7 @@
     "tnt_music_radio": {
       "name": "ТНТ Music Radio",
       "cover": "tnt_music_radio.webp",
+      "cover_identity": "tnt_music_radio",
       "source": "radio_covers_russia/covers/88200_tnt_music_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8580,6 +8945,7 @@
     "tochka": {
       "name": "Радио Точка",
       "cover": "tochka.webp",
+      "cover_identity": "tochka",
       "source": "radio_covers_russia/covers/99600_tochka.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8593,6 +8959,7 @@
     "tomskiy_blagovest": {
       "name": "Томский Благовест",
       "cover": "tomskiy_blagovest.webp",
+      "cover_identity": "tomskiy_blagovest",
       "source": "radio_covers_russia/covers/100900_tomskiy_blagovest.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8606,6 +8973,7 @@
     "top_radio": {
       "name": "Топ Радио",
       "cover": "top_radio.webp",
+      "cover_identity": "top_radio",
       "source": "radio_covers_russia/covers/97800_top_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8619,6 +8987,7 @@
     "transmit": {
       "name": "Радио Трансмит",
       "cover": "transmit.webp",
+      "cover_identity": "transmit",
       "source": "radio_covers_russia/covers/105500_transmit.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8632,6 +9001,7 @@
     "trend_fm": {
       "name": "Trend FM",
       "cover": "trend_fm.webp",
+      "cover_identity": "trend_fm",
       "source": "radio_covers_russia/covers/97300_trend_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8645,6 +9015,7 @@
     "tulun_fm": {
       "name": "Тулун FM",
       "cover": "tulun_fm.webp",
+      "cover_identity": "tulun_fm",
       "source": "radio_covers_russia/covers/103400_tulun_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8658,6 +9029,7 @@
     "tvoya_volna": {
       "name": "Радио Твоя волна",
       "cover": "tvoya_volna.webp",
+      "cover_identity": "tvoya_volna",
       "source": "radio_covers_russia/covers/91000_tvoya_volna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8671,6 +9043,7 @@
     "tvs": {
       "name": "Радио ТВС",
       "cover": "tvs.webp",
+      "cover_identity": "tvs",
       "source": "radio_covers_russia/covers/101900_tvs.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8684,6 +9057,7 @@
     "tăvan_radio": {
       "name": "Тăван радио",
       "cover": "tavan_radio.webp",
+      "cover_identity": "tăvan_radio",
       "source": "radio_covers_russia/covers/98700_tăvan_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8697,6 +9071,7 @@
     "u_fm": {
       "name": "У-ФМ",
       "cover": "u_fm.webp",
+      "cover_identity": "u_fm",
       "source": "radio_covers_russia/covers/107900_u_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8710,6 +9085,7 @@
     "udachnoe_radio": {
       "name": "Удачное радио",
       "cover": "udachnoe_radio.webp",
+      "cover_identity": "udachnoe_radio",
       "source": "radio_covers_russia/covers/104000_udachnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8723,6 +9099,7 @@
     "udaloe_radio": {
       "name": "Удалое радио",
       "cover": "udaloe_radio.webp",
+      "cover_identity": "udaloe_radio",
       "source": "radio_covers_russia/covers/106300_udaloe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8736,6 +9113,7 @@
     "uezdnoe_radio": {
       "name": "Уездное радио",
       "cover": "uezdnoe_radio.webp",
+      "cover_identity": "uezdnoe_radio",
       "source": "radio_covers_russia/covers/91200_uezdnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8749,6 +9127,7 @@
     "ufm": {
       "name": "UFM",
       "cover": "ufm.webp",
+      "cover_identity": "ufm",
       "source": "radio_covers_russia/covers/98400_ufm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8762,6 +9141,7 @@
     "ulyanovsk_fm": {
       "name": "Ульяновск FM",
       "cover": "ulyanovsk_fm.webp",
+      "cover_identity": "ulyanovsk_fm",
       "source": "radio_covers_russia/covers/104200_ulyanovsk_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8775,6 +9155,7 @@
     "umnoe_radio": {
       "name": "Умное радио",
       "cover": "umnoe_radio.webp",
+      "cover_identity": "umnoe_radio",
       "source": "radio_covers_russia/covers/107000_umnoe_radio.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8788,6 +9169,7 @@
     "uryupinsk_fm": {
       "name": "Урюпинск FM",
       "cover": "uryupinsk_fm.webp",
+      "cover_identity": "uryupinsk_fm",
       "source": "radio_covers_russia/covers/107800_uryupinsk_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8801,6 +9183,7 @@
     "usole_fm": {
       "name": "Усолье FM",
       "cover": "usole_fm.webp",
+      "cover_identity": "usole_fm",
       "source": "radio_covers_russia/covers/105300_usole_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8814,6 +9197,7 @@
     "valday_fm": {
       "name": "Валдай FM",
       "cover": "valday_fm.webp",
+      "cover_identity": "valday_fm",
       "source": "radio_covers_russia/covers/100100_valday_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8827,6 +9211,7 @@
     "vanya": {
       "name": "Радио Ваня",
       "cover": "vanya.webp",
+      "cover_identity": "vanya",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/105400_vanja.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -8842,6 +9227,7 @@
     "vatan": {
       "name": "Радио Ватан",
       "cover": "vatan.webp",
+      "cover_identity": "vatan",
       "source": "radio_covers_russia/covers/107900_vatan.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8855,6 +9241,7 @@
     "vatan_sedasy": {
       "name": "Ватан седасы",
       "cover": "vatan_sedasy.webp",
+      "cover_identity": "vatan_sedasy",
       "source": "radio_covers_russia/covers/99500_vatan_sedasy.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8868,6 +9255,7 @@
     "vera": {
       "name": "Радио Вера",
       "cover": "vera.webp",
+      "cover_identity": "vera",
       "source": "media-runtime/src/main/assets/radio/covers/094700_radio_vera.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -8883,6 +9271,7 @@
     "vesna": {
       "name": "Радио Весна",
       "cover": "vesna.webp",
+      "cover_identity": "vesna",
       "source": "Радио/AtlasMediaWidget_smolensk-radio.zip!/covers/radio_vesna.webp",
       "source_tier": "city_archive",
       "archive_sha256": "aac51ef340cf5a85822079823010083168a5b340368ad3f16a2dcf2b22270860",
@@ -8898,6 +9287,7 @@
     "vesti_fm": {
       "name": "Вести FM",
       "cover": "vesti_fm.webp",
+      "cover_identity": "vesti_fm",
       "source": "media-runtime/src/main/assets/radio/covers/096000_vesti_fm.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -8913,6 +9303,7 @@
     "viktoriya": {
       "name": "Радио Виктория",
       "cover": "viktoriya.webp",
+      "cover_identity": "viktoriya",
       "source": "radio_covers_russia/covers/103100_viktoriya.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8926,6 +9317,7 @@
     "viktoriya_sakha": {
       "name": "Виктория-Саха",
       "cover": "viktoriya_sakha.webp",
+      "cover_identity": "viktoriya_sakha",
       "source": "radio_covers_russia/covers/104500_viktoriya_sakha.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8939,6 +9331,7 @@
     "vilgan": {
       "name": "Радио Вилган",
       "cover": "vilgan.webp",
+      "cover_identity": "vilgan",
       "source": "radio_covers_russia/covers/101600_vilgan.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -8952,6 +9345,7 @@
     "vizavi_fm": {
       "name": "Визави FM",
       "cover": "vizavi_fm.webp",
+      "cover_identity": "vizavi_fm",
       "source": "radio_covers_russia/covers/102200_vizavi_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8965,6 +9359,7 @@
     "vladivostok_fm": {
       "name": "Владивосток FM",
       "cover": "vladivostok_fm.webp",
+      "cover_identity": "vladivostok_fm",
       "source": "radio_covers_russia/covers/90000_vladivostok_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -8978,6 +9373,7 @@
     "volgograd_24": {
       "name": "Волгоград 24",
       "cover": "volgograd_24.webp",
+      "cover_identity": "volgograd_24",
       "source": "radio_covers_russia/covers/93400_volgograd_24.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -8991,6 +9387,7 @@
     "volgograd_fm": {
       "name": "Волгоград FM",
       "cover": "volgograd_fm.webp",
+      "cover_identity": "volgograd_fm",
       "source": "radio_covers_russia/covers/102000_volgograd_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9004,6 +9401,7 @@
     "volkhov_fm": {
       "name": "Волхов FM",
       "cover": "volkhov_fm.webp",
+      "cover_identity": "volkhov_fm",
       "source": "radio_covers_russia/covers/99300_volkhov_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -9017,6 +9415,7 @@
     "volna": {
       "name": "Радио Волна",
       "cover": "volna.webp",
+      "cover_identity": "volna",
       "source": "radio_covers_russia/covers/102600_volna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9030,6 +9429,7 @@
     "volna_fm": {
       "name": "Волна FM",
       "cover": "volna_fm.webp",
+      "cover_identity": "volna_fm",
       "source": "radio_covers_russia/covers/99100_volna_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9043,6 +9443,7 @@
     "volny_baykala": {
       "name": "Волны Байкала",
       "cover": "volny_baykala.webp",
+      "cover_identity": "volny_baykala",
       "source": "radio_covers_russia/covers/103300_volny_baykala.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9056,6 +9457,7 @@
     "voltazh_fm": {
       "name": "Вольтаж FM",
       "cover": "voltazh_fm.webp",
+      "cover_identity": "voltazh_fm",
       "source": "Радио/kaliningrad_radio_covers.zip!/covers/101100_voltazh_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d289afca709ca4191fabab0a16b524dc5173bec0c7948bbfd9f8ca949cc4682a",
@@ -9071,6 +9473,7 @@
     "vostok_fm": {
       "name": "Восток FM",
       "cover": "vostok_fm.webp",
+      "cover_identity": "vostok_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/94000_vostok_fm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -9086,6 +9489,7 @@
     "vostok_rossii": {
       "name": "Восток России",
       "cover": "vostok_rossii.webp",
+      "cover_identity": "vostok_rossii",
       "source": "radio_covers_russia/covers/88900_vostok_rossii.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9099,6 +9503,7 @@
     "voyazh": {
       "name": "Радио Вояж",
       "cover": "voyazh.webp",
+      "cover_identity": "voyazh",
       "source": "radio_covers_russia/covers/100000_voyazh.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -9112,6 +9517,7 @@
     "vtoraya_volna": {
       "name": "Вторая волна",
       "cover": "vtoraya_volna.webp",
+      "cover_identity": "vtoraya_volna",
       "source": "radio_covers_russia/covers/102300_vtoraya_volna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9125,6 +9531,7 @@
     "yalta_fm": {
       "name": "Ялта FM",
       "cover": "yalta_fm.webp",
+      "cover_identity": "yalta_fm",
       "source": "radio_covers_russia/covers/95600_yalta_fm.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9138,6 +9545,7 @@
     "yamal_1": {
       "name": "Ямал 1",
       "cover": "yamal_1.webp",
+      "cover_identity": "yamal_1",
       "source": "radio_covers_russia/covers/87900_yamal_1.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9151,6 +9559,7 @@
     "yugra": {
       "name": "Радио Югра",
       "cover": "yugra.webp",
+      "cover_identity": "yugra",
       "source": "radio_covers_russia/covers/107400_yugra.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9164,6 +9573,7 @@
     "yuldash": {
       "name": "Радио Юлдаш",
       "cover": "yuldash.webp",
+      "cover_identity": "yuldash",
       "source": "radio_covers_russia/covers/98900_yuldash.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9177,6 +9587,7 @@
     "yumor_fm": {
       "name": "Юмор FM",
       "cover": "yumor_fm.webp",
+      "cover_identity": "yumor_fm",
       "source": "media-runtime/src/main/assets/radio/covers/106700_yumor_fm.webp",
       "source_tier": "penza",
       "source_kind": "penza:built-in",
@@ -9192,6 +9603,7 @@
     "yuniton": {
       "name": "Радио Юнитон",
       "cover": "yuniton.webp",
+      "cover_identity": "yuniton",
       "source": "radio_covers_russia/covers/100700_yuniton.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9205,6 +9617,7 @@
     "yuzhnaya_volna": {
       "name": "Южная волна",
       "cover": "yuzhnaya_volna.webp",
+      "cover_identity": "yuzhnaya_volna",
       "source": "radio_covers_russia/covers/95900_yuzhnaya_volna.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9218,6 +9631,7 @@
     "z_fm": {
       "name": "Z-FM",
       "cover": "z_fm.webp",
+      "cover_identity": "z_fm",
       "source": "radio_covers_russia/covers/99200_z_fm.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -9231,6 +9645,7 @@
     "za_oblakami": {
       "name": "Радио За облаками",
       "cover": "za_oblakami.webp",
+      "cover_identity": "za_oblakami",
       "source": "radio_covers_russia/covers/105800_za_oblakami.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9244,6 +9659,7 @@
     "zelenyy_gorod": {
       "name": "Зелёный город",
       "cover": "zelenyy_gorod.webp",
+      "cover_identity": "zelenyy_gorod",
       "source": "radio_covers_russia/covers/107000_zelenyy_gorod.webp",
       "source_tier": "national",
       "source_kind": "radio-online",
@@ -9257,6 +9673,7 @@
     "zenit": {
       "name": "Радио Зенит",
       "cover": "zenit.webp",
+      "cover_identity": "zenit",
       "source": "radio_covers_russia/covers/89700_zenit.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9270,6 +9687,7 @@
     "zeya": {
       "name": "Радио Зея",
       "cover": "zeya.webp",
+      "cover_identity": "zeya",
       "source": "radio_covers_russia/covers/72410_zeya.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -9283,6 +9701,7 @@
     "zhara_fm": {
       "name": "Жара FM",
       "cover": "zhara_fm.webp",
+      "cover_identity": "zhara_fm",
       "source": "Радио/stations_moscow_v2.zip!/covers/100500_zharafm.webp",
       "source_tier": "city_archive",
       "archive_sha256": "89bd4fee43fc167a6f73a7f91bd9fc987bbdd8a37f1947cdfc4c6387f8ec2894",
@@ -9298,6 +9717,7 @@
     "zhelezo_fm": {
       "name": "Железо ФМ",
       "cover": "zhelezo_fm.webp",
+      "cover_identity": "zhelezo_fm",
       "source": "radio_covers_russia/covers/99000_zhelezo_fm.webp",
       "source_tier": "national",
       "source_kind": "fmplay",
@@ -9311,6 +9731,7 @@
     "zhirnovsk": {
       "name": "Радио Жирновск",
       "cover": "zhirnovsk.webp",
+      "cover_identity": "zhirnovsk",
       "source": "radio_covers_russia/covers/105900_zhirnovsk.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -9324,6 +9745,7 @@
     "zvezda": {
       "name": "Радио Звезда",
       "cover": "zvezda.webp",
+      "cover_identity": "zvezda",
       "source": "Радио/stations_ryazan1.zip!/stations_ryazan/covers/095700_zvezda.webp",
       "source_tier": "city_archive",
       "archive_sha256": "d4164c099fec7c5bf1c56eacd5b22b513dd7f5a9edd7fd124994990e4178e8c6",
@@ -9339,6 +9761,7 @@
     "zvuk": {
       "name": "Радио Звук",
       "cover": "zvuk.webp",
+      "cover_identity": "zvuk",
       "source": "radio_covers_russia/covers/103900_zvuk.webp",
       "source_tier": "national",
       "source_kind": "generated",
@@ -9354,26 +9777,18 @@
     {
       "filename": "atlas-radio-all.zip",
       "status": "PASS",
-      "catalogs": 3180,
-      "station_rows": 12010,
-      "covers": 486,
-      "changed_station_artwork_rows": 11849,
-      "unchanged_station_data": true,
-      "all_25_penza_covers_byte_exact": true,
-      "source_priorities_checked": true,
-      "sha256": "fa3eba9912101a1d1bc493d978b96049edba223fd24704a5ca5f99e1ab436412"
+      "sha256": "2f02e985adf0f7c187342e35ddb680001a9cb86795b72fb4b789dadc9bacc02f",
+      "checked_rows": 12001,
+      "all_rows_highest_source_priority": true,
+      "same_station_one_cover": true
     },
     {
       "filename": "atlas-radio-6plus.zip",
       "status": "PASS",
-      "catalogs": 462,
-      "station_rows": 6686,
-      "covers": 401,
-      "changed_station_artwork_rows": 6565,
-      "unchanged_station_data": true,
-      "all_25_penza_covers_byte_exact": true,
-      "source_priorities_checked": true,
-      "sha256": "6605eabb5e9258c36f9ad8fb8fe447fb14eda106223ff7eebfb0b2324908b6bd"
+      "sha256": "530014604af824292f990208d073c8bee3a92547f514996475d739ba1e8dc5ab",
+      "checked_rows": 6685,
+      "all_rows_highest_source_priority": true,
+      "same_station_one_cover": true
     }
   ],
   "whole_pack_import_verification": {
@@ -9381,7 +9796,7 @@
     "packs": [
       {
         "archive": "atlas-radio-all.zip",
-        "sha256": "fa3eba9912101a1d1bc493d978b96049edba223fd24704a5ca5f99e1ab436412",
+        "sha256": "2f02e985adf0f7c187342e35ddb680001a9cb86795b72fb4b789dadc9bacc02f",
         "cities": 3180,
         "station_rows": 12010,
         "whole_pack_import": "PASS",
@@ -9390,7 +9805,7 @@
       },
       {
         "archive": "six-plus/atlas-radio-6plus.zip",
-        "sha256": "6605eabb5e9258c36f9ad8fb8fe447fb14eda106223ff7eebfb0b2324908b6bd",
+        "sha256": "530014604af824292f990208d073c8bee3a92547f514996475d739ba1e8dc5ab",
         "cities": 462,
         "station_rows": 6686,
         "whole_pack_import": "PASS",
@@ -9401,5 +9816,62 @@
     "checked_station_rows": 18696,
     "checked_cover_reads": 18686,
     "full_to_filtered_update_keeps_minsk": true
-  }
+  },
+  "station_identity_audit": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "2f02e985adf0f7c187342e35ddb680001a9cb86795b72fb4b789dadc9bacc02f",
+      "checked_rows": 12001,
+      "uncertain_rows_without_cover": 9,
+      "expected_tier_rows": {
+        "3": 7922,
+        "2": 1714,
+        "1": 2365
+      },
+      "wrong_priority": {},
+      "same_station_multiple_covers": {},
+      "unmatched_names": []
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "530014604af824292f990208d073c8bee3a92547f514996475d739ba1e8dc5ab",
+      "checked_rows": 6685,
+      "uncertain_rows_without_cover": 1,
+      "expected_tier_rows": {
+        "3": 4338,
+        "2": 1442,
+        "1": 905
+      },
+      "wrong_priority": {},
+      "same_station_multiple_covers": {},
+      "unmatched_names": []
+    }
+  ],
+  "identity_audit_fixes": [
+    {
+      "station": "Новое Радио",
+      "city": "Минск",
+      "rule": "Penza cover"
+    },
+    {
+      "station": "Русское Радио",
+      "city": "Минск",
+      "rule": "Penza cover"
+    },
+    {
+      "station": "Радио Энерджи / NRJ",
+      "city": "Лесосибирск",
+      "rule": "Penza cover"
+    },
+    {
+      "station": "Радио Для Двоих",
+      "city": "Серпухов",
+      "rule": "Shared city archive cover"
+    },
+    {
+      "station": "Радио Шансон",
+      "city": "All cities including Minsk",
+      "rule": "One shared best city archive cover"
+    }
+  ]
 }

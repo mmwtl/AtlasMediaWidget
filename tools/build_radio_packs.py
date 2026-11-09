@@ -186,7 +186,7 @@ for folder, place in CURATED.items():
         frequency = int(x['frequency_khz'])
         station = alias.get(name_key(x['name']))
         if place == ('Беларусь','Минск'):
-            # Distinct Belarusian brands do not inherit similarly named Russian logos.
+            # Preserve original catalog identities; artwork is shared by name aliases below.
             if station is None or x['name'] in ('Energy FM','Радио Ретро','Новое Радио','Русское Радио','Радио Шансон'):
                 station = 'by_' + ascii_slug(x['name']).replace('-','_')
                 display[station] = x['name']
@@ -243,6 +243,12 @@ def region_name(region):
     return SPECIAL_REGIONS.get(region, region + (' край' if region in KRAIS else ' область'))
 
 used_stations = set(s for stations in catalogs.values() for s in stations.values())
+# Source IDs and country prefixes must not split the same station's artwork pool.
+# For example, NRJ/Радио Энерджи and both spellings of Радио Для Двоих share a pool.
+cover_identity = {station: alias.get(name_key(display[station]), station) for station in assets}
+shared_assets = defaultdict(list)
+for station, candidates in assets.items():
+    shared_assets[cover_identity[station]].extend(candidates)
 cover_for = {}
 cover_bytes = {}
 provenance = {}
@@ -252,7 +258,7 @@ for station in sorted(used_stations):
         cover_for[station] = ''
         continue
     # Source priority wins; within one tier prefer native dimensions, then detail/file size.
-    candidates = {p:(rank,source) for rank,p,source in assets[station]}
+    candidates = {p:(rank,source) for rank,p,source in shared_assets[cover_identity[station]]}
     def rank_asset(path):
         with Image.open(path) as im:
             return candidates[path][0], min(im.size), im.width * im.height, path.stat().st_size, str(path)
@@ -280,7 +286,7 @@ for station in sorted(used_stations):
     sha = digest(data)
     name = hash_to_name.get(sha)
     if not name:
-        name = ascii_slug(station).replace('-','_') + '.webp'
+        name = ascii_slug(cover_identity[station]).replace('-','_') + '.webp'
         assert name not in cover_bytes, name
         hash_to_name[sha] = name
         cover_bytes[name] = data
@@ -288,7 +294,8 @@ for station in sorted(used_stations):
     origin = origins[chosen] if chosen in origins else {
         'source': str(chosen.relative_to(ROOT)), 'source_tier': 'national',
     }
-    provenance[station] = {'name':display[station], 'cover':name, **origin,
+    provenance[station] = {'name':display[station], 'cover':name,
+                           'cover_identity':cover_identity[station], **origin,
                            'source_kind':candidates[chosen][1],
                            'chosen_priority':candidates[chosen][0],
                            'available_priorities':sorted({rank for rank, source in candidates.values()}, reverse=True),
@@ -329,6 +336,8 @@ stats = {'catalogs':len(catalogs),'regions':len({r for r,c in catalogs}),
          'uncertain_rows':len(uncertain),'text_placeholder_brands':sum(p['source_kind']=='generated' for p in provenance.values()),
          'radio_logo_brands':sum(p['source_kind']=='Radio:visual_identification' for p in provenance.values()),
          'cover_source_tiers':dict(Counter(p['source_tier'] for p in provenance.values())),
+         'unique_cover_source_tiers':{tier:len({p['cover'] for p in provenance.values() if p['source_tier']==tier})
+                                      for tier in ('penza','city_archive','national')},
          'curated_rows_not_merged':len(excluded_curated),
          'source_national_rows':len(rows),'source_city_region_pairs':len({(x['region'],x['city']) for x in rows}),
          'catalogs_with_only_oirt':sum(all(f<87500 for f in stations) for stations in catalogs.values())}
@@ -373,6 +382,8 @@ selected_stats = {
     'uncertain_rows': sum(not row['cover'] for row in selected_rows),
     'text_placeholder_brands': sum(p['source_kind']=='generated' for p in selected_provenance.values()),
     'cover_source_tiers': dict(Counter(p['source_tier'] for p in selected_provenance.values())),
+    'unique_cover_source_tiers': {tier:len({p['cover'] for p in selected_provenance.values() if p['source_tier']==tier})
+                                  for tier in ('penza','city_archive','national')},
     'pack_id': selected_manifest['id'], 'sha256': digest(selected_archive.read_bytes()),
     'source_sha256': stats['sha256'],
 }
