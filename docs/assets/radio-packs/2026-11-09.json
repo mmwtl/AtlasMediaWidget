@@ -26,7 +26,8 @@
     "curated_rows_not_merged": 15,
     "source_national_rows": 11984,
     "source_city_region_pairs": 3183,
-    "catalogs_with_only_oirt": 440
+    "catalogs_with_only_oirt": 440,
+    "repository_path": "docs/assets/radio-packs/atlas-radio-all.zip"
   },
   "selected_pack": {
     "filename": "atlas-radio-6plus.zip",
@@ -47,7 +48,8 @@
     "pack_id": "atlas-radio-all",
     "sha256": "bf3cb2644b2ba1584df342fbba7a3644a376a3f8d7148e204ce09aea7591258d",
     "source_sha256": "3f3d316fe1a7a8d5c040f5607f69e3ccc23abe0ff9e7e28f89345560635b834f",
-    "verification": "CRC, exact CSV/cover subset, schema, frequencies, image decoding, no unused covers"
+    "verification": "CRC, exact CSV/cover subset, schema, frequencies, image decoding, no unused covers",
+    "repository_path": "docs/assets/radio-packs/atlas-radio-6plus.zip"
   },
   "full_pack_distribution": [
     {
@@ -3843,7 +3845,7 @@
     "whole_pack_new_importer_tested": false,
     "physical_head_unit_tested": false,
     "every_transmitter_current_broadcast_verified": false,
-    "zip_binaries_in_this_repository_snapshot": false
+    "zip_binaries_in_this_repository_snapshot": true
   },
   "selected_cover_provenance": {
     "1": {
