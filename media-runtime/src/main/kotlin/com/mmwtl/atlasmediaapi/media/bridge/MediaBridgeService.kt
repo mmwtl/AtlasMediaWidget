@@ -628,7 +628,7 @@ class MediaBridgeService : Service() {
         val catalogName = data.getString(MediaBridgeContract.Key.CATALOG_NAME)
         try {
             val imported = android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { input ->
-                coordinator.radioCatalogRepository.importCatalogZip(
+                coordinator.radioCatalogRepository.importZip(
                     inputStream = input,
                     name = catalogName,
                     replaceId = replaceId,
@@ -644,8 +644,11 @@ class MediaBridgeService : Service() {
                     putInt(MediaBridgeContract.Key.STATUS, MediaBridgeContract.Status.OK)
                     putString(MediaBridgeContract.Key.MESSAGE, "Radio catalog imported")
                     putInt(MediaBridgeContract.Key.CATALOG_STATION_COUNT, count)
-                    putString(MediaBridgeContract.Key.CATALOG_ID, imported.id)
-                    putString(MediaBridgeContract.Key.CATALOG_NAME, imported.name)
+                    putString(MediaBridgeContract.Key.CATALOG_ID, imported.catalogs.first().id)
+                    putString(MediaBridgeContract.Key.CATALOG_NAME, imported.catalogs.first().name)
+                    putString(MediaBridgeContract.Key.CATALOG_PACK_ID, imported.packId)
+                    putString(MediaBridgeContract.Key.CATALOG_PACK_NAME, imported.packName)
+                    putInt(MediaBridgeContract.Key.CATALOG_COUNT, imported.catalogs.size)
                     putLong(MediaBridgeContract.Key.SETTINGS_REVISION, snapshot.revision)
                 },
             )

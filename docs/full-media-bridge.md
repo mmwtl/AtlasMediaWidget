@@ -71,8 +71,8 @@ Binding is established via explicit Intent (`bindService`):
 | `12` | `ABORT_MEDIA_IMPORT` | Удалить подготовленный импорт / Discard staged import | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
 | `13` | `RESTORE_DEFAULT_CATALOG` | Сделать активным встроенный каталог (импортированные сохраняются) / Activate the builtin catalog, keeping imported ones | `protocolVersion`, `requestId`, `replyTo` |
 | `14` | `EXPORT_RADIO_CATALOG` | Экспорт каталога / Export a radio catalog | `protocolVersion`, `fileDescriptor` (write PFD), optional `catalogId` (по умолчанию активный / active by default), `requestId`, `replyTo` |
-| `15` | `IMPORT_RADIO_CATALOG` | Добавить каталог или заменить существующий / Add a catalog or replace one | `protocolVersion`, `fileDescriptor` (read PFD), optional `catalogName`, optional `catalogId` (заменяемый / to replace), `requestId`, `replyTo` |
-| `16` | `MANAGE_RADIO_CATALOG` | Включить, переименовать или удалить каталог / Activate, rename or delete a catalog | `protocolVersion`, `catalogAction` (`ACTIVATE`/`RENAME`/`DELETE`), `catalogId`, `catalogName` для / for `RENAME`, `requestId`, `replyTo` |
+| `15` | `IMPORT_RADIO_CATALOG` | Добавить каталог или набор, заменить каталог / Add a catalog or pack, replace a catalog | `protocolVersion`, `fileDescriptor` (read PFD), optional `catalogName`, optional `catalogId` (заменяемый / to replace), `requestId`, `replyTo` |
+| `16` | `MANAGE_RADIO_CATALOG` | Включить, переименовать или удалить каталог / Activate, rename or delete a catalog | `protocolVersion`, `catalogAction` (`ACTIVATE`/`RENAME`/`DELETE`/`DELETE_PACK`), `catalogId`, `catalogName` для / for `RENAME`, `requestId`, `replyTo` |
 
 ### Сервис → Клиент (Service → Client)
 
@@ -92,7 +92,7 @@ Binding is established via explicit Intent (`bindService`):
 | `111` | `MEDIA_IMPORT_ABORTED` | Отмена обработана / Abort handled | `protocolVersion`, `status`, `requestId`, `operationId` |
 | `112` | `DEFAULT_CATALOG_RESTORED` | Встроенный каталог восстановлен / Builtin catalog restored | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
 | `114` | `RADIO_CATALOG_EXPORTED` | Радио ZIP записан / Radio ZIP written | `protocolVersion`, `status`, `requestId`, `catalogStationCount` |
-| `115` | `RADIO_CATALOG_IMPORTED` | Каталог добавлен или заменён / Catalog added or replaced | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `catalogId`, `catalogName`, `settingsRevision` |
+| `115` | `RADIO_CATALOG_IMPORTED` | Каталог или набор загружен / Catalog or pack loaded | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `catalogId`, `catalogName`, `catalogPackId`, `catalogPackName`, `catalogCount`, `settingsRevision` |
 | `116` | `RADIO_CATALOG_MANAGED` | Каталог включён, переименован или удалён / Catalog activated, renamed or deleted | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
 
 ---
@@ -219,12 +219,19 @@ read-PFD при импорте. Сервис обрабатывает поток
 - `GET_IMPORT_STATUS`: `IDLE`, `PREPARED`, `COMMITTING`, `COMMITTED`, `FAILED`.
   `COMMITTING` повторно завершает сохранённую операцию. Abort не откатывает начатый
   commit. Widget хранит отдельный журнал для согласования своей части импорта.
-- `IMPORT_RADIO_CATALOG` валидирует архив целиком до изменений. Без `catalogId` он
-  добавляет новый активный каталог (не больше 8), с `catalogId` заменяет станции и
-  обложки этого каталога, сохраняя название и положение; станции не объединяются.
-  Настройки сохраняются. Снимок настроек перечисляет каталоги полями `catalogActiveId`,
-  `catalogIds`, `catalogNames` и `catalogStationCounts` (параллельные массивы, первым
-  идёт встроенный `builtin`).
+- `IMPORT_RADIO_CATALOG` валидирует архив целиком до изменений. Архив с `pack.json`
+  загружается как набор (docs/radio-catalog.md, раздел 3a): один каталог на город,
+  набор с тем же `id` обновляется, активный каталог не меняется, если не был городом
+  этого набора; `catalogId` для набора недопустим. Отдельный архив без `catalogId`
+  добавляет новый активный каталог, с `catalogId` заменяет станции и обложки этого
+  каталога, сохраняя название и положение; станции не объединяются. Всего не больше
+  64 каталогов, считая города наборов. Настройки сохраняются. Ответ ждётся до 60 с.
+- Снимок настроек перечисляет каталоги параллельными массивами `catalogIds`,
+  `catalogNames`, `catalogStationCounts`, `catalogPackIds`, `catalogPackNames` и
+  `catalogRegions` (первым идёт встроенный `builtin`; у отдельных каталогов поля
+  набора пустые) и полем `catalogActiveId`. `EXPORT_RADIO_CATALOG` для города набора
+  экспортирует весь набор. `RENAME`, `DELETE` и замена не применяются к городам
+  набора; набор удаляется действием `DELETE_PACK`.
 
 Успешный update подтверждается после синхронного сохранения параметров и ревизии.
 Несколько SharedPreferences не являются общей дисковой транзакцией. Журнал импорта

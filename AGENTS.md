@@ -124,8 +124,10 @@ migration request.
   app process and media/runtime settings in `:media` behind the Media Bridge settings operations.
 - Keep settings export/import and radio-catalog export/import separate. Preserve legacy JSON
   settings compatibility and the crash-recovery journal.
-- Radio catalogs: the built-in one plus up to 8 imported ZIP catalogs, exactly one active
-  (`RadioCatalogRepository`, see docs/radio-catalog.md). Covers are stored once by content hash in
+- Radio catalogs: the built-in one plus up to 64 imported catalogs, exactly one active
+  (`RadioCatalogRepository`, see docs/radio-catalog.md). A pack ZIP (`pack.json`) adds one catalog
+  per city and is loaded, updated (by pack `id`, keeping the active city by `key`) and deleted as a
+  whole; single ZIP catalogs stay supported. Covers are stored once by content hash in
   `radio_covers`; `radio_catalogs/index.json` is the commit point and unreferenced files are
   removed at startup. Switching catalogs must re-resolve the current station's title and artwork.
 - Export and import work as in GInputBridge, because OneOS has no `ACTION_CREATE_DOCUMENT` and

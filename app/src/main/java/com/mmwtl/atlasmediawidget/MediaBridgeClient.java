@@ -47,7 +47,8 @@ final class MediaBridgeClient {
     }
 
     interface RadioCatalogImportCallback {
-        void onCatalogImported(int stationCount);
+        /** [packId] is empty for a single catalog; [catalogCount] counts the imported cities. */
+        void onCatalogImported(int stationCount, String packId, String packName, int catalogCount);
         void onError(int status, String message);
     }
 
@@ -106,6 +107,8 @@ final class MediaBridgeClient {
     private final java.util.Map<String, Object> pendingCallbacks = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, Runnable> pendingTimeouts = new java.util.concurrent.ConcurrentHashMap<>();
     private static final long REQUEST_TIMEOUT_MS = 15_000L;
+    /** A radio pack import validates and hashes every city and cover before it replies. */
+    static final long RADIO_IMPORT_TIMEOUT_MS = 60_000L;
     private volatile boolean settingsSupported;
     private String settingsUnsupportedMessage;
     private Handler ipc;
@@ -592,7 +595,11 @@ final class MediaBridgeClient {
                         if (status == MediaBridgeContract.STATUS_OK) {
                             int stationCount = data.getInt(
                                     MediaBridgeContract.K_CATALOG_STATION_COUNT, 0);
-                            main.post(() -> rcb.onCatalogImported(stationCount));
+                            String packId = data.getString(MediaBridgeContract.K_CATALOG_PACK_ID, "");
+                            String packName = data.getString(MediaBridgeContract.K_CATALOG_PACK_NAME, "");
+                            int catalogCount = data.getInt(MediaBridgeContract.K_CATALOG_COUNT, 1);
+                            main.post(() -> rcb.onCatalogImported(stationCount, packId, packName,
+                                    catalogCount));
                         } else {
                             dispatchError(rcb, status,
                                     data.getString(MediaBridgeContract.K_MESSAGE, ""));
@@ -808,7 +815,7 @@ final class MediaBridgeClient {
     void importRadioCatalog(android.os.ParcelFileDescriptor pfd, String name,
             String replaceCatalogId, RadioCatalogImportCallback callback) {
         String reqId = requestId("import-radio-catalog");
-        if (callback != null) addPendingCallback(reqId, callback);
+        if (callback != null) addPendingCallback(reqId, callback, RADIO_IMPORT_TIMEOUT_MS);
         Bundle extra = new Bundle();
         extra.putParcelable(MediaBridgeContract.K_FILE_DESCRIPTOR, pfd);
         if (name != null) extra.putString(MediaBridgeContract.K_CATALOG_NAME, name);
@@ -875,6 +882,10 @@ final class MediaBridgeClient {
     }
 
     private void addPendingCallback(String requestId, Object callback) {
+        addPendingCallback(requestId, callback, REQUEST_TIMEOUT_MS);
+    }
+
+    private void addPendingCallback(String requestId, Object callback, long timeoutMs) {
         pendingCallbacks.put(requestId, callback);
         Runnable timeout = () -> {
             if (pendingCallbacks.remove(requestId, callback)) {
@@ -884,7 +895,7 @@ final class MediaBridgeClient {
             }
         };
         pendingTimeouts.put(requestId, timeout);
-        main.postDelayed(timeout, REQUEST_TIMEOUT_MS);
+        main.postDelayed(timeout, timeoutMs);
     }
 
     private Object takePendingCallback(String requestId) {

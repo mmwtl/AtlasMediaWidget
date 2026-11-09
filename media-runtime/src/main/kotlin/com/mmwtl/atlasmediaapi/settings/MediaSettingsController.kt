@@ -132,7 +132,7 @@ class MediaSettingsController(
             uiScaleTenths = preferences.uiScaleTenths,
             catalogActiveId = catalogInfo.activeId,
             catalogs = catalogInfo.catalogs.map {
-                MediaSettingsCatalog(it.id, it.name, it.stationCount)
+                MediaSettingsCatalog(it.id, it.name, it.stationCount, it.packId, it.packName, it.region)
             },
         )
     }
@@ -309,6 +309,7 @@ class MediaSettingsController(
                 MediaBridgeContract.CatalogAction.ACTIVATE -> radioCatalogRepository.activateCatalog(catalogId)
                 MediaBridgeContract.CatalogAction.RENAME -> radioCatalogRepository.renameCatalog(catalogId, name.orEmpty())
                 MediaBridgeContract.CatalogAction.DELETE -> radioCatalogRepository.deleteCatalog(catalogId)
+                MediaBridgeContract.CatalogAction.DELETE_PACK -> radioCatalogRepository.deletePackOf(catalogId)
                 else -> throw IllegalArgumentException("Неизвестное действие с каталогом: $action")
             }
             nextRevision()

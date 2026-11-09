@@ -163,6 +163,14 @@ object MediaBridgeContract {
         const val CATALOG_IDS = "catalogIds"
         const val CATALOG_NAMES = "catalogNames"
         const val CATALOG_STATION_COUNTS = "catalogStationCounts"
+        /** Pack id, pack name and region of every listed catalog; empty for single catalogs. */
+        const val CATALOG_PACK_IDS = "catalogPackIds"
+        const val CATALOG_PACK_NAMES = "catalogPackNames"
+        const val CATALOG_REGIONS = "catalogRegions"
+        /** IMPORT_RADIO_CATALOG reply: the imported pack (empty for a single catalog) and its size. */
+        const val CATALOG_PACK_ID = "catalogPackId"
+        const val CATALOG_PACK_NAME = "catalogPackName"
+        const val CATALOG_COUNT = "catalogCount"
         /** Target catalog of MANAGE/EXPORT, or the catalog an import replaces. */
         const val CATALOG_ID = "catalogId"
         const val CATALOG_NAME = "catalogName"
@@ -173,6 +181,8 @@ object MediaBridgeContract {
         const val ACTIVATE = "ACTIVATE"
         const val RENAME = "RENAME"
         const val DELETE = "DELETE"
+        /** Deletes the whole pack of the catalog named by [Key.CATALOG_ID]. */
+        const val DELETE_PACK = "DELETE_PACK"
     }
 
     object Status {

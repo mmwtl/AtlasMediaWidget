@@ -104,12 +104,12 @@ public final class MainActivityTest {
             collectShownLabels(root, labels);
             int navigationIndex = labels.indexOf("Переключать радио без поиска по эфиру");
             int catalogIndex = labels.indexOf("Каталоги станций");
-            int importIndex = labels.indexOf("Добавить каталог (ZIP)");
+            int importIndex = labels.indexOf("Добавить каталог или набор (ZIP)");
             assertTrue(navigationIndex >= 0);
             assertTrue(catalogIndex > navigationIndex);
             assertTrue(importIndex > catalogIndex);
             assertFalse(labels.contains("Медиасервис OneOS"));
-            assertFalse(findLabel(root, "Добавить каталог (ZIP)").isEnabled());
+            assertFalse(findLabel(root, "Добавить каталог или набор (ZIP)").isEnabled());
             assertFalse(findLabel(root, "Названия и обложки из каталога в карточке").isEnabled());
         } finally {
             controller.pause().stop().destroy();
@@ -272,6 +272,47 @@ public final class MainActivityTest {
         assertEquals("3 станции", MainActivity.stationCountLabel(3));
         assertEquals("12 станций", MainActivity.stationCountLabel(12));
         assertEquals("25 станций", MainActivity.stationCountLabel(25));
+    }
+
+    @Test
+    public void packsAreRecognisedAndDescribed() throws Exception {
+        File zip = temporaryFolder.newFile("pack.zip");
+        try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zip))) {
+            out.putNextEntry(new ZipEntry("pack.json"));
+            out.write(("{\"format\":\"atlas-radio-pack\",\"version\":1,\"id\":\"russia\","
+                    + "\"name\":\"Россия\",\"catalogs\":["
+                    + "{\"key\":\"penza\",\"name\":\"Пенза\",\"region\":\"Пензенская область\"},"
+                    + "{\"key\":\"kuznetsk\",\"name\":\"Кузнецк\",\"region\":\"Пензенская область\"},"
+                    + "{\"key\":\"moscow\",\"name\":\"Москва\",\"region\":\"Москва\"}]}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        RadioPackPreview pack = RadioPackPreview.read(zip);
+        assertEquals("russia", pack.id);
+        assertEquals("Россия", pack.name);
+        assertEquals(3, pack.cityCount);
+        assertEquals(2, pack.regionCount);
+
+        File single = temporaryFolder.newFile("single.zip");
+        try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(single))) {
+            out.putNextEntry(new ZipEntry("stations.csv"));
+            out.write("frequency_khz,name,band,cover\n".getBytes());
+            out.closeEntry();
+        }
+        assertEquals(null, RadioPackPreview.read(single));
+        assertEquals("", RadioPackPreview.parse("{broken").id);
+
+        MediaSettingsSnapshot.Catalog city = new MediaSettingsSnapshot.Catalog(
+                "a", "Пенза", 25, "russia", "Россия", "Пензенская область");
+        assertEquals("Пенза · Пензенская область", MainActivity.cityLabel(city));
+        assertEquals("AtlasMediaWidget-radio-Россия.zip",
+                MainActivity.radioCatalogExportFileName(city));
+        assertEquals("3 города в 2 регионах", MainActivity.packSizeLabel(java.util.List.of(city,
+                new MediaSettingsSnapshot.Catalog("b", "Кузнецк", 5, "russia", "Россия",
+                        "Пензенская область"),
+                new MediaSettingsSnapshot.Catalog("c", "Москва", 9, "russia", "Россия",
+                        "Москва"))));
+        assertEquals("21 город", MainActivity.plural(21, "город", "города", "городов"));
     }
 
     private static ExecutorService io(MainActivity activity) throws Exception {

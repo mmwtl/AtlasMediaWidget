@@ -39,11 +39,27 @@ final class MediaSettingsSnapshot {
         final String id;
         final String name;
         final int stationCount;
+        /** The pack this city belongs to; empty for a catalog imported on its own. */
+        final String packId;
+        final String packName;
+        final String region;
 
         Catalog(String id, String name, int stationCount) {
+            this(id, name, stationCount, "", "", "");
+        }
+
+        Catalog(String id, String name, int stationCount, String packId, String packName,
+                String region) {
             this.id = id;
             this.name = name;
             this.stationCount = stationCount;
+            this.packId = packId != null ? packId : "";
+            this.packName = packName != null ? packName : "";
+            this.region = region != null ? region : "";
+        }
+
+        boolean isInPack() {
+            return !packId.isEmpty();
         }
 
         boolean isBuiltIn() {
@@ -212,7 +228,23 @@ final class MediaSettingsSnapshot {
         bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_IDS, ids);
         bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_NAMES, names);
         bundle.putIntArray(MediaBridgeContract.K_CATALOG_STATION_COUNTS, counts);
+        ArrayList<String> packIds = new ArrayList<>(catalogs.size());
+        ArrayList<String> packNames = new ArrayList<>(catalogs.size());
+        ArrayList<String> regions = new ArrayList<>(catalogs.size());
+        for (Catalog catalog : catalogs) {
+            packIds.add(catalog.packId);
+            packNames.add(catalog.packName);
+            regions.add(catalog.region);
+        }
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_PACK_IDS, packIds);
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_PACK_NAMES, packNames);
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_REGIONS, regions);
         return bundle;
+    }
+
+    private static ArrayList<String> optionalColumn(Bundle bundle, String key, int size) {
+        ArrayList<String> column = bundle.getStringArrayList(key);
+        return column != null && column.size() == size ? column : null;
     }
 
     private static List<Catalog> readCatalogs(Bundle bundle) {
@@ -223,12 +255,18 @@ final class MediaSettingsSnapshot {
                 || ids.size() != counts.length) {
             return Collections.emptyList();
         }
+        ArrayList<String> packIds = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_PACK_IDS, ids.size());
+        ArrayList<String> packNames = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_PACK_NAMES, ids.size());
+        ArrayList<String> regions = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_REGIONS, ids.size());
         ArrayList<Catalog> result = new ArrayList<>(ids.size());
         for (int i = 0; i < ids.size(); i++) {
             String id = ids.get(i);
             if (id == null || id.isEmpty()) continue;
             String name = names.get(i);
-            result.add(new Catalog(id, name != null ? name : "", counts[i]));
+            result.add(new Catalog(id, name != null ? name : "", counts[i],
+                    packIds == null ? "" : packIds.get(i),
+                    packNames == null ? "" : packNames.get(i),
+                    regions == null ? "" : regions.get(i)));
         }
         return Collections.unmodifiableList(result);
     }

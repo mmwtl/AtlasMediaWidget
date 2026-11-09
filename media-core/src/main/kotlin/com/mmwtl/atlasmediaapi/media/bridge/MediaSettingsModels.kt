@@ -35,6 +35,9 @@ data class MediaSettingsCatalog(
     val id: String,
     val name: String,
     val stationCount: Int,
+    val packId: String = "",
+    val packName: String = "",
+    val region: String = "",
 )
 
 fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
@@ -65,6 +68,9 @@ fun MediaSettingsSnapshot.toBundle(): Bundle = Bundle().apply {
     putStringArrayList(MediaBridgeContract.Key.CATALOG_IDS, ArrayList(catalogs.map(MediaSettingsCatalog::id)))
     putStringArrayList(MediaBridgeContract.Key.CATALOG_NAMES, ArrayList(catalogs.map(MediaSettingsCatalog::name)))
     putIntArray(MediaBridgeContract.Key.CATALOG_STATION_COUNTS, catalogs.map(MediaSettingsCatalog::stationCount).toIntArray())
+    putStringArrayList(MediaBridgeContract.Key.CATALOG_PACK_IDS, ArrayList(catalogs.map(MediaSettingsCatalog::packId)))
+    putStringArrayList(MediaBridgeContract.Key.CATALOG_PACK_NAMES, ArrayList(catalogs.map(MediaSettingsCatalog::packName)))
+    putStringArrayList(MediaBridgeContract.Key.CATALOG_REGIONS, ArrayList(catalogs.map(MediaSettingsCatalog::region)))
 }
 
 fun Bundle.toMediaSettingsSnapshot(): MediaSettingsSnapshot = MediaSettingsSnapshot(
@@ -100,5 +106,11 @@ private fun Bundle.readCatalogs(): List<MediaSettingsCatalog> {
     val names = getStringArrayList(MediaBridgeContract.Key.CATALOG_NAMES).orEmpty()
     val counts = getIntArray(MediaBridgeContract.Key.CATALOG_STATION_COUNTS) ?: IntArray(0)
     if (ids.size != names.size || ids.size != counts.size) return emptyList()
-    return ids.indices.map { MediaSettingsCatalog(ids[it], names[it], counts[it]) }
+    val packIds = getStringArrayList(MediaBridgeContract.Key.CATALOG_PACK_IDS).orEmpty()
+    val packNames = getStringArrayList(MediaBridgeContract.Key.CATALOG_PACK_NAMES).orEmpty()
+    val regions = getStringArrayList(MediaBridgeContract.Key.CATALOG_REGIONS).orEmpty()
+    fun List<String>.at(index: Int) = if (size == ids.size) this[index].orEmpty() else ""
+    return ids.indices.map {
+        MediaSettingsCatalog(ids[it], names[it], counts[it], packIds.at(it), packNames.at(it), regions.at(it))
+    }
 }

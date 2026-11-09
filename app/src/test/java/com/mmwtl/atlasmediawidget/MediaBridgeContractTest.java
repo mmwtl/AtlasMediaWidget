@@ -90,6 +90,22 @@ public class MediaBridgeContractTest {
                 MediaBridgeContract.CATALOG_ACTION_RENAME);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.DELETE,
                 MediaBridgeContract.CATALOG_ACTION_DELETE);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.CatalogAction.DELETE_PACK,
+                MediaBridgeContract.CATALOG_ACTION_DELETE_PACK);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_IDS,
+                MediaBridgeContract.K_CATALOG_PACK_IDS);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_NAMES,
+                MediaBridgeContract.K_CATALOG_PACK_NAMES);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_REGIONS,
+                MediaBridgeContract.K_CATALOG_REGIONS);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_ID,
+                MediaBridgeContract.K_CATALOG_PACK_ID);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_PACK_NAME,
+                MediaBridgeContract.K_CATALOG_PACK_NAME);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract.Key.CATALOG_COUNT,
+                MediaBridgeContract.K_CATALOG_COUNT);
+        assertEquals(com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository.PACK_MANIFEST_NAME,
+                RadioPackPreview.MANIFEST);
         assertEquals(com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository.BUILT_IN_ID,
                 MediaBridgeContract.BUILT_IN_CATALOG_ID);
     }
@@ -101,9 +117,10 @@ public class MediaBridgeContractTest {
                         false, 1250L, 100L, "CUSTOM", 3, "", 15, "abc",
                         java.util.List.of(
                                 new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog(
-                                        "builtin", "Встроенный (Пенза)", 25),
+                                        "builtin", "Встроенный (Пенза)", 25, "", "", ""),
                                 new com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog(
-                                        "abc", "Москва", 3))));
+                                        "abc", "Москва", 3, "russia", "Россия",
+                                        "Москва и область"))));
         MediaSettingsSnapshot snapshot = MediaSettingsSnapshot.fromBundle(bundle);
         assertEquals("abc", snapshot.catalogActiveId);
         assertEquals(2, snapshot.catalogs.size());
@@ -114,6 +131,10 @@ public class MediaBridgeContractTest {
         MediaSettingsSnapshot restored = MediaSettingsSnapshot.fromBundle(snapshot.toBundle());
         assertEquals("abc", restored.catalogActiveId);
         assertEquals("Встроенный (Пенза)", restored.catalogs.get(0).name);
+        assertTrue(snapshot.activeCatalog().isInPack());
+        assertEquals("Россия", restored.activeCatalog().packName);
+        assertEquals("Москва и область", restored.activeCatalog().region);
+        assertEquals("", restored.catalogs.get(0).packId);
     }
 
     @Test public void mediaSettingsSnapshotRoundTrip() {

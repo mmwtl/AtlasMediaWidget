@@ -159,12 +159,19 @@ final class MediaBridgeContract {
     static final String K_CATALOG_IDS = "catalogIds";
     static final String K_CATALOG_NAMES = "catalogNames";
     static final String K_CATALOG_STATION_COUNTS = "catalogStationCounts";
+    static final String K_CATALOG_PACK_IDS = "catalogPackIds";
+    static final String K_CATALOG_PACK_NAMES = "catalogPackNames";
+    static final String K_CATALOG_REGIONS = "catalogRegions";
+    static final String K_CATALOG_PACK_ID = "catalogPackId";
+    static final String K_CATALOG_PACK_NAME = "catalogPackName";
+    static final String K_CATALOG_COUNT = "catalogCount";
     static final String K_CATALOG_ID = "catalogId";
     static final String K_CATALOG_NAME = "catalogName";
     static final String K_CATALOG_ACTION = "catalogAction";
     static final String CATALOG_ACTION_ACTIVATE = "ACTIVATE";
     static final String CATALOG_ACTION_RENAME = "RENAME";
     static final String CATALOG_ACTION_DELETE = "DELETE";
+    static final String CATALOG_ACTION_DELETE_PACK = "DELETE_PACK";
     static final String BUILT_IN_CATALOG_ID = "builtin";
 
     private MediaBridgeContract() {}
