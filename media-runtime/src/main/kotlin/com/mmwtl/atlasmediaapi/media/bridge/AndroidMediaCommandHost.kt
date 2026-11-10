@@ -265,7 +265,8 @@ class AndroidMediaCommandHost(
 
     /**
      * Startup without autoplay on a head unit that came up on ONLINE by itself: the remembered or
-     * configured player shows the track it would resume. Other sources are left alone.
+     * configured player shows the track it would resume, as with ONLINE as the default source.
+     * Other sources are left alone.
      */
     suspend fun prepareCurrentOnlinePlayer(): Boolean {
         val center = mediaCenter()
@@ -281,32 +282,54 @@ class AndroidMediaCommandHost(
             Timber.i("Startup prepare skipped: a player is already playing")
             return true
         }
-        return prepareQuietly(packageName)
+        return launchPackageAndMaybePlay(
+            packageName = packageName,
+            autoplay = false,
+            returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
+        )
+    }
+
+    private enum class QuietPrepare {
+        /** The player's session, prepared or active, shows a track. */
+        TRACK,
+
+        /** The browser connected, but the player published no track (AIMP and VLC on the emulator). */
+        NO_TRACK,
+
+        /** No media browser service, or it refused the connection. */
+        UNAVAILABLE,
     }
 
     /**
      * Shows [packageName] with the track it would resume, without playback and without opening its
      * activity: its media browser session (prepared, or the recent root of Android 11 media
-     * resumption) joins the observed sessions. False when the player has no reachable browser.
+     * resumption) joins the observed sessions.
      */
-    private suspend fun prepareQuietly(packageName: String): Boolean {
-        val existing = configuredController(packageName)
-        if (existing != null && sessionObserver.metadataOf(existing).hasPlayerContent()) {
+    private suspend fun prepareQuietly(packageName: String): QuietPrepare {
+        if (hasTrack(packageName)) {
             Timber.i("%s already shows a track; nothing to prepare", packageName)
-            return true
+            return QuietPrepare.TRACK
         }
-        val starter = backgroundPlayerStarter ?: return false
+        val starter = backgroundPlayerStarter ?: return QuietPrepare.UNAVAILABLE
         // Prepare is not playback, but a player that takes audio focus for it would hit the call.
         val prepared = starter.connectAndPrepare(
             packageName = packageName,
             allowPrepare = !CallGuard.isCallActive(context),
-        ) ?: return false
+        ) ?: return QuietPrepare.UNAVAILABLE
         preparedBrowserConnection.getAndSet(prepared.connection)?.close()
         rememberOnlineMediaPackage(packageName)
         currentMediaPackageRef.set(packageName)
         sessionObserver.addPreparedSession(prepared.session)
-        return true
+        return if (prepared.session.metadata().hasPlayerContent() || hasTrack(packageName)) {
+            QuietPrepare.TRACK
+        } else {
+            QuietPrepare.NO_TRACK
+        }
     }
+
+    private fun hasTrack(packageName: String): Boolean =
+        configuredController(packageName)
+            ?.let { sessionObserver.metadataOf(it).hasPlayerContent() } == true
 
     private suspend fun launchPackageAndMaybePlay(
         packageName: String,
@@ -317,10 +340,15 @@ class AndroidMediaCommandHost(
         Timber.i("Starting configured media package %s (autoplay=%s)", packageName, autoplay)
         if (autoplay) {
             startInBackgroundAndPlay(packageName)?.let { return it }
-        } else if (prepareQuietly(packageName)) {
-            return true
         } else {
-            Timber.i("%s cannot be prepared in the background; launching its activity", packageName)
+            // Some players (AIMP, VLC) load their last track only when their activity opens.
+            when (prepareQuietly(packageName)) {
+                QuietPrepare.TRACK -> return true
+                QuietPrepare.NO_TRACK ->
+                    Timber.i("%s showed no track in the background; launching its activity", packageName)
+                QuietPrepare.UNAVAILABLE ->
+                    Timber.i("%s cannot be prepared in the background; launching its activity", packageName)
+            }
         }
         val launched = launchPackage?.let { callback ->
             runCatching { callback(packageName) }
@@ -505,9 +533,10 @@ class AndroidMediaCommandHost(
         }
         val controller = configuredController(packageName)
         if (!autoplay) {
+            // A tile does not open the player's activity: without a track the card stays empty.
             if (controller != null && sessionObserver.metadataOf(controller).hasPlayerContent()) {
                 publish(controller)
-            } else if (!prepareQuietly(packageName)) {
+            } else if (prepareQuietly(packageName) != QuietPrepare.TRACK) {
                 controller?.let(::publish)
             }
             return true

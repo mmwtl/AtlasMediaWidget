@@ -194,13 +194,25 @@ ONLINE, запуск ГУ, который сам поднялся на ONLINE (�
 команд, пока её пакет не опубликует активную сессию или сессия не будет уничтожена. Подготовленная
 сессия без состояния или без действия play показывается остановленной с `PLAY`: кнопка отправляет
 ей `MEDIA_PLAY`. Соединение с браузером удерживается отдельно от соединения, через которое играет
-другой плеер. Если браузера нет или он не подключается, при запуске остаётся прежнее поведение —
-открыть окно плеера (с автосворачиванием по настройке).
+другой плеер. Если при запуске браузера нет, он не подключается или трек так и не появился, сервис,
+как раньше, открывает окно плеера (с автосворачиванием по настройке): некоторые плееры загружают
+последний трек только вместе со своим окном. Плитка плеера окно не открывает.
 
-Факты Android API: `EXTRA_RECENT`, `prepare()` и токен сессии из `MediaBrowser`. Не проверено на
-ГУ: какие плееры (в том числе AIMP) отдают трек через `prepare()` или корень `EXTRA_RECENT`,
-проверяют ли они пакет вызывающего, доступна ли нам иконка по `content://` и меняет ли
-подготовка источник OneOS.
+Факты Android API: `EXTRA_RECENT`, `prepare()` и токен сессии из `MediaBrowser`. Окно другого
+приложения из фона открывается только при выданном виджету «поверх других окон» и не раньше чем
+через 5 с после нажатия HOME (защита переключения приложений Android).
+
+Эмулятор Android 11, холодный старт без автовоспроизведения (2026-11-10):
+
+| Плеер | Браузер | Трек без окна | Итог |
+|---|---|---|---|
+| Murglar | подключается | да, после `prepare()` | трек на паузе, окно не открывается |
+| AIMP | подключается | нет, сессия пустая | окно открывается и сворачивается, трек на паузе |
+| VLC | подключается | нет | окно открывается, трека нет и после него |
+| Яндекс Музыка, YT Music | отказ (без входа в аккаунт) | — | окно открывается |
+
+Корень `EXTRA_RECENT` нам не отдал ни один из них. Не проверено на ГУ: плееры с входом в аккаунт,
+доступ к иконке по `content://` и меняет ли подготовка источник OneOS.
 
 [EN] To show an Online player without autoplay (startup with ONLINE as the default source, a head
 unit that came up on ONLINE by itself with a default player configured and nothing playing, a
@@ -211,9 +223,13 @@ call, it sends `prepare()` and waits up to 4 s (a player that starts playing is 
 otherwise, when the root echoes `EXTRA_RECENT`, the first playable child stands in for the
 metadata until the session publishes its own. `MediaSessionObserver` keeps the session as prepared
 until its package publishes an active session or the session is destroyed; without a state or
-play action it is shown stopped with `PLAY` and receives `MEDIA_PLAY`. Without a reachable browser
-startup still opens the player's activity. Which players answer either path, caller checks,
-`content://` icon access and OneOS source effects are not verified on the head unit.
+play action it is shown stopped with `PLAY` and receives `MEDIA_PLAY`. When no browser is reachable
+or no track appears, startup still opens the player's activity (minimized by the setting): some
+players load their last track only with their activity; a player tile does not open it. On the
+Android 11 emulator Murglar showed its track through `prepare()`, AIMP only after its activity
+opened, VLC not at all; Yandex Music and YT Music (not signed in) refused the browser, and none
+returned an `EXTRA_RECENT` root. Signed-in players, `content://` icon access and OneOS source
+effects are not verified on the head unit.
 
 ### Локальный расчет прогресса (Local Progress Estimation):
 Вместо ежесекундного Binder-опроса клиент вычисляет прогресс локально, если `playbackState == 3` (`PLAYING`):

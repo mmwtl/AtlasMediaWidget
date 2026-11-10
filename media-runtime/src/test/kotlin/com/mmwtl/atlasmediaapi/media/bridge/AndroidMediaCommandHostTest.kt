@@ -542,6 +542,29 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
+    fun `online default without autoplay launches a prepared player that shows no track`() = runBlocking {
+        val fixture = prepareFixture("com.example.resume", prepares = true, recentTitle = null)
+
+        assertTrue(fixture.host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = false))
+
+        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
+        assertEquals(listOf("com.example.resume"), fixture.launched)
+        fixture.release()
+    }
+
+    @Test
+    fun `player tile without autoplay does not launch a prepared player that shows no track`() = runBlocking {
+        val fixture = prepareFixture("com.example.resume", prepares = true, recentTitle = null)
+        install(fixture.context, "com.example.resume")
+
+        assertTrue(fixture.host.selectPlayer("com.example.resume", autoplay = false))
+
+        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
+        assertTrue(fixture.launched.isEmpty())
+        fixture.release()
+    }
+
+    @Test
     fun `startup prepare shows the configured player when MediaCenter is unavailable`() = runBlocking {
         val fixture = prepareFixture("com.example.resume", prepares = true)
 
@@ -582,11 +605,12 @@ class AndroidMediaCommandHostTest {
         }
     }
 
-    /** A player whose browser session has no track and whose recent root names "Last track". */
+    /** A player whose browser session has no track and whose recent root names [recentTitle]. */
     private fun prepareFixture(
         configuredPackage: String,
         prepares: Boolean,
         preparedPackage: String = configuredPackage,
+        recentTitle: String? = "Last track",
     ): PrepareFixture {
         val context = RuntimeEnvironment.getApplication()
         val repository = MediaStateRepository()
@@ -595,9 +619,9 @@ class AndroidMediaCommandHostTest {
         val session = MediaSession(context, "prepared-$preparedPackage")
         val controller = MediaController(context, session.sessionToken)
         shadowOf(controller).setPackageName(preparedPackage)
-        val recent = MediaMetadata.Builder()
-            .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, "Last track")
-            .build()
+        val recent = recentTitle?.let {
+            MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, it).build()
+        }
         val starter = FakeBackgroundStarter(
             onPrepare = { PreparedSession(controller, recent) }.takeIf { prepares },
         )
