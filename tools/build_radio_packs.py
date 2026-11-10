@@ -102,6 +102,7 @@ EXTRA_ALIASES = {
     'ТКР ФМ':'tkr_fm', 'MAXIMUM':'maksimum',
     'Радио Серебряный дождь':'serebryanyy_dozhd',
     'Радио России / ГТРК Пенза':'rossii', 'Радио 7 на семи холмах':'7',
+    'Ретро FM Казахстан':'retro_fm', 'Авторадио Казахстан':'avtoradio',
 }
 alias.update({name_key(name): slug for name, slug in EXTRA_ALIASES.items()})
 
@@ -154,11 +155,14 @@ CURATED = {
     'radio_rostov':('Ростовская','Ростов-на-Дону'),
     'kaliningrad_radio_covers':('Калининградская','Калининград'),
     'voronezh-radio':('Воронежская','Воронеж'),
+    'stations_kostanay':('Казахстан','Костанай'),
 }
 extra_city_covers = []
 for folder, place in CURATED.items():
     archive_name = 'stations_ryazan1.zip' if folder == 'stations_ryazan' else folder + '.zip'
-    archive = ROOT / 'Радио' / archive_name
+    archive = (REPO / 'docs/assets/radio-packs/stations_kostanay.zip'
+               if folder == 'stations_kostanay' else ROOT / 'Радио' / archive_name)
+    archive_source = str(archive.relative_to(REPO if folder == 'stations_kostanay' else ROOT))
     path = OUT / 'source-city-archives' / folder
     (path / 'covers').mkdir(parents=True, exist_ok=True)
     archive_images = []
@@ -177,7 +181,7 @@ for folder, place in CURATED.items():
             target = path / 'covers' / filename
             target.write_bytes(z.read(entry))
             archive_images.append(target)
-            origins[target] = {'source': str(archive.relative_to(ROOT)) + '!/' + entry.filename,
+            origins[target] = {'source': archive_source + '!/' + entry.filename,
                                'source_tier': 'city_archive',
                                'archive_sha256': digest(archive.read_bytes())}
     city_rows = read_csv(path / 'stations.csv')
@@ -185,7 +189,14 @@ for folder, place in CURATED.items():
     for x in city_rows:
         frequency = int(x['frequency_khz'])
         station = alias.get(name_key(x['name']))
-        if place == ('Беларусь','Минск'):
+        if place == ('Казахстан','Костанай'):
+            # Keep the approved CSV names; shared artwork still resolves by alias.
+            station = 'kz_' + ascii_slug(x['name']).replace('-','_')
+            display[station] = x['name']
+            source_type[station] = 'curated'
+            assert frequency not in catalogs[place]
+            catalogs[place][frequency] = station
+        elif place == ('Беларусь','Минск'):
             # Preserve original catalog identities; artwork is shared by name aliases below.
             if station is None or x['name'] in ('Energy FM','Радио Ретро','Новое Радио','Русское Радио','Радио Шансон'):
                 station = 'by_' + ascii_slug(x['name']).replace('-','_')
@@ -236,6 +247,7 @@ SPECIAL_REGIONS = {
     'Чувашия':'Чувашская Республика','Чукотский':'Чукотский автономный округ',
     'Якутия':'Республика Саха (Якутия)','Ямало-Ненецкий':'Ямало-Ненецкий автономный округ',
     'Москва':'Москва','Санкт-Петербург':'Санкт-Петербург','Севастополь':'Севастополь','Беларусь':'Беларусь',
+    'Казахстан':'Казахстан',
 }
 KRAIS = set('Алтайский Забайкальский Камчатский Краснодарский Красноярский Пермский Приморский Ставропольский Хабаровский'.split())
 
@@ -302,7 +314,7 @@ for station in sorted(used_stations):
                            'source_sha256':source_sha,'output_sha256':sha}
 
 manifest = {'format':'atlas-radio-pack','version':1,'id':'atlas-radio-all',
-            'name':'Россия и Минск','catalogs':[]}
+            'name':'Россия, Минск и Костанай','catalogs':[]}
 files = {}
 index = []
 all_rows = []
@@ -359,7 +371,7 @@ selected = [city for city in index if city['stations'] >= 6]
 selected_keys = {city['key'] for city in selected}
 selected_rows = [row for row in all_rows if row['key'] in selected_keys]
 selected_covers = {row['cover'] for row in selected_rows if row['cover']}
-selected_manifest = {**manifest, 'name': 'Россия и Минск — 6+ станций',
+selected_manifest = {**manifest, 'name': 'Россия, Минск и Костанай — 6+ станций',
                      'catalogs': [city for city in manifest['catalogs'] if city['key'] in selected_keys]}
 selected_files = {
     'pack.json': (json.dumps(selected_manifest, ensure_ascii=False, indent=2)+'\n').encode('utf-8'),
@@ -387,7 +399,7 @@ selected_stats = {
     'pack_id': selected_manifest['id'], 'sha256': digest(selected_archive.read_bytes()),
     'source_sha256': stats['sha256'],
 }
-assert len(selected) == 462 and len(selected_rows) == 6686
+assert len(selected) == 463 and len(selected_rows) == 6700
 write_json(selected_out/'stats.json', selected_stats)
 write_json(selected_out/'city-index.json', selected)
 write_json(selected_out/'cover-provenance.json', selected_provenance)
