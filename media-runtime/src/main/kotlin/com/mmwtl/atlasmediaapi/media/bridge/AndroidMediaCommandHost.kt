@@ -263,32 +263,6 @@ class AndroidMediaCommandHost(
         return false
     }
 
-    /**
-     * Startup without autoplay on a head unit that came up on ONLINE by itself: the remembered or
-     * configured player shows the track it would resume, as with ONLINE as the default source.
-     * Other sources are left alone.
-     */
-    suspend fun prepareCurrentOnlinePlayer(): Boolean {
-        val center = mediaCenter()
-        if (center != null && runCatching { center.currentAudioSource }.getOrNull() !=
-            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE
-        ) {
-            Timber.i("Startup prepare skipped: the head unit source is not ONLINE")
-            return true
-        }
-        val packageName = lastOnlineMediaPackageRef.get().ifBlank { defaultMediaPackage() }
-        if (packageName.isBlank()) return true
-        if (sessionObserver.getActiveControllers().any { PlayerSessionSelector.isPlaying(it.playbackState?.state) }) {
-            Timber.i("Startup prepare skipped: a player is already playing")
-            return true
-        }
-        return launchPackageAndMaybePlay(
-            packageName = packageName,
-            autoplay = false,
-            returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
-        )
-    }
-
     private enum class QuietPrepare {
         /** The player's session, prepared or active, shows a track. */
         TRACK,

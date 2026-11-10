@@ -177,10 +177,10 @@ Binding is established via explicit Intent (`bindService`):
 
 ### Подготовка Online-плеера без воспроизведения / Preparing an Online player without playback
 
-[RU] Когда Online-плеер нужно показать без автовоспроизведения — запуск с источником по умолчанию
-ONLINE, запуск ГУ, который сам поднялся на ONLINE (если задан плеер по умолчанию и никто не
-играет), плитка плеера с `autoplay = false`, — сервис не открывает окно плеера, а подключается к
-его `MediaBrowserService`:
+[RU] Когда Online-плеер явно выбран, но играть не должен — запуск с источником по умолчанию ONLINE
+без автовоспроизведения или плитка плеера с `autoplay = false`, — сервис сначала не открывает окно
+плеера, а подключается к его `MediaBrowserService`. При источнике по умолчанию «Отключено» плееры
+при старте не готовятся и не запускаются:
 
 1. сначала с подсказкой `BrowserRoot.EXTRA_RECENT` (возобновление медиа Android 11); если сервис
    отказывает в подключении, повторно без подсказок;
@@ -214,9 +214,9 @@ ONLINE, запуск ГУ, который сам поднялся на ONLINE (�
 Корень `EXTRA_RECENT` нам не отдал ни один из них. Не проверено на ГУ: плееры с входом в аккаунт,
 доступ к иконке по `content://` и меняет ли подготовка источник OneOS.
 
-[EN] To show an Online player without autoplay (startup with ONLINE as the default source, a head
-unit that came up on ONLINE by itself with a default player configured and nothing playing, a
-player tile with `autoplay = false`), the service connects to the player's `MediaBrowserService`
+[EN] When an Online player is chosen explicitly but must not play (startup with ONLINE as the
+default source and autoplay off, a player tile with `autoplay = false`; with no default source
+players are left alone at startup), the service connects to the player's `MediaBrowserService`
 instead of opening its activity: first with the `BrowserRoot.EXTRA_RECENT` hint (Android 11 media
 resumption), again without hints if the service refuses; then, without a track and without a
 call, it sends `prepare()` and waits up to 4 s (a player that starts playing is paused again);

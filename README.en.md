@@ -112,9 +112,9 @@ the background until you pick your own. The overlay uses the night colours.
 - Online player selection, optional switch to Online before session playback and background
   playback start without opening the player when the player supports it; otherwise the player opens
   and can be minimized automatically;
-- without autoplay, the card shows the Online player at startup with the track it stopped on, and
-  music starts only from the play button; a player that provides no track in the background is
-  opened for this and can be minimized automatically;
+- with Online as the default source and autoplay off, the card shows the player at startup with the
+  track it stopped on, and music starts only from the play button; a player that provides no track
+  in the background is opened for this and can be minimized automatically;
 - radio catalogs with station artwork: a built-in pack of 463 cities in Russia, Kazakhstan and
   Belarus with a country- and region-grouped city picker (Penza by default), loadable city packs and
   custom single catalogs, favorites grid and saved-station navigation without scanning;

@@ -2493,6 +2493,14 @@ public final class MainActivity extends ScaledActivity {
 
         startupAutoplaySwitch = mediaSwitch(startup, "Автовоспроизведение при старте", 12,
                 MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY);
+        TextView autoplayNote = text("С источником Online плеер по умолчанию готовится и без "
+                        + "автовоспроизведения: показывает трек на паузе, а если отдаёт его только "
+                        + "вместе со своим окном, открывается и может сворачиваться (настройка "
+                        + "онлайн-плеера). Воспроизведение начинается только с этим переключателем.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams autoplayNoteParams = fullWrap();
+        autoplayNoteParams.topMargin = Ui.dp(this, 4);
+        startup.addView(autoplayNote, autoplayNoteParams);
         startupInternetSwitch = mediaSwitch(startup, "Ждать подключения к интернету", 12,
                 MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET);
         TextView internetNote = text("Работает вместе с автовоспроизведением: переключение и "
@@ -2566,7 +2574,7 @@ public final class MainActivity extends ScaledActivity {
         online.addView(onlinePlayerSpinner, onlineSpinnerParams);
 
         minimizeOnlinePlayerSwitch = mediaSwitch(online,
-                "Сворачивать онлайн-плеер после автозапуска", 10,
+                "Сворачивать онлайн-плеер, если он открылся автоматически", 10,
                 MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART);
         page.addView(onlineCard);
 

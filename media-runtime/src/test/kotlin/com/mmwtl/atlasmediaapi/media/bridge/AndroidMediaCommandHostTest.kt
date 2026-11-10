@@ -565,17 +565,6 @@ class AndroidMediaCommandHostTest {
     }
 
     @Test
-    fun `startup prepare shows the configured player when MediaCenter is unavailable`() = runBlocking {
-        val fixture = prepareFixture("com.example.resume", prepares = true)
-
-        assertTrue(fixture.host.prepareCurrentOnlinePlayer())
-
-        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
-        assertEquals("Last track", fixture.repository.snapshot().title)
-        fixture.release()
-    }
-
-    @Test
     fun `player tile without autoplay prepares a player that has no session`() = runBlocking {
         val fixture = prepareFixture("com.example.default", prepares = true, preparedPackage = "com.example.resume")
         install(fixture.context, "com.example.resume")

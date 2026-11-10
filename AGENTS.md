@@ -102,11 +102,12 @@ migration request.
   broadcast result data `PLAY`/`PAUSE`/`NEXT`/`PREVIOUS` or null when dropped). Do not
   change it without coordinating with AtlasLauncher. It only forwards to a running
   `OverlayService` with a connected Bridge; it never starts the service or binds.
-- Showing an Online player without autoplay (startup, player tile) prepares it through its
-  MediaBrowser (`EXTRA_RECENT` root, `prepare()`) instead of opening its activity. At startup the
-  activity is still opened when no browser is reachable or no track appears (AIMP loads its last
-  track only with its activity); a player tile never opens it. `MediaSessionObserver` keeps such a prepared
-  session until its package publishes an active session (docs/full-media-bridge.md §6).
+- Showing an explicitly chosen Online player without autoplay (ONLINE default source, player tile;
+  never with no default source) prepares it through its MediaBrowser (`EXTRA_RECENT` root,
+  `prepare()`) instead of opening its activity. At startup the activity is still opened when no
+  browser is reachable or no track appears (AIMP loads its last track only with its activity); a
+  player tile never opens it. `MediaSessionObserver` keeps such a prepared session until its
+  package publishes an active session (docs/full-media-bridge.md §6).
 - Automatic playback (startup autoplay, autoplay after source loss) runs through `CallGuard`: an
   active call by audio mode skips it or cancels its play retries, which would otherwise restart
   the player against the call's audio focus. User commands are not blocked.
