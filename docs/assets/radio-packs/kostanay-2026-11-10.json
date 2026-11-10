@@ -7,12 +7,11 @@
   "source_unchanged": true,
   "catalog_type": "single_catalog_zip",
   "filename": "stations_kostanay.zip",
-  "sha256": "1d964b3cb4a1d61bb7f4f8c4f715848b7d20d49adf01223487387569e57f4523",
-  "zip_bytes": 635675,
+  "sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+  "zip_bytes": 409996,
   "station_count": 14,
   "covers": 14,
   "penza_covers": 5,
-  "local_low_resolution_covers": 9,
   "structure_fix": "Removed outer Cyrillic directory; stations.csv and covers/ at ZIP root",
   "source_image_below_minimum": {
     "file": "shalqar-96.webp",
@@ -128,16 +127,33 @@
       "name": "LUX FM",
       "frequency_khz": 99000,
       "cover": "lux_fm.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/luxfm-96.webp",
-      "source_sha256": "6c625d776cc5423dfe0c2f645aae95ff23ed2f94815f6cb7b8c039a74a7c8d34",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://luxfm.kz/assets/img/lux-fm.png",
+      "original_file": "research/radio-covers-kostanay/originals/lux_fm.png",
+      "source_sha256": "12d1738e7c250bc49d0c98bdc900c5d62fec416922e80e88d44d23ae1d1f3c0f",
       "original_size": [
-        96,
-        96
+        1280,
+        1280
       ],
-      "padding_background": "white",
+      "padding_background": "#FFFFFF",
+      "composition": "logo",
+      "foreground_max_px": 430,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "4d0e10e4b4a54c28be5d24f467d31cd04f529dfff59e1feb74876a6337202d01"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "eede8064791b60a62b4d98e46a9e35914119d79d5c8f24491aa68714e67d01b7",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/luxfm-96.webp",
+        "source_sha256": "6c625d776cc5423dfe0c2f645aae95ff23ed2f94815f6cb7b8c039a74a7c8d34",
+        "original_size": [
+          96,
+          96
+        ]
+      }
     },
     {
       "name": "Европа Плюс",
@@ -153,31 +169,66 @@
       "name": "Радио Алау",
       "frequency_khz": 100700,
       "cover": "alau.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/alau-96.webp",
-      "source_sha256": "9008187f0f7e3646e323c173e83d64a32ea13a65a94e14cf5c6e2adfc517be83",
+      "source_tier": "manually_collected",
+      "source_kind": "station_directory",
+      "source": "https://cdn-radiotime-logos.tunein.com/s209611g.png",
+      "original_file": "research/radio-covers-kostanay/originals/alau.png",
+      "source_sha256": "05c21e0b34cb8085c65c92bc9e78cb1bb2b041fd65274bbd7c6b0a9f1844f70d",
       "original_size": [
-        96,
-        96
+        500,
+        500
       ],
-      "padding_background": "transparent",
+      "padding_background": "#FFFFFF",
+      "composition": "flatten-trim",
+      "foreground_max_px": 430,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "ef997ff8ac25cffb4c6f555ce7a3048c2cad324afdf6227740f064f5204faec9"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "6c7790018d8990c111cf96bf0e7138328443de0a40a249518be8fc0ce361713b",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/alau-96.webp",
+        "source_sha256": "9008187f0f7e3646e323c173e83d64a32ea13a65a94e14cf5c6e2adfc517be83",
+        "original_size": [
+          96,
+          96
+        ]
+      },
+      "source_page": "https://tunein.com/radio/Radio-Alau-1007-s209611/"
     },
     {
       "name": "Радио КН",
       "frequency_khz": 101500,
       "cover": "radio_kn.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/kn-96.webp",
-      "source_sha256": "3d82f9a0e8685416ecf78d93a3e0cf1e92dd60e1e6da2cd2574e509699850ae3",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://radiokn.kz/wp-content/uploads/2022/04/path1044-2.png",
+      "original_file": "research/radio-covers-kostanay/originals/radio_kn.png",
+      "source_sha256": "7065e3ac0acfdf7d75becc73770f4e35ea87a3053f44d86e4556fe7a2fc1d027",
       "original_size": [
-        96,
-        96
+        843,
+        843
       ],
-      "padding_background": "transparent",
+      "padding_background": "#FFFFFF",
+      "composition": "flatten-trim",
+      "foreground_max_px": 450,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "9d05a7b8396be59b7029a646ec616e8d066fee2caf20149b3fead880cabad4c4"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "8dea6eb29924f9b6a0a7e0abea87c63cefee7a11cbd0916eaaab8bd2ad2d2847",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/kn-96.webp",
+        "source_sha256": "3d82f9a0e8685416ecf78d93a3e0cf1e92dd60e1e6da2cd2574e509699850ae3",
+        "original_size": [
+          96,
+          96
+        ]
+      }
     },
     {
       "name": "Love Radio",
@@ -213,61 +264,129 @@
       "name": "Жулдыз FM",
       "frequency_khz": 104400,
       "cover": "zhuldyz_fm.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/zhuldyz-96.webp",
-      "source_sha256": "6ca90a2ec5e695a6f594f964ae49e519f20330d749ea12d55284aaa062e2f4c5",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://www.zhuldyzfm.kz/sites/default/files/logo_0_0.png",
+      "original_file": "research/radio-covers-kostanay/originals/zhuldyz_fm.png",
+      "source_sha256": "1bbf113108643a3da1eda39ca49c4d254ddd0d6f5fbfd379e0b5da79145995f4",
       "original_size": [
-        96,
-        96
+        768,
+        768
       ],
-      "padding_background": "white",
+      "padding_background": "#FEFEFE",
+      "composition": "flatten-trim",
+      "foreground_max_px": 430,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "436669794e2d174a6d4261ff73910b4a98997b59168e6d73bc73cf8cd583338e"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "e1d2bd2f8ce1066204f4e1faf9d928d22b3287f5f5ee33ae261e91fcaaebb324",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/zhuldyz-96.webp",
+        "source_sha256": "6ca90a2ec5e695a6f594f964ae49e519f20330d749ea12d55284aaa062e2f4c5",
+        "original_size": [
+          96,
+          96
+        ]
+      }
     },
     {
       "name": "Казахское радио",
       "frequency_khz": 105400,
       "cover": "qazaq_radio.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/qazradio-96.webp",
-      "source_sha256": "63b69fdb85c79f0825d8281fd58060b4ec529d1f8503f3f7e1e0f4f8b4b3559c",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://qazradio.fm/images/qazradio.png?v=0.133",
+      "original_file": "research/radio-covers-kostanay/originals/qazaq_radio.png",
+      "source_sha256": "9f2635e8571dd87956d662af80039890e56ed0620157701b224d7d75df515919",
       "original_size": [
-        96,
-        33
+        351,
+        120
       ],
-      "padding_background": "transparent",
+      "padding_background": "#003E4F",
+      "composition": "logo",
+      "foreground_max_px": 430,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "d1319b4858e160a17b00c3777b0edd2e40c62d46ed76325d175183636eb24b2d"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "2e21b0a741b53b7acb3e1c0322ae27438aee1ff7b3d0f1b64598b69aaa4a3045",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/qazradio-96.webp",
+        "source_sha256": "63b69fdb85c79f0825d8281fd58060b4ec529d1f8503f3f7e1e0f4f8b4b3559c",
+        "original_size": [
+          96,
+          33
+        ]
+      }
     },
     {
       "name": "Радио NS",
       "frequency_khz": 107000,
       "cover": "radio_ns.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/ns-96.webp",
-      "source_sha256": "c6045d64afeb8b5f09453da38821ab2f8eb78414d67afae79cf332e93e3eb911",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://ns.kz/assets/img/NS_logo.png",
+      "original_file": "research/radio-covers-kostanay/originals/radio_ns.png",
+      "source_sha256": "8908400cd85a6cef51c2734b6929b1c7f6d853c22dc9d36de95edf081053f713",
       "original_size": [
-        96,
-        41
+        1603,
+        692
       ],
-      "padding_background": "white",
+      "padding_background": "#FFFFFF",
+      "composition": "logo",
+      "foreground_max_px": 440,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "c6c994913f86996d1857f1b9cdd51e8fffb5f2d81a1d5587a43db51978d1f4dc"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "f6c0d97546c43e8ae738b95245d217e1a1ae65083b8fdca7d410d74d0c7d6772",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/ns-96.webp",
+        "source_sha256": "c6045d64afeb8b5f09453da38821ab2f8eb78414d67afae79cf332e93e3eb911",
+        "original_size": [
+          96,
+          41
+        ]
+      }
     },
     {
       "name": "Шалкар радио",
       "frequency_khz": 107400,
       "cover": "shalqar.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/shalqar-96.webp",
-      "source_sha256": "2709c66f627a906b393e87b96a9ec45837391d7532a8f714221c6180fb86a0de",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://qazradio.fm/images/shalqarfm.png?v=0.133",
+      "original_file": "research/radio-covers-kostanay/originals/shalqar.png",
+      "source_sha256": "2952d4ff4ccc9033e8f3800284489945d34eb6b141c85fab00fe1e7ca1b19e02",
       "original_size": [
-        96,
-        28
+        406,
+        120
       ],
-      "padding_background": "transparent",
+      "padding_background": "#003E4F",
+      "composition": "logo",
+      "foreground_max_px": 430,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "64338a607ea306aec6b3b612c03cded5ca7e0aa8db21b2bee4eb62204a5b5686"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "11e0af46c3bdd2b551b7d509bb7f3f6378cd25d068eee0360e941e7bd2d1dd0c",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/shalqar-96.webp",
+        "source_sha256": "2709c66f627a906b393e87b96a9ec45837391d7532a8f714221c6180fb86a0de",
+        "original_size": [
+          96,
+          28
+        ]
+      }
     },
     {
       "name": "Русское Радио",
@@ -283,31 +402,67 @@
       "name": "Народное радио",
       "frequency_khz": 106600,
       "cover": "narodnoe_radio.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/dala-96.webp",
-      "source_sha256": "c3c52c58fee9b9f2557c00719a0412e85dc12af8b0892088e0e17b4a33769099",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://static.tildacdn.com/tild3334-3066-4132-b661-396363333065/__logo.png",
+      "original_file": "research/radio-covers-kostanay/originals/narodnoe_radio.png",
+      "source_sha256": "88f471f3a40e2569ec69afe4c94d32441181d7fa4cfc377cc92aba572ec5fcad",
       "original_size": [
-        96,
-        51
+        1680,
+        704
       ],
-      "padding_background": "white",
+      "padding_background": "#3FAB3C",
+      "composition": "flatten-trim",
+      "foreground_max_px": 440,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "d9602bd3762be59e1c8cef090fd1aff0b26a672158ef3060a4c95e8af7da1fa0"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "257e18357941fc723f3bce636c7a17bd93aec70dab020c86a4ad037972ed8ccd",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/dala-96.webp",
+        "source_sha256": "c3c52c58fee9b9f2557c00719a0412e85dc12af8b0892088e0e17b4a33769099",
+        "original_size": [
+          96,
+          51
+        ]
+      },
+      "source_page": "https://narodnoeradio.kz/",
+      "note": "Current wordmark from official site CDN; old archive thumbnail replaced"
     },
     {
       "name": "Жана FM",
       "frequency_khz": 107900,
       "cover": "zhana_fm.webp",
-      "source_tier": "kostanay_archive",
-      "source": "stations_Коstanay.zip!/stations_Коstanay/covers/zhanafm-96.webp",
-      "source_sha256": "1d746f4390a15d3a1019d01ac1f76027cce2ffed3534272f457869b517a27cc6",
+      "source_tier": "manually_collected",
+      "source_kind": "official_site_asset",
+      "source": "https://zhanafm.kz/assets/img/header-logos.png",
+      "original_file": "research/radio-covers-kostanay/originals/zhana_fm.png",
+      "source_sha256": "b87d3ffa5ad87823187bb34c73c837d869b1379a956fedf83d626bbb9e56f2e0",
       "original_size": [
-        96,
-        96
+        1278,
+        550
       ],
-      "padding_background": "transparent",
+      "padding_background": "#59B137",
+      "composition": "logo",
+      "foreground_max_px": 440,
+      "upscaled": false,
       "new_encoding": "WebP lossless",
-      "output_sha256": "2fd107b9384d7e710e07174b6195c9c09a71a322dff6caed3ca18be451e11cb9"
+      "output_size": [
+        512,
+        512
+      ],
+      "output_sha256": "becb9a61ef62e2c61bc5b8bd869e28235f2e1285dd29af298d79876f6abefd56",
+      "replaced_archive_thumbnail": {
+        "source": "stations_Коstanay.zip!/stations_Коstanay/covers/zhanafm-96.webp",
+        "source_sha256": "1d746f4390a15d3a1019d01ac1f76027cce2ffed3534272f457869b517a27cc6",
+        "original_size": [
+          96,
+          96
+        ]
+      }
     }
   ],
   "field_reception_verified": false,
@@ -320,7 +475,24 @@
     "station_count": 14,
     "cover_reads": 14,
     "import_export_reimport": "PASS",
-    "sha256": "1d964b3cb4a1d61bb7f4f8c4f715848b7d20d49adf01223487387569e57f4523"
+    "sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5"
   },
-  "application_sources_changed": false
+  "application_sources_changed": false,
+  "local_rebuilt_covers": 9,
+  "upscaled_thumbnail_covers": 0,
+  "artwork_update": {
+    "date": "2026-11-10",
+    "previous_archive_sha256": "1d964b3cb4a1d61bb7f4f8c4f715848b7d20d49adf01223487387569e57f4523",
+    "normalizer": "research/radio-covers-kostanay/fetch_and_build.sh",
+    "rules_from": "research/radio-covers-penza/fetch_and_build.sh",
+    "manifest": "research/radio-covers-kostanay/manifest.csv",
+    "new_sources": 9,
+    "official_site_sources": 8,
+    "station_directory_sources": 1,
+    "csv_unchanged": true,
+    "penza_covers_byte_exact": 5,
+    "originals_upscaled": false,
+    "all_covers_opaque_512x512": true,
+    "visual_review": "Reviewed all covers at 256px and logo detail at native 512px; solid backgrounds and safe margins"
+  }
 }
