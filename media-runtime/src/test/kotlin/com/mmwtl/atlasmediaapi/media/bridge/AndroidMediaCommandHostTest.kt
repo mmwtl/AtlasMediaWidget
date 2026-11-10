@@ -9,6 +9,8 @@ import android.media.session.PlaybackState
 import com.geely.lib.oneosapi.OneOSApiManager
 import com.mmwtl.atlasmediaapi.media.session.BackgroundPlayerStarter
 import com.mmwtl.atlasmediaapi.media.session.MediaSessionObserver
+import com.mmwtl.atlasmediaapi.media.session.PreparedPlayer
+import com.mmwtl.atlasmediaapi.media.session.PreparedSession
 import com.mmwtl.atlasmediaapi.settings.AtlasPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -511,6 +513,111 @@ class AndroidMediaCommandHostTest {
         session.release()
     }
 
+    @Test
+    fun `online default without autoplay shows the prepared track instead of opening the player`() = runBlocking {
+        val fixture = prepareFixture("com.example.resume", prepares = true)
+
+        assertTrue(fixture.host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = false))
+
+        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
+        assertTrue(fixture.launched.isEmpty())
+        assertNull(shadowOf(fixture.context).nextStartedActivity)
+        val shown = fixture.repository.snapshot()
+        assertEquals("Last track", shown.title)
+        assertEquals("com.example.resume", shown.ownerPackage)
+        assertEquals(PlaybackState.STATE_STOPPED, shown.playbackState)
+        assertTrue(shown.capabilities and MediaCapabilities.PLAY != 0L)
+        fixture.release()
+    }
+
+    @Test
+    fun `online default without autoplay launches a player that cannot be prepared`() = runBlocking {
+        val fixture = prepareFixture("com.example.resume", prepares = false)
+
+        assertTrue(fixture.host.setDefaultSource(BridgeAudioSource.ONLINE, autoplay = false))
+
+        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
+        assertEquals(listOf("com.example.resume"), fixture.launched)
+        fixture.release()
+    }
+
+    @Test
+    fun `startup prepare shows the configured player when MediaCenter is unavailable`() = runBlocking {
+        val fixture = prepareFixture("com.example.resume", prepares = true)
+
+        assertTrue(fixture.host.prepareCurrentOnlinePlayer())
+
+        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
+        assertEquals("Last track", fixture.repository.snapshot().title)
+        fixture.release()
+    }
+
+    @Test
+    fun `player tile without autoplay prepares a player that has no session`() = runBlocking {
+        val fixture = prepareFixture("com.example.default", prepares = true, preparedPackage = "com.example.resume")
+        install(fixture.context, "com.example.resume")
+
+        assertTrue(fixture.host.selectPlayer("com.example.resume", autoplay = false))
+
+        assertEquals(listOf("prepare:com.example.resume"), fixture.starter.calls)
+        assertEquals("com.example.resume", fixture.repository.snapshot().ownerPackage)
+        assertEquals("Last track", fixture.repository.snapshot().title)
+        assertEquals("com.example.resume", fixture.host.preferredSession()?.packageName)
+        assertTrue(fixture.host.preferredSession()!!.capabilities and MediaCapabilities.PLAY != 0L)
+        fixture.release()
+    }
+
+    private class PrepareFixture(
+        val context: android.app.Application,
+        val repository: MediaStateRepository,
+        val observer: MediaSessionObserver,
+        val host: AndroidMediaCommandHost,
+        val starter: FakeBackgroundStarter,
+        val launched: List<String>,
+        val session: MediaSession,
+    ) {
+        fun release() {
+            observer.stop()
+            session.release()
+        }
+    }
+
+    /** A player whose browser session has no track and whose recent root names "Last track". */
+    private fun prepareFixture(
+        configuredPackage: String,
+        prepares: Boolean,
+        preparedPackage: String = configuredPackage,
+    ): PrepareFixture {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub).apply { start() }
+        val session = MediaSession(context, "prepared-$preparedPackage")
+        val controller = MediaController(context, session.sessionToken)
+        shadowOf(controller).setPackageName(preparedPackage)
+        val recent = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, "Last track")
+            .build()
+        val starter = FakeBackgroundStarter(
+            onPrepare = { PreparedSession(controller, recent) }.takeIf { prepares },
+        )
+        val launched = mutableListOf<String>()
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply { defaultMediaPackage = configuredPackage },
+            hub = hub,
+            launchPackage = {
+                launched += it
+                true
+            },
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+            backgroundPlayerStarter = starter,
+        )
+        return PrepareFixture(context, repository, observer, host, starter, launched, session)
+    }
+
     private data class Fixture(
         val context: android.app.Application,
         val repository: MediaStateRepository,
@@ -597,6 +704,7 @@ class AndroidMediaCommandHostTest {
     private class FakeBackgroundStarter(
         private val onBrowserPlay: (() -> Unit)? = null,
         private val onMediaButton: (() -> Unit)? = null,
+        private val onPrepare: (() -> PreparedSession)? = null,
     ) : BackgroundPlayerStarter {
         val calls = mutableListOf<String>()
 
@@ -612,6 +720,15 @@ class AndroidMediaCommandHostTest {
             val press = onMediaButton ?: return false
             press()
             return true
+        }
+
+        override suspend fun connectAndPrepare(
+            packageName: String,
+            allowPrepare: Boolean,
+        ): PreparedPlayer? {
+            calls += "prepare:$packageName"
+            val session = onPrepare?.invoke() ?: return null
+            return PreparedPlayer(session, AutoCloseable { calls += "close:$packageName" })
         }
     }
 

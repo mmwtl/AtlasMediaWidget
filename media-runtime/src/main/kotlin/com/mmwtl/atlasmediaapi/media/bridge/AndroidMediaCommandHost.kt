@@ -64,6 +64,10 @@ class AndroidMediaCommandHost(
     // connection that started playback stays open until another background start replaces it.
     private val retainedBrowserConnection = AtomicReference<AutoCloseable?>(null)
 
+    // The browser connection of a player prepared without playback; kept apart so that preparing
+    // one player does not release the connection another one plays through.
+    private val preparedBrowserConnection = AtomicReference<AutoCloseable?>(null)
+
     private fun mediaCenter(): MediaCenterManager? =
         apiManager.getMediaCenterManager()?.takeIf { it.isAlive }
 
@@ -78,7 +82,7 @@ class AndroidMediaCommandHost(
         if (mediaCenter()?.currentAudioSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA) {
             val session = sessionObserver.getActiveControllers()
                 .firstOrNull { it.packageName in CARPLAY_MEDIA_SESSION_PACKAGES }
-                ?.let(::AndroidMediaSessionTarget)
+                ?.let(::sessionTarget)
             return session ?: carPlayBridge?.let(::CarPlayMediaSessionTarget)
         }
         return null
@@ -134,10 +138,10 @@ class AndroidMediaCommandHost(
         if (mediaCenter()?.currentAudioSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA) {
             val session = sessionObserver.getActiveControllers()
                 .firstOrNull { it.packageName in CARPLAY_MEDIA_SESSION_PACKAGES }
-                ?.let(::AndroidMediaSessionTarget)
+                ?.let(::sessionTarget)
             return session ?: carPlayBridge?.let(::CarPlayMediaSessionTarget)
         }
-        return selectPlayerSession()?.let(::AndroidMediaSessionTarget)
+        return selectPlayerSession()?.let(::sessionTarget)
     }
 
     /**
@@ -146,7 +150,9 @@ class AndroidMediaCommandHost(
      */
     private fun selectPlayerSession(): MediaController? {
         val sessions = sessionObserver.getActiveControllers()
-        val facts = sessions.associateWith { it.playerSessionFacts() }
+        val facts = sessions.associateWith {
+            it.playerSessionFacts(sessionObserver.metadataOf(it), sessionObserver.playbackStateOf(it))
+        }
         val shownPackage = displayedMediaPackage()
         val selected = PlayerSessionSelector.select(
             sessions = sessions,
@@ -165,8 +171,20 @@ class AndroidMediaCommandHost(
         return if (holdMs > 0L) shown else selected
     }
 
+    private fun publish(controller: MediaController) {
+        stateHub?.onMediaController(
+            controller,
+            sessionObserver.metadataOf(controller),
+            sessionObserver.playbackStateOf(controller),
+        )
+    }
+
+    /** A prepared session offers play before the player publishes a playback state. */
+    private fun sessionTarget(controller: MediaController): MediaSessionCommandTarget =
+        AndroidMediaSessionTarget(controller) { sessionObserver.playbackStateOf(controller) }
+
     override fun sessions(): List<MediaSessionCommandTarget> =
-        sessionObserver.getActiveControllers().map(::AndroidMediaSessionTarget)
+        sessionObserver.getActiveControllers().map(::sessionTarget)
 
     override fun currentVisiblePackage(): String = displayedMediaPackage()
 
@@ -194,7 +212,7 @@ class AndroidMediaCommandHost(
         onUserAction?.invoke()
         val controller = sessionObserver.getActiveControllers().firstOrNull { it.packageName == packageName }
         if (controller != null) {
-            val target = AndroidMediaSessionTarget(controller)
+            val target = sessionTarget(controller)
             return when (command) {
                 MediaCommand.PLAY -> target.play()
                 MediaCommand.PAUSE -> target.pause()
@@ -245,6 +263,51 @@ class AndroidMediaCommandHost(
         return false
     }
 
+    /**
+     * Startup without autoplay on a head unit that came up on ONLINE by itself: the remembered or
+     * configured player shows the track it would resume. Other sources are left alone.
+     */
+    suspend fun prepareCurrentOnlinePlayer(): Boolean {
+        val center = mediaCenter()
+        if (center != null && runCatching { center.currentAudioSource }.getOrNull() !=
+            MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE
+        ) {
+            Timber.i("Startup prepare skipped: the head unit source is not ONLINE")
+            return true
+        }
+        val packageName = lastOnlineMediaPackageRef.get().ifBlank { defaultMediaPackage() }
+        if (packageName.isBlank()) return true
+        if (sessionObserver.getActiveControllers().any { PlayerSessionSelector.isPlaying(it.playbackState?.state) }) {
+            Timber.i("Startup prepare skipped: a player is already playing")
+            return true
+        }
+        return prepareQuietly(packageName)
+    }
+
+    /**
+     * Shows [packageName] with the track it would resume, without playback and without opening its
+     * activity: its media browser session (prepared, or the recent root of Android 11 media
+     * resumption) joins the observed sessions. False when the player has no reachable browser.
+     */
+    private suspend fun prepareQuietly(packageName: String): Boolean {
+        val existing = configuredController(packageName)
+        if (existing != null && sessionObserver.metadataOf(existing).hasPlayerContent()) {
+            Timber.i("%s already shows a track; nothing to prepare", packageName)
+            return true
+        }
+        val starter = backgroundPlayerStarter ?: return false
+        // Prepare is not playback, but a player that takes audio focus for it would hit the call.
+        val prepared = starter.connectAndPrepare(
+            packageName = packageName,
+            allowPrepare = !CallGuard.isCallActive(context),
+        ) ?: return false
+        preparedBrowserConnection.getAndSet(prepared.connection)?.close()
+        rememberOnlineMediaPackage(packageName)
+        currentMediaPackageRef.set(packageName)
+        sessionObserver.addPreparedSession(prepared.session)
+        return true
+    }
+
     private suspend fun launchPackageAndMaybePlay(
         packageName: String,
         autoplay: Boolean,
@@ -254,6 +317,10 @@ class AndroidMediaCommandHost(
         Timber.i("Starting configured media package %s (autoplay=%s)", packageName, autoplay)
         if (autoplay) {
             startInBackgroundAndPlay(packageName)?.let { return it }
+        } else if (prepareQuietly(packageName)) {
+            return true
+        } else {
+            Timber.i("%s cannot be prepared in the background; launching its activity", packageName)
         }
         val launched = launchPackage?.let { callback ->
             runCatching { callback(packageName) }
@@ -317,7 +384,7 @@ class AndroidMediaCommandHost(
         var controller = initialController
         if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
             setCurrentMediaPackage(packageName)
-            stateHub?.onMediaController(controller)
+            publish(controller)
             return true
         }
 
@@ -330,7 +397,7 @@ class AndroidMediaCommandHost(
             controller = configuredController(packageName) ?: controller
             if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
                 setCurrentMediaPackage(packageName)
-                stateHub?.onMediaController(controller)
+                publish(controller)
                 return true
             }
         }
@@ -351,7 +418,7 @@ class AndroidMediaCommandHost(
         controller = configuredController(packageName) ?: controller
         if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
             setCurrentMediaPackage(packageName)
-            stateHub?.onMediaController(controller)
+            publish(controller)
             return true
         }
 
@@ -438,7 +505,11 @@ class AndroidMediaCommandHost(
         }
         val controller = configuredController(packageName)
         if (!autoplay) {
-            controller?.let { stateHub?.onMediaController(it) }
+            if (controller != null && sessionObserver.metadataOf(controller).hasPlayerContent()) {
+                publish(controller)
+            } else if (!prepareQuietly(packageName)) {
+                controller?.let(::publish)
+            }
             return true
         }
         val playing = if (controller != null) {
@@ -663,13 +734,13 @@ class AndroidMediaCommandHost(
         if (rememberedPackage.isNotBlank()) {
             controllers
                 .firstOrNull { it.packageName == rememberedPackage }
-                ?.let { return AndroidMediaSessionTarget(it) }
+                ?.let { return sessionTarget(it) }
         }
         val configuredPackage = defaultMediaPackage()
         if (configuredPackage.isNotBlank()) {
             controllers
                 .firstOrNull { it.packageName == configuredPackage }
-                ?.let { return AndroidMediaSessionTarget(it) }
+                ?.let { return sessionTarget(it) }
         }
         return null
     }
@@ -781,7 +852,7 @@ class AndroidMediaCommandHost(
     ) {
         if (target == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) {
             val packageName = preferredOnlineSession()?.packageName ?: return
-            configuredController(packageName)?.let { stateHub?.onMediaController(it) }
+            configuredController(packageName)?.let(::publish)
             return
         }
         if (target !in setOf(
@@ -933,19 +1004,20 @@ fun BridgeAudioSource.toOneOsSource(): MediaCenterConstant.AudioSource = when (t
 
 class AndroidMediaSessionTarget(
     private val controller: MediaController,
+    private val state: () -> PlaybackState? = { controller.playbackState },
 ) : MediaSessionCommandTarget {
     override val packageName: String get() = controller.packageName.orEmpty()
     override val lastPositionUpdateTime: Long
-        get() = controller.playbackState?.lastPositionUpdateTime ?: 0L
+        get() = state()?.lastPositionUpdateTime ?: 0L
 
     override val playbackState: SessionPlaybackState
-        get() = if (PlayerSessionSelector.isPlaying(controller.playbackState?.state)) {
+        get() = if (PlayerSessionSelector.isPlaying(state()?.state)) {
             SessionPlaybackState.PLAYING
         } else SessionPlaybackState.NOT_PLAYING
 
     override val capabilities: Long
         get() {
-            val actions = controller.playbackState?.actions ?: 0L
+            val actions = state()?.actions ?: 0L
             var caps = MediaCapabilities.fromPlaybackActions(actions)
             if (caps and MediaCapabilities.PLAY != 0L &&
                 caps and MediaCapabilities.PAUSE != 0L
@@ -961,7 +1033,7 @@ class AndroidMediaSessionTarget(
         }
 
     override fun play(): Boolean = runCatching {
-        if (isIdle(controller.playbackState?.state)) {
+        if (isIdle(state()?.state)) {
             // An idle player may have nothing loaded: Media3 ignores play() with an empty playlist
             // but resumes its last queue from a MEDIA_PLAY key, as after a cold start.
             val eventTime = android.os.SystemClock.uptimeMillis()

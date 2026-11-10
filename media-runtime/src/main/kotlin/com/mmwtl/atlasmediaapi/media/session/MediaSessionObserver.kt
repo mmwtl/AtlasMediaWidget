@@ -27,6 +27,11 @@ class MediaSessionObserver(
     private var cbHandler: Handler? = null
     private val callbacks = mutableMapOf<MediaController, MediaController.Callback>()
     private val activeControllers = CopyOnWriteArrayList<MediaController>()
+
+    // Sessions reached through a player's media browser before the player made them active; each
+    // is dropped once its package publishes an active session or the session is destroyed.
+    private val preparedSessions = CopyOnWriteArrayList<PreparedSession>()
+    private val preparedCallbacks = mutableMapOf<MediaController, MediaController.Callback>()
     private var sessionListener: MediaSessionManager.OnActiveSessionsChangedListener? = null
     private var sessionListenerRegistered = false
     private var isStarted = false
@@ -64,6 +69,9 @@ class MediaSessionObserver(
             MediaNotificationListenerService.removeConnectionListener(notificationConnectionListener)
             callbacks.clear()
             activeControllers.clear()
+            val registeredPrepared = preparedCallbacks.toMap()
+            preparedCallbacks.clear()
+            preparedSessions.clear()
 
             cbHandler?.removeCallbacksAndMessages(null)
             cbHandler?.post {
@@ -71,7 +79,7 @@ class MediaSessionObserver(
                     runCatching { sessionManager.removeOnActiveSessionsChangedListener(it) }
                         .onFailure(Timber::e)
                 }
-                registeredCallbacks.forEach { (controller, callback) ->
+                (registeredCallbacks + registeredPrepared).forEach { (controller, callback) ->
                     runCatching { controller.unregisterCallback(callback) }.onFailure(Timber::e)
                 }
             }
@@ -84,7 +92,84 @@ class MediaSessionObserver(
         }
     }
 
-    fun getActiveControllers(): List<MediaController> = activeControllers.toList()
+    /** Active sessions, then prepared sessions of packages that have no active one. */
+    fun getActiveControllers(): List<MediaController> {
+        val active = activeControllers.toList()
+        val activePackages = active.mapTo(HashSet()) { it.packageName }
+        return active + preparedSessions.map { it.controller }.filter { it.packageName !in activePackages }
+    }
+
+    private fun preparedSession(controller: MediaController): PreparedSession? =
+        preparedSessions.firstOrNull { it.controller === controller }
+
+    /** Metadata the card shows for [controller]; see [PreparedSession.metadata]. */
+    fun metadataOf(controller: MediaController): MediaMetadata? =
+        preparedSession(controller)?.metadata() ?: controller.metadata
+
+    /** Playback state the card and commands use for [controller]; see [PreparedSession]. */
+    fun playbackStateOf(controller: MediaController): PlaybackState? =
+        preparedSession(controller)?.playbackState() ?: controller.playbackState
+
+    private fun factsOf(controller: MediaController) =
+        controller.playerSessionFacts(metadataOf(controller), playbackStateOf(controller))
+
+    private fun publish(controller: MediaController) {
+        hub.onMediaController(controller, metadataOf(controller), playbackStateOf(controller))
+    }
+
+    /**
+     * Observes a player session reached through its media browser that may not be active yet, so
+     * the card can show the track the player would resume and commands can reach it.
+     */
+    fun addPreparedSession(session: PreparedSession) {
+        synchronized(this) {
+            if (!isStarted) return
+            val handler = cbHandler ?: return
+            val controller = session.controller
+            val packageName = controller.packageName
+            if (activeControllers.any { it.packageName == packageName }) {
+                dispatchSessionUpdate(generation)
+                return
+            }
+            preparedSessions.filter { it.controller.packageName == packageName }
+                .forEach { removePreparedLocked(it.controller) }
+            val callback = object : MediaController.Callback() {
+                override fun onPlaybackStateChanged(state: PlaybackState?) {
+                    handler.post(::dispatchCurrentSessions)
+                }
+
+                override fun onMetadataChanged(metadata: MediaMetadata?) {
+                    handler.post(::dispatchCurrentSessions)
+                }
+
+                override fun onSessionDestroyed() {
+                    handler.post {
+                        synchronized(this@MediaSessionObserver) {
+                            removePreparedLocked(controller)
+                            dispatchSessionUpdate(generation)
+                        }
+                    }
+                }
+            }
+            runCatching { controller.registerCallback(callback, handler) }
+                .onSuccess { preparedCallbacks[controller] = callback }
+                .onFailure(Timber::e)
+            preparedSessions += session
+            Timber.i("Observing the prepared session of %s", packageName)
+            dispatchSessionUpdate(generation)
+        }
+    }
+
+    private fun dispatchCurrentSessions() {
+        synchronized(this) { dispatchSessionUpdate(generation) }
+    }
+
+    private fun removePreparedLocked(controller: MediaController) {
+        preparedCallbacks.remove(controller)?.let { callback ->
+            runCatching { controller.unregisterCallback(callback) }.onFailure(Timber::e)
+        }
+        preparedSessions.removeAll { it.controller === controller }
+    }
 
     /** Elapsed realtime the player stopped playing while it had a session, or null. */
     fun stoppedPlayingAt(packageName: String): Long? =
@@ -94,8 +179,8 @@ class MediaSessionObserver(
         synchronized(this) {
             if (!isStarted) return
             // A refresh only republishes; session removal is reported by session callbacks.
-            selectActive(activeControllers.toList().filterNot(::isNativeBluetoothController), generation)
-                ?.let(hub::onMediaController)
+            selectActive(getActiveControllers().filterNot(::isNativeBluetoothController), generation)
+                ?.let(::publish)
         }
     }
 
@@ -160,6 +245,9 @@ class MediaSessionObserver(
             }
             clearControllersLocked()
             activeControllers.addAll(filtered)
+            val activePackages = filtered.mapTo(HashSet()) { it.packageName }
+            preparedSessions.filter { it.controller.packageName in activePackages }
+                .forEach { removePreparedLocked(it.controller) }
             val handler = cbHandler ?: return
             filtered.forEach { controller ->
                 val callback = object : MediaController.Callback() {
@@ -198,7 +286,7 @@ class MediaSessionObserver(
     private fun dispatchSessionUpdate(expectedGeneration: Long) {
         synchronized(this) {
             if (!isGenerationActiveLocked(expectedGeneration)) return
-            val controllers = activeControllers.toList()
+            val controllers = getActiveControllers()
             publishActive(controllers, expectedGeneration)
 
             val carPlay = controllers.firstOrNull { it.packageName in CARPLAY_MEDIA_SESSION_PACKAGES }
@@ -240,7 +328,7 @@ class MediaSessionObserver(
         candidates: List<MediaController>,
         expectedGeneration: Long,
     ): MediaController? {
-        val facts = candidates.associateWith { it.playerSessionFacts() }
+        val facts = candidates.associateWith(::factsOf)
         val now = android.os.SystemClock.elapsedRealtime()
         val playing = facts.values.filter { it.playing }.map { it.packageName }.toSet()
         (playingPackages - playing).forEach { stoppedPlayingAt[it] = now }
@@ -269,7 +357,7 @@ class MediaSessionObserver(
         val candidates = controllers.filterNot(::isNativeBluetoothController)
         val active = selectActive(candidates, expectedGeneration)
         when {
-            active != null -> hub.onMediaController(active)
+            active != null -> publish(active)
             candidates.isEmpty() -> hub.onMediaController(null)
             else -> hub.onPlayerContentGone()
         }

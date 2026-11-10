@@ -10,6 +10,7 @@ import android.os.Handler
 import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import com.mmwtl.atlasmediaapi.media.bridge.ArtworkRepository
 import com.mmwtl.atlasmediaapi.media.bridge.BridgeAudioSource
+import com.mmwtl.atlasmediaapi.media.bridge.MediaCapabilities
 import com.mmwtl.atlasmediaapi.media.bridge.MediaStateHub
 import com.mmwtl.atlasmediaapi.media.bridge.MediaStateRepository
 import kotlinx.coroutines.CoroutineScope
@@ -316,6 +317,55 @@ class MediaSessionObserverRecoveryTest {
         assertEquals("Shown track", fixture.repository.snapshot().title)
         fixture.observer.stop()
         shown.session.release()
+    }
+
+    @Test
+    fun `prepared session shows the recent track until its player publishes an active session`() {
+        val fixture = onlineFixture()
+        fixture.observer.start()
+        notifyNotificationListener(fixture.observer, true)
+        val preparedSession = MediaSession(fixture.context, "observer-test-prepared")
+        val prepared = MediaController(fixture.context, preparedSession.sessionToken)
+        shadowOf(prepared).setPackageName("com.example.resume")
+        val recent = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE, "Last track")
+            .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, "Last artist")
+            .build()
+
+        fixture.observer.addPreparedSession(PreparedSession(prepared, recent))
+        waitFor { fixture.repository.snapshot().title == "Last track" }
+
+        val shown = fixture.repository.snapshot()
+        assertEquals("Last track", shown.title)
+        assertEquals("Last artist", shown.artist)
+        assertEquals("com.example.resume", shown.ownerPackage)
+        assertEquals(PlaybackState.STATE_STOPPED, shown.playbackState)
+        assertTrue(shown.capabilities and MediaCapabilities.PLAY != 0L)
+        assertEquals(listOf(prepared), fixture.observer.getActiveControllers())
+
+        val active = createController(fixture.context, "com.example.resume", "Playing track")
+        ShadowMediaSessionManager.setControllers(listOf(active.controller))
+        ShadowMediaSessionManager.dispatchControllers()
+        waitFor { fixture.repository.snapshot().title == "Playing track" }
+
+        assertEquals("Playing track", fixture.repository.snapshot().title)
+        assertEquals(listOf(active.controller), fixture.observer.getActiveControllers())
+        fixture.observer.stop()
+        preparedSession.release()
+        active.session.release()
+    }
+
+    @Test
+    fun `prepared session is not observed after the observer stops`() {
+        val fixture = onlineFixture()
+        val preparedSession = MediaSession(fixture.context, "observer-test-stopped")
+        val prepared = MediaController(fixture.context, preparedSession.sessionToken)
+        shadowOf(prepared).setPackageName("com.example.resume")
+
+        fixture.observer.addPreparedSession(PreparedSession(prepared, recentTrack = null))
+
+        assertTrue(fixture.observer.getActiveControllers().isEmpty())
+        preparedSession.release()
     }
 
     private data class OnlineFixture(

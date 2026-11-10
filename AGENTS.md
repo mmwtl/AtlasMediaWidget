@@ -102,6 +102,10 @@ migration request.
   broadcast result data `PLAY`/`PAUSE`/`NEXT`/`PREVIOUS` or null when dropped). Do not
   change it without coordinating with AtlasLauncher. It only forwards to a running
   `OverlayService` with a connected Bridge; it never starts the service or binds.
+- Showing an Online player without autoplay (startup, player tile) prepares it through its
+  MediaBrowser (`EXTRA_RECENT` root, `prepare()`) instead of opening its activity; the activity is
+  only the fallback without a reachable browser. `MediaSessionObserver` keeps such a prepared
+  session until its package publishes an active session (docs/full-media-bridge.md §6).
 - Automatic playback (startup autoplay, autoplay after source loss) runs through `CallGuard`: an
   active call by audio mode skips it or cancels its play retries, which would otherwise restart
   the player against the call's audio focus. User commands are not blocked.

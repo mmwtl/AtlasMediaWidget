@@ -167,12 +167,53 @@ Binding is established via explicit Intent (`bindService`):
   Online-плеер и запускает его теми же путями, что и плеер по умолчанию (сессия, MediaBrowser,
   кнопка MEDIA_PLAY, окно приложения). Плеер, который играл до этого, ставится на паузу только
   после того, как новый подтвердил воспроизведение. Неустановленный пакет даёт `FAILED`.
+  С `autoplay = false` плеер без сессии с треком готовится без воспроизведения (см. ниже).
 - `0x80` (`TUNE_RADIO`) — прямая настройка частоты радио (`radioFrequencyKHz: Int`, `radioBand: String`)
 
 Команда `CUSTOM_ACTION` (`customAction: String`) не входит в маску: она доступна, пока действие
 есть в `customActions`. Сервис отправляет его через `TransportControls.sendCustomAction` той
 сессии, которая сейчас его публикует, иначе отвечает `NOT_SUPPORTED`. Смысл действия (лайк,
 перемешивание и т. п.) определяет плеер; Bridge и клиент его не интерпретируют.
+
+### Подготовка Online-плеера без воспроизведения / Preparing an Online player without playback
+
+[RU] Когда Online-плеер нужно показать без автовоспроизведения — запуск с источником по умолчанию
+ONLINE, запуск ГУ, который сам поднялся на ONLINE (если задан плеер по умолчанию и никто не
+играет), плитка плеера с `autoplay = false`, — сервис не открывает окно плеера, а подключается к
+его `MediaBrowserService`:
+
+1. сначала с подсказкой `BrowserRoot.EXTRA_RECENT` (возобновление медиа Android 11); если сервис
+   отказывает в подключении, повторно без подсказок;
+2. если в сессии нет трека и звонка нет, вызывается `TransportControls.prepare()` и ожидается
+   трек (до 4 с); плеер, который при этом заиграл, ставится на паузу;
+3. если трека всё ещё нет, а сервис вернул `EXTRA_RECENT` в extras корня, первый воспроизводимый
+   элемент корня (название, подзаголовок, иконка) служит метаданными, пока сессия не опубликует
+   свои.
+
+Сессия добавляется в `MediaSessionObserver` как подготовленная и участвует в выборе карточки и
+команд, пока её пакет не опубликует активную сессию или сессия не будет уничтожена. Подготовленная
+сессия без состояния или без действия play показывается остановленной с `PLAY`: кнопка отправляет
+ей `MEDIA_PLAY`. Соединение с браузером удерживается отдельно от соединения, через которое играет
+другой плеер. Если браузера нет или он не подключается, при запуске остаётся прежнее поведение —
+открыть окно плеера (с автосворачиванием по настройке).
+
+Факты Android API: `EXTRA_RECENT`, `prepare()` и токен сессии из `MediaBrowser`. Не проверено на
+ГУ: какие плееры (в том числе AIMP) отдают трек через `prepare()` или корень `EXTRA_RECENT`,
+проверяют ли они пакет вызывающего, доступна ли нам иконка по `content://` и меняет ли
+подготовка источник OneOS.
+
+[EN] To show an Online player without autoplay (startup with ONLINE as the default source, a head
+unit that came up on ONLINE by itself with a default player configured and nothing playing, a
+player tile with `autoplay = false`), the service connects to the player's `MediaBrowserService`
+instead of opening its activity: first with the `BrowserRoot.EXTRA_RECENT` hint (Android 11 media
+resumption), again without hints if the service refuses; then, without a track and without a
+call, it sends `prepare()` and waits up to 4 s (a player that starts playing is paused again);
+otherwise, when the root echoes `EXTRA_RECENT`, the first playable child stands in for the
+metadata until the session publishes its own. `MediaSessionObserver` keeps the session as prepared
+until its package publishes an active session or the session is destroyed; without a state or
+play action it is shown stopped with `PLAY` and receives `MEDIA_PLAY`. Without a reachable browser
+startup still opens the player's activity. Which players answer either path, caller checks,
+`content://` icon access and OneOS source effects are not verified on the head unit.
 
 ### Локальный расчет прогресса (Local Progress Estimation):
 Вместо ежесекундного Binder-опроса клиент вычисляет прогресс локально, если `playbackState == 3` (`PLAYING`):

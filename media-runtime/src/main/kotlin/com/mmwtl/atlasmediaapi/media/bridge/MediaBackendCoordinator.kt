@@ -326,7 +326,8 @@ class MediaBackendCoordinator(
             runCatching { BridgeAudioSource.valueOf(targetSourceStr) }.getOrNull() ?: return
         }
         if (targetSource == BridgeAudioSource.UNKNOWN || targetSource == BridgeAudioSource.OTHER) return
-        if (targetSource == null && !autoplay) return
+        // Without a default source or autoplay, an ONLINE head unit still shows its player's track.
+        if (targetSource == null && !autoplay && preferences.defaultMediaPackage.isBlank()) return
 
         val delayMs = if (targetSource != null) {
             preferences.defaultAudioSourceDelaySec * 1000L
@@ -376,8 +377,10 @@ class MediaBackendCoordinator(
                                         source = targetSource,
                                         autoplay = autoplay,
                                     )
-                                } else {
+                                } else if (autoplay) {
                                     commandHost.autoplayCurrentSource()
+                                } else {
+                                    commandHost.prepareCurrentOnlinePlayer()
                                 }
                             }
                         }

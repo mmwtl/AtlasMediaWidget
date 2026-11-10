@@ -285,9 +285,17 @@ class MediaStateHub(
         }
     }
 
-    fun onMediaController(controller: MediaController?): BridgeAudioSource? {
+    /**
+     * @param metadata the session's metadata, or the recent track of a prepared session.
+     * @param state the session's playback state, with play for a prepared session.
+     */
+    fun onMediaController(
+        controller: MediaController?,
+        metadata: MediaMetadata? = controller?.metadata,
+        state: PlaybackState? = controller?.playbackState,
+    ): BridgeAudioSource? {
         synchronized(mediaCallbackLock) {
-            return onMediaControllerLocked(controller)
+            return onMediaControllerLocked(controller, metadata, state)
         }
     }
 
@@ -331,7 +339,11 @@ class MediaStateHub(
         }
     }
 
-    private fun onMediaControllerLocked(controller: MediaController?): BridgeAudioSource? {
+    private fun onMediaControllerLocked(
+        controller: MediaController?,
+        metadata: MediaMetadata?,
+        state: PlaybackState?,
+    ): BridgeAudioSource? {
         if (controller == null) {
             val snapshot = repository.snapshot()
             val fallback = onlineSourcePolicy.onSessionGone(snapshot.audioSource.asBridgeAudioSource())
@@ -363,8 +375,6 @@ class MediaStateHub(
             )
         ) return null
 
-        val metadata = controller.metadata
-        val state = controller.playbackState
         val ownerPackage = controller.packageName.orEmpty()
         val title = metadata.text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
             .ifBlank { metadata.text(MediaMetadata.METADATA_KEY_TITLE) }
@@ -995,11 +1005,14 @@ internal fun MediaMetadata?.hasPlayerContent(): Boolean {
         text(MediaMetadata.METADATA_KEY_MEDIA_ID).isNotBlank()
 }
 
-internal fun MediaController.playerSessionFacts(): PlayerSessionFacts = PlayerSessionFacts(
+internal fun MediaController.playerSessionFacts(
+    metadata: MediaMetadata? = this.metadata,
+    state: PlaybackState? = playbackState,
+): PlayerSessionFacts = PlayerSessionFacts(
     packageName = packageName.orEmpty(),
-    playing = PlayerSessionSelector.isPlaying(playbackState?.state),
+    playing = PlayerSessionSelector.isPlaying(state?.state),
     hasContent = metadata.hasPlayerContent(),
-    lastPositionUpdateTime = playbackState?.lastPositionUpdateTime ?: 0L,
+    lastPositionUpdateTime = state?.lastPositionUpdateTime ?: 0L,
 )
 
 /** Track and playback fields cleared for a newly selected source until it reports its own. */
