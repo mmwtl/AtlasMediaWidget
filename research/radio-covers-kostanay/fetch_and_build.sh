@@ -50,7 +50,7 @@ while IFS=, read -r cover original source_url background foreground_size composi
 done
 
 # The built-in Penza cover always wins for a recognised station, byte for byte.
-penza="$repo_dir/media-runtime/src/main/assets/radio/covers"
+penza="$repo_dir/research/radio-covers-penza/covers"
 cp "$penza/103800_europa_plus.webp" "$covers/europa_plus.webp"
 cp "$penza/096400_love_radio.webp" "$covers/love_radio.webp"
 cp "$penza/095600_retro_fm.webp" "$covers/retro_fm.webp"

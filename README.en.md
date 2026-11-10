@@ -115,7 +115,7 @@ the background until you pick your own. The overlay uses the night colours.
 - with Online as the default source and autoplay off, the card shows the player at startup with the
   track it stopped on, and music starts only from the play button; a player that provides no track
   in the background is opened for this and can be minimized automatically;
-- radio catalogs with station artwork: a built-in pack of 463 cities in Russia, Kazakhstan and
+- radio catalogs with station artwork: a built-in pack of 466 cities in Russia, Kazakhstan and
   Belarus with a country- and region-grouped city picker (Penza by default), loadable city packs and
   custom single catalogs, favorites grid and saved-station navigation without scanning;
 - radio title and artwork broadcast to the Geely OneOS DIM; optional separate Online progress

@@ -1,0 +1,48 @@
+{
+  "beu_fm.webp": {
+    "original": "beu_fm.png",
+    "url": "https://beufm.kz/template/logo_white.png",
+    "background": "#171717",
+    "size": 440,
+    "composition": "logo"
+  },
+  "jibek_joly.webp": {
+    "original": "jibek_joly.svg",
+    "url": "https://jjfm.kz/static/img/logo.svg",
+    "background": "#0D6781",
+    "size": 440,
+    "composition": "logo"
+  },
+  "classic.webp": {
+    "original": "classic.svg",
+    "url": "https://storage.igraphic.kz/projects/-N-SKJv-fiD381fC3Jul/cover.svg",
+    "source_page": "https://igraphic.kz/projects/radio_classic_redesign",
+    "background": "#005972",
+    "size": 430,
+    "composition": "classic-mono"
+  },
+  "orda_fm.webp": {
+    "original": "orda_fm.png",
+    "url": "https://orda.fm/ordafm-logo26.png",
+    "background": "#FFFFFF",
+    "size": 430,
+    "composition": "crop",
+    "crop": "326x136+12+12"
+  },
+  "toi_duman.webp": {
+    "original": "toi_duman.svg",
+    "url": "https://toiduman.kz/images/toiduman-logo.svg",
+    "background": "#442F1D",
+    "size": 430,
+    "composition": "svg-transparent"
+  },
+  "halyq_radio.webp": {
+    "original": "halyq_radio.png",
+    "url": "https://pavlodarnews.kz/logotype/hr.png",
+    "background": "#C62D3B",
+    "size": 512,
+    "composition": "restored-tile",
+    "prepared": "halyq_radio-restored.png",
+    "restoration": "image_gen built-in; see halyq-restoration-prompt.txt"
+  }
+}

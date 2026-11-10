@@ -1,0 +1,355 @@
+{
+  "snapshot_date": "2026-11-10",
+  "base_commit": "1d7232b",
+  "primary_pack": "atlas-radio-6plus.zip",
+  "built_in_pack": "media-runtime/src/main/assets/radio_pack/",
+  "new_cities": [
+    {
+      "name": "Астана",
+      "filename": "stations_astana.zip",
+      "stations": 18,
+      "zip_bytes": 338351,
+      "sha256": "03c2fda2777fd4effa2ddeeaabd2b3fc1c49f9b9a8f26d2f4b7d883afca7cfb5"
+    },
+    {
+      "name": "Кокшетау",
+      "filename": "stations_kokshetau.zip",
+      "stations": 9,
+      "zip_bytes": 122915,
+      "sha256": "f5840a152d58cbe5d51f0fac29ceb4813d38a7660ce8df08419a6c9a551b45ec"
+    },
+    {
+      "name": "Павлодар",
+      "filename": "stations_pavlodar.zip",
+      "stations": 13,
+      "zip_bytes": 223647,
+      "sha256": "6a13ead4ea852ce0f1afe25c3e9a966116bda2982cdc4a5b0f0a5e774cff5253"
+    }
+  ],
+  "added_station_rows": 40,
+  "new_unique_covers": 6,
+  "previous_archives": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "781ae9dff6c0ad22695aece05548db3f07edf1c6e49ef79fc39fce234ae9655f"
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "21cd7b80f9dd907f30642a61c37db4686d4cc925f251393dbeec2893cd1519eb"
+    }
+  ],
+  "full_pack": {
+    "catalogs": 3184,
+    "regions": 90,
+    "countries": {
+      "Россия": 3179,
+      "Казахстан": 4,
+      "Беларусь": 1
+    },
+    "station_rows": 12064,
+    "station_brands": 513,
+    "covers": 496,
+    "entries": 3681,
+    "uncompressed_bytes": 8079121,
+    "zip_bytes": 7664438,
+    "sha256": "3b5bcd353ed6b58d81b6a7c6d74696ec3ef1458a080f608f39dbcb0c38a5c67d",
+    "max_stations_per_city": 54,
+    "oirt_rows": 2099,
+    "uncertain_rows": 9,
+    "text_placeholder_brands": 150,
+    "radio_logo_brands": 0,
+    "cover_source_tiers": {
+      "national": 392,
+      "city_archive": 84,
+      "penza": 34
+    },
+    "unique_cover_source_tiers": {
+      "penza": 25,
+      "city_archive": 81,
+      "national": 390
+    },
+    "curated_rows_not_merged": 15,
+    "source_national_rows": 11984,
+    "source_city_region_pairs": 3183,
+    "catalogs_with_only_oirt": 440,
+    "filename": "atlas-radio-all.zip",
+    "repository_path": "docs/assets/radio-packs/atlas-radio-all.zip"
+  },
+  "selected_pack": {
+    "minimum_stations": 6,
+    "catalogs": 466,
+    "station_rows": 6740,
+    "regions": 89,
+    "countries": {
+      "Россия": 461,
+      "Казахстан": 4,
+      "Беларусь": 1
+    },
+    "covers": 411,
+    "entries": 878,
+    "zip_bytes": 6263876,
+    "uncompressed_bytes": 6461224,
+    "min_stations_per_city": 6,
+    "max_stations_per_city": 54,
+    "oirt_rows": 584,
+    "uncertain_rows": 1,
+    "text_placeholder_brands": 92,
+    "cover_source_tiers": {
+      "national": 307,
+      "city_archive": 84,
+      "penza": 34
+    },
+    "unique_cover_source_tiers": {
+      "penza": 25,
+      "city_archive": 81,
+      "national": 305
+    },
+    "pack_id": "atlas-radio-all",
+    "sha256": "44b32b7bd12fdc0e7e96b76096c2f7426786be66cd94f8f6cd6bf2826fe442d0",
+    "source_sha256": "3b5bcd353ed6b58d81b6a7c6d74696ec3ef1458a080f608f39dbcb0c38a5c67d",
+    "filename": "atlas-radio-6plus.zip",
+    "repository_path": "docs/assets/radio-packs/atlas-radio-6plus.zip"
+  },
+  "frequency_sources": "research/radio-kazakhstan/frequency-sources.json",
+  "cover_sources": {
+    "beu_fm.webp": {
+      "original": "beu_fm.png",
+      "url": "https://beufm.kz/template/logo_white.png",
+      "background": "#171717",
+      "size": 440,
+      "composition": "logo",
+      "source_sha256": "f890cee24cf90667c618bc220c672da9a9b68ae5c6ba2d72b69693fd3ea60133",
+      "original_size": [
+        944,
+        320
+      ],
+      "output_sha256": "28132883ff2f85bbdb2bcc24a0e0eadd768fe5b2937b23b672a5753089c8d44a",
+      "output_size": [
+        512,
+        512
+      ]
+    },
+    "jibek_joly.webp": {
+      "original": "jibek_joly.svg",
+      "url": "https://jjfm.kz/static/img/logo.svg",
+      "background": "#0D6781",
+      "size": 440,
+      "composition": "logo",
+      "source_sha256": "ce8526f296e19fa4034a85339f989c9aac9b218bcce5f70dccb78e1ef23d33d7",
+      "output_sha256": "d98f3c44296327637021d5b352f591d16bb3d03b0430846e56611779b65c7537",
+      "output_size": [
+        512,
+        512
+      ]
+    },
+    "classic.webp": {
+      "original": "classic.svg",
+      "url": "https://storage.igraphic.kz/projects/-N-SKJv-fiD381fC3Jul/cover.svg",
+      "source_page": "https://igraphic.kz/projects/radio_classic_redesign",
+      "background": "#005972",
+      "size": 430,
+      "composition": "classic-mono",
+      "source_sha256": "d51907ef98f2cea9e70729a1f10c665769c5c059623acf66b04997eb1776cf5d",
+      "output_sha256": "263d147b5cf56f4108cc158f8da8440c2993a0e1e07bc0247c491afee70057d1",
+      "output_size": [
+        512,
+        512
+      ]
+    },
+    "orda_fm.webp": {
+      "original": "orda_fm.png",
+      "url": "https://orda.fm/ordafm-logo26.png",
+      "background": "#FFFFFF",
+      "size": 430,
+      "composition": "crop",
+      "crop": "326x136+12+12",
+      "source_sha256": "97275dccbc6faacbc560dcfc205a04a69dc691cede610e43f87adda36ebec267",
+      "original_size": [
+        350,
+        209
+      ],
+      "output_sha256": "64c129a9c72b5ee2584a639660b33e4858cc906ad8ea999c45f0a3a37b97f9a3",
+      "output_size": [
+        512,
+        512
+      ]
+    },
+    "toi_duman.webp": {
+      "original": "toi_duman.svg",
+      "url": "https://toiduman.kz/images/toiduman-logo.svg",
+      "background": "#442F1D",
+      "size": 430,
+      "composition": "svg-transparent",
+      "source_sha256": "83f7cafa997868a6a613d21a135d53504efcef23e4147d43882bfb7c0cd081f6",
+      "output_sha256": "9c6aa64e43f0c0ce0de602d093456a613860d05bd320d67c304bc7186c9f7398",
+      "output_size": [
+        512,
+        512
+      ]
+    },
+    "halyq_radio.webp": {
+      "original": "halyq_radio.png",
+      "url": "https://pavlodarnews.kz/logotype/hr.png",
+      "background": "#C62D3B",
+      "size": 512,
+      "composition": "restored-tile",
+      "prepared": "halyq_radio-restored.png",
+      "restoration": "image_gen built-in; see halyq-restoration-prompt.txt",
+      "source_sha256": "934a744bba534d7e284abbfd391f2d82a34d2c3237528067d0f2b29fe2903fda",
+      "original_size": [
+        279,
+        40
+      ],
+      "prepared_sha256": "1ba0e875dbe25c8d757c8d98900898e353a9fa70154e3537d22a46c90eb6c08e",
+      "output_sha256": "ea499e762e2d3764199ef282a0f231bf83eb983d8488fd698ab63b3bfdb7aff0",
+      "output_size": [
+        512,
+        512
+      ]
+    }
+  },
+  "archive_validation": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "3b5bcd353ed6b58d81b6a7c6d74696ec3ef1458a080f608f39dbcb0c38a5c67d",
+      "zip_bytes": 7664438,
+      "cities": 3184,
+      "station_rows": 12064,
+      "covers": 496,
+      "new_cities": [
+        {
+          "key": "kazakhstan-kokshetau-3b76257416",
+          "name": "Кокшетау",
+          "country": "Казахстан",
+          "region": "Акмолинская область",
+          "file": "cities/kazakhstan-kokshetau-3b76257416.csv"
+        },
+        {
+          "key": "kazakhstan-astana-624f0adeaf",
+          "name": "Астана",
+          "country": "Казахстан",
+          "region": "Астана",
+          "file": "cities/kazakhstan-astana-624f0adeaf.csv"
+        },
+        {
+          "key": "kazakhstan-pavlodar-f9d978a571",
+          "name": "Павлодар",
+          "country": "Казахстан",
+          "region": "Павлодарская область",
+          "file": "cities/kazakhstan-pavlodar-f9d978a571.csv"
+        }
+      ],
+      "previous_csv_and_covers_byte_exact": true,
+      "all_25_penza_covers_byte_exact": true,
+      "crc_and_structure": "PASS"
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "44b32b7bd12fdc0e7e96b76096c2f7426786be66cd94f8f6cd6bf2826fe442d0",
+      "zip_bytes": 6263876,
+      "cities": 466,
+      "station_rows": 6740,
+      "covers": 411,
+      "new_cities": [
+        {
+          "key": "kazakhstan-kokshetau-3b76257416",
+          "name": "Кокшетау",
+          "country": "Казахстан",
+          "region": "Акмолинская область",
+          "file": "cities/kazakhstan-kokshetau-3b76257416.csv"
+        },
+        {
+          "key": "kazakhstan-astana-624f0adeaf",
+          "name": "Астана",
+          "country": "Казахстан",
+          "region": "Астана",
+          "file": "cities/kazakhstan-astana-624f0adeaf.csv"
+        },
+        {
+          "key": "kazakhstan-pavlodar-f9d978a571",
+          "name": "Павлодар",
+          "country": "Казахстан",
+          "region": "Павлодарская область",
+          "file": "cities/kazakhstan-pavlodar-f9d978a571.csv"
+        }
+      ],
+      "previous_csv_and_covers_byte_exact": true,
+      "all_25_penza_covers_byte_exact": true,
+      "crc_and_structure": "PASS"
+    }
+  ],
+  "station_identity_audit": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "3b5bcd353ed6b58d81b6a7c6d74696ec3ef1458a080f608f39dbcb0c38a5c67d",
+      "checked_rows": 12055,
+      "uncertain_rows_without_cover": 9,
+      "expected_tier_rows": {
+        "3": 7944,
+        "2": 1746,
+        "1": 2365
+      },
+      "wrong_priority": {},
+      "same_station_multiple_covers": {},
+      "unmatched_names": []
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "44b32b7bd12fdc0e7e96b76096c2f7426786be66cd94f8f6cd6bf2826fe442d0",
+      "checked_rows": 6739,
+      "uncertain_rows_without_cover": 1,
+      "expected_tier_rows": {
+        "3": 4360,
+        "2": 1474,
+        "1": 905
+      },
+      "wrong_priority": {},
+      "same_station_multiple_covers": {},
+      "unmatched_names": []
+    }
+  ],
+  "whole_pack_import_verification": {
+    "sdk": 30,
+    "packs": [
+      {
+        "archive": "atlas-radio-all.zip",
+        "sha256": "3b5bcd353ed6b58d81b6a7c6d74696ec3ef1458a080f608f39dbcb0c38a5c67d",
+        "cities": 3184,
+        "station_rows": 12064,
+        "whole_pack_import": "PASS",
+        "all_city_activation_and_artwork": "PASS",
+        "export_and_reimport": "PASS"
+      },
+      {
+        "archive": "six-plus/atlas-radio-6plus.zip",
+        "sha256": "44b32b7bd12fdc0e7e96b76096c2f7426786be66cd94f8f6cd6bf2826fe442d0",
+        "cities": 466,
+        "station_rows": 6740,
+        "whole_pack_import": "PASS",
+        "all_city_activation_and_artwork": "PASS",
+        "export_and_reimport": "PASS"
+      }
+    ],
+    "checked_station_rows": 18804,
+    "checked_cover_reads": 18794,
+    "full_to_filtered_update_keeps_minsk": true
+  },
+  "all_previous_city_csv_and_covers_byte_exact": true,
+  "builtin_assets_byte_exact_with_selected_zip": true,
+  "all_25_penza_covers_preserved": true,
+  "full_build": {
+    "command": "sh gradlew --offline clean check assembleRelease",
+    "status": "PASS",
+    "apk": "app/build/outputs/apk/integrated/release/4.3.2-feat-custom-sources-autoplay-triggers[130]AtlasMediaWidget-release-unsigned.apk",
+    "apk_sha256": "d4574c67c564a1cfe66cf19717f41c9dbe10cd5cca9660163c519b21bcbc4c84",
+    "signing": "unsigned",
+    "apk_radio_pack_entries_verified": 878,
+    "apk_radio_pack_byte_exact": true,
+    "package": "com.mmwtl.atlasmediawidget",
+    "version_code": 130,
+    "version_name": "4.3.2-feat-custom-sources-autoplay-triggers",
+    "integrated_manifest": "PASS",
+    "signature_verification": "unsigned"
+  },
+  "physical_head_unit_verified": false
+}
