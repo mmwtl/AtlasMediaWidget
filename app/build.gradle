@@ -50,7 +50,9 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            // R8 runs in full mode (the AGP 8 default); see proguard-rules.pro for kept OEM edges.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
