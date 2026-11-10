@@ -3232,11 +3232,32 @@
       "file": "cities/yaroslavskaya-yaroslavl-fe609a5949.csv"
     },
     {
+      "key": "kazakhstan-kokshetau-3b76257416",
+      "name": "Кокшетау",
+      "country": "Казахстан",
+      "region": "Акмолинская область",
+      "file": "cities/kazakhstan-kokshetau-3b76257416.csv"
+    },
+    {
+      "key": "kazakhstan-astana-624f0adeaf",
+      "name": "Астана",
+      "country": "Казахстан",
+      "region": "Астана",
+      "file": "cities/kazakhstan-astana-624f0adeaf.csv"
+    },
+    {
       "key": "kazakhstan-kostanay-7372a66754",
       "name": "Костанай",
       "country": "Казахстан",
       "region": "Костанайская область",
       "file": "cities/kazakhstan-kostanay-7372a66754.csv"
+    },
+    {
+      "key": "kazakhstan-pavlodar-f9d978a571",
+      "name": "Павлодар",
+      "country": "Казахстан",
+      "region": "Павлодарская область",
+      "file": "cities/kazakhstan-pavlodar-f9d978a571.csv"
     },
     {
       "key": "belarus-minsk-57e8660ca2",

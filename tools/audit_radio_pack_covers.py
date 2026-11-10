@@ -58,14 +58,16 @@ def add(name, tier, source, data, stem=None, region=None):
     candidates[key][tier][sha(data)] = (source, data)
     if stem: stems.setdefault(stem, key)
 
-penza = REPO/'media-runtime/src/main/assets/radio'
+penza = REPO/'research/radio-covers-penza'
 for row in rows((penza/'stations.csv').read_bytes()):
     add(row['name'], 3, str(penza/'covers'/row['cover']), (penza/'covers'/row['cover']).read_bytes(),
         re.sub(r'^\d{5,6}_','',Path(row['cover']).stem).casefold())
 city_archives = []
 for path in [*sorted((SOURCE/'Радио').glob('*.zip')),
-             REPO/'docs/assets/radio-packs/stations_kostanay.zip']:
-    region = {'minsk-radio.zip': 'Беларусь', 'stations_kostanay.zip': 'Казахстан'}.get(path.name)
+             *(REPO/'docs/assets/radio-packs'/f'stations_{city}.zip'
+               for city in ('kostanay', 'astana', 'kokshetau', 'pavlodar'))]:
+    region = ('Казахстан' if path.parent == REPO/'docs/assets/radio-packs'
+              else 'Беларусь' if path.name == 'minsk-radio.zip' else None)
     with zipfile.ZipFile(path) as z:
         csv_path = next(n for n in z.namelist() if Path(n).name=='stations.csv')
         data = rows(z.read(csv_path))
@@ -104,7 +106,7 @@ for filename in ['atlas-radio-all.zip','atlas-radio-6plus.zip']:
         matches={}
         for city in manifest['catalogs']:
             for row in rows(z.read(city['file'])):
-                key=identity(row['name'], city.get('region'))
+                key=identity(row['name'], city.get('country') or city.get('region'))
                 if key is None:
                     assert not row['cover'];uncertain+=1;continue
                 if key not in candidates:

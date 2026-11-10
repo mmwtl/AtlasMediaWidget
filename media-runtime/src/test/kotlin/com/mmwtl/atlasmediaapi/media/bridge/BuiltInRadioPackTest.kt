@@ -46,8 +46,8 @@ class BuiltInRadioPackTest {
         assertEquals(RadioCatalogRepository.BUILT_IN_ID, builtIn.id)
         assertTrue(builtIn.builtIn && builtIn.isPack)
         assertEquals("atlas-radio-all", builtIn.packId)
-        assertEquals(463, builtIn.cityCount)
-        assertEquals(6700, builtIn.stationCount)
+        assertEquals(466, builtIn.cityCount)
+        assertEquals(6740, builtIn.stationCount)
         assertEquals(RadioCatalogType.BUILT_IN, info.type)
         assertEquals(RadioCatalogRepository.DEFAULT_BUILT_IN_CITY, info.activeCityKey)
         assertEquals("Пенза", info.activeCityName)
@@ -62,12 +62,45 @@ class BuiltInRadioPackTest {
 
         assertEquals(listOf("Россия", "Казахстан", "Беларусь"), cities.map { it.country }.distinct())
         assertEquals(461, cities.count { it.country == "Россия" })
+        assertEquals(4, cities.count { it.country == "Казахстан" })
         assertEquals(
             RadioPackCity(kostanay, "Костанай", "Костанайская область", 14, "Казахстан"),
             cities.single { it.key == kostanay },
         )
         assertEquals("Минск", cities.single { it.key == minsk }.region)
         assertTrue(cities.all { it.stationCount >= 6 })
+    }
+
+    @Test
+    fun `Kazakhstan cities have current stations and usable artwork`() {
+        val cities = repository.packCities(RadioCatalogRepository.BUILT_IN_ID)
+        val expected = listOf(
+            Triple("Астана", "Астана", 18),
+            Triple("Кокшетау", "Акмолинская область", 9),
+            Triple("Павлодар", "Павлодарская область", 13),
+        )
+        expected.forEach { (name, region, count) ->
+            val city = cities.single { it.country == "Казахстан" && it.name == name }
+            assertEquals(region, city.region)
+            assertEquals(count, city.stationCount)
+            repository.activateCatalog(RadioCatalogRepository.BUILT_IN_ID, city.key)
+            assertEquals(count, repository.stations().size)
+            repository.stations().forEach { station ->
+                assertTrue(repository.openCoverStream(station)!!.use { it.readBytes().isNotEmpty() })
+            }
+            when (name) {
+                "Астана" -> {
+                    assertEquals("Радио Jibek Joly", repository.lookup(101400)?.name)
+                    assertEquals("Той Думан", repository.lookup(103700)?.name)
+                    assertEquals("LUX FM", repository.lookup(107700)?.name)
+                }
+                "Кокшетау" -> assertEquals(null, repository.lookup(101400)) // LUX is announced, not on air yet.
+                "Павлодар" -> {
+                    assertEquals("Радио Халык", repository.lookup(100500)?.name)
+                    assertEquals("Ретро FM Казахстан", repository.lookup(101800)?.name)
+                }
+            }
+        }
     }
 
     @Test

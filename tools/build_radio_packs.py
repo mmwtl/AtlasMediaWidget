@@ -135,7 +135,7 @@ for x in rows:
     if '?' in x['name']:
         uncertain.append({**x, 'output_name':display[station], 'action':'Сохранена пометка неопределённости; обложка не назначена'})
 
-penza = REPO / 'media-runtime/src/main/assets/radio'
+penza = REPO / 'research/radio-covers-penza'
 cover_aliases = {name_key(name): x['slug'] for x in national if '?' not in x['name']
                  for name in (x['slug'], x['name'], display[x['slug']])}
 for x in read_csv(penza / 'stations.csv'):
@@ -156,13 +156,17 @@ CURATED = {
     'kaliningrad_radio_covers':('Калининградская','Калининград'),
     'voronezh-radio':('Воронежская','Воронеж'),
     'stations_kostanay':('Казахстан','Костанай'),
+    'stations_astana':('Казахстан','Астана'),
+    'stations_kokshetau':('Казахстан','Кокшетау'),
+    'stations_pavlodar':('Казахстан','Павлодар'),
 }
 extra_city_covers = []
 for folder, place in CURATED.items():
     archive_name = 'stations_ryazan1.zip' if folder == 'stations_ryazan' else folder + '.zip'
-    archive = (REPO / 'docs/assets/radio-packs/stations_kostanay.zip'
-               if folder == 'stations_kostanay' else ROOT / 'Радио' / archive_name)
-    archive_source = str(archive.relative_to(REPO if folder == 'stations_kostanay' else ROOT))
+    repo_catalog = place[0] == 'Казахстан'
+    archive = (REPO / 'docs/assets/radio-packs' / archive_name
+               if repo_catalog else ROOT / 'Радио' / archive_name)
+    archive_source = str(archive.relative_to(REPO if repo_catalog else ROOT))
     path = OUT / 'source-city-archives' / folder
     (path / 'covers').mkdir(parents=True, exist_ok=True)
     archive_images = []
@@ -189,7 +193,7 @@ for folder, place in CURATED.items():
     for x in city_rows:
         frequency = int(x['frequency_khz'])
         station = alias.get(name_key(x['name']))
-        if place == ('Казахстан','Костанай'):
+        if place[0] == 'Казахстан':
             # Keep the approved CSV names; shared artwork still resolves by alias.
             station = 'kz_' + ascii_slug(x['name']).replace('-','_')
             display[station] = x['name']
@@ -258,6 +262,9 @@ def region_name(region):
 FOREIGN_PLACES = {
     ('Беларусь','Минск'):('Беларусь','Минск'),
     ('Казахстан','Костанай'):('Казахстан','Костанайская область'),
+    ('Казахстан','Астана'):('Казахстан','Астана'),
+    ('Казахстан','Кокшетау'):('Казахстан','Акмолинская область'),
+    ('Казахстан','Павлодар'):('Казахстан','Павлодарская область'),
 }
 COUNTRY_ORDER = ['Россия','Казахстан','Беларусь']
 
@@ -357,7 +364,7 @@ files = {'pack.json':(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').enc
 archive = OUT / 'atlas-radio-all.zip'
 write_archive(archive, files)
 
-stats = {'catalogs':len(catalogs),'regions':len({r for r,c in catalogs}),
+stats = {'catalogs':len(catalogs),'regions':len({(city['country'], city['region']) for city in index}),
          'countries':dict(Counter(city['country'] for city in manifest['catalogs'])),
          'station_rows':len(all_rows),'station_brands':len(used_stations),
          'covers':len(cover_bytes),'entries':len(files),
@@ -419,7 +426,7 @@ selected_stats = {
     'pack_id': selected_manifest['id'], 'sha256': digest(selected_archive.read_bytes()),
     'source_sha256': stats['sha256'],
 }
-assert len(selected) == 463 and len(selected_rows) == 6700
+assert len(selected) == 466 and len(selected_rows) == 6740
 assert len(manifest['name']) <= 40 and len(selected_manifest['name']) <= 40
 write_json(selected_out/'stats.json', selected_stats)
 write_json(selected_out/'city-index.json', selected)
