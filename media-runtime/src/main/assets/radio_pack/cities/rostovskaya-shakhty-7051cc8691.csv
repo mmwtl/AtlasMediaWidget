@@ -1,0 +1,10 @@
+frequency_khz,name,band,cover
+92100,Вести FM,FM,vesti_fm.webp
+100500,Радио Маяк,FM,mayak.webp
+101900,Новое Радио,FM,novoe_radio.webp
+102400,Дорожное радио,FM,dorozhnoe_radio.webp
+102900,Радио России,FM,rossii.webp
+103500,Авторадио,FM,avtoradio.webp
+104700,Европа Плюс,FM,evropa.webp
+106800,ФМ-на-Дону,FM,na_donu.webp
+107300,Русское Радио,FM,russkoe_radio.webp

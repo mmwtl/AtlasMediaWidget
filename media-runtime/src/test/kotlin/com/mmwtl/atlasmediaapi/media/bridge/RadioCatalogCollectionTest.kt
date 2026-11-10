@@ -176,7 +176,10 @@ class RadioCatalogCollectionTest {
         val restarted = RadioCatalogRepository(context)
 
         assertEquals(first.id, restarted.getCatalogInfo().activeId)
-        assertEquals(listOf("Встроенный (Пенза)", "A", "B"), restarted.getCatalogInfo().catalogs.map { it.name })
+        assertEquals(
+            listOf("Россия, Казахстан, Беларусь — 6+ станций", "A", "B"),
+            restarted.getCatalogInfo().catalogs.map { it.name },
+        )
         assertNotNull(restarted.openCoverStream(restarted.lookup(90000)!!))
     }
 

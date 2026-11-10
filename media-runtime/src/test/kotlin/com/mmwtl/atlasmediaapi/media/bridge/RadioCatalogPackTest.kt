@@ -32,7 +32,13 @@ class RadioCatalogPackTest {
     private val radio7 = png(0xFF336699.toInt())
     private val vera = png(0xFF993366.toInt())
 
-    private data class City(val key: String, val name: String, val region: String, val rows: String)
+    private data class City(
+        val key: String,
+        val name: String,
+        val region: String,
+        val rows: String,
+        val country: String = "",
+    )
 
     private val penza = City("penza", "Пенза", "Пензенская область", "100100,Радио 7,FM,radio7.png\n94700,Радио Вера,FM,vera.png\n")
     private val kuznetsk = City("kuznetsk", "Кузнецк", "Пензенская область", "101500,Радио 7,FM,radio7.png\n")
@@ -132,7 +138,7 @@ class RadioCatalogPackTest {
         repository.importZip(ByteArrayInputStream(pack(moscow))).getOrThrow()
 
         assertEquals(RadioCatalogRepository.BUILT_IN_ID, repository.getCatalogInfo().activeId)
-        assertEquals("", repository.getCatalogInfo().activeCityKey)
+        assertEquals(RadioCatalogRepository.DEFAULT_BUILT_IN_CITY, repository.getCatalogInfo().activeCityKey)
     }
 
     @Test
@@ -195,6 +201,26 @@ class RadioCatalogPackTest {
     }
 
     @Test
+    fun `a city's country survives import, restart and export`() {
+        val minsk = City("minsk", "Минск", "Минск", "101200,Радио 7,FM,radio7.png\n", country = "Беларусь")
+        val imported = importPack(penza.copy(country = "Россия"), minsk)
+
+        val restarted = RadioCatalogRepository(context)
+
+        assertEquals(
+            listOf(
+                RadioPackCity("penza", "Пенза", "Пензенская область", 2, "Россия"),
+                RadioPackCity("minsk", "Минск", "Минск", 1, "Беларусь"),
+            ),
+            restarted.packCities(imported.id),
+        )
+        val output = ByteArrayOutputStream()
+        restarted.exportCatalogZip(output, imported.id)
+        val manifest = JSONObject(String(unzip(output.toByteArray()).getValue("pack.json"), StandardCharsets.UTF_8))
+        assertEquals("Беларусь", manifest.getJSONArray("catalogs").getJSONObject(1).getString("country"))
+    }
+
+    @Test
     fun `the active city survives a restart`() {
         val imported = importPack(penza, moscow)
         repository.activateCatalog(imported.id, "penza")
@@ -252,6 +278,7 @@ class RadioCatalogPackTest {
                     put(JSONObject().apply {
                         put("key", city.key)
                         put("name", city.name)
+                        if (city.country.isNotEmpty()) put("country", city.country)
                         put("region", city.region)
                         put("file", "cities/${city.key}.csv")
                     })

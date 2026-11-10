@@ -246,13 +246,30 @@ SPECIAL_REGIONS = {
     'Ханты-Мансийский':'Ханты-Мансийский АО — Югра','Чечня':'Чеченская Республика',
     'Чувашия':'Чувашская Республика','Чукотский':'Чукотский автономный округ',
     'Якутия':'Республика Саха (Якутия)','Ямало-Ненецкий':'Ямало-Ненецкий автономный округ',
-    'Москва':'Москва','Санкт-Петербург':'Санкт-Петербург','Севастополь':'Севастополь','Беларусь':'Беларусь',
-    'Казахстан':'Казахстан',
+    'Москва':'Москва','Санкт-Петербург':'Санкт-Петербург','Севастополь':'Севастополь',
 }
 KRAIS = set('Алтайский Забайкальский Камчатский Краснодарский Красноярский Пермский Приморский Ставропольский Хабаровский'.split())
 
 def region_name(region):
     return SPECIAL_REGIONS.get(region, region + (' край' if region in KRAIS else ' область'))
+
+# The city picker groups country > region > city. Source regions of the places outside Russia
+# name the country; keys keep that source region so selected cities survive the regrouping.
+FOREIGN_PLACES = {
+    ('Беларусь','Минск'):('Беларусь','Минск'),
+    ('Казахстан','Костанай'):('Казахстан','Костанайская область'),
+}
+COUNTRY_ORDER = ['Россия','Казахстан','Беларусь']
+
+def place_location(region, city):
+    if region in {country for country, _ in FOREIGN_PLACES.values()}:
+        assert (region, city) in FOREIGN_PLACES, (region, city)
+    return FOREIGN_PLACES.get((region, city), ('Россия', region_name(region)))
+
+def place_order(item):
+    (region, city), _ = item
+    country, name = place_location(region, city)
+    return COUNTRY_ORDER.index(country), name.casefold(), city.casefold()
 
 used_stations = set(s for stations in catalogs.values() for s in stations.values())
 # Source IDs and country prefixes must not split the same station's artwork pool.
@@ -314,22 +331,23 @@ for station in sorted(used_stations):
                            'source_sha256':source_sha,'output_sha256':sha}
 
 manifest = {'format':'atlas-radio-pack','version':1,'id':'atlas-radio-all',
-            'name':'Россия, Минск и Костанай','catalogs':[]}
+            'name':'Россия, Казахстан, Беларусь','catalogs':[]}
 files = {}
 index = []
 all_rows = []
-for (region,city), stations in sorted(catalogs.items(), key=lambda item:(region_name(item[0][0]).casefold(),item[0][1].casefold())):
+for (region,city), stations in sorted(catalogs.items(), key=place_order):
     key = city_key(region,city)
     city_name = 'Санкт-Петербург' if (region,city)==('Санкт-Петербург','СПб') else city
-    entry = {'key':key,'name':city_name,'region':region_name(region),'file':f'cities/{key}.csv'}
-    assert len(entry['name'])<=40 and len(entry['region'])<=40
+    country, region_title = place_location(region, city)
+    entry = {'key':key,'name':city_name,'country':country,'region':region_title,'file':f'cities/{key}.csv'}
+    assert all(len(entry[field])<=40 for field in ('name','country','region'))
     manifest['catalogs'].append(entry)
     output = io.StringIO(newline='')
     writer = csv.writer(output, lineterminator='\n')
     writer.writerow(['frequency_khz','name','band','cover'])
     for frequency, station in sorted(stations.items()):
         writer.writerow([frequency, display[station],'FM',cover_for[station]])
-        all_rows.append({'region':entry['region'],'city':city_name,'key':key,
+        all_rows.append({'country':country,'region':entry['region'],'city':city_name,'key':key,
                          'frequency_khz':frequency,'name':display[station],'band':'FM',
                          'cover':cover_for[station]})
     files[entry['file']] = output.getvalue().encode('utf-8')
@@ -340,6 +358,7 @@ archive = OUT / 'atlas-radio-all.zip'
 write_archive(archive, files)
 
 stats = {'catalogs':len(catalogs),'regions':len({r for r,c in catalogs}),
+         'countries':dict(Counter(city['country'] for city in manifest['catalogs'])),
          'station_rows':len(all_rows),'station_brands':len(used_stations),
          'covers':len(cover_bytes),'entries':len(files),
          'uncompressed_bytes':sum(map(len,files.values())), 'zip_bytes':archive.stat().st_size,
@@ -371,7 +390,7 @@ selected = [city for city in index if city['stations'] >= 6]
 selected_keys = {city['key'] for city in selected}
 selected_rows = [row for row in all_rows if row['key'] in selected_keys]
 selected_covers = {row['cover'] for row in selected_rows if row['cover']}
-selected_manifest = {**manifest, 'name': 'Россия, Минск и Костанай — 6+ станций',
+selected_manifest = {**manifest, 'name': 'Россия, Казахстан, Беларусь — 6+ станций',
                      'catalogs': [city for city in manifest['catalogs'] if city['key'] in selected_keys]}
 selected_files = {
     'pack.json': (json.dumps(selected_manifest, ensure_ascii=False, indent=2)+'\n').encode('utf-8'),
@@ -385,7 +404,8 @@ write_archive(selected_archive, selected_files)
 selected_provenance = {key: value for key, value in provenance.items() if value['cover'] in selected_covers}
 selected_stats = {
     'minimum_stations': 6, 'catalogs': len(selected), 'station_rows': len(selected_rows),
-    'regions': len({city['region'] for city in selected}), 'covers': len(selected_covers),
+    'regions': len({(city['country'], city['region']) for city in selected}),
+    'countries': dict(Counter(city['country'] for city in selected)), 'covers': len(selected_covers),
     'entries': len(selected_files), 'zip_bytes': selected_archive.stat().st_size,
     'uncompressed_bytes': sum(map(len, selected_files.values())),
     'min_stations_per_city': min(city['stations'] for city in selected),
@@ -400,6 +420,7 @@ selected_stats = {
     'source_sha256': stats['sha256'],
 }
 assert len(selected) == 463 and len(selected_rows) == 6700
+assert len(manifest['name']) <= 40 and len(selected_manifest['name']) <= 40
 write_json(selected_out/'stats.json', selected_stats)
 write_json(selected_out/'city-index.json', selected)
 write_json(selected_out/'cover-provenance.json', selected_provenance)

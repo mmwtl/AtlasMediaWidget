@@ -1,0 +1,16 @@
+frequency_khz,name,band,cover
+87500,Terra FM,FM,terra_fm.webp
+87900,DFM,FM,dfm.webp
+88700,Маруся FM,FM,marusya_fm.webp
+89500,Русский Хит,FM,russkiy_khit.webp
+90000,Радио Шансон,FM,shanson.webp
+90500,Русское Радио,FM,russkoe_radio.webp
+92400,Радио Вера,FM,vera.webp
+100700,Radio Monte Carlo,FM,monte_karlo.webp
+101100,Love Radio,FM,love_radio.webp
+102000,Юмор FM,FM,yumor_fm.webp
+105300,Радио Ваня,FM,vanya.webp
+105700,Радио Дача,FM,dacha.webp
+106100,Радио Родных дорог,FM,rodnykh_dorog.webp
+106900,Авторадио,FM,avtoradio.webp
+107700,Европа Плюс,FM,evropa.webp

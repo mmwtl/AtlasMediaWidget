@@ -112,8 +112,9 @@ the background until you pick your own. The overlay uses the night colours.
 - Online player selection, optional switch to Online before session playback and background
   playback start without opening the player when the player supports it; otherwise the player opens
   and can be minimized automatically;
-- radio catalogs with station artwork: a city pack with a region-grouped city picker and custom
-  single catalogs, favorites grid and saved-station navigation without scanning;
+- radio catalogs with station artwork: a built-in pack of 463 cities in Russia, Kazakhstan and
+  Belarus with a country- and region-grouped city picker (Penza by default), loadable city packs and
+  custom single catalogs, favorites grid and saved-station navigation without scanning;
 - radio title and artwork broadcast to the Geely OneOS DIM; optional separate Online progress
   updates;
 - optional now-playing text in the OneOS status bar pill with a choice of text layout (station or

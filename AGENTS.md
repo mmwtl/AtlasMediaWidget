@@ -125,7 +125,10 @@ migration request.
 - Keep settings export/import and radio-catalog export/import separate. Preserve legacy JSON
   settings compatibility and the crash-recovery journal.
 - Radio catalogs: the built-in one plus up to 64 imported catalogs and packs, exactly one active
-  (`RadioCatalogRepository`, see docs/radio-catalog.md). A pack ZIP (`pack.json`, up to 5000
+  (`RadioCatalogRepository`, see docs/radio-catalog.md). The built-in catalog is a read-only pack:
+  `media-runtime/src/main/assets/radio_pack/` is the extracted `docs/assets/radio-packs/atlas-radio-6plus.zip`
+  (a test checks they match); rebuild packs with `tools/build_radio_packs.py` and re-extract instead of
+  editing the assets. Its city is kept apart from imported packs' and defaults to Penza. A pack ZIP (`pack.json`, up to 5000
   cities) is one index entry; the active city is a key within it. A pack is loaded, updated (by
   pack `id`, keeping the active city by `key`) and deleted as a whole; single ZIP catalogs stay
   supported. Keep pack cities out of the settings snapshot (Binder transaction limit); they are

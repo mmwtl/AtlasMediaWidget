@@ -1,0 +1,32 @@
+frequency_khz,name,band,cover
+66560,Радио России,FM,rossii.webp
+68120,Радио Маяк,FM,mayak.webp
+87600,Радио МИР,FM,mir.webp
+88000,Европа Плюс,FM,evropa.webp
+88400,Love Radio,FM,love_radio.webp
+88800,Дорожное радио,FM,dorozhnoe_radio.webp
+89200,Радио Дача,FM,dacha.webp
+89800,Радио Комсомольская правда,FM,kp.webp
+90200,Новое Радио,FM,novoe_radio.webp
+90600,Вести FM,FM,vesti_fm.webp
+91000,Кузбасс FM,FM,kuzbass_fm.webp
+91500,Серебряный дождь,FM,serebryanyy_dozhd.webp
+92100,Радио Record,FM,rekord.webp
+92700,Like FM,FM,like_fm.webp
+93300,Радио России,FM,rossii.webp
+93800,Детское радио,FM,detskoe_radio.webp
+100600,Радио ENERGY,FM,nrj.webp
+101000,Апекс-Радио,FM,apeks_radio.webp
+101800,DFM,FM,dfm.webp
+102300,Радио Маяк,FM,mayak.webp
+102800,Радио Ваня,FM,vanya.webp
+103300,Радио Шансон,FM,shanson.webp
+103700,Радио России,FM,rossii.webp
+104300,Радио Вера,FM,vera.webp
+104800,Русское Радио,FM,russkoe_radio.webp
+105300,Авторадио,FM,avtoradio.webp
+105800,Пи FM,FM,pi_fm.webp
+106200,Радио Гордость,FM,gordost.webp
+106700,НАШЕ Радио,FM,nashe_radio.webp
+107300,Business FM,FM,biznes_fm.webp
+107900,Ретро FM,FM,retro_fm.webp

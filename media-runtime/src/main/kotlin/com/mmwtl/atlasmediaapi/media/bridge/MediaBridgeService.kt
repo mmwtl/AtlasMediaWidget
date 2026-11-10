@@ -552,6 +552,7 @@ class MediaBridgeService : Service() {
                     array.put(org.json.JSONObject().apply {
                         put("key", city.key)
                         put("name", city.name)
+                        if (city.country.isNotEmpty()) put("country", city.country)
                         if (city.region.isNotEmpty()) put("region", city.region)
                         put("stations", city.stationCount)
                     })

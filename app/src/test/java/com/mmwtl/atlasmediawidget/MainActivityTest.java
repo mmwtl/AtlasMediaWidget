@@ -328,6 +328,37 @@ public final class MainActivityTest {
         assertEquals(2, RadioPackCities.byRegion(cities).get("Пензенская область").size());
     }
 
+    @Test
+    public void radioPackCitiesGroupByCountryThenRegion() throws Exception {
+        List<RadioPackCities.City> cities = RadioPackCities.parse("["
+                + "{\"key\":\"penza\",\"name\":\"Пенза\",\"country\":\"Россия\","
+                + "\"region\":\"Пензенская область\",\"stations\":27},"
+                + "{\"key\":\"moscow\",\"name\":\"Москва\",\"country\":\"Россия\","
+                + "\"region\":\"Москва\",\"stations\":54},"
+                + "{\"key\":\"kostanay\",\"name\":\"Костанай\",\"country\":\"Казахстан\","
+                + "\"region\":\"Костанайская область\",\"stations\":14},"
+                + "{\"key\":\"minsk\",\"name\":\"Минск\",\"country\":\"Беларусь\","
+                + "\"region\":\"Минск\",\"stations\":20}]");
+        java.util.Map<String, java.util.Map<String, List<RadioPackCities.City>>> countries =
+                RadioPackCities.byCountry(cities);
+        assertEquals(java.util.List.of("Россия", "Казахстан", "Беларусь"),
+                new ArrayList<>(countries.keySet()));
+        assertEquals(java.util.List.of("Пензенская область", "Москва"),
+                new ArrayList<>(countries.get("Россия").keySet()));
+        assertEquals(4, RadioPackCities.regionCount(cities));
+
+        assertEquals("Пензенская область", MainActivity.searchPlaceLabel(cities.get(0), "Россия"));
+        assertEquals("", MainActivity.searchPlaceLabel(cities.get(1), "Россия"));
+        assertEquals("Костанайская область, Казахстан",
+                MainActivity.searchPlaceLabel(cities.get(2), "Россия"));
+        assertEquals("Беларусь", MainActivity.searchPlaceLabel(cities.get(3), "Россия"));
+        // A pack without countries keeps one group and the plain region.
+        List<RadioPackCities.City> plain = RadioPackCities.parse(
+                "[{\"key\":\"a\",\"name\":\"A\",\"region\":\"R\",\"stations\":1}]");
+        assertEquals(java.util.List.of(""), new ArrayList<>(RadioPackCities.byCountry(plain).keySet()));
+        assertEquals("R", MainActivity.searchPlaceLabel(plain.get(0), ""));
+    }
+
     private static ExecutorService io(MainActivity activity) throws Exception {
         Field executorField = MainActivity.class.getDeclaredField("ioExecutor");
         executorField.setAccessible(true);

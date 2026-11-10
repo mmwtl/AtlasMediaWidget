@@ -1968,7 +1968,8 @@ public final class MainActivity extends ScaledActivity {
     private String packName(String packId) {
         if (currentMediaSettings != null) {
             for (MediaSettingsSnapshot.Catalog catalog : currentMediaSettings.catalogs) {
-                if (catalog.packId.equals(packId)) return catalog.name;
+                // The built-in pack shares its id with the imported packs it was taken from.
+                if (!catalog.isBuiltIn() && catalog.packId.equals(packId)) return catalog.name;
             }
         }
         return packId;
@@ -1977,7 +1978,7 @@ public final class MainActivity extends ScaledActivity {
     private boolean isPackInstalled(String packId) {
         if (packId == null || packId.isEmpty() || currentMediaSettings == null) return false;
         for (MediaSettingsSnapshot.Catalog catalog : currentMediaSettings.catalogs) {
-            if (catalog.packId.equals(packId)) return true;
+            if (!catalog.isBuiltIn() && catalog.packId.equals(packId)) return true;
         }
         return false;
     }
@@ -2928,8 +2929,9 @@ public final class MainActivity extends ScaledActivity {
     }
 
     /**
-     * Cities grouped by region, each region collapsed except the active city's; a search field
-     * lists matching cities across all regions.
+     * Cities grouped by country and region, each group collapsed except the active city's; a
+     * search field lists matching cities across the pack. A country with one region lists its
+     * cities without a region header.
      */
     private void showRadioCityPicker(MediaSettingsSnapshot.Catalog pack,
             List<RadioPackCities.City> cities) {
@@ -2937,8 +2939,12 @@ public final class MainActivity extends ScaledActivity {
         if (snapshot == null || cities.isEmpty()) return;
         String activeKey = pack.id.equals(snapshot.catalogActiveId)
                 ? snapshot.catalogActiveCityKey : "";
-        Map<String, List<RadioPackCities.City>> regions = RadioPackCities.byRegion(cities);
-        boolean expandAll = cities.size() <= 8 || regions.size() == 1;
+        Map<String, Map<String, List<RadioPackCities.City>>> countries =
+                RadioPackCities.byCountry(cities);
+        boolean byCountry = countries.size() > 1;
+        String homeCountry = cities.get(0).country;
+        int regionCount = RadioPackCities.regionCount(cities);
+        boolean expandAll = !byCountry && (cities.size() <= 8 || regionCount <= 1);
         AlertDialog[] dialog = new AlertDialog[1];
 
         LinearLayout content = new LinearLayout(this);
@@ -2974,43 +2980,46 @@ public final class MainActivity extends ScaledActivity {
             });
             return row;
         };
-        Runnable showRegions = () -> {
-            list.removeAllViews();
-            for (Map.Entry<String, List<RadioPackCities.City>> region : regions.entrySet()) {
-                LinearLayout group = new LinearLayout(this);
-                group.setOrientation(LinearLayout.VERTICAL);
-                boolean containsActive = false;
-                for (RadioPackCities.City city : region.getValue()) {
-                    if (city.key.equals(activeKey)) containsActive = true;
-                }
-                // Rows of a region are built when it opens: a pack can hold thousands of cities.
-                Runnable fill = () -> {
-                    if (group.getChildCount() > 0) return;
-                    for (RadioPackCities.City city : region.getValue()) {
+        java.util.function.BiConsumer<LinearLayout, List<RadioPackCities.City>> addCities =
+                (parent, group) -> {
+                    for (RadioPackCities.City city : group) {
                         LinearLayout.LayoutParams params = fullWrap();
                         params.topMargin = Ui.dp(this, 6);
-                        group.addView(cityRow.apply(city), params);
+                        parent.addView(cityRow.apply(city), params);
                     }
                 };
-                if (region.getKey().isEmpty()) {
-                    fill.run();
-                } else {
-                    TextView header = text("", 15, Ui.PRIMARY, Typeface.BOLD);
-                    header.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 4));
-                    String title = region.getKey() + " · " + region.getValue().size();
-                    boolean open = expandAll || containsActive;
-                    group.setVisibility(open ? View.VISIBLE : View.GONE);
-                    if (open) fill.run();
-                    header.setText((open ? "▾ " : "▸ ") + title);
-                    header.setOnClickListener(v -> {
-                        boolean show = group.getVisibility() != View.VISIBLE;
-                        if (show) fill.run();
-                        group.setVisibility(show ? View.VISIBLE : View.GONE);
-                        header.setText((show ? "▾ " : "▸ ") + title);
-                    });
-                    list.addView(header, fullWrap());
+        // Regions of a country, or of the whole pack without countries.
+        java.util.function.BiConsumer<LinearLayout, Map<String, List<RadioPackCities.City>>>
+                addRegions = (parent, regions) -> {
+                    for (Map.Entry<String, List<RadioPackCities.City>> region
+                            : regions.entrySet()) {
+                        if (region.getKey().isEmpty() || (byCountry && regions.size() == 1)) {
+                            addCities.accept(parent, region.getValue());
+                        } else {
+                            addCityGroup(parent, region.getKey(), region.getValue().size(), 15,
+                                    expandAll || containsCity(region.getValue(), activeKey),
+                                    group -> addCities.accept(group, region.getValue()));
+                        }
+                    }
+                };
+        Runnable showRegions = () -> {
+            list.removeAllViews();
+            if (!byCountry) {
+                addRegions.accept(list, countries.values().iterator().next());
+                return;
+            }
+            for (Map.Entry<String, Map<String, List<RadioPackCities.City>>> country
+                    : countries.entrySet()) {
+                List<RadioPackCities.City> all = new ArrayList<>();
+                for (List<RadioPackCities.City> group : country.getValue().values()) {
+                    all.addAll(group);
                 }
-                list.addView(group, fullWrap());
+                String title = country.getKey().isEmpty() ? "Другие" : country.getKey();
+                addCityGroup(list, title, all.size(), 16, containsCity(all, activeKey),
+                        group -> {
+                            group.setPadding(Ui.dp(this, 12), 0, 0, 0);
+                            addRegions.accept(group, country.getValue());
+                        });
             }
         };
         search.addTextChangedListener(new android.text.TextWatcher() {
@@ -3030,8 +3039,9 @@ public final class MainActivity extends ScaledActivity {
                 }
                 for (RadioPackCities.City city : found) {
                     View row = cityRow.apply(city);
-                    if (!city.region.isEmpty() && row instanceof TextView label) {
-                        label.setText(city.name + "  ·  " + city.region + "  ·  "
+                    String place = searchPlaceLabel(city, homeCountry);
+                    if (!place.isEmpty() && row instanceof TextView label) {
+                        label.setText(city.name + "  ·  " + place + "  ·  "
                                 + stationCountLabel(city.stationCount));
                     }
                     LinearLayout.LayoutParams params = fullWrap();
@@ -3043,24 +3053,74 @@ public final class MainActivity extends ScaledActivity {
         showRegions.run();
         dialog[0] = CompactDialog.show(new AlertDialog.Builder(this)
                 .setTitle(pack.name + ": " + plural(cities.size(), "город", "города", "городов")
-                        + (regions.size() > 1 ? " в " + regions.size() + " регионах" : ""))
+                        + (regionCount > 1 ? " в " + regionCount + " регионах" : ""))
                 .setView(content)
                 .setNegativeButton("Закрыть", null));
     }
 
+    /** A collapsible header with a group whose rows are built when it first opens. */
+    private void addCityGroup(LinearLayout parent, String name, int count, int textSize,
+            boolean open, java.util.function.Consumer<LinearLayout> fill) {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        TextView header = text("", textSize, Ui.PRIMARY, Typeface.BOLD);
+        header.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 4));
+        String title = name + " · " + count;
+        // Rows are built when a group opens: a pack can hold thousands of cities.
+        Runnable build = () -> {
+            if (group.getChildCount() == 0) fill.accept(group);
+        };
+        group.setVisibility(open ? View.VISIBLE : View.GONE);
+        if (open) build.run();
+        header.setText((open ? "▾ " : "▸ ") + title);
+        header.setOnClickListener(v -> {
+            boolean show = group.getVisibility() != View.VISIBLE;
+            if (show) build.run();
+            group.setVisibility(show ? View.VISIBLE : View.GONE);
+            header.setText((show ? "▾ " : "▸ ") + title);
+        });
+        parent.addView(header, fullWrap());
+        parent.addView(group, fullWrap());
+    }
+
+    private static boolean containsCity(List<RadioPackCities.City> cities, String key) {
+        for (RadioPackCities.City city : cities) {
+            if (city.key.equals(key)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The region of a search result, with the country when it differs from the pack's first
+     * one: "Костанайская область, Казахстан".
+     */
+    static String searchPlaceLabel(RadioPackCities.City city, String homeCountry) {
+        boolean foreign = !city.country.isEmpty() && !city.country.equals(homeCountry);
+        String region = city.region.equals(city.name) ? "" : city.region;
+        if (!foreign) return region;
+        return region.isEmpty() ? city.country : region + ", " + city.country;
+    }
+
     private void showRadioPackActions(MediaSettingsSnapshot.Catalog pack, boolean active) {
         if (mediaSettingsBusy || radioCatalogBusy || settingsTransferBusy) return;
-        String[] labels = {"Выбрать город", "Обновить из ZIP", "Экспортировать набор (ZIP)",
-                "Удалить набор"};
-        Runnable[] actions = {
-                () -> openRadioCityPicker(pack),
-                () -> chooseRadioPackUpdate(pack.packId),
-                () -> exportRadioCatalog(pack),
-                () -> confirmDeleteRadioPack(pack, active),
-        };
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        labels.add("Выбрать город");
+        actions.add(() -> openRadioCityPicker(pack));
+        // The built-in pack ships with the app: it is updated with it and cannot be deleted.
+        if (!pack.isBuiltIn()) {
+            labels.add("Обновить из ZIP");
+            actions.add(() -> chooseRadioPackUpdate(pack.packId));
+        }
+        labels.add("Экспортировать набор (ZIP)");
+        actions.add(() -> exportRadioCatalog(pack));
+        if (!pack.isBuiltIn()) {
+            labels.add("Удалить набор");
+            actions.add(() -> confirmDeleteRadioPack(pack, active));
+        }
         CompactDialog.show(new AlertDialog.Builder(this)
-                .setTitle(pack.name)
-                .setItems(labels, (d, which) -> actions[which].run())
+                .setTitle(pack.isBuiltIn() ? pack.name + " (встроенный)" : pack.name)
+                .setItems(labels.toArray(new String[0]), (d, which) -> actions.get(which).run())
                 .setNegativeButton("Отмена", null));
     }
 
@@ -3069,7 +3129,7 @@ public final class MainActivity extends ScaledActivity {
                 .setTitle("Удалить набор «" + pack.name + "»?")
                 .setMessage(plural(pack.cityCount, "город", "города", "городов")
                         + " и их обложки будут удалены."
-                        + (active ? " Активным станет встроенный каталог." : ""))
+                        + (active ? " Активным станет встроенный набор." : ""))
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Удалить", (d, w) -> manageRadioCatalog(
                         MediaBridgeContract.CATALOG_ACTION_DELETE, pack, null, null,
@@ -3137,7 +3197,7 @@ public final class MainActivity extends ScaledActivity {
         CompactDialog.show(new AlertDialog.Builder(this)
                 .setTitle("Удалить каталог «" + catalog.name + "»?")
                 .setMessage("Станции и обложки этого каталога будут удалены."
-                        + (active ? " Активным станет встроенный каталог." : ""))
+                        + (active ? " Активным станет встроенный набор." : ""))
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Удалить", (d, w) -> manageRadioCatalog(
                         MediaBridgeContract.CATALOG_ACTION_DELETE, catalog, null, null,

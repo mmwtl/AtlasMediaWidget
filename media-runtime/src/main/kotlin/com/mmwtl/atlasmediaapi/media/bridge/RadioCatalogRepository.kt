@@ -32,7 +32,7 @@ enum class RadioCatalogType {
 }
 
 /**
- * One entry of the catalog list: the built-in catalog, a catalog imported on its own, or a pack.
+ * One entry of the catalog list: the built-in pack, a catalog imported on its own, or a pack.
  * A pack holds many cities; [stationCount] then counts the stations of all its cities.
  */
 data class RadioCatalogEntry(
@@ -40,7 +40,7 @@ data class RadioCatalogEntry(
     val name: String,
     val stationCount: Int,
     val builtIn: Boolean,
-    /** The pack id from pack.json; empty for the built-in and single catalogs. */
+    /** The pack id from pack.json; empty for a single catalog. */
     val packId: String = "",
     val cityCount: Int = 0,
 ) {
@@ -53,6 +53,8 @@ data class RadioPackCity(
     val name: String,
     val region: String,
     val stationCount: Int,
+    /** Optional; the picker groups cities by country, then by region. */
+    val country: String = "",
 )
 
 /** The catalog or pack an import created or updated. */
@@ -78,6 +80,10 @@ data class RadioCatalogInfo(
 /**
  * Keeps several named radio catalogs and serves the active one.
  *
+ * The built-in catalog is a read-only pack in the APK assets (`radio_pack/`, the extracted
+ * `atlas-radio-6plus.zip`). Its selected city is kept apart from the imported pack's city, so
+ * returning to the built-in pack restores it; it defaults to Penza.
+ *
  * Layout under filesDir:
  * - `radio_catalogs/index.json` (AtomicFile) lists the catalogs and packs, their order, the active
  *   one and, for a pack, the active city;
@@ -102,11 +108,14 @@ class RadioCatalogRepository(
         const val KEY_CUSTOM_CATALOG_ACTIVE = "custom_catalog_active"
 
         const val BUILT_IN_ID = "builtin"
-        const val BUILT_IN_NAME = "Встроенный (Пенза)"
+        /** Shown only when the built-in pack's manifest cannot be read. */
+        const val BUILT_IN_NAME = "Встроенный набор"
+        /** Penza, the city the built-in catalog served before it became a pack. */
+        const val DEFAULT_BUILT_IN_CITY = "penzenskaya-penza-9c0768c073"
         const val MIGRATED_CATALOG_NAME = "Мой каталог"
         const val DEFAULT_CATALOG_NAME = "Каталог"
 
-        const val BUILT_IN_DIR = "radio"
+        const val BUILT_IN_DIR = "radio_pack"
         const val MANIFEST_NAME = "stations.csv"
         const val COVERS_DIR = "covers"
         const val CATALOGS_DIR = "radio_catalogs"
@@ -182,7 +191,19 @@ class RadioCatalogRepository(
         val region: String,
         val file: String,
         val stationCount: Int,
-    )
+        val country: String = "",
+    ) {
+        fun toCity() = RadioPackCity(key, name, region, stationCount, country)
+    }
+
+    /** The built-in pack as its asset manifest describes it. */
+    private class BuiltInPack(
+        val id: String,
+        val name: String,
+        val cities: List<StoredCity>,
+    ) {
+        val stationCount: Int = cities.sumOf(StoredCity::stationCount)
+    }
 
     private class ValidatedPack(
         val id: String,
@@ -195,7 +216,9 @@ class RadioCatalogRepository(
     private data class CatalogIndex(
         val activeId: String,
         val entries: List<IndexEntry>,
+        /** The city of the active imported pack; the built-in pack uses [builtInCityKey]. */
         val activeCityKey: String = "",
+        val builtInCityKey: String = DEFAULT_BUILT_IN_CITY,
     )
 
     private class ActiveCatalog(
@@ -203,7 +226,7 @@ class RadioCatalogRepository(
         val name: String,
         val type: RadioCatalogType,
         val stations: Map<Int, RadioStation>,
-        /** Cover file name from the CSV -> stored cover name; empty for the built-in catalog. */
+        /** Cover file name from the CSV -> stored cover name; empty for the built-in pack. */
         val storedCovers: Map<String, String>,
         val city: StoredCity? = null,
     )
@@ -233,7 +256,7 @@ class RadioCatalogRepository(
     var isWidgetBroadcastEnabled: Boolean = prefs.getBoolean(KEY_WIDGET_BROADCAST_ENABLED, true)
         private set
 
-    private val builtInStationCount: Int by lazy { loadBuiltIn().stations.size }
+    private val builtInPack: BuiltInPack by lazy(::readBuiltInPack)
 
     private val _catalogInfoFlow = MutableStateFlow(buildCatalogInfo())
     val catalogInfoFlow: StateFlow<RadioCatalogInfo> = _catalogInfoFlow.asStateFlow()
@@ -323,9 +346,9 @@ class RadioCatalogRepository(
     private fun openCoverStream(station: RadioStation, catalog: ActiveCatalog): InputStream? {
         if (station.coverFileName.isBlank()) return null
         return when (catalog.type) {
-            RadioCatalogType.BUILT_IN -> runCatching {
-                context.assets.open("$BUILT_IN_DIR/$COVERS_DIR/${station.coverFileName}")
-            }.getOrNull()
+            RadioCatalogType.BUILT_IN -> station.coverFileName.takeIf(SAFE_COVER_NAME::matches)?.let {
+                runCatching { context.assets.open("$BUILT_IN_DIR/$COVERS_DIR/$it") }.getOrNull()
+            }
             RadioCatalogType.CUSTOM -> {
                 val stored = catalog.storedCovers[station.coverFileName]
                     ?.takeIf(STORED_COVER::matches)
@@ -338,18 +361,33 @@ class RadioCatalogRepository(
         }
     }
 
-    /** Makes the built-in catalog active; imported catalogs stay available. */
+    /** Makes the built-in pack active with its last city; imported catalogs stay available. */
     fun restoreDefaultCatalog() {
         activateCatalog(BUILT_IN_ID)
     }
 
-    /** Activates a catalog, or the city [cityKey] of a pack. */
+    /**
+     * Activates a catalog, or the city [cityKey] of a pack. The built-in pack keeps its last city
+     * when [cityKey] is empty.
+     */
     @Synchronized
     fun activateCatalog(id: String, cityKey: String? = null) {
         val current = index
+        if (id == BUILT_IN_ID) {
+            val key = cityKey?.takeIf(String::isNotEmpty) ?: current.builtInCityKey
+            require(cityKey.isNullOrEmpty() || builtInPack.cities.any { it.key == key }) {
+                "Во встроенном наборе нет города «$key»"
+            }
+            if (current.activeId == id && current.builtInCityKey == key && active.id == id &&
+                active.city?.key == builtInCity(key)?.key
+            ) return
+            commitIndex(current.copy(activeId = id, activeCityKey = "", builtInCityKey = key))
+            reloadCatalog()
+            return
+        }
         val entry = current.entries.firstOrNull { it.id == id }
-        require(id == BUILT_IN_ID || entry != null) { "Каталог не найден" }
-        val key = if (entry?.isPack == true) {
+        require(entry != null) { "Каталог не найден" }
+        val key = if (entry.isPack) {
             require(!cityKey.isNullOrEmpty()) { "Выберите город набора «${entry.name}»" }
             require(readPackCities(entry).any { it.key == cityKey }) { "В наборе нет города «$cityKey»" }
             cityKey
@@ -364,11 +402,12 @@ class RadioCatalogRepository(
         reloadCatalog()
     }
 
-    /** The cities of pack [id] in pack order. */
+    /** The cities of pack [id] (or of the built-in pack) in pack order. */
     fun packCities(id: String): List<RadioPackCity> {
+        if (id == BUILT_IN_ID) return builtInPack.cities.map(StoredCity::toCity)
         val entry = index.entries.firstOrNull { it.id == id && it.isPack }
             ?: throw IllegalArgumentException("Набор не найден")
-        return readPackCities(entry).map { RadioPackCity(it.key, it.name, it.region, it.stationCount) }
+        return readPackCities(entry).map(StoredCity::toCity)
     }
 
     @Synchronized
@@ -394,7 +433,7 @@ class RadioCatalogRepository(
         }
     }
 
-    /** Deletes a catalog or a whole pack; deleting the active one activates the built-in one. */
+    /** Deletes a catalog or a whole pack; deleting the active one activates the built-in pack. */
     @Synchronized
     fun deleteCatalog(id: String) {
         require(id != BUILT_IN_ID) { "Встроенный каталог нельзя удалить" }
@@ -402,7 +441,7 @@ class RadioCatalogRepository(
         require(current.entries.any { it.id == id }) { "Каталог не найден" }
         val wasActive = current.activeId == id
         commitIndex(
-            CatalogIndex(
+            current.copy(
                 activeId = if (wasActive) BUILT_IN_ID else current.activeId,
                 entries = current.entries.filter { it.id != id },
                 activeCityKey = if (wasActive) "" else current.activeCityKey,
@@ -414,7 +453,7 @@ class RadioCatalogRepository(
 
     /** Names a single catalog must not repeat; a pack keeps the name from its pack.json. */
     private fun singleNames(current: CatalogIndex, exceptId: String? = null): List<String> =
-        current.entries.filter { !it.isPack && it.id != exceptId }.map { it.name } + BUILT_IN_NAME
+        current.entries.filter { !it.isPack && it.id != exceptId }.map { it.name } + builtInPack.name
 
     private fun validateCoverFile(coverFile: File, coverName: String) {
         if (!SAFE_COVER_NAME.matches(coverName) || coverName == "." || coverName == "..") {
@@ -555,8 +594,8 @@ class RadioCatalogRepository(
             current.entries + entry
         }
         val next = when {
-            activate -> CatalogIndex(entry.id, entries)
-            replaced != null && current.activeId == replaced.id -> CatalogIndex(entry.id, entries)
+            activate || (replaced != null && current.activeId == replaced.id) ->
+                current.copy(activeId = entry.id, entries = entries, activeCityKey = "")
             else -> current.copy(entries = entries)
         }
         commitImported(next, entry, reload = replaced?.id == active.id)
@@ -586,6 +625,7 @@ class RadioCatalogRepository(
                 cities.put(JSONObject().apply {
                     put("key", city.key)
                     put("name", city.name)
+                    if (city.country.isNotEmpty()) put("country", city.country)
                     if (city.region.isNotEmpty()) put("region", city.region)
                     put("file", city.file)
                     put("stations", city.stationCount)
@@ -611,8 +651,8 @@ class RadioCatalogRepository(
         val next = when {
             !wasActive -> current.copy(entries = entries)
             pack.cities.any { it.key == current.activeCityKey } ->
-                CatalogIndex(id, entries, current.activeCityKey)
-            else -> CatalogIndex(BUILT_IN_ID, entries)
+                current.copy(activeId = id, entries = entries)
+            else -> current.copy(activeId = BUILT_IN_ID, entries = entries, activeCityKey = "")
         }
         commitImported(next, entry, reload = wasActive)
         return entry.toEntry()
@@ -694,7 +734,10 @@ class RadioCatalogRepository(
                 }
             }
             stationCount += stations.size
-            cities += StoredCity(key, cityName, normalizeName(item.optString("region")), path, stations.size)
+            cities += StoredCity(
+                key, cityName, normalizeName(item.optString("region")), path, stations.size,
+                normalizeName(item.optString("country")),
+            )
         }
 
         val manifestFile = File(root, PACK_MANIFEST_NAME)
@@ -868,7 +911,7 @@ class RadioCatalogRepository(
     @Synchronized
     fun exportCatalogZip(outputStream: OutputStream, id: String = active.id) {
         if (id == BUILT_IN_ID) {
-            exportSampleZip(outputStream)
+            exportBuiltInZip(outputStream)
             return
         }
         val entry = index.entries.firstOrNull { it.id == id } ?: throw IllegalArgumentException("Каталог не найден")
@@ -886,6 +929,7 @@ class RadioCatalogRepository(
                             put(JSONObject().apply {
                                 put("key", city.key)
                                 put("name", city.name)
+                                if (city.country.isNotEmpty()) put("country", city.country)
                                 if (city.region.isNotEmpty()) put("region", city.region)
                                 put("file", city.file)
                             })
@@ -916,23 +960,16 @@ class RadioCatalogRepository(
         }
     }
 
-    fun exportSampleZip(outputStream: OutputStream) {
+    /** Exports the built-in pack as the pack ZIP it was extracted from. */
+    fun exportBuiltInZip(outputStream: OutputStream) {
+        val files = listOf(PACK_MANIFEST_NAME) +
+            builtInPack.cities.map(StoredCity::file) +
+            context.assets.list("$BUILT_IN_DIR/$COVERS_DIR").orEmpty().sorted().map { "$COVERS_DIR/$it" }
         ZipOutputStream(BufferedOutputStream(outputStream)).use { zos ->
-            val manifestBytes = context.assets.open("$BUILT_IN_DIR/$MANIFEST_NAME").use { it.readBytes() }
-            zos.putNextEntry(ZipEntry(MANIFEST_NAME))
-            zos.write(manifestBytes)
-            zos.closeEntry()
-
-            val coverFiles = runCatching { context.assets.list("$BUILT_IN_DIR/$COVERS_DIR") }
-                .getOrNull().orEmpty()
-
-            for (coverName in coverFiles) {
-                runCatching {
-                    val coverBytes = context.assets.open("$BUILT_IN_DIR/$COVERS_DIR/$coverName").use { it.readBytes() }
-                    zos.putNextEntry(ZipEntry("$COVERS_DIR/$coverName"))
-                    zos.write(coverBytes)
-                    zos.closeEntry()
-                }
+            files.forEach { path ->
+                zos.putNextEntry(ZipEntry(path))
+                context.assets.open("$BUILT_IN_DIR/$path").use { it.copyTo(zos) }
+                zos.closeEntry()
             }
         }
     }
@@ -945,20 +982,55 @@ class RadioCatalogRepository(
         return catalogZip
     }
 
+    /** The built-in city [key], or Penza when an APK update dropped it. */
+    private fun builtInCity(key: String): StoredCity? {
+        val cities = builtInPack.cities
+        return cities.firstOrNull { it.key == key }
+            ?: cities.firstOrNull { it.key == DEFAULT_BUILT_IN_CITY }
+            ?: cities.firstOrNull()
+    }
+
     private fun loadBuiltIn(): ActiveCatalog {
-        val builtIn = runCatching {
-            InputStreamReader(context.assets.open("$BUILT_IN_DIR/$MANIFEST_NAME"), StandardCharsets.UTF_8).use {
-                RadioCatalogCsv.read(it)
-            }
-        }.onFailure(Timber::e).getOrDefault(emptyList())
+        val city = builtInCity(index.builtInCityKey)
+        val stations = city
+            ?.let { runCatching { readBuiltInStations(it.file) }.onFailure(Timber::e).getOrNull() }
+            .orEmpty()
         return ActiveCatalog(
             BUILT_IN_ID,
-            BUILT_IN_NAME,
+            builtInPack.name,
             RadioCatalogType.BUILT_IN,
-            builtIn.associateBy { it.frequencyKHz },
+            stations.associateBy { it.frequencyKHz },
             emptyMap(),
+            city,
         )
     }
+
+    private fun readBuiltInStations(path: String): List<RadioStation> {
+        require(PACK_CSV_PATH.matches(path)) { "Недопустимый путь $path" }
+        return InputStreamReader(context.assets.open("$BUILT_IN_DIR/$path"), StandardCharsets.UTF_8)
+            .use { RadioCatalogCsv.read(it) }
+    }
+
+    /** Reads the asset manifest and counts every city's stations; empty when assets are missing. */
+    private fun readBuiltInPack(): BuiltInPack = runCatching {
+        val json = context.assets.open("$BUILT_IN_DIR/$PACK_MANIFEST_NAME").use {
+            JSONObject(String(it.readBytes(), StandardCharsets.UTF_8))
+        }
+        val array = json.getJSONArray("catalogs")
+        val cities = List(array.length()) { position ->
+            val item = array.getJSONObject(position)
+            val file = item.getString("file")
+            StoredCity(
+                key = item.getString("key"),
+                name = normalizeName(item.getString("name")),
+                region = normalizeName(item.optString("region")),
+                file = file,
+                stationCount = readBuiltInStations(file).size,
+                country = normalizeName(item.optString("country")),
+            )
+        }
+        BuiltInPack(json.getString("id"), normalizeName(json.getString("name")).ifEmpty { BUILT_IN_NAME }, cities)
+    }.onFailure(Timber::e).getOrElse { BuiltInPack("", BUILT_IN_NAME, emptyList()) }
 
     private fun loadCustom(entry: IndexEntry): ActiveCatalog? {
         val directory = File(catalogsDirectory, entry.id)
@@ -999,6 +1071,7 @@ class RadioCatalogRepository(
                 region = item.optString("region"),
                 file = item.getString("file"),
                 stationCount = item.optInt("stations"),
+                country = item.optString("country"),
             )
         }
     }
@@ -1117,7 +1190,8 @@ class RadioCatalogRepository(
         val activeCity = json.optString("activeCity")
             .takeIf { activeId != BUILT_IN_ID && entries.first { it.id == activeId }.isPack }
             .orEmpty()
-        return CatalogIndex(activeId, entries, activeCity)
+        val builtInCity = json.optString("builtinCity").takeIf(PACK_KEY::matches) ?: DEFAULT_BUILT_IN_CITY
+        return CatalogIndex(activeId, entries, activeCity, builtInCity)
     }
 
     /** Writes [next] atomically and makes it current; the write is the commit point. */
@@ -1126,6 +1200,7 @@ class RadioCatalogRepository(
             put("version", 2)
             put("active", next.activeId)
             if (next.activeCityKey.isNotEmpty()) put("activeCity", next.activeCityKey)
+            put("builtinCity", next.builtInCityKey)
             put("catalogs", JSONArray().apply {
                 next.entries.forEach { entry ->
                     put(JSONObject().apply {
@@ -1178,13 +1253,15 @@ class RadioCatalogRepository(
         val count = catalog.stations.size
         val city = catalog.city
         val description = when {
-            catalog.type == RadioCatalogType.BUILT_IN -> "Встроенный каталог (Пенза, $count станций)"
+            catalog.type == RadioCatalogType.BUILT_IN && city != null ->
+                "«${city.name}» (встроенный набор, $count станций)"
+            catalog.type == RadioCatalogType.BUILT_IN -> "Встроенный набор недоступен"
             city != null -> "«${city.name}» (${catalog.name}, $count станций)"
             else -> "«${catalog.name}» ($count станций)"
         }
-        val builtInCount = if (catalog.type == RadioCatalogType.BUILT_IN) count else builtInStationCount
+        val pack = builtInPack
         val catalogs = buildList {
-            add(RadioCatalogEntry(BUILT_IN_ID, BUILT_IN_NAME, builtInCount, builtIn = true))
+            add(RadioCatalogEntry(BUILT_IN_ID, pack.name, pack.stationCount, builtIn = true, pack.id, pack.cities.size))
             index.entries.forEach { add(it.toEntry()) }
         }
         return RadioCatalogInfo(

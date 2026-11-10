@@ -6,7 +6,9 @@
 ## 1. Архитектура / Architecture
 
 ### [RU] Централизованное управление в AtlasMediaApi
-Каталоги радиостанций управляются централизованно в сервисе `AtlasMediaApi`, который входит прямо в единственный поддерживаемый интегрированный Widget APK (модуль `:media-runtime`). Каталогов может быть несколько: встроенный каталог станций Пензы, наборы городов (один ZIP с `pack.json`, например общий набор по регионам России) и отдельные ZIP-каталоги — всего до 64 импортированных каталогов и наборов; набор считается один раз и может содержать до 5000 городов. Активен ровно один каталог или один город набора.
+Каталоги радиостанций управляются централизованно в сервисе `AtlasMediaApi`, который входит прямо в единственный поддерживаемый интегрированный Widget APK (модуль `:media-runtime`). Каталогов может быть несколько: встроенный набор городов, загружаемые наборы городов (один ZIP с `pack.json`, например общий набор по регионам России) и отдельные ZIP-каталоги — всего до 64 импортированных каталогов и наборов; набор считается один раз и может содержать до 5000 городов. Активен ровно один каталог или один город набора.
+
+Встроенный каталог — набор «Россия, Казахстан, Беларусь — 6+ станций» (463 города, где не меньше шести записей частот; см. [подготовку набора](radio-pack-preparation-2026-11-09.md)). Он лежит в APK (`media-runtime/src/main/assets/radio_pack/` — распакованный `docs/assets/radio-packs/atlas-radio-6plus.zip`), читается прямо из assets, обновляется вместе с приложением и не занимает место среди 64 импортированных. По умолчанию выбран город Пенза; выбранный город встроенного набора запоминается отдельно от городов загруженных наборов (`builtinCity` в `index.json`), поэтому возврат ко встроенному набору восстанавливает его. Если город пропал из новой версии APK, выбирается Пенза. Установки, где был активен прежний встроенный каталог Пензы, получают встроенный набор с Пензой.
 
 - `AtlasMediaApi` сопоставляет текущую частоту радиоприёмника с активным каталогом;
 - название станции передаётся в `snapshot.title`;
@@ -14,10 +16,12 @@
 - обложка станции предоставляется через `FileProvider` URI в `snapshot.artworkUri` с инкрементом `snapshot.artworkRevision`;
 - при переключении каталога название и обложка текущей станции пересчитываются сразу; обложка из прежнего каталога не переиспользуется, даже если частота та же;
 - виджет `AtlasMediaWidget` отображает полученные данные и декодирует обложку по URI без хранения локальных дубликатов файлов;
-- управление каталогами доступно на вкладке «Радио» экрана `MainActivity` (карточка «Каталоги станций»): нажатие на каталог делает его активным; набор занимает одну строку, нажатие открывает выбор города: регионы свёрнуты (кроме региона выбранного города), поле поиска ищет город по всему набору без учёта регистра и «ё». Меню «⋯» отдельного каталога — экспорт, замена из ZIP, переименование и удаление; меню набора — выбор города, обновление из ZIP, экспорт и удаление набора. «Добавить каталог или набор (ZIP)» сам распознаёт набор по `pack.json`: новый отдельный каталог становится активным, а после загрузки нового набора открывается выбор города. Встроенный каталог можно только включить и экспортировать.
+- управление каталогами доступно на вкладке «Радио» экрана `MainActivity` (карточка «Каталоги станций»): нажатие на каталог делает его активным; набор занимает одну строку, нажатие открывает выбор города: города сгруппированы по странам (если их в наборе больше одной) и регионам, группы свёрнуты (кроме группы выбранного города), у страны с одним регионом города идут без заголовка региона; поле поиска ищет город по всему набору без учёта регистра и «ё». Меню «⋯» отдельного каталога — экспорт, замена из ZIP, переименование и удаление; меню набора — выбор города, обновление из ZIP, экспорт и удаление набора. «Добавить каталог или набор (ZIP)» сам распознаёт набор по `pack.json`: новый отдельный каталог становится активным, а после загрузки нового набора открывается выбор города. Во встроенном наборе можно только выбрать город и экспортировать набор.
 
 ### [EN] Centralized Management in AtlasMediaApi
-Radio station catalogs are managed centrally by the `AtlasMediaApi` service, compiled directly into the only supported integrated Widget APK (module `:media-runtime`). There can be several catalogs: the built-in Penza catalog, city packs (one ZIP with `pack.json`, for example a shared pack of Russian regions) and single ZIP catalogs — up to 64 imported catalogs and packs in total; a pack counts once and may hold up to 5000 cities. Exactly one catalog, or one city of a pack, is active.
+Radio station catalogs are managed centrally by the `AtlasMediaApi` service, compiled directly into the only supported integrated Widget APK (module `:media-runtime`). There can be several catalogs: the built-in city pack, loadable city packs (one ZIP with `pack.json`, for example a shared pack of Russian regions) and single ZIP catalogs — up to 64 imported catalogs and packs in total; a pack counts once and may hold up to 5000 cities. Exactly one catalog, or one city of a pack, is active.
+
+The built-in catalog is the pack "Россия, Казахстан, Беларусь — 6+ станций" (463 cities with at least six frequency rows; see the [pack preparation](radio-pack-preparation-2026-11-09.md)). It ships in the APK (`media-runtime/src/main/assets/radio_pack/`, the extracted `docs/assets/radio-packs/atlas-radio-6plus.zip`), is read directly from the assets, is updated with the app and does not count towards the 64 imported catalogs. Penza is selected by default; the built-in pack's city is stored apart from the cities of loaded packs (`builtinCity` in `index.json`), so returning to the built-in pack restores it. A city missing from a newer APK falls back to Penza. Installations that had the former built-in Penza catalog active get the built-in pack with Penza.
 
 - `AtlasMediaApi` matches the current radio frequency against the active catalog;
 - The resolved station name is supplied in `snapshot.title`;
@@ -25,7 +29,7 @@ Radio station catalogs are managed centrally by the `AtlasMediaApi` service, com
 - Station artwork is provided via a `FileProvider` URI in `snapshot.artworkUri` with an incrementing `snapshot.artworkRevision`;
 - Switching catalogs re-resolves the current station at once; artwork from the previous catalog is never reused, even for the same frequency;
 - `AtlasMediaWidget` renders the incoming metadata and decodes the artwork URI without storing redundant local assets;
-- Catalogs are managed on the Radio tab of `MainActivity` ("Station catalogs" card): tapping a catalog activates it; a pack is one row that opens a city picker: regions start collapsed (except the selected city's) and a search field finds a city across the pack, ignoring case and «ё». A single catalog's "⋯" menu exports, replaces from ZIP, renames or deletes it; a pack's menu picks a city, updates from ZIP, exports or deletes the pack. "Add catalog or pack (ZIP)" recognises a pack by `pack.json`: a new single catalog becomes active, and a newly loaded pack opens the city picker. The built-in catalog can only be activated and exported.
+- Catalogs are managed on the Radio tab of `MainActivity` ("Station catalogs" card): tapping a catalog activates it; a pack is one row that opens a city picker: cities are grouped by country (when the pack has more than one) and region, groups start collapsed (except the selected city's), a country with a single region lists its cities without a region header, and a search field finds a city across the pack, ignoring case and «ё». A single catalog's "⋯" menu exports, replaces from ZIP, renames or deletes it; a pack's menu picks a city, updates from ZIP, exports or deletes the pack. "Add catalog or pack (ZIP)" recognises a pack by `pack.json`: a new single catalog becomes active, and a newly loaded pack opens the city picker. In the built-in pack you can only pick a city and export the pack.
 
 ### [RU] Хранение и общие обложки
 Каталоги хранятся в `filesDir/radio_catalogs`: файл `index.json` (AtomicFile) содержит названия, порядок, активный каталог и выбранный город набора. У отдельного каталога своя папка `<id>/` с `stations.csv` и `covers.json` (имя обложки из архива → сохранённый файл). Набор — тоже одна папка `<id>/` с CSV городов в исходных путях, `cities.json` (ключ, название, регион, файл и число станций каждого города) и общим `covers.json`; в `index.json` набор занимает одну запись, сколько бы городов в нём ни было, а список городов читается из `cities.json` по запросу. Все обложки лежат один раз в `filesDir/radio_covers/<sha256>.<ext>`: одинаковые по содержимому обложки разных каталогов (одна и та же станция на разных частотах в разных городах) не дублируются. Совпадение определяется побайтно; одна и та же картинка в разном размере или сжатии хранится дважды. Обложки всех каталогов вместе занимают не больше 128 МБ.
@@ -114,9 +118,9 @@ russia-radio.zip
   "id": "russia",
   "name": "Россия",
   "catalogs": [
-    {"key": "penza",    "name": "Пенза",   "region": "Пензенская область", "file": "cities/penza.csv"},
-    {"key": "kuznetsk", "name": "Кузнецк", "region": "Пензенская область", "file": "cities/kuznetsk.csv"},
-    {"key": "moscow",   "name": "Москва",  "region": "Москва и область",   "file": "cities/moscow.csv"}
+    {"key": "penza",    "name": "Пенза",    "country": "Россия",    "region": "Пензенская область",   "file": "cities/penza.csv"},
+    {"key": "kuznetsk", "name": "Кузнецк",  "country": "Россия",    "region": "Пензенская область",   "file": "cities/kuznetsk.csv"},
+    {"key": "kostanay", "name": "Костанай", "country": "Казахстан", "region": "Костанайская область", "file": "cities/kostanay.csv"}
   ]
 }
 ```
@@ -124,9 +128,9 @@ russia-radio.zip
 - `id`, `key`:
   - **[RU]** строчные латинские буквы, цифры, `-` и `_` (до 40 символов). `id` определяет набор: повторная загрузка набора с тем же `id` обновляет его, а не добавляет второй. `key` определяет город внутри набора: выбранный город остаётся выбранным после обновления, если его `key` есть в новой версии; иначе активным становится встроенный каталог.
   - **[EN]** lowercase Latin letters, digits, `-` and `_` (up to 40 characters). `id` identifies the pack: loading a pack with the same `id` updates it instead of adding another. `key` identifies a city within the pack: the selected city stays selected after an update if its `key` is still there; otherwise the built-in catalog becomes active.
-- `name`, `region`:
-  - **[RU]** названия набора, города и региона (до 40 символов). Регион необязателен; города группируются по нему в порядке первого появления.
-  - **[EN]** names of the pack, city and region (up to 40 characters). The region is optional; cities are grouped by it in order of first appearance.
+- `name`, `country`, `region`:
+  - **[RU]** названия набора, города, страны и региона (до 40 символов). Страна и регион необязательны; в выборе города города группируются по стране, затем по региону, в порядке первого появления. Набор без `country` показывается только по регионам, как раньше.
+  - **[EN]** names of the pack, city, country and region (up to 40 characters). Country and region are optional; the city picker groups cities by country, then by region, in order of first appearance. A pack without `country` is grouped by region only, as before.
 - `file`:
   - **[RU]** путь к CSV города внутри архива, только латиница, цифры, `-`, `_` и `/`, с расширением `.csv`. Имена файлов латинские, потому что архиваторы записывают кириллицу в именах по-разному.
   - **[EN]** path to the city CSV inside the archive: Latin letters, digits, `-`, `_` and `/`, ending in `.csv`. File names are Latin because archivers encode Cyrillic names inconsistently.
