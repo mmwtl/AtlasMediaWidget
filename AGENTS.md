@@ -109,7 +109,8 @@ migration request.
   player tile never opens it. `MediaSessionObserver` keeps such a prepared session until its
   package publishes an active session (docs/full-media-bridge.md §6).
 - Automatic playback (startup autoplay, autoplay after source loss) runs through `CallGuard`: an
-  active call by audio mode skips it or cancels its play retries, which would otherwise restart
+  active call (audio mode or the Telecom call state, which on Android 11 includes the head unit's
+  Bluetooth calls) skips it or cancels its play retries, which would otherwise restart
   the player against the call's audio focus. User commands are not blocked.
 - Preserve the selected Online player when returning from native sources. For OneOS DIM, send full
   Online metadata once per change and use the isolated numeric progress facade for optional progress

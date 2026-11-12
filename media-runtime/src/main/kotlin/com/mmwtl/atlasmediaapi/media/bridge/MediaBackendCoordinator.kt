@@ -433,7 +433,13 @@ class MediaBackendCoordinator(
     /** Runs an automatic action; with [autoplay] a phone call cancels it and yields null. */
     private suspend fun runAutoplay(autoplay: Boolean, action: suspend () -> Boolean): Boolean? =
         if (autoplay) {
-            CallGuard.runUnlessCallActive(isCallActive = { CallGuard.isCallActive(context) }, block = action)
+            CallGuard.runUnlessCallActive(
+                isCallActive = {
+                    CallGuard.callSignal(context)
+                        ?.also { Timber.i("Call detected by %s; cancelling automatic playback", it) } != null
+                },
+                block = action,
+            )
         } else {
             action()
         }
