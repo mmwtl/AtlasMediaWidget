@@ -1,5 +1,6 @@
 package com.mmwtl.atlasmediaapi.diagnostics
 
+import com.mmwtl.atlasmediaapi.media.bridge.InternetAvailability
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -519,10 +520,10 @@ class DiagnosticActivity : Activity() {
             radioButtonsLayout.addView(importBackupBtn, DiagnosticUi.fullWrap())
             DiagnosticUi.topMargin(importBackupBtn, this, 8f)
 
-            restoreDefaultCatalogButton = DiagnosticUi.outlinedButton(this, "Восстановить стандартный каталог", destructive = true).apply {
+            restoreDefaultCatalogButton = DiagnosticUi.outlinedButton(this, "Включить встроенный каталог").apply {
                 setOnClickListener {
                     coordinator.settingsController.restoreDefaultCatalog()
-                    Toast.makeText(this@DiagnosticActivity, "Стандартный каталог Пензы восстановлен", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this@DiagnosticActivity, "Включён встроенный каталог Пензы", Toast.LENGTH_SHORT).show()
                     render()
                 }
             }
@@ -811,7 +812,7 @@ class DiagnosticActivity : Activity() {
                 withContext(Dispatchers.Main) {
                     result.onSuccess { count ->
                         coordinator.settingsController.onRadioCatalogChanged()
-                        Toast.makeText(this@DiagnosticActivity, "Успешно импортировано $count станций (каталог заменён)", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@DiagnosticActivity, "Импортировано $count станций: каталог добавлен и включён", Toast.LENGTH_LONG).show()
                         render()
                     }.onFailure { error ->
                         Toast.makeText(this@DiagnosticActivity, "Ошибка импорта: ${error.message}", Toast.LENGTH_LONG).show()
@@ -1090,6 +1091,11 @@ class DiagnosticActivity : Activity() {
             appendLine("Default media package: ${coordinator.preferences.defaultMediaPackage.ifBlank { "none" }}")
             appendLine("Default audio source: ${coordinator.preferences.defaultAudioSource.ifBlank { "disabled" }}")
             appendLine("Default audio source delay: ${coordinator.preferences.defaultAudioSourceDelaySec}s")
+            appendLine(
+                "Startup waits for internet: ${coordinator.preferences.startupWaitForInternet} " +
+                    "(up to ${coordinator.preferences.startupInternetTimeoutSec}s); " +
+                    "validated internet now: ${InternetAvailability.isValidated(this@DiagnosticActivity)}",
+            )
             appendLine("Autoplay on startup: ${coordinator.preferences.defaultAudioSourceAutoplayOnStartup}")
             appendLine("Auto-switch on source lost: ${coordinator.preferences.autoSwitchToDefaultOnSourceLost}")
             appendLine("Autoplay on source lost: ${coordinator.preferences.autoSwitchToDefaultAutoplayOnSourceLost}")
@@ -1139,6 +1145,8 @@ class DiagnosticActivity : Activity() {
             appendLine("--- Radio Catalog & Cluster ---")
             appendLine("catalogType: ${catalogInfo.type}")
             appendLine("stationCount: ${catalogInfo.stationCount}")
+            appendLine("activeCatalogId: ${catalogInfo.activeId}")
+            appendLine("catalogs: ${catalogInfo.catalogs.joinToString { "${it.id}=${it.stationCount}" }}")
             appendLine("radioWidgetBroadcastEnabled: ${catalogInfo.isWidgetBroadcastEnabled}")
             appendLine("clusterDimBroadcastEnabled: ${coordinator.clusterMediaBridge.isClusterCoversEnabled}")
             appendLine("clusterDimAdaptiveWatchdogBaseMs: ${coordinator.clusterMediaBridge.reassertWatchdogIntervalMs}")

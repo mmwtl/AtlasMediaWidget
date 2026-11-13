@@ -511,16 +511,12 @@ public final class OverlayService extends Service
             return;
         }
         if (!openSourceWidgetIds.contains(widgetId)) return;
-        MediaSource.Id selected = MediaSource.Id.fromWire(control.substring("source_".length()));
-        if (!selected.isWidgetChoice()
-                || selected == MediaSource.selectedId(snapshot.audioSource, snapshot.sources).displayId()) return;
-        MediaSource choice = null;
-        for (MediaSource source : snapshot.sources) {
-            if (source.id.displayId() == selected
-                    && (choice == null || source.id == selected)) choice = source;
-        }
-        if (choice != null && choice.available
-                && (choice.capabilities & MediaBridgeContract.CAP_SET_SOURCE) != 0L) {
+        SourceTile selected = SourceTile.fromWire(control.substring("source_".length()));
+        List<SourceTile> tiles = prefs.sourceTiles();
+        int index = selected == null ? -1 : tiles.indexOf(selected);
+        boolean installed = selected == null || !selected.isPlayer()
+                || PlayerApps.get(this, selected.playerPackage).installed();
+        if (SourceTile.selectable(tiles, index, snapshot, installed)) {
             openSourceWidgetIds.remove(widgetId);
             renderWidgets(true);
             onSource(selected);
@@ -1039,14 +1035,15 @@ public final class OverlayService extends Service
                 + " position=" + positionMs + " source=" + visibleSource());
     }
 
-    @Override public void onSource(MediaSource.Id source) {
+    @Override public void onSource(SourceTile tile) {
         transportSnapshotGuard.clear();
         main.removeCallbacks(transportReconcile);
-        pendingRadioNavigation.cancelIfSourceChanged(source);
-        String requestId = bridge.setSource(source);
+        pendingRadioNavigation.cancelIfSourceChanged(tile.source);
+        String requestId = tile.isPlayer() ? bridge.selectPlayer(tile.playerPackage)
+                : bridge.setSource(tile.source);
         latestCommandRequestId = requestId;
         AppLog.info("Sending media command request=" + requestId + " command=SET_SOURCE"
-                + " source=" + source);
+                + " source=" + tile.wire());
     }
 
     @Override public void onRadioStationsRequested() {
@@ -1200,6 +1197,8 @@ public final class OverlayService extends Service
                 prefs.getBoolean(Prefs.KEY_DRAG_HANDLE_VISIBLE, true),
                 prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), this);
         candidate.setCustomActionPolicy(prefs.playerActionsCount(), prefs.playerActionRules());
+        candidate.setSourceTiles(prefs.sourceTiles(),
+                prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false));
         migrateLegacyPosition(bounds, candidate.cardWidth(), candidate.cardHeight());
         WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 candidate.cardWidth(),

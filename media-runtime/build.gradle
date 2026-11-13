@@ -15,6 +15,8 @@ android {
     }
     kotlinOptions { jvmTarget = '17' }
     lint { abortOnError = false }
+    // Tests read the built-in radio pack from the assets.
+    testOptions { unitTests.includeAndroidResources = true }
 }
 
 dependencies {

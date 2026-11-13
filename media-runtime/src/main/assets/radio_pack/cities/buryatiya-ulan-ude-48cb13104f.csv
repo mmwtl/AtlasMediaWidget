@@ -1,0 +1,25 @@
+frequency_khz,name,band,cover
+88400,Вести FM,FM,vesti_fm.webp
+88800,Радио МСМ,FM,msm.webp
+89200,Love Radio,FM,love_radio.webp
+89600,Радио Гордость,FM,gordost.webp
+90000,Радио России,FM,rossii.webp
+90400,Радио Комсомольская правда,FM,kp.webp
+90800,Буряад FM,FM,buryaad_fm.webp
+91200,Радио Шансон,FM,shanson.webp
+91600,Радио Дача,FM,dacha.webp
+98900,Радио Вера,FM,vera.webp
+99300,Радио Искатель,FM,iskatel.webp
+101300,Радио ENERGY,FM,nrj.webp
+101900,Radio Monte Carlo,FM,monte_karlo.webp
+102300,Европа Плюс,FM,evropa.webp
+102800,Радио Sputnik,FM,sputnik.webp
+103200,Радио Маяк,FM,mayak.webp
+103700,Дорожное радио,FM,dorozhnoe_radio.webp
+104200,Пи FM,FM,pi_fm.webp
+104600,Баргузин FM,FM,barguzin_fm.webp
+105000,Ретро FM,FM,retro_fm.webp
+105500,Радио МИР,FM,mir.webp
+106000,Авторадио,FM,avtoradio.webp
+106900,НАШЕ Радио,FM,nashe_radio.webp
+107500,Русское Радио,FM,russkoe_radio.webp

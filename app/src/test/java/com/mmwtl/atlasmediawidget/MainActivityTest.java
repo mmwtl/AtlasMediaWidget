@@ -103,16 +103,13 @@ public final class MainActivityTest {
             List<String> labels = new ArrayList<>();
             collectShownLabels(root, labels);
             int navigationIndex = labels.indexOf("Переключать радио без поиска по эфиру");
-            int catalogIndex = labels.indexOf("Каталог станций");
-            int exportIndex = labels.indexOf("Экспортировать каталог радио (ZIP)");
-            int importIndex = labels.indexOf("Импортировать каталог радио (ZIP)");
+            int catalogIndex = labels.indexOf("Каталоги станций");
+            int importIndex = labels.indexOf("Добавить каталог или набор (ZIP)");
             assertTrue(navigationIndex >= 0);
             assertTrue(catalogIndex > navigationIndex);
-            assertTrue(exportIndex > catalogIndex);
-            assertTrue(importIndex > exportIndex);
+            assertTrue(importIndex > catalogIndex);
             assertFalse(labels.contains("Медиасервис OneOS"));
-            assertFalse(findLabel(root, "Экспортировать каталог радио (ZIP)").isEnabled());
-            assertFalse(findLabel(root, "Импортировать каталог радио (ZIP)").isEnabled());
+            assertFalse(findLabel(root, "Добавить каталог или набор (ZIP)").isEnabled());
             assertFalse(findLabel(root, "Названия и обложки из каталога в карточке").isEnabled());
         } finally {
             controller.pause().stop().destroy();
@@ -146,8 +143,7 @@ public final class MainActivityTest {
         AlertDialog dialog = ShadowAlertDialog.getLatestAlertDialog();
         assertTrue(dialog.isShowing());
         ShadowAlertDialog shadowDialog = Shadows.shadowOf(dialog);
-        assertEquals("Заменить каталог радио?", shadowDialog.getTitle());
-        assertTrue(shadowDialog.getMessage().toString().contains("полностью заменён"));
+        assertEquals("Добавить каталог радио", shadowDialog.getTitle());
         Field stagedField = MainActivity.class.getDeclaredField("pendingRadioImportFile");
         stagedField.setAccessible(true);
         File stagedFile = (File) stagedField.get(activity);
@@ -255,6 +251,112 @@ public final class MainActivityTest {
             controller.pause().stop().destroy();
             ShadowLooper.runUiThreadTasks();
         }
+    }
+
+    @Test
+    public void catalogNamesComeFromPickedFilesAndGoIntoExportNames() {
+        assertEquals("Москва", MainActivity.catalogNameFromFileName("Москва.zip"));
+        assertEquals("Москва", MainActivity.catalogNameFromFileName(
+                "2026-11-09_10-20-30_AtlasMediaWidget-radio-Москва.ZIP"));
+        assertEquals("", MainActivity.catalogNameFromFileName(
+                "2026-11-09_10-20-30_AtlasMediaWidget-radio.zip"));
+        assertEquals("my radio", MainActivity.catalogNameFromFileName("my_radio.zip"));
+        assertEquals("", MainActivity.catalogNameFromFileName(null));
+
+        assertEquals(MainActivity.RADIO_ZIP_FILE_NAME, MainActivity.radioCatalogExportFileName(
+                new MediaSettingsSnapshot.Catalog("builtin", "Встроенный (Пенза)", 25)));
+        assertEquals("AtlasMediaWidget-radio-Москва_центр.zip",
+                MainActivity.radioCatalogExportFileName(
+                        new MediaSettingsSnapshot.Catalog("abc", "Москва / центр", 3)));
+        assertEquals("1 станция", MainActivity.stationCountLabel(1));
+        assertEquals("3 станции", MainActivity.stationCountLabel(3));
+        assertEquals("12 станций", MainActivity.stationCountLabel(12));
+        assertEquals("25 станций", MainActivity.stationCountLabel(25));
+    }
+
+    @Test
+    public void packsAreRecognisedAndDescribed() throws Exception {
+        File zip = temporaryFolder.newFile("pack.zip");
+        try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zip))) {
+            out.putNextEntry(new ZipEntry("pack.json"));
+            out.write(("{\"format\":\"atlas-radio-pack\",\"version\":1,\"id\":\"russia\","
+                    + "\"name\":\"Россия\",\"catalogs\":["
+                    + "{\"key\":\"penza\",\"name\":\"Пенза\",\"region\":\"Пензенская область\"},"
+                    + "{\"key\":\"kuznetsk\",\"name\":\"Кузнецк\",\"region\":\"Пензенская область\"},"
+                    + "{\"key\":\"moscow\",\"name\":\"Москва\",\"region\":\"Москва\"}]}")
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            out.closeEntry();
+        }
+        RadioPackPreview pack = RadioPackPreview.read(zip);
+        assertEquals("russia", pack.id);
+        assertEquals("Россия", pack.name);
+        assertEquals(3, pack.cityCount);
+        assertEquals(2, pack.regionCount);
+
+        File single = temporaryFolder.newFile("single.zip");
+        try (ZipOutputStream out = new ZipOutputStream(new FileOutputStream(single))) {
+            out.putNextEntry(new ZipEntry("stations.csv"));
+            out.write("frequency_khz,name,band,cover\n".getBytes());
+            out.closeEntry();
+        }
+        assertEquals(null, RadioPackPreview.read(single));
+        assertEquals("", RadioPackPreview.parse("{broken").id);
+
+        assertEquals("Пенза · Пензенская область",
+                MainActivity.cityLabel("Пенза", "Пензенская область"));
+        assertEquals("Москва", MainActivity.cityLabel("Москва", ""));
+        assertEquals("AtlasMediaWidget-radio-Россия.zip", MainActivity.radioCatalogExportFileName(
+                new MediaSettingsSnapshot.Catalog("a", "Россия", 12010, "russia", 3180)));
+        assertEquals("21 город", MainActivity.plural(21, "город", "города", "городов"));
+        assertEquals("3180 городов", MainActivity.plural(3180, "город", "города", "городов"));
+
+        List<RadioPackCities.City> cities = RadioPackCities.parse("[{\"key\":\"pugachev\","
+                + "\"name\":\"Пугачёв\",\"region\":\"Саратовская область\",\"stations\":3},"
+                + "{\"key\":\"penza\",\"name\":\"Пенза\",\"region\":\"Пензенская область\","
+                + "\"stations\":25},{\"key\":\"zarechny\",\"name\":\"Заречный\","
+                + "\"region\":\"Пензенская область\",\"stations\":9},"
+                + "{\"key\":\"minsk\",\"name\":\"Минск\",\"stations\":20}]");
+        assertEquals("pugachev", RadioPackCities.search(cities, "пугачев", 10).get(0).key);
+        List<RadioPackCities.City> found = RadioPackCities.search(cities, "ен", 10);
+        assertEquals(1, found.size());
+        assertEquals("penza", found.get(0).key);
+        assertEquals("penza", RadioPackCities.search(cities, "  ПЕН ", 10).get(0).key);
+        assertTrue(RadioPackCities.search(cities, "", 10).isEmpty());
+        assertEquals(1, RadioPackCities.search(cities, "р", 1).size());
+        assertEquals(java.util.List.of("Саратовская область", "Пензенская область", ""),
+                new ArrayList<>(RadioPackCities.byRegion(cities).keySet()));
+        assertEquals(2, RadioPackCities.byRegion(cities).get("Пензенская область").size());
+    }
+
+    @Test
+    public void radioPackCitiesGroupByCountryThenRegion() throws Exception {
+        List<RadioPackCities.City> cities = RadioPackCities.parse("["
+                + "{\"key\":\"penza\",\"name\":\"Пенза\",\"country\":\"Россия\","
+                + "\"region\":\"Пензенская область\",\"stations\":27},"
+                + "{\"key\":\"moscow\",\"name\":\"Москва\",\"country\":\"Россия\","
+                + "\"region\":\"Москва\",\"stations\":54},"
+                + "{\"key\":\"kostanay\",\"name\":\"Костанай\",\"country\":\"Казахстан\","
+                + "\"region\":\"Костанайская область\",\"stations\":14},"
+                + "{\"key\":\"minsk\",\"name\":\"Минск\",\"country\":\"Беларусь\","
+                + "\"region\":\"Минск\",\"stations\":20}]");
+        java.util.Map<String, java.util.Map<String, List<RadioPackCities.City>>> countries =
+                RadioPackCities.byCountry(cities);
+        assertEquals(java.util.List.of("Россия", "Казахстан", "Беларусь"),
+                new ArrayList<>(countries.keySet()));
+        assertEquals(java.util.List.of("Пензенская область", "Москва"),
+                new ArrayList<>(countries.get("Россия").keySet()));
+        assertEquals(4, RadioPackCities.regionCount(cities));
+
+        assertEquals("Пензенская область", MainActivity.searchPlaceLabel(cities.get(0), "Россия"));
+        assertEquals("", MainActivity.searchPlaceLabel(cities.get(1), "Россия"));
+        assertEquals("Костанайская область, Казахстан",
+                MainActivity.searchPlaceLabel(cities.get(2), "Россия"));
+        assertEquals("Беларусь", MainActivity.searchPlaceLabel(cities.get(3), "Россия"));
+        // A pack without countries keeps one group and the plain region.
+        List<RadioPackCities.City> plain = RadioPackCities.parse(
+                "[{\"key\":\"a\",\"name\":\"A\",\"region\":\"R\",\"stations\":1}]");
+        assertEquals(java.util.List.of(""), new ArrayList<>(RadioPackCities.byCountry(plain).keySet()));
+        assertEquals("R", MainActivity.searchPlaceLabel(plain.get(0), ""));
     }
 
     private static ExecutorService io(MainActivity activity) throws Exception {

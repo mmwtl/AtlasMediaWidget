@@ -2,6 +2,7 @@ package com.mmwtl.atlasmediaapi.media.bridge
 
 import android.content.Context
 import android.media.AudioManager
+import android.telephony.TelephonyManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -15,9 +16,15 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Keeps automatic playback away from phone calls.
  *
  * A call handed over to the head unit takes audio focus, so every play retry of an automatic
- * action starts the player and the focus loss stops it again. The call is read from the audio
- * mode, which needs no permission; the Bluetooth phone is assumed to set it like any Android
- * telephony or VoIP call (not yet confirmed on the head unit).
+ * action starts the player and the focus loss stops it again. A call is detected by either of two
+ * signals, neither of which needs a permission on Android 11:
+ * - the audio mode, which Telecom sets for its calls;
+ * - the Telecom call state: on Android 11 [TelephonyManager.getCallState] reads it from Telecom,
+ *   which also holds the Bluetooth (HFP client) calls of the head unit, whose logs show them in
+ *   Telecom. Android 12 and later require READ_PHONE_STATE for it, and the read then fails.
+ *
+ * The audio mode alone did not stop the play retries of a head unit started during a call
+ * (device report); which of the signals the head unit provides is not yet confirmed.
  */
 object CallGuard {
     const val CALL_POLL_MS = 250L
@@ -30,9 +37,20 @@ object CallGuard {
         else -> false
     }
 
-    fun isCallActive(context: Context): Boolean {
-        val audioManager = context.getSystemService(AudioManager::class.java) ?: return false
-        return runCatching { isCallAudioMode(audioManager.mode) }.getOrDefault(false)
+    fun isCallState(state: Int): Boolean =
+        state == TelephonyManager.CALL_STATE_RINGING || state == TelephonyManager.CALL_STATE_OFFHOOK
+
+    fun isCallActive(context: Context): Boolean = callSignal(context) != null
+
+    /** Names the signal that reports a call, or null without one; for logs and the guard. */
+    fun callSignal(context: Context): String? {
+        val mode = runCatching { context.getSystemService(AudioManager::class.java)?.mode }.getOrNull()
+        if (mode != null && isCallAudioMode(mode)) return "audio mode $mode"
+        @Suppress("DEPRECATION")
+        val state = runCatching { context.getSystemService(TelephonyManager::class.java)?.callState }
+            .getOrNull()
+        if (state != null && isCallState(state)) return "call state $state"
+        return null
     }
 
     /**

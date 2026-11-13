@@ -69,9 +69,11 @@ Binding is established via explicit Intent (`bindService`):
 | `10` | `COMMIT_MEDIA_IMPORT` | Применить подготовленные настройки / Apply staged settings | `protocolVersion`, `operationId`, `stagingToken`, `requestId`, `replyTo` |
 | `11` | `GET_IMPORT_STATUS` | Статус операции / Operation status | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
 | `12` | `ABORT_MEDIA_IMPORT` | Удалить подготовленный импорт / Discard staged import | `protocolVersion`, `operationId`, `requestId`, `replyTo` |
-| `13` | `RESTORE_DEFAULT_CATALOG` | Восстановить встроенное радио / Restore builtin catalog | `protocolVersion`, `requestId`, `replyTo` |
-| `14` | `EXPORT_RADIO_CATALOG` | Экспорт текущих станций и обложек / Export active radio catalog | `protocolVersion`, `fileDescriptor` (write PFD), `requestId`, `replyTo` |
-| `15` | `IMPORT_RADIO_CATALOG` | Полная замена радио / Replace radio catalog | `protocolVersion`, `fileDescriptor` (read PFD), `requestId`, `replyTo` |
+| `13` | `RESTORE_DEFAULT_CATALOG` | Сделать активным встроенный каталог (импортированные сохраняются) / Activate the builtin catalog, keeping imported ones | `protocolVersion`, `requestId`, `replyTo` |
+| `14` | `EXPORT_RADIO_CATALOG` | Экспорт каталога / Export a radio catalog | `protocolVersion`, `fileDescriptor` (write PFD), optional `catalogId` (по умолчанию активный / active by default), `requestId`, `replyTo` |
+| `15` | `IMPORT_RADIO_CATALOG` | Добавить каталог или набор, заменить каталог / Add a catalog or pack, replace a catalog | `protocolVersion`, `fileDescriptor` (read PFD), optional `catalogName`, optional `catalogId` (заменяемый / to replace), `requestId`, `replyTo` |
+| `16` | `MANAGE_RADIO_CATALOG` | Включить, переименовать или удалить каталог / Activate, rename or delete a catalog | `protocolVersion`, `catalogAction` (`ACTIVATE`/`RENAME`/`DELETE`), `catalogId`, `catalogCityKey` для набора / for a pack, `catalogName` для / for `RENAME`, `requestId`, `replyTo` |
+| `17` | `GET_RADIO_PACK_CITIES` | Города набора / Cities of a pack | `protocolVersion`, `catalogId`, `fileDescriptor` (write PFD), `requestId`, `replyTo` |
 
 ### Сервис → Клиент (Service → Client)
 
@@ -91,7 +93,9 @@ Binding is established via explicit Intent (`bindService`):
 | `111` | `MEDIA_IMPORT_ABORTED` | Отмена обработана / Abort handled | `protocolVersion`, `status`, `requestId`, `operationId` |
 | `112` | `DEFAULT_CATALOG_RESTORED` | Встроенный каталог восстановлен / Builtin catalog restored | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
 | `114` | `RADIO_CATALOG_EXPORTED` | Радио ZIP записан / Radio ZIP written | `protocolVersion`, `status`, `requestId`, `catalogStationCount` |
-| `115` | `RADIO_CATALOG_IMPORTED` | Радиокаталог заменён / Radio catalog replaced | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `settingsRevision` |
+| `115` | `RADIO_CATALOG_IMPORTED` | Каталог или набор загружен / Catalog or pack loaded | `protocolVersion`, `status`, `requestId`, `catalogStationCount`, `catalogId`, `catalogName`, `catalogPackId`, `catalogPackName`, `catalogCount`, `settingsRevision` |
+| `116` | `RADIO_CATALOG_MANAGED` | Каталог включён, переименован или удалён / Catalog activated, renamed or deleted | `protocolVersion`, `status`, `requestId`, flat snapshot with `settingsRevision` |
+| `117` | `RADIO_PACK_CITIES` | JSON городов записан / City JSON written | `protocolVersion`, `status`, `requestId`, `catalogCount` |
 
 ---
 
@@ -156,13 +160,76 @@ Binding is established via explicit Intent (`bindService`):
 - `0x08` (`NEXT`) — следующий трек или поиск следующей станции
 - `0x10` (`PREVIOUS`) — предыдущий трек или поиск предыдущей станции
 - `0x20` (`SEEK_TO`) — перемотка по таймлайну (требует аргумент `position: Long >= 0`)
-- `0x40` (`SET_SOURCE`) — переключение источника (`source: String`, `autoplay: Boolean`)
+- `0x40` (`SET_SOURCE`) — переключение источника (`source: String`, `autoplay: Boolean`).
+  Необязательный `playerPackage: String` (только с `source = ONLINE`, корректное имя пакета до
+  128 символов, иначе `INVALID_REQUEST`) переключает Online на это Android-приложение: сервис
+  при необходимости запрашивает у OneOS ONLINE без автозапуска, запоминает плеер как последний
+  Online-плеер и запускает его теми же путями, что и плеер по умолчанию (сессия, MediaBrowser,
+  кнопка MEDIA_PLAY, окно приложения). Плеер, который играл до этого, ставится на паузу только
+  после того, как новый подтвердил воспроизведение. Неустановленный пакет даёт `FAILED`.
+  С `autoplay = false` плеер без сессии с треком готовится без воспроизведения (см. ниже).
 - `0x80` (`TUNE_RADIO`) — прямая настройка частоты радио (`radioFrequencyKHz: Int`, `radioBand: String`)
 
 Команда `CUSTOM_ACTION` (`customAction: String`) не входит в маску: она доступна, пока действие
 есть в `customActions`. Сервис отправляет его через `TransportControls.sendCustomAction` той
 сессии, которая сейчас его публикует, иначе отвечает `NOT_SUPPORTED`. Смысл действия (лайк,
 перемешивание и т. п.) определяет плеер; Bridge и клиент его не интерпретируют.
+
+### Подготовка Online-плеера без воспроизведения / Preparing an Online player without playback
+
+[RU] Когда Online-плеер явно выбран, но играть не должен — запуск с источником по умолчанию ONLINE
+без автовоспроизведения или плитка плеера с `autoplay = false`, — сервис сначала не открывает окно
+плеера, а подключается к его `MediaBrowserService`. При источнике по умолчанию «Отключено» плееры
+при старте не готовятся и не запускаются:
+
+1. сначала с подсказкой `BrowserRoot.EXTRA_RECENT` (возобновление медиа Android 11); если сервис
+   отказывает в подключении, повторно без подсказок;
+2. если в сессии нет трека и звонка нет, вызывается `TransportControls.prepare()` и ожидается
+   трек (до 4 с); плеер, который при этом заиграл, ставится на паузу;
+3. если трека всё ещё нет, а сервис вернул `EXTRA_RECENT` в extras корня, первый воспроизводимый
+   элемент корня (название, подзаголовок, иконка) служит метаданными, пока сессия не опубликует
+   свои.
+
+Сессия добавляется в `MediaSessionObserver` как подготовленная и участвует в выборе карточки и
+команд, пока её пакет не опубликует активную сессию или сессия не будет уничтожена. Подготовленная
+сессия без состояния или без действия play показывается остановленной с `PLAY`: кнопка отправляет
+ей `MEDIA_PLAY`. Соединение с браузером удерживается отдельно от соединения, через которое играет
+другой плеер. Если при запуске браузера нет, он не подключается или трек так и не появился, сервис,
+как раньше, открывает окно плеера (с автосворачиванием по настройке): некоторые плееры загружают
+последний трек только вместе со своим окном. Плитка плеера окно не открывает.
+
+Факты Android API: `EXTRA_RECENT`, `prepare()` и токен сессии из `MediaBrowser`. Окно другого
+приложения из фона открывается только при выданном виджету «поверх других окон» и не раньше чем
+через 5 с после нажатия HOME (защита переключения приложений Android).
+
+Эмулятор Android 11, холодный старт без автовоспроизведения (2026-11-10):
+
+| Плеер | Браузер | Трек без окна | Итог |
+|---|---|---|---|
+| Murglar | подключается | да, после `prepare()` | трек на паузе, окно не открывается |
+| AIMP | подключается | нет, сессия пустая | окно открывается и сворачивается, трек на паузе |
+| VLC | подключается | нет | окно открывается, трека нет и после него |
+| Яндекс Музыка, YT Music | отказ (без входа в аккаунт) | — | окно открывается |
+
+Корень `EXTRA_RECENT` нам не отдал ни один из них. Не проверено на ГУ: плееры с входом в аккаунт,
+доступ к иконке по `content://` и меняет ли подготовка источник OneOS.
+
+[EN] When an Online player is chosen explicitly but must not play (startup with ONLINE as the
+default source and autoplay off, a player tile with `autoplay = false`; with no default source
+players are left alone at startup), the service connects to the player's `MediaBrowserService`
+instead of opening its activity: first with the `BrowserRoot.EXTRA_RECENT` hint (Android 11 media
+resumption), again without hints if the service refuses; then, without a track and without a
+call, it sends `prepare()` and waits up to 4 s (a player that starts playing is paused again);
+otherwise, when the root echoes `EXTRA_RECENT`, the first playable child stands in for the
+metadata until the session publishes its own. `MediaSessionObserver` keeps the session as prepared
+until its package publishes an active session or the session is destroyed; without a state or
+play action it is shown stopped with `PLAY` and receives `MEDIA_PLAY`. When no browser is reachable
+or no track appears, startup still opens the player's activity (minimized by the setting): some
+players load their last track only with their activity; a player tile does not open it. On the
+Android 11 emulator Murglar showed its track through `prepare()`, AIMP only after its activity
+opened, VLC not at all; Yandex Music and YT Music (not signed in) refused the browser, and none
+returned an `EXTRA_RECENT` root. Signed-in players, `content://` icon access and OneOS source
+effects are not verified on the head unit.
 
 ### Локальный расчет прогресса (Local Progress Estimation):
 Вместо ежесекундного Binder-опроса клиент вычисляет прогресс локально, если `playbackState == 3` (`PLAYING`):
@@ -211,8 +278,24 @@ read-PFD при импорте. Сервис обрабатывает поток
 - `GET_IMPORT_STATUS`: `IDLE`, `PREPARED`, `COMMITTING`, `COMMITTED`, `FAILED`.
   `COMMITTING` повторно завершает сохранённую операцию. Abort не откатывает начатый
   commit. Widget хранит отдельный журнал для согласования своей части импорта.
-- `IMPORT_RADIO_CATALOG` валидирует отдельный архив до замены всего каталога.
-  Старые станции и обложки не объединяются с новыми; настройки сохраняются.
+- `IMPORT_RADIO_CATALOG` валидирует архив целиком до изменений. Архив с `pack.json`
+  загружается как набор (docs/radio-catalog.md, раздел 3a) одной записью каталога;
+  набор с тем же `id` обновляется на месте, выбранный город сохраняется по ключу,
+  новый набор активный каталог не меняет; `catalogId` для набора недопустим. Отдельный
+  архив без `catalogId` добавляет новый активный каталог, с `catalogId` заменяет
+  станции и обложки этого каталога, сохраняя название и положение; станции не
+  объединяются. Всего не больше 64 каталогов и наборов, в наборе до 5000 городов.
+  Настройки сохраняются. Ответ ждётся до 60 с; `catalogCount` — число городов набора.
+- Снимок настроек перечисляет каталоги и наборы параллельными массивами `catalogIds`,
+  `catalogNames`, `catalogStationCounts`, `catalogPackIds` и `catalogCityCounts`
+  (первым идёт встроенный `builtin`; у отдельных каталогов `catalogPackIds` пуст)
+  и полями `catalogActiveId`, `catalogActiveCityKey`, `catalogActiveCityName`,
+  `catalogActiveRegion`. Города в снимок не входят: тысячи городов превысили бы лимит
+  транзакции Binder. Их пишет в файловый дескриптор клиента `GET_RADIO_PACK_CITIES`
+  как JSON `[{"key","name","region","stations"}]`.
+- `ACTIVATE` набора требует `catalogCityKey`; у отдельного каталога его быть не
+  должно. `RENAME` и замена через `catalogId` к набору не применяются, `DELETE`
+  удаляет набор целиком, `EXPORT_RADIO_CATALOG` экспортирует его в формате набора.
 
 Успешный update подтверждается после синхронного сохранения параметров и ревизии.
 Несколько SharedPreferences не являются общей дисковой транзакцией. Журнал импорта

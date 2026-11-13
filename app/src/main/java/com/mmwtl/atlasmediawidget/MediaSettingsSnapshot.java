@@ -2,6 +2,10 @@ package com.mmwtl.atlasmediawidget;
 
 import android.os.Bundle;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 final class MediaSettingsSnapshot {
     final long revision;
     final String defaultAudioSource;
@@ -21,6 +25,55 @@ final class MediaSettingsSnapshot {
     final int catalogStationCount;
     final String catalogDescription;
     final int uiScaleTenths;
+    static final int MIN_STARTUP_INTERNET_TIMEOUT_SEC = 10;
+    static final int MAX_STARTUP_INTERNET_TIMEOUT_SEC = 300;
+    static final int DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC = 60;
+    /** Startup waits for a validated internet connection; set only from a Bridge snapshot. */
+    boolean startupWaitForInternet;
+    int startupInternetTimeoutSec = DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC;
+    /** The active radio catalog and every catalog in order; set only from a Bridge snapshot. */
+    String catalogActiveId = "";
+    List<Catalog> catalogs = Collections.emptyList();
+    /** The selected city when the active entry is a pack. */
+    String catalogActiveCityKey = "";
+    String catalogActiveCityName = "";
+    String catalogActiveRegion = "";
+
+    static final class Catalog {
+        final String id;
+        final String name;
+        final int stationCount;
+        /** The pack id from pack.json; empty for the built-in and single catalogs. */
+        final String packId;
+        final int cityCount;
+
+        Catalog(String id, String name, int stationCount) {
+            this(id, name, stationCount, "", 0);
+        }
+
+        Catalog(String id, String name, int stationCount, String packId, int cityCount) {
+            this.id = id;
+            this.name = name;
+            this.stationCount = stationCount;
+            this.packId = packId != null ? packId : "";
+            this.cityCount = cityCount;
+        }
+
+        boolean isPack() {
+            return !packId.isEmpty();
+        }
+
+        boolean isBuiltIn() {
+            return MediaBridgeContract.BUILT_IN_CATALOG_ID.equals(id);
+        }
+    }
+
+    Catalog activeCatalog() {
+        for (Catalog catalog : catalogs) {
+            if (catalog.id.equals(catalogActiveId)) return catalog;
+        }
+        return null;
+    }
 
     MediaSettingsSnapshot(
             long revision,
@@ -112,7 +165,7 @@ final class MediaSettingsSnapshot {
         if (bundle == null) {
             return new MediaSettingsSnapshot(0L, "", 0, true, false, true, "", true, true, 1250L, "BUILT_IN", 0, "", 15);
         }
-        return new MediaSettingsSnapshot(
+        MediaSettingsSnapshot snapshot = new MediaSettingsSnapshot(
                 bundle.getLong(MediaBridgeContract.K_SETTINGS_REVISION, 0L),
                 bundle.getString(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE, ""),
                 bundle.getInt(MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_DELAY_SEC, 0),
@@ -131,6 +184,17 @@ final class MediaSettingsSnapshot {
                 bundle.getInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, 0),
                 bundle.getString(MediaBridgeContract.K_CATALOG_DESCRIPTION, ""),
                 bundle.getInt(MediaBridgeContract.K_UI_SCALE_TENTHS, 15));
+        snapshot.startupWaitForInternet =
+                bundle.getBoolean(MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET, false);
+        snapshot.startupInternetTimeoutSec = bundle.getInt(
+                MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC,
+                DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC);
+        snapshot.catalogActiveId = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_ID, "");
+        snapshot.catalogs = readCatalogs(bundle);
+        snapshot.catalogActiveCityKey = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_KEY, "");
+        snapshot.catalogActiveCityName = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_NAME, "");
+        snapshot.catalogActiveRegion = bundle.getString(MediaBridgeContract.K_CATALOG_ACTIVE_REGION, "");
+        return snapshot;
     }
 
     Bundle toBundle() {
@@ -154,6 +218,59 @@ final class MediaSettingsSnapshot {
         bundle.putInt(MediaBridgeContract.K_CATALOG_STATION_COUNT, catalogStationCount);
         bundle.putString(MediaBridgeContract.K_CATALOG_DESCRIPTION, catalogDescription);
         bundle.putInt(MediaBridgeContract.K_UI_SCALE_TENTHS, uiScaleTenths);
+        bundle.putBoolean(MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET, startupWaitForInternet);
+        bundle.putInt(MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC, startupInternetTimeoutSec);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_ID, catalogActiveId);
+        ArrayList<String> ids = new ArrayList<>(catalogs.size());
+        ArrayList<String> names = new ArrayList<>(catalogs.size());
+        int[] counts = new int[catalogs.size()];
+        for (int i = 0; i < catalogs.size(); i++) {
+            ids.add(catalogs.get(i).id);
+            names.add(catalogs.get(i).name);
+            counts[i] = catalogs.get(i).stationCount;
+        }
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_IDS, ids);
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_NAMES, names);
+        bundle.putIntArray(MediaBridgeContract.K_CATALOG_STATION_COUNTS, counts);
+        ArrayList<String> packIds = new ArrayList<>(catalogs.size());
+        int[] cityCounts = new int[catalogs.size()];
+        for (int i = 0; i < catalogs.size(); i++) {
+            packIds.add(catalogs.get(i).packId);
+            cityCounts[i] = catalogs.get(i).cityCount;
+        }
+        bundle.putStringArrayList(MediaBridgeContract.K_CATALOG_PACK_IDS, packIds);
+        bundle.putIntArray(MediaBridgeContract.K_CATALOG_CITY_COUNTS, cityCounts);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_KEY, catalogActiveCityKey);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_CITY_NAME, catalogActiveCityName);
+        bundle.putString(MediaBridgeContract.K_CATALOG_ACTIVE_REGION, catalogActiveRegion);
         return bundle;
+    }
+
+    private static ArrayList<String> optionalColumn(Bundle bundle, String key, int size) {
+        ArrayList<String> column = bundle.getStringArrayList(key);
+        return column != null && column.size() == size ? column : null;
+    }
+
+    private static List<Catalog> readCatalogs(Bundle bundle) {
+        ArrayList<String> ids = bundle.getStringArrayList(MediaBridgeContract.K_CATALOG_IDS);
+        ArrayList<String> names = bundle.getStringArrayList(MediaBridgeContract.K_CATALOG_NAMES);
+        int[] counts = bundle.getIntArray(MediaBridgeContract.K_CATALOG_STATION_COUNTS);
+        if (ids == null || names == null || counts == null || ids.size() != names.size()
+                || ids.size() != counts.length) {
+            return Collections.emptyList();
+        }
+        ArrayList<String> packIds = optionalColumn(bundle, MediaBridgeContract.K_CATALOG_PACK_IDS, ids.size());
+        int[] cityCounts = bundle.getIntArray(MediaBridgeContract.K_CATALOG_CITY_COUNTS);
+        if (cityCounts != null && cityCounts.length != ids.size()) cityCounts = null;
+        ArrayList<Catalog> result = new ArrayList<>(ids.size());
+        for (int i = 0; i < ids.size(); i++) {
+            String id = ids.get(i);
+            if (id == null || id.isEmpty()) continue;
+            String name = names.get(i);
+            result.add(new Catalog(id, name != null ? name : "", counts[i],
+                    packIds == null ? "" : packIds.get(i),
+                    cityCounts == null ? 0 : cityCounts[i]));
+        }
+        return Collections.unmodifiableList(result);
     }
 }

@@ -143,7 +143,7 @@ public class WidgetRenderingTest {
                     public boolean onDragTouch(View v, android.view.MotionEvent e) { return false; }
                     public void onCommand(String command) {}
                     public void onSeek(long value) {}
-                    public void onSource(MediaSource.Id id) {}
+                    public void onSource(SourceTile tile) {}
                     public void onOpenSource() {}
                     public void onRadioStationsRequested() {}
                     public void onRadioStation(RadioStation station) {}

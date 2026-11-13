@@ -18,6 +18,7 @@ object MediaBridgeContract {
     const val MAX_CUSTOM_ACTIONS = 8
     const val MAX_CUSTOM_ACTION_LENGTH = 128
     const val MAX_CUSTOM_ACTION_NAME_LENGTH = 64
+    const val MAX_PACKAGE_NAME_LENGTH = 128
 
     object ClientMessage {
         const val REGISTER = 1
@@ -35,6 +36,10 @@ object MediaBridgeContract {
         const val RESTORE_DEFAULT_CATALOG = 13
         const val EXPORT_RADIO_CATALOG = 14
         const val IMPORT_RADIO_CATALOG = 15
+        /** Activates, renames or deletes one radio catalog ([Key.CATALOG_ACTION]). */
+        const val MANAGE_RADIO_CATALOG = 16
+        /** Writes the cities of one pack as JSON into [Key.FILE_DESCRIPTOR]. */
+        const val GET_RADIO_PACK_CITIES = 17
     }
 
     object ServerMessage {
@@ -53,6 +58,8 @@ object MediaBridgeContract {
         const val DEFAULT_CATALOG_RESTORED = 112
         const val RADIO_CATALOG_EXPORTED = 114
         const val RADIO_CATALOG_IMPORTED = 115
+        const val RADIO_CATALOG_MANAGED = 116
+        const val RADIO_PACK_CITIES = 117
     }
 
     object Key {
@@ -123,6 +130,8 @@ object MediaBridgeContract {
         const val COMMAND_APP_SOURCE = "appSource"
         const val COMMAND_AUTOPLAY = "autoplay"
         const val COMMAND_CUSTOM_ACTION = "customAction"
+        /** Optional SET_SOURCE extra: switch ONLINE to this player app. */
+        const val COMMAND_PLAYER_PACKAGE = "playerPackage"
         const val UI_SCALE_TENTHS = "uiScaleTenths"
 
         const val SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion"
@@ -141,6 +150,8 @@ object MediaBridgeContract {
         const val AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay"
         const val DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage"
         const val MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART = "minimizeOnlinePlayerAfterAutostart"
+        const val STARTUP_WAIT_FOR_INTERNET = "startupWaitForInternet"
+        const val STARTUP_INTERNET_TIMEOUT_SEC = "startupInternetTimeoutSec"
         const val RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled"
         const val CLUSTER_COVERS_ENABLED = "clusterCoversEnabled"
         const val CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled"
@@ -150,6 +161,34 @@ object MediaBridgeContract {
         const val CATALOG_TYPE = "catalogType"
         const val CATALOG_STATION_COUNT = "catalogStationCount"
         const val CATALOG_DESCRIPTION = "catalogDescription"
+        /** The active catalog and the ordered catalog list as parallel arrays. */
+        const val CATALOG_ACTIVE_ID = "catalogActiveId"
+        const val CATALOG_IDS = "catalogIds"
+        const val CATALOG_NAMES = "catalogNames"
+        const val CATALOG_STATION_COUNTS = "catalogStationCounts"
+        /** Pack id and city count of every listed entry; empty and 0 for single catalogs. */
+        const val CATALOG_PACK_IDS = "catalogPackIds"
+        const val CATALOG_CITY_COUNTS = "catalogCityCounts"
+        /** The selected city when the active entry is a pack. */
+        const val CATALOG_ACTIVE_CITY_KEY = "catalogActiveCityKey"
+        const val CATALOG_ACTIVE_CITY_NAME = "catalogActiveCityName"
+        const val CATALOG_ACTIVE_REGION = "catalogActiveRegion"
+        /** MANAGE_RADIO_CATALOG ACTIVATE: the city of the pack named by [CATALOG_ID]. */
+        const val CATALOG_CITY_KEY = "catalogCityKey"
+        /** IMPORT_RADIO_CATALOG reply: the imported pack (empty for a single catalog) and its cities. */
+        const val CATALOG_PACK_ID = "catalogPackId"
+        const val CATALOG_PACK_NAME = "catalogPackName"
+        const val CATALOG_COUNT = "catalogCount"
+        /** Target catalog of MANAGE/EXPORT, or the catalog an import replaces. */
+        const val CATALOG_ID = "catalogId"
+        const val CATALOG_NAME = "catalogName"
+        const val CATALOG_ACTION = "catalogAction"
+    }
+
+    object CatalogAction {
+        const val ACTIVATE = "ACTIVATE"
+        const val RENAME = "RENAME"
+        const val DELETE = "DELETE"
     }
 
     object Status {
@@ -256,12 +295,20 @@ fun Bundle.toMediaCommandRequest(): MediaCommandRequest? {
                 ?: return null
             val appSource = getString(MediaBridgeContract.Key.COMMAND_APP_SOURCE)
                 ?.takeIf { it.length <= 64 }
+            val playerPackage = if (containsKey(MediaBridgeContract.Key.COMMAND_PLAYER_PACKAGE)) {
+                getString(MediaBridgeContract.Key.COMMAND_PLAYER_PACKAGE)
+                    ?.takeIf { source == BridgeAudioSource.ONLINE && isPlayerPackageName(it) }
+                    ?: return null
+            } else {
+                null
+            }
             MediaCommandRequest(
                 requestId = rawRequestId,
                 command = command,
                 source = source,
                 appSource = appSource,
                 autoplay = getBoolean(MediaBridgeContract.Key.COMMAND_AUTOPLAY, true),
+                playerPackage = playerPackage,
             )
         }
 
@@ -329,6 +376,12 @@ fun RadioStationSnapshot.toBundle(): Bundle = Bundle().apply {
     putBoolean(MediaBridgeContract.Key.RADIO_FAVORITE, favorite)
     putString(MediaBridgeContract.Key.RADIO_ARTWORK_URI, artworkUri)
 }
+
+private val PACKAGE_NAME = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
+
+/** A syntactically valid Android package name within the protocol limit. */
+fun isPlayerPackageName(value: String): Boolean =
+    value.length <= MediaBridgeContract.MAX_PACKAGE_NAME_LENGTH && PACKAGE_NAME.matches(value)
 
 private fun Bundle.radioString(key: String): String? {
     val value = getString(key).orEmpty().trim()

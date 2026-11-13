@@ -44,7 +44,7 @@ class MediaSettingsControllerTest {
         context.getSharedPreferences("radio_catalog_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("cluster_dim_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         context.getSharedPreferences("media_settings_meta", Context.MODE_PRIVATE).edit().clear().commit()
-        listOf("custom_radio", "custom_radio_prev", "custom_radio_next").forEach {
+        listOf("custom_radio", "custom_radio_prev", "custom_radio_next", "radio_catalogs", "radio_covers").forEach {
             java.io.File(context.filesDir, it).deleteRecursively()
         }
 
@@ -71,6 +71,8 @@ class MediaSettingsControllerTest {
         assertFalse(snapshot.autoSwitchToDefaultOnSourceLost)
         assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
         assertFalse(snapshot.minimizeOnlinePlayerAfterAutostart)
+        assertFalse(snapshot.startupWaitForInternet)
+        assertEquals(60, snapshot.startupInternetTimeoutSec)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)
@@ -89,6 +91,8 @@ class MediaSettingsControllerTest {
             putBoolean(MediaBridgeContract.Key.DEFAULT_AUDIO_SOURCE_AUTOPLAY, false)
             putBoolean(MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT, true)
             putBoolean(MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART, true)
+            putBoolean(MediaBridgeContract.Key.STARTUP_WAIT_FOR_INTERNET, true)
+            putInt(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC, 120)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED, true)
             putBoolean(MediaBridgeContract.Key.CLUSTER_ONLINE_PROGRESS_ENABLED, true)
             putLong(MediaBridgeContract.Key.CLUSTER_WATCHDOG_INTERVAL_MS, 2000L)
@@ -106,6 +110,8 @@ class MediaSettingsControllerTest {
         assertFalse(snap.defaultAudioSourceAutoplayOnStartup)
         assertTrue(snap.autoSwitchToDefaultOnSourceLost)
         assertTrue(snap.minimizeOnlinePlayerAfterAutostart)
+        assertTrue(snap.startupWaitForInternet)
+        assertEquals(120, snap.startupInternetTimeoutSec)
         assertTrue(snap.clusterOnlineEnabled)
         assertTrue(snap.clusterOnlineProgressEnabled)
         assertEquals(2000L, snap.clusterWatchdogIntervalMs)
@@ -259,6 +265,16 @@ class MediaSettingsControllerTest {
         }
         val res4 = controller.updateSettings(null, badBurst)
         assertEquals(MediaBridgeContract.Status.VALIDATION_ERROR, res4.status)
+
+        listOf(5, 301).forEach { timeout ->
+            val badInternetWait = Bundle().apply {
+                putInt(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC, timeout)
+            }
+            assertEquals(
+                MediaBridgeContract.Status.VALIDATION_ERROR,
+                controller.updateSettings(null, badInternetWait).status,
+            )
+        }
     }
 
     @Test
@@ -293,6 +309,8 @@ class MediaSettingsControllerTest {
         assertTrue(json.has("clusterOnlineProgressEnabled"))
         assertFalse(json.has("clusterOnlineFacadeProgressEnabled"))
         assertTrue(json.has("minimizeOnlinePlayerAfterAutostart"))
+        assertTrue(json.has("startupWaitForInternet"))
+        assertTrue(json.has("startupInternetTimeoutSec"))
         assertTrue(json.has("clusterReassertBurstIntervalMs"))
         assertFalse(json.has("uiScaleTenths"))
     }
@@ -399,6 +417,8 @@ class MediaSettingsControllerTest {
         preferences.autoSwitchToDefaultAutoplayOnSourceLost = false
         preferences.defaultMediaPackage = "com.example.player"
         preferences.minimizeOnlinePlayerAfterAutostart = true
+        preferences.startupWaitForInternet = true
+        preferences.startupInternetTimeoutSec = 200
         radioCatalogRepository.setWidgetBroadcastEnabled(false)
         clusterMediaBridge.setClusterCoversEnabled(false)
         clusterMediaBridge.setClusterOnlineEnabled(true)
@@ -432,6 +452,8 @@ class MediaSettingsControllerTest {
         assertTrue(snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
         assertEquals("", snapshot.defaultMediaPackage)
         assertFalse(snapshot.minimizeOnlinePlayerAfterAutostart)
+        assertFalse(snapshot.startupWaitForInternet)
+        assertEquals(60, snapshot.startupInternetTimeoutSec)
         assertTrue(snapshot.radioWidgetBroadcastEnabled)
         assertTrue(snapshot.clusterCoversEnabled)
         assertFalse(snapshot.clusterOnlineEnabled)

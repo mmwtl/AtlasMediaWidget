@@ -1,3 +1,5 @@
 * text=auto
 *.bat text eol=crlf
 *.jar binary
+# Downloaded SVG originals must retain the recorded source hashes.
+research/radio-kazakhstan/originals/*.svg binary

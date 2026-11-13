@@ -33,6 +33,10 @@ final class SettingsBackup {
         List<Map<String, Object>> widgetProfiles = List.of();
         /** The shared widget theme, {@link CardTheme#AUTO} in files without it. */
         int widgetTheme = CardTheme.AUTO;
+        /** Tiles of the source chooser, {@link SourceTile#DEFAULT} in files without them. */
+        List<SourceTile> sourceTiles = SourceTile.DEFAULT;
+        /** One-tone player icons; colour icons in files without the setting. */
+        boolean playerIconsMono;
         final int freeformHideThresholdPercent;
         final boolean widgetMode;
         final boolean autoStart;
@@ -348,6 +352,8 @@ final class SettingsBackup {
                 prefs.getBoolean(Prefs.KEY_CARD_OPENS_PLAYER, true), prefs.cardColors());
         data.widgetProfiles = prefs.widgetProfiles();
         data.widgetTheme = prefs.widgetTheme();
+        data.sourceTiles = prefs.sourceTiles();
+        data.playerIconsMono = prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false);
         return data;
     }
 
@@ -400,6 +406,10 @@ final class SettingsBackup {
             settings.put("statusBarFormat", data.statusBarFormat.preferenceValue);
             settings.put("cardOpensPlayer", data.cardOpensPlayer);
             settings.put("widgetTheme", data.widgetTheme);
+            JSONArray tiles = new JSONArray();
+            for (SourceTile tile : data.sourceTiles) tiles.put(tile.wire());
+            settings.put("sourceTiles", tiles);
+            settings.put("playerIconsMono", data.playerIconsMono);
             settings.put("uiScaleTenths", data.appUiScaleTenths);
             settings.put("selectedCardStyle", styleName(data.selectedStyle));
             if (data.positionX == null) {
@@ -536,10 +546,29 @@ final class SettingsBackup {
                         requireInt(settings, "widgetTheme", "settings.widgetTheme"),
                         CardTheme.AUTO, CardTheme.NIGHT);
             }
+            // Added within schema 17; older files keep the stock tiles.
+            if (settings.has("sourceTiles")) data.sourceTiles = decodeSourceTiles(settings);
+            data.playerIconsMono = settings.has("playerIconsMono") && requireBoolean(settings,
+                    "playerIconsMono", "settings.playerIconsMono");
             return data;
         } catch (JSONException error) {
             throw invalid("Повреждённый JSON настроек", error);
         }
+    }
+
+    /** Entries this version cannot show are dropped, as in the stored setting. */
+    private static List<SourceTile> decodeSourceTiles(JSONObject settings) throws IOException {
+        JSONArray array = settings.optJSONArray("sourceTiles");
+        if (array == null) throw invalid("Неверный формат settings.sourceTiles");
+        List<String> values = new ArrayList<>();
+        for (int index = 0; index < array.length(); index++) {
+            Object value = array.opt(index);
+            if (!(value instanceof String text) || text.indexOf(',') >= 0) {
+                throw invalid("Неверный формат settings.sourceTiles");
+            }
+            values.add(text);
+        }
+        return SourceTile.decode(String.join(",", values));
     }
 
     private static JSONArray encodeWidgetProfiles(List<Map<String, Object>> profiles)

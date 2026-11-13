@@ -1,0 +1,21 @@
+frequency_khz,name,band,cover
+87800,Ретро FM,FM,retro_fm.webp
+88300,Радио Ваня,FM,vanya.webp
+88700,Европа Плюс,FM,evropa.webp
+89100,Авторадио,FM,avtoradio.webp
+89500,Радио Record,FM,rekord.webp
+89900,НАШЕ Радио,FM,nashe_radio.webp
+90300,Radio Monte Carlo,FM,monte_karlo.webp
+90700,Радио Маяк,FM,mayak.webp
+100000,Радио России,FM,rossii.webp
+101800,Хит FM,FM,khit_fm.webp
+102300,Радио Сигма,FM,sigma.webp
+102800,Дорожное радио,FM,dorozhnoe_radio.webp
+103300,Русское Радио,FM,russkoe_radio.webp
+104400,Радио Дача,FM,dacha.webp
+104800,Comedy Radio,FM,comedy_radio.webp
+105200,Радио Искатель,FM,iskatel.webp
+106100,Радио ENERGY,FM,nrj.webp
+106500,Норд FM,FM,nord_fm.webp
+106900,Love Radio,FM,love_radio.webp
+107500,Вести FM,FM,vesti_fm.webp

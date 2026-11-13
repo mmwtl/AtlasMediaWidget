@@ -346,6 +346,15 @@ class MediaBackendCoordinator(
                 delay(delayMs)
             }
             if (!isBackendStarted) return@launch
+            // Internet is needed to play, not to select a source: without autoplay nothing waits.
+            if (autoplay && preferences.startupWaitForInternet &&
+                !awaitStartupInternet(targetDescription)
+            ) {
+                // The condition was not met; a Bridge reconnect must not start it later.
+                hasAppliedDefaultSource = true
+                return@launch
+            }
+            if (!isBackendStarted) return@launch
             var attempt = 0
             while (isBackendStarted && !hasAppliedDefaultSource) {
                 isApplyingDefaultSource = true
@@ -408,10 +417,29 @@ class MediaBackendCoordinator(
         }
     }
 
+    private suspend fun awaitStartupInternet(targetDescription: String): Boolean {
+        val timeoutMs = preferences.startupInternetTimeoutSec * 1_000L
+        if (InternetAvailability.isValidated(context)) return true
+        Timber.i("Startup media action for %s waits up to %d ms for internet", targetDescription, timeoutMs)
+        val online = StartupInternetGate.await(timeoutMs) { InternetAvailability.isValidated(context) }
+        if (online) {
+            Timber.i("Internet is available; continuing startup media action for %s", targetDescription)
+        } else {
+            Timber.w("Startup media action for %s skipped: no internet within %d ms", targetDescription, timeoutMs)
+        }
+        return online
+    }
+
     /** Runs an automatic action; with [autoplay] a phone call cancels it and yields null. */
     private suspend fun runAutoplay(autoplay: Boolean, action: suspend () -> Boolean): Boolean? =
         if (autoplay) {
-            CallGuard.runUnlessCallActive(isCallActive = { CallGuard.isCallActive(context) }, block = action)
+            CallGuard.runUnlessCallActive(
+                isCallActive = {
+                    CallGuard.callSignal(context)
+                        ?.also { Timber.i("Call detected by %s; cancelling automatic playback", it) } != null
+                },
+                block = action,
+            )
         } else {
             action()
         }

@@ -105,11 +105,19 @@ the background until you pick your own. The overlay uses the night colours.
 - HOME-only visibility, drag handle and configurable hiding threshold;
 - one settings screen with four tabs: Card, Media, Radio and System; text, spacing and control
   panel fine-tuning is collapsed by default;
-- default source, startup delay, autoplay and source-loss behavior controls;
+- a custom set of up to six source tiles: remove unused sources and add several Android
+  players; a player tile carries the app's name and switches Online to that player;
+- default source, startup delay, autoplay and source-loss behavior controls; startup can wait for
+  an internet connection;
 - Online player selection, optional switch to Online before session playback and background
   playback start without opening the player when the player supports it; otherwise the player opens
   and can be minimized automatically;
-- radio catalog with station artwork, favorites grid and saved-station navigation without scanning;
+- with Online as the default source and autoplay off, the card shows the player at startup with the
+  track it stopped on, and music starts only from the play button; a player that provides no track
+  in the background is opened for this and can be minimized automatically;
+- radio catalogs with station artwork: a built-in pack of 466 cities in Russia, Kazakhstan and
+  Belarus with a country- and region-grouped city picker (Penza by default), loadable city packs and
+  custom single catalogs, favorites grid and saved-station navigation without scanning;
 - radio title and artwork broadcast to the Geely OneOS DIM; optional separate Online progress
   updates;
 - optional now-playing text in the OneOS status bar pill with a choice of text layout (station or

@@ -528,6 +528,39 @@ public final class SettingsBackupTest {
                 columns, rows, true);
     }
 
+    @Test public void sourceTilesRoundTripAndDefaultForOlderFiles() throws Exception {
+        SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
+        assertEquals(SourceTile.DEFAULT, base.sourceTiles);
+        base.sourceTiles = java.util.List.of(SourceTile.player("ru.yandex.music"),
+                SourceTile.source(MediaSource.Id.BT));
+        JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
+        assertEquals("player:ru.yandex.music",
+                root.getJSONObject("settings").getJSONArray("sourceTiles").getString(0));
+        assertEquals(base.sourceTiles, SettingsBackup.decode(root.toString()).sourceTiles);
+        root.getJSONObject("settings").put("sourceTiles",
+                new org.json.JSONArray().put("BT").put("NEW_SOURCE"));
+        assertEquals(java.util.List.of(SourceTile.source(MediaSource.Id.BT)),
+                SettingsBackup.decode(root.toString()).sourceTiles);
+        root.getJSONObject("settings").put("sourceTiles", new org.json.JSONArray().put(7));
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").put("sourceTiles", "BT");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("sourceTiles");
+        assertEquals(SourceTile.DEFAULT, SettingsBackup.decode(root.toString()).sourceTiles);
+    }
+
+    @Test public void playerIconStyleRoundTripsAndDefaultsToColour() throws Exception {
+        SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
+        assertFalse(base.playerIconsMono);
+        base.playerIconsMono = true;
+        JSONObject root = new JSONObject(SettingsBackup.encode(base, "test"));
+        assertTrue(SettingsBackup.decode(root.toString()).playerIconsMono);
+        root.getJSONObject("settings").put("playerIconsMono", "yes");
+        assertThrows(IOException.class, () -> SettingsBackup.decode(root.toString()));
+        root.getJSONObject("settings").remove("playerIconsMono");
+        assertFalse(SettingsBackup.decode(root.toString()).playerIconsMono);
+    }
+
     @Test public void playerActionsCountRoundTripsAndDefaultsForOlderFiles() throws Exception {
         SettingsBackup.Data base = data(15, CardStyle.COMPACT, null, null);
         assertEquals(Prefs.DEFAULT_PLAYER_ACTIONS, base.playerActionsCount);

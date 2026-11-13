@@ -3,6 +3,7 @@ package com.mmwtl.atlasmediaapi.media.bridge
 import android.content.Context
 import android.graphics.Bitmap
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -23,6 +24,11 @@ import java.util.zip.ZipOutputStream
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
 class RadioCatalogRepositoryValidationTest {
+    private companion object {
+        val STORAGE_DIRS = listOf(
+            "custom_radio", "custom_radio_prev", "custom_radio_next", "radio_catalogs", "radio_covers",
+        )
+    }
 
     private lateinit var context: Context
     private lateinit var repository: RadioCatalogRepository
@@ -34,7 +40,7 @@ class RadioCatalogRepositoryValidationTest {
             .edit()
             .clear()
             .commit()
-        listOf("custom_radio", "custom_radio_prev", "custom_radio_next").forEach {
+        STORAGE_DIRS.forEach {
             File(context.filesDir, it).deleteRecursively()
         }
         context.filesDir.listFiles()
@@ -45,7 +51,7 @@ class RadioCatalogRepositoryValidationTest {
 
     @After
     fun tearDown() {
-        listOf("custom_radio", "custom_radio_prev", "custom_radio_next").forEach {
+        STORAGE_DIRS.forEach {
             File(context.filesDir, it).deleteRecursively()
         }
         context.filesDir.listFiles()
@@ -118,7 +124,7 @@ class RadioCatalogRepositoryValidationTest {
     }
 
     @Test
-    fun `valid old archive with covers directory entry fully replaces the current catalog`() {
+    fun `valid old archive with covers directory entry becomes the active catalog`() {
         installCatalog(
             "90000,Old Station,FM,old.png\n91000,Old Station Two,FM,old-two.png\n",
             listOf("old.png", "old-two.png"),
@@ -132,10 +138,7 @@ class RadioCatalogRepositoryValidationTest {
 
         assertNull(repository.lookup(90000))
         assertNull(repository.lookup(91000))
-        assertNotNull(repository.lookup(92000))
-        assertFalse(File(context.filesDir, "custom_radio/covers/old.png").exists())
-        assertFalse(File(context.filesDir, "custom_radio/covers/old-two.png").exists())
-        assertTrue(File(context.filesDir, "custom_radio/covers/new.png").isFile)
+        assertNotNull(repository.openCoverStream(repository.lookup(92000)!!))
     }
 
     @Test
@@ -145,7 +148,16 @@ class RadioCatalogRepositoryValidationTest {
             listOf("new.png", "unused.png"),
         )
         assertTrue(repository.importCustomZip(ByteArrayInputStream(archive)).isSuccess)
-        assertTrue(File(context.filesDir, "custom_radio/covers/unused.png").isFile)
+        val exported = ByteArrayOutputStream().also { repository.exportCatalogZip(it) }.toByteArray()
+        val names = mutableListOf<String>()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(exported)).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                names += entry.name
+                entry = zip.nextEntry
+            }
+        }
+        assertTrue(names.contains("covers/unused.png"))
     }
 
     @Test
@@ -174,7 +186,8 @@ class RadioCatalogRepositoryValidationTest {
     private fun assertOldCatalogStillActive() {
         assertNotNull(repository.lookup(90000))
         assertNull(repository.lookup(91000))
-        assertTrue(File(context.filesDir, "custom_radio/covers/old.png").isFile)
+        repository.openCoverStream(repository.lookup(90000)!!).use { assertNotNull(it) }
+        assertEquals(2, repository.getCatalogInfo().catalogs.size)
     }
 
     private fun catalogZip(

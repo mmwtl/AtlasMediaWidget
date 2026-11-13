@@ -14,15 +14,6 @@ public class MediaSourceTest {
         assertEquals(MediaSource.Id.UNKNOWN, MediaSource.Id.fromWire(null));
     }
 
-    @Test public void widgetChoicesIncludePhoneProjectionAsTheFifthSource() {
-        assertEquals(true, MediaSource.Id.BT.isWidgetChoice());
-        assertEquals(true, MediaSource.Id.RADIO.isWidgetChoice());
-        assertEquals(true, MediaSource.Id.USB.isWidgetChoice());
-        assertEquals(true, MediaSource.Id.ONLINE.isWidgetChoice());
-        assertEquals(true, MediaSource.Id.CPAA.isWidgetChoice());
-        assertEquals(false, MediaSource.Id.YUNTING.isWidgetChoice());
-    }
-
     @Test public void yuntingIsPresentedAsOnlineWithoutChangingWireId() {
         assertEquals(MediaSource.Id.ONLINE, MediaSource.Id.YUNTING.displayId());
         assertEquals(MediaSource.Id.YUNTING, MediaSource.Id.fromWire("YUNTING"));

@@ -69,6 +69,7 @@ public final class MainActivity extends ScaledActivity {
     private static final int REQUEST_IMPORT_SETTINGS = 4102;
     private static final int REQUEST_IMPORT_RADIO_CATALOG = 4103;
     static final String RADIO_ZIP_FILE_NAME = "AtlasMediaWidget-radio.zip";
+    private static final int MAX_CATALOG_NAME_LENGTH = 40;
     private static final long SETTINGS_READINESS_TIMEOUT_MS = 20_000L;
     private static final String MEDIA_NOTIFICATION_LISTENER_CLASS =
             "com.mmwtl.atlasmediaapi.media.session.MediaNotificationListenerService";
@@ -112,12 +113,19 @@ public final class MainActivity extends ScaledActivity {
     private TextView defaultSourceTitle;
     private TextView defaultSourceDelayLabel;
     private SeekBar defaultSourceDelaySeekBar;
+    private LinearLayout sourceTilesList;
+    private Button sourceTilesAdd;
+    private Button sourceTilesReset;
+    private Switch playerIconsMono;
     private TextView onlinePlayerTitle;
     private Spinner onlinePlayerSpinner;
     private ArrayAdapter<OnlinePlayerOption> onlinePlayerAdapter;
     private boolean refreshingOnlinePlayer;
     private Switch minimizeOnlinePlayerSwitch;
     private Switch startupAutoplaySwitch;
+    private Switch startupInternetSwitch;
+    private TextView startupInternetTimeoutLabel;
+    private SeekBar startupInternetTimeoutSeekBar;
     private Switch sourceLostSwitch;
     private Switch sourceLostAutoplaySwitch;
     private Switch radioWidgetBroadcastSwitch;
@@ -128,7 +136,13 @@ public final class MainActivity extends ScaledActivity {
     private TextView clusterReassertBurstLabel;
     private SeekBar clusterReassertBurstSeekBar;
     private TextView radioCatalogInfoText;
-    private Button restoreDefaultRadioCatalogButton;
+    private LinearLayout radioCatalogList;
+    /** The catalog the picked ZIP replaces, or null when it adds a new catalog. */
+    private String pendingReplaceCatalogId;
+    /** The pack a picked ZIP must update, when the import was started from that pack's menu. */
+    private String pendingUpdatePackId;
+    /** A newly loaded pack whose city picker opens once the settings list it. */
+    private String pendingCityPickerCatalogId;
     private TextView mediaStatusText;
     private final List<View> mediaSettingsViews = new ArrayList<>();
     private Button overlayPermissionButton;
@@ -147,7 +161,6 @@ public final class MainActivity extends ScaledActivity {
     private RadioButton[] statusBarFormatButtons;
     private Button exportSettingsButton;
     private Button importSettingsButton;
-    private Button exportRadioCatalogButton;
     private Button importRadioCatalogButton;
     private TextView coverDimTitle;
     private RadioGroup coverDimPresetGroup;
@@ -554,6 +567,7 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout themeCard = createThemeCard();
         page.addView(themeCard);
         widgetOnly.add(themeCard);
+        page.addView(createSourceTilesCard());
         page.addView(createPlayerActionsCard());
         createTypographySection(collapsibleCard(page, "Текст и отступы",
                 "Размеры шрифтов, отступы и линия прогресса"));
@@ -1699,7 +1713,18 @@ public final class MainActivity extends ScaledActivity {
         launchFilePicker(picker, REQUEST_IMPORT_SETTINGS);
     }
 
-    private void chooseRadioCatalogImport() {
+    private void chooseRadioPackUpdate(String packId) {
+        chooseRadioCatalogImport(null, packId);
+    }
+
+    private void chooseRadioCatalogImport(String replaceCatalogId) {
+        chooseRadioCatalogImport(replaceCatalogId, null);
+    }
+
+    private void chooseRadioCatalogImport(String replaceCatalogId, String expectedPackId) {
+        if (radioCatalogBusy || mediaSettingsBusy || settingsTransferBusy) return;
+        pendingReplaceCatalogId = replaceCatalogId;
+        pendingUpdatePackId = expectedPackId;
         Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("*/*");
@@ -1801,7 +1826,7 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
-    private void exportRadioCatalog() {
+    private void exportRadioCatalog(MediaSettingsSnapshot.Catalog catalog) {
         if (radioCatalogBusy || mediaSettingsBusy || settingsTransferBusy || recoveryInProgress
                 || importInProgress || mediaBridgeClient == null
                 || !mediaBridgeClient.isSettingsSupported()) return;
@@ -1826,7 +1851,7 @@ public final class MainActivity extends ScaledActivity {
                 final CountDownLatch latch = new CountDownLatch(1);
                 final boolean[] success = new boolean[1];
                 final String[] errorHolder = new String[1];
-                mediaBridgeClient.exportRadioCatalog(exportFile,
+                mediaBridgeClient.exportRadioCatalog(exportFile, catalog.id,
                         new MediaBridgeClient.RadioCatalogExportCallback() {
                             @Override public void onCatalogExported(int stationCount) {
                                 success[0] = true;
@@ -1843,7 +1868,7 @@ public final class MainActivity extends ScaledActivity {
                     throw new IOException("Ошибка экспорта каталога радио: "
                             + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
                 }
-                String name = datedExportName(RADIO_ZIP_FILE_NAME);
+                String name = datedExportName(radioCatalogExportFileName(catalog));
                 Uri uri = BackupProvider.publish(appContext, name, exportFile);
                 main.post(() -> {
                     if (isDestroyed()) return;
@@ -1879,9 +1904,14 @@ public final class MainActivity extends ScaledActivity {
         setRadioCatalogTransferEnabled(false);
         setSettingsTransferEnabled(false);
         android.content.Context appContext = getApplicationContext();
+        String replaceCatalogId = pendingReplaceCatalogId;
+        String expectedPackId = pendingUpdatePackId;
+        pendingReplaceCatalogId = null;
+        pendingUpdatePackId = null;
         ioExecutor.execute(() -> {
             File staged = null;
             try {
+                String suggestedName = catalogNameFromFileName(displayName(appContext, uri));
                 File importDir = new File(getCacheDir(), "imports");
                 if (!importDir.exists() && !importDir.mkdirs()) {
                     throw new IOException("Не удалось создать временное хранилище импорта");
@@ -1902,6 +1932,7 @@ public final class MainActivity extends ScaledActivity {
                         out.write(buffer, 0, length);
                     }
                 }
+                RadioPackPreview pack = RadioPackPreview.read(staged);
                 File readyFile = staged;
                 main.post(() -> {
                     if (isDestroyed()) {
@@ -1910,7 +1941,8 @@ public final class MainActivity extends ScaledActivity {
                         return;
                     }
                     pendingRadioImportFile = readyFile;
-                    showRadioCatalogImportConfirmation(readyFile);
+                    showRadioCatalogImportConfirmation(readyFile, replaceCatalogId,
+                            suggestedName, pack, expectedPackId);
                 });
             } catch (Exception error) {
                 if (staged != null) staged.delete();
@@ -1920,17 +1952,111 @@ public final class MainActivity extends ScaledActivity {
         });
     }
 
-    private void showRadioCatalogImportConfirmation(File stagedFile) {
-        CompactDialog.show(new AlertDialog.Builder(this)
-                .setTitle("Заменить каталог радио?")
-                .setMessage("Текущий каталог радиостанций и обложек будет полностью заменён "
-                        + "содержимым выбранного ZIP-файла.")
-                .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
-                .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
-                .setPositiveButton("Заменить", (d, w) -> importRadioCatalog(stagedFile)));
+    private static String displayName(android.content.Context context, Uri uri) {
+        try (android.database.Cursor cursor = context.getContentResolver().query(uri,
+                new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(0);
+                if (name != null) return name;
+            }
+        } catch (RuntimeException ignored) {
+            // Some pickers expose no display name; fall back to the path.
+        }
+        return uri.getLastPathSegment();
     }
 
-    private void importRadioCatalog(File stagedFile) {
+    private String packName(String packId) {
+        if (currentMediaSettings != null) {
+            for (MediaSettingsSnapshot.Catalog catalog : currentMediaSettings.catalogs) {
+                // The built-in pack shares its id with the imported packs it was taken from.
+                if (!catalog.isBuiltIn() && catalog.packId.equals(packId)) return catalog.name;
+            }
+        }
+        return packId;
+    }
+
+    private boolean isPackInstalled(String packId) {
+        if (packId == null || packId.isEmpty() || currentMediaSettings == null) return false;
+        for (MediaSettingsSnapshot.Catalog catalog : currentMediaSettings.catalogs) {
+            if (!catalog.isBuiltIn() && catalog.packId.equals(packId)) return true;
+        }
+        return false;
+    }
+
+    private void showRadioPackImportConfirmation(File stagedFile, RadioPackPreview pack) {
+        boolean update = isPackInstalled(pack.id);
+        String name = pack.name.isEmpty() ? "без названия" : pack.name;
+        String size = plural(pack.cityCount, "город", "города", "городов")
+                + (pack.regionCount > 1 ? " в " + pack.regionCount + " регионах" : "") + ".";
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle((update ? "Обновить набор «" : "Загрузить набор «") + name + "»?")
+                .setMessage(size + (update
+                        ? " Города и обложки набора будут заменены новой версией. Выбранный "
+                                + "город останется выбранным, если он есть в новой версии."
+                        : " Остальные каталоги сохранятся. После загрузки выберите свой город."))
+                .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
+                .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
+                .setPositiveButton(update ? "Обновить" : "Загрузить",
+                        (d, w) -> importRadioCatalog(stagedFile, null, null)));
+    }
+
+    private MediaSettingsSnapshot.Catalog catalogById(String id) {
+        if (id == null || currentMediaSettings == null) return null;
+        for (MediaSettingsSnapshot.Catalog catalog : currentMediaSettings.catalogs) {
+            if (catalog.id.equals(id)) return catalog;
+        }
+        return null;
+    }
+
+    private void showRadioCatalogImportConfirmation(File stagedFile, String replaceCatalogId,
+            String suggestedName, RadioPackPreview pack, String expectedPackId) {
+        if (expectedPackId != null && (pack == null || !expectedPackId.equals(pack.id))) {
+            finishRadioCatalogImport(stagedFile);
+            Toast.makeText(this, "Выбранный файл — не набор «" + packName(expectedPackId) + "»",
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (pack != null) {
+            if (replaceCatalogId != null) {
+                finishRadioCatalogImport(stagedFile);
+                Toast.makeText(this, "Набор нельзя загрузить вместо отдельного каталога",
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            showRadioPackImportConfirmation(stagedFile, pack);
+            return;
+        }
+        MediaSettingsSnapshot.Catalog replaced = catalogById(replaceCatalogId);
+        if (replaceCatalogId != null && replaced != null) {
+            CompactDialog.show(new AlertDialog.Builder(this)
+                    .setTitle("Заменить каталог «" + replaced.name + "»?")
+                    .setMessage("Станции и обложки каталога будут полностью заменены "
+                            + "содержимым выбранного ZIP-файла. Название сохранится.")
+                    .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
+                    .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
+                    .setPositiveButton("Заменить", (d, w) ->
+                            importRadioCatalog(stagedFile, null, replaced.id)));
+            return;
+        }
+        EditText input = catalogNameInput(suggestedName);
+        input.setHint("Название каталога");
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(text("Новый каталог станет активным. Остальные каталоги сохранятся.",
+                13, Ui.SECONDARY, Typeface.NORMAL));
+        LinearLayout.LayoutParams inputParams = fullWrap();
+        inputParams.topMargin = Ui.dp(this, 8);
+        content.addView(input, inputParams);
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Добавить каталог радио")
+                .setView(paddedDialogView(content))
+                .setOnCancelListener(d -> finishRadioCatalogImport(stagedFile))
+                .setNegativeButton("Отмена", (d, w) -> finishRadioCatalogImport(stagedFile))
+                .setPositiveButton("Добавить", (d, w) -> importRadioCatalog(stagedFile,
+                        input.getText().toString().trim(), null)));
+    }
+
+    private void importRadioCatalog(File stagedFile, String name, String replaceCatalogId) {
         ioExecutor.execute(() -> {
             try {
                 MediaBridgeClient bridge = mediaBridgeClient;
@@ -1945,11 +2071,19 @@ public final class MainActivity extends ScaledActivity {
                 final CountDownLatch latch = new CountDownLatch(1);
                 final boolean[] success = new boolean[1];
                 final int[] stationCount = new int[1];
+                final int[] catalogCount = new int[1];
+                final String[] pack = new String[2];
+                final String[] importedId = new String[1];
                 final String[] errorHolder = new String[1];
-                bridge.importRadioCatalog(stagedFile,
+                bridge.importRadioCatalog(stagedFile, name, replaceCatalogId,
                         new MediaBridgeClient.RadioCatalogImportCallback() {
-                            @Override public void onCatalogImported(int count) {
+                            @Override public void onCatalogImported(int count, String catalogId,
+                                    String packId, String packName, int catalogs) {
                                 stationCount[0] = count;
+                                catalogCount[0] = catalogs;
+                                pack[0] = packId;
+                                pack[1] = packName;
+                                importedId[0] = catalogId;
                                 success[0] = true;
                                 latch.countDown();
                             }
@@ -1959,15 +2093,28 @@ public final class MainActivity extends ScaledActivity {
                                 latch.countDown();
                             }
                         });
-                latch.await(17, TimeUnit.SECONDS);
+                latch.await(MediaBridgeClient.RADIO_IMPORT_TIMEOUT_MS + 2_000L,
+                        TimeUnit.MILLISECONDS);
                 if (!success[0]) {
                     throw new IOException("Ошибка импорта каталога радио: "
                             + (errorHolder[0] != null ? errorHolder[0] : "таймаут"));
                 }
                 main.post(() -> {
                     if (isDestroyed()) return;
-                    Toast.makeText(this, "Каталог радио импортирован ("
-                                    + stationCount[0] + " станций)", Toast.LENGTH_LONG).show();
+                    String packId = pack[0] == null ? "" : pack[0];
+                    String message;
+                    if (!packId.isEmpty()) {
+                        boolean update = isPackInstalled(packId);
+                        // A new pack leaves the active catalog as it was: offer its cities.
+                        if (!update) pendingCityPickerCatalogId = importedId[0];
+                        message = (update ? "Набор «" + pack[1] + "» обновлён: "
+                                : "Набор «" + pack[1] + "» загружен: ")
+                                + plural(catalogCount[0], "город", "города", "городов");
+                    } else {
+                        message = (replaceCatalogId != null ? "Каталог заменён ("
+                                : "Каталог добавлен (") + stationCountLabel(stationCount[0]) + ")";
+                    }
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 });
             } catch (Exception error) {
                 AppLog.warn("Cannot import radio catalog", error);
@@ -2346,6 +2493,45 @@ public final class MainActivity extends ScaledActivity {
 
         startupAutoplaySwitch = mediaSwitch(startup, "Автовоспроизведение при старте", 12,
                 MediaBridgeContract.K_DEFAULT_AUDIO_SOURCE_AUTOPLAY);
+        TextView autoplayNote = text("С источником Online плеер по умолчанию готовится и без "
+                        + "автовоспроизведения: показывает трек на паузе, а если отдаёт его только "
+                        + "вместе со своим окном, открывается и может сворачиваться (настройка "
+                        + "онлайн-плеера). Воспроизведение начинается только с этим переключателем.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams autoplayNoteParams = fullWrap();
+        autoplayNoteParams.topMargin = Ui.dp(this, 4);
+        startup.addView(autoplayNote, autoplayNoteParams);
+        startupInternetSwitch = mediaSwitch(startup, "Ждать подключения к интернету", 12,
+                MediaBridgeContract.K_STARTUP_WAIT_FOR_INTERNET);
+        TextView internetNote = text("Работает вместе с автовоспроизведением: переключение и "
+                        + "запуск при старте начнутся, только когда появится интернет (Wi-Fi, "
+                        + "точка доступа телефона или связь машины). Если за отведённое время его "
+                        + "нет, автозапуск пропускается.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams internetNoteParams = fullWrap();
+        internetNoteParams.topMargin = Ui.dp(this, 4);
+        startup.addView(internetNote, internetNoteParams);
+        startupInternetTimeoutLabel = text("Ждать не дольше 60 сек", 15, Ui.PRIMARY,
+                Typeface.BOLD);
+        LinearLayout.LayoutParams internetLabelParams = fullWrap();
+        internetLabelParams.topMargin = Ui.dp(this, 10);
+        startup.addView(startupInternetTimeoutLabel, internetLabelParams);
+        startupInternetTimeoutSeekBar = sizeSeekBar(
+                MediaSettingsSnapshot.MIN_STARTUP_INTERNET_TIMEOUT_SEC / 10,
+                MediaSettingsSnapshot.MAX_STARTUP_INTERNET_TIMEOUT_SEC / 10);
+        startupInternetTimeoutSeekBar.setContentDescription("Предел ожидания интернета");
+        startupInternetTimeoutSeekBar.setOnSeekBarChangeListener(
+                new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar bar, int progress, boolean fromUser) {
+                if (fromUser) setStartupInternetTimeoutLabel(progress * 10);
+            }
+            @Override public void onStartTrackingTouch(SeekBar bar) {}
+            @Override public void onStopTrackingTouch(SeekBar bar) {
+                sendMediaSettingChange(MediaBridgeContract.K_STARTUP_INTERNET_TIMEOUT_SEC,
+                        bar.getProgress() * 10);
+            }
+        });
+        startup.addView(startupInternetTimeoutSeekBar, fullWrap());
         page.addView(startupCard);
 
         LinearLayout onlineCard = card();
@@ -2388,7 +2574,7 @@ public final class MainActivity extends ScaledActivity {
         online.addView(onlinePlayerSpinner, onlineSpinnerParams);
 
         minimizeOnlinePlayerSwitch = mediaSwitch(online,
-                "Сворачивать онлайн-плеер после автозапуска", 10,
+                "Сворачивать онлайн-плеер, если он открылся автоматически", 10,
                 MediaBridgeContract.K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART);
         page.addView(onlineCard);
 
@@ -2569,7 +2755,7 @@ public final class MainActivity extends ScaledActivity {
 
     private LinearLayout createRadioCatalogCard() {
         LinearLayout radioCard = card();
-        radioCard.addView(text("Каталог станций", 20, Ui.PRIMARY, Typeface.BOLD));
+        radioCard.addView(text("Каталоги станций", 20, Ui.PRIMARY, Typeface.BOLD));
         LinearLayout catalog = mediaSettingsBody(radioCard);
         radioWidgetBroadcastSwitch = mediaSwitch(catalog,
                 "Названия и обложки из каталога в карточке", 12,
@@ -2578,28 +2764,514 @@ public final class MainActivity extends ScaledActivity {
         LinearLayout.LayoutParams rciParams = fullWrap();
         rciParams.topMargin = Ui.dp(this, 12);
         catalog.addView(radioCatalogInfoText, rciParams);
-        restoreDefaultRadioCatalogButton = actionButton("Восстановить стандартный каталог радио");
-        restoreDefaultRadioCatalogButton.setOnClickListener(v -> restoreDefaultRadioCatalog());
-        catalog.addView(restoreDefaultRadioCatalogButton, buttonParams());
+        radioCatalogList = new LinearLayout(this);
+        radioCatalogList.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams listParams = fullWrap();
+        listParams.topMargin = Ui.dp(this, 4);
+        catalog.addView(radioCatalogList, listParams);
 
         TextView hint = text(
-                "Отдельный ZIP-каталог содержит stations.csv и обложки радиостанций. "
-                        + "Импорт заменяет текущий каталог после подтверждения.",
+                "Активен один каталог: нажмите на нужный, чтобы переключиться. Набор городов "
+                        + "занимает одну строку — нажмите на неё, чтобы выбрать город. В меню «⋯» "
+                        + "— экспорт, обновление и удаление. Отдельный ZIP со stations.csv и "
+                        + "обложками добавляется как свой каталог; одинаковые обложки хранятся "
+                        + "один раз.",
                 13, Ui.SECONDARY, Typeface.NORMAL);
         hint.setLineSpacing(0, 1.15f);
         LinearLayout.LayoutParams hintParams = fullWrap();
         hintParams.topMargin = Ui.dp(this, 14);
         radioCard.addView(hint, hintParams);
 
-        exportRadioCatalogButton = actionButton("Экспортировать каталог радио (ZIP)");
-        exportRadioCatalogButton.setOnClickListener(v -> exportRadioCatalog());
-        radioCard.addView(exportRadioCatalogButton, buttonParams());
-
-        importRadioCatalogButton = actionButton("Импортировать каталог радио (ZIP)");
-        importRadioCatalogButton.setOnClickListener(v -> chooseRadioCatalogImport());
+        importRadioCatalogButton = actionButton("Добавить каталог или набор (ZIP)");
+        importRadioCatalogButton.setOnClickListener(v -> chooseRadioCatalogImport(null));
         radioCard.addView(importRadioCatalogButton, buttonParams());
         setRadioCatalogTransferEnabled(false);
         return radioCard;
+    }
+
+    private void renderRadioCatalogs(MediaSettingsSnapshot snapshot) {
+        if (radioCatalogList == null) return;
+        radioCatalogList.removeAllViews();
+        boolean enabled = !mediaSettingsBusy && !radioCatalogBusy && !settingsTransferBusy;
+        for (MediaSettingsSnapshot.Catalog catalog : snapshot.catalogs) {
+            boolean active = catalog.id.equals(snapshot.catalogActiveId);
+            if (catalog.isPack()) {
+                // A pack is one row however many cities it has; its city is chosen in a dialog.
+                String subtitle = active
+                        ? cityLabel(snapshot.catalogActiveCityName, snapshot.catalogActiveRegion)
+                                + " · " + stationCountLabel(snapshot.catalogStationCount)
+                                + " · активен"
+                        : plural(catalog.cityCount, "город", "города", "городов")
+                                + " · нажмите, чтобы выбрать город";
+                addRadioCatalogRow(catalog.name, subtitle, active, enabled,
+                        () -> openRadioCityPicker(catalog),
+                        () -> showRadioPackActions(catalog, active));
+            } else {
+                addRadioCatalogRow(catalog.name, stationCountLabel(catalog.stationCount)
+                                + (active ? " · активен" : ""), active, enabled,
+                        () -> {
+                            if (!active) activateRadioCatalog(catalog);
+                        },
+                        () -> showRadioCatalogActions(catalog, active));
+            }
+        }
+    }
+
+    private void addRadioCatalogRow(String title, String subtitle, boolean active,
+            boolean enabled, Runnable onClick, Runnable onMenu) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setBackground(Ui.background(active ? Ui.ACCENT : Ui.NESTED, 8, this));
+        row.setPadding(Ui.dp(this, 14), Ui.dp(this, 8), Ui.dp(this, 6), Ui.dp(this, 8));
+        int primary = active ? Ui.ON_ACCENT : Ui.PRIMARY;
+
+        LinearLayout labels = new LinearLayout(this);
+        labels.setOrientation(LinearLayout.VERTICAL);
+        labels.addView(text(title, 15, primary, active ? Typeface.BOLD : Typeface.NORMAL));
+        labels.addView(text(subtitle, 12, active ? Ui.ON_ACCENT : Ui.SECONDARY,
+                Typeface.NORMAL));
+        row.addView(labels, new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        Button menu = actionButton("⋯");
+        menu.setTextSize(18);
+        menu.setTextColor(primary);
+        menu.setBackground(null);
+        menu.setMinWidth(Ui.dp(this, 48));
+        menu.setContentDescription("Действия: " + title);
+        menu.setOnClickListener(v -> onMenu.run());
+        menu.setEnabled(enabled);
+        row.addView(menu, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        row.setOnClickListener(v -> onClick.run());
+        row.setEnabled(enabled);
+        LinearLayout.LayoutParams rowParams = fullWrap();
+        rowParams.topMargin = Ui.dp(this, 8);
+        radioCatalogList.addView(row, rowParams);
+    }
+
+    private void activateRadioCatalog(MediaSettingsSnapshot.Catalog catalog) {
+        manageRadioCatalog(MediaBridgeContract.CATALOG_ACTION_ACTIVATE, catalog, null, null,
+                "Активен каталог «" + catalog.name + "»");
+    }
+
+    /** "Пенза · Пензенская область", or the plain name when there is no region. */
+    static String cityLabel(String name, String region) {
+        return region == null || region.isEmpty() || region.equals(name)
+                ? name : name + " · " + region;
+    }
+
+    static String stationCountLabel(int count) {
+        return plural(count, "станция", "станции", "станций");
+    }
+
+    static String plural(int count, String one, String few, String many) {
+        int mod100 = count % 100;
+        int mod10 = count % 10;
+        String word = mod100 >= 11 && mod100 <= 14 ? many
+                : mod10 == 1 ? one
+                : mod10 >= 2 && mod10 <= 4 ? few : many;
+        return count + " " + word;
+    }
+
+    /** Reads the pack's cities from the Media Bridge, then shows the picker. */
+    private void openRadioCityPicker(MediaSettingsSnapshot.Catalog pack) {
+        if (mediaBridgeClient == null || mediaSettingsBusy || radioCatalogBusy
+                || settingsTransferBusy || !mediaBridgeClient.isSettingsSupported()) return;
+        radioCatalogBusy = true;
+        setMediaSettingsEnabled(false);
+        setRadioCatalogTransferEnabled(false);
+        setSettingsTransferEnabled(false);
+        MediaBridgeClient bridge = mediaBridgeClient;
+        ioExecutor.execute(() -> {
+            File file = new File(getCacheDir(), "radio_pack_cities.json");
+            List<RadioPackCities.City> cities = null;
+            Exception failure = null;
+            try {
+                CountDownLatch latch = new CountDownLatch(1);
+                String[] error = new String[1];
+                boolean[] success = new boolean[1];
+                bridge.readPackCities(file, pack.id, new MediaBridgeClient.PackCitiesCallback() {
+                    @Override public void onPackCities(int count) {
+                        success[0] = true;
+                        latch.countDown();
+                    }
+
+                    @Override public void onError(int code, String message) {
+                        error[0] = message;
+                        latch.countDown();
+                    }
+                });
+                latch.await(17, TimeUnit.SECONDS);
+                if (!success[0]) {
+                    throw new IOException("Не удалось прочитать города набора: "
+                            + (error[0] != null ? error[0] : "таймаут"));
+                }
+                cities = RadioPackCities.parse(new String(java.nio.file.Files.readAllBytes(
+                        file.toPath()), java.nio.charset.StandardCharsets.UTF_8));
+            } catch (Exception error) {
+                failure = error;
+                AppLog.warn("Cannot read radio pack cities", error);
+            } finally {
+                file.delete();
+            }
+            List<RadioPackCities.City> loaded = cities;
+            Exception problem = failure;
+            main.post(() -> {
+                radioCatalogBusy = false;
+                if (isDestroyed()) return;
+                if (currentMediaSettings != null) updateMediaSettingsUi(currentMediaSettings);
+                setRadioCatalogTransferEnabled(true);
+                setSettingsTransferEnabled(true);
+                if (loaded != null) {
+                    showRadioCityPicker(pack, loaded);
+                } else {
+                    Toast.makeText(this, problem != null && problem.getMessage() != null
+                                    ? problem.getMessage() : "Не удалось прочитать города набора",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+    }
+
+    /**
+     * Cities grouped by country and region, each group collapsed except the active city's; a
+     * search field lists matching cities across the pack. A country with one region lists its
+     * cities without a region header.
+     */
+    private void showRadioCityPicker(MediaSettingsSnapshot.Catalog pack,
+            List<RadioPackCities.City> cities) {
+        MediaSettingsSnapshot snapshot = currentMediaSettings;
+        if (snapshot == null || cities.isEmpty()) return;
+        String activeKey = pack.id.equals(snapshot.catalogActiveId)
+                ? snapshot.catalogActiveCityKey : "";
+        Map<String, Map<String, List<RadioPackCities.City>>> countries =
+                RadioPackCities.byCountry(cities);
+        boolean byCountry = countries.size() > 1;
+        String homeCountry = cities.get(0).country;
+        int regionCount = RadioPackCities.regionCount(cities);
+        boolean expandAll = !byCountry && (cities.size() <= 8 || regionCount <= 1);
+        AlertDialog[] dialog = new AlertDialog[1];
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int side = Ui.dp(this, 20);
+        content.setPadding(side, Ui.dp(this, 4), side, 0);
+        EditText search = new EditText(this);
+        search.setSingleLine(true);
+        search.setHint("Найти город");
+        search.setTextColor(Ui.PRIMARY);
+        content.addView(search, fullWrap());
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(0, 0, 0, Ui.dp(this, 8));
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(list);
+        content.addView(scroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 420)));
+
+        java.util.function.Function<RadioPackCities.City, View> cityRow = city -> {
+            boolean active = city.key.equals(activeKey);
+            TextView row = text(city.name + "  ·  " + stationCountLabel(city.stationCount),
+                    15, active ? Ui.ON_ACCENT : Ui.PRIMARY,
+                    active ? Typeface.BOLD : Typeface.NORMAL);
+            row.setBackground(Ui.background(active ? Ui.ACCENT : Ui.NESTED, 8, this));
+            row.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 14), Ui.dp(this, 10));
+            row.setOnClickListener(v -> {
+                if (dialog[0] != null) dialog[0].dismiss();
+                if (!active) {
+                    manageRadioCatalog(MediaBridgeContract.CATALOG_ACTION_ACTIVATE, pack, null,
+                            city.key, "Активен город «" + cityLabel(city.name, city.region) + "»");
+                }
+            });
+            return row;
+        };
+        java.util.function.BiConsumer<LinearLayout, List<RadioPackCities.City>> addCities =
+                (parent, group) -> {
+                    for (RadioPackCities.City city : group) {
+                        LinearLayout.LayoutParams params = fullWrap();
+                        params.topMargin = Ui.dp(this, 6);
+                        parent.addView(cityRow.apply(city), params);
+                    }
+                };
+        // Regions of a country, or of the whole pack without countries.
+        java.util.function.BiConsumer<LinearLayout, Map<String, List<RadioPackCities.City>>>
+                addRegions = (parent, regions) -> {
+                    for (Map.Entry<String, List<RadioPackCities.City>> region
+                            : regions.entrySet()) {
+                        if (region.getKey().isEmpty() || (byCountry && regions.size() == 1)) {
+                            addCities.accept(parent, region.getValue());
+                        } else {
+                            addCityGroup(parent, region.getKey(), region.getValue().size(), 15,
+                                    expandAll || containsCity(region.getValue(), activeKey),
+                                    group -> addCities.accept(group, region.getValue()));
+                        }
+                    }
+                };
+        Runnable showRegions = () -> {
+            list.removeAllViews();
+            if (!byCountry) {
+                addRegions.accept(list, countries.values().iterator().next());
+                return;
+            }
+            for (Map.Entry<String, Map<String, List<RadioPackCities.City>>> country
+                    : countries.entrySet()) {
+                List<RadioPackCities.City> all = new ArrayList<>();
+                for (List<RadioPackCities.City> group : country.getValue().values()) {
+                    all.addAll(group);
+                }
+                String title = country.getKey().isEmpty() ? "Другие" : country.getKey();
+                addCityGroup(list, title, all.size(), 16, containsCity(all, activeKey),
+                        group -> {
+                            group.setPadding(Ui.dp(this, 12), 0, 0, 0);
+                            addRegions.accept(group, country.getValue());
+                        });
+            }
+        };
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {}
+            @Override public void afterTextChanged(android.text.Editable value) {
+                String query = value.toString().trim();
+                if (query.isEmpty()) {
+                    showRegions.run();
+                    return;
+                }
+                list.removeAllViews();
+                List<RadioPackCities.City> found = RadioPackCities.search(cities, query,
+                        RadioPackCities.MAX_SEARCH_RESULTS);
+                if (found.isEmpty()) {
+                    list.addView(text("Ничего не найдено", 14, Ui.SECONDARY, Typeface.NORMAL));
+                }
+                for (RadioPackCities.City city : found) {
+                    View row = cityRow.apply(city);
+                    String place = searchPlaceLabel(city, homeCountry);
+                    if (!place.isEmpty() && row instanceof TextView label) {
+                        label.setText(city.name + "  ·  " + place + "  ·  "
+                                + stationCountLabel(city.stationCount));
+                    }
+                    LinearLayout.LayoutParams params = fullWrap();
+                    params.topMargin = Ui.dp(MainActivity.this, 6);
+                    list.addView(row, params);
+                }
+            }
+        });
+        showRegions.run();
+        dialog[0] = CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle(pack.name + ": " + plural(cities.size(), "город", "города", "городов")
+                        + (regionCount > 1 ? " в " + regionCount + " регионах" : ""))
+                .setView(content)
+                .setNegativeButton("Закрыть", null));
+    }
+
+    /** A collapsible header with a group whose rows are built when it first opens. */
+    private void addCityGroup(LinearLayout parent, String name, int count, int textSize,
+            boolean open, java.util.function.Consumer<LinearLayout> fill) {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        TextView header = text("", textSize, Ui.PRIMARY, Typeface.BOLD);
+        header.setPadding(0, Ui.dp(this, 12), 0, Ui.dp(this, 4));
+        String title = name + " · " + count;
+        // Rows are built when a group opens: a pack can hold thousands of cities.
+        Runnable build = () -> {
+            if (group.getChildCount() == 0) fill.accept(group);
+        };
+        group.setVisibility(open ? View.VISIBLE : View.GONE);
+        if (open) build.run();
+        header.setText((open ? "▾ " : "▸ ") + title);
+        header.setOnClickListener(v -> {
+            boolean show = group.getVisibility() != View.VISIBLE;
+            if (show) build.run();
+            group.setVisibility(show ? View.VISIBLE : View.GONE);
+            header.setText((show ? "▾ " : "▸ ") + title);
+        });
+        parent.addView(header, fullWrap());
+        parent.addView(group, fullWrap());
+    }
+
+    private static boolean containsCity(List<RadioPackCities.City> cities, String key) {
+        for (RadioPackCities.City city : cities) {
+            if (city.key.equals(key)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The region of a search result, with the country when it differs from the pack's first
+     * one: "Костанайская область, Казахстан".
+     */
+    static String searchPlaceLabel(RadioPackCities.City city, String homeCountry) {
+        boolean foreign = !city.country.isEmpty() && !city.country.equals(homeCountry);
+        String region = city.region.equals(city.name) ? "" : city.region;
+        if (!foreign) return region;
+        return region.isEmpty() ? city.country : region + ", " + city.country;
+    }
+
+    private void showRadioPackActions(MediaSettingsSnapshot.Catalog pack, boolean active) {
+        if (mediaSettingsBusy || radioCatalogBusy || settingsTransferBusy) return;
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        labels.add("Выбрать город");
+        actions.add(() -> openRadioCityPicker(pack));
+        // The built-in pack ships with the app: it is updated with it and cannot be deleted.
+        if (!pack.isBuiltIn()) {
+            labels.add("Обновить из ZIP");
+            actions.add(() -> chooseRadioPackUpdate(pack.packId));
+        }
+        labels.add("Экспортировать набор (ZIP)");
+        actions.add(() -> exportRadioCatalog(pack));
+        if (!pack.isBuiltIn()) {
+            labels.add("Удалить набор");
+            actions.add(() -> confirmDeleteRadioPack(pack, active));
+        }
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle(pack.isBuiltIn() ? pack.name + " (встроенный)" : pack.name)
+                .setItems(labels.toArray(new String[0]), (d, which) -> actions.get(which).run())
+                .setNegativeButton("Отмена", null));
+    }
+
+    private void confirmDeleteRadioPack(MediaSettingsSnapshot.Catalog pack, boolean active) {
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Удалить набор «" + pack.name + "»?")
+                .setMessage(plural(pack.cityCount, "город", "города", "городов")
+                        + " и их обложки будут удалены."
+                        + (active ? " Активным станет встроенный набор." : ""))
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Удалить", (d, w) -> manageRadioCatalog(
+                        MediaBridgeContract.CATALOG_ACTION_DELETE, pack, null, null,
+                        "Набор «" + pack.name + "» удалён")));
+    }
+
+    private void showRadioCatalogActions(MediaSettingsSnapshot.Catalog catalog, boolean active) {
+        if (mediaSettingsBusy || radioCatalogBusy || settingsTransferBusy) return;
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        if (!active) {
+            labels.add("Сделать активным");
+            actions.add(() -> activateRadioCatalog(catalog));
+        }
+        labels.add("Экспортировать (ZIP)");
+        actions.add(() -> exportRadioCatalog(catalog));
+        if (!catalog.isBuiltIn()) {
+            labels.add("Заменить из ZIP");
+            actions.add(() -> chooseRadioCatalogImport(catalog.id));
+            labels.add("Переименовать");
+            actions.add(() -> showRenameRadioCatalog(catalog));
+            labels.add("Удалить");
+            actions.add(() -> confirmDeleteRadioCatalog(catalog, active));
+        }
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle(catalog.name)
+                .setItems(labels.toArray(new String[0]), (d, which) -> actions.get(which).run())
+                .setNegativeButton("Отмена", null));
+    }
+
+    private EditText catalogNameInput(String value) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setText(value);
+        input.setSelectAllOnFocus(true);
+        input.setTextColor(Ui.PRIMARY);
+        input.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(MAX_CATALOG_NAME_LENGTH)});
+        return input;
+    }
+
+    private View paddedDialogView(View content) {
+        android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+        int padding = Ui.dp(this, 20);
+        frame.setPadding(padding, Ui.dp(this, 8), padding, 0);
+        frame.addView(content);
+        return frame;
+    }
+
+    private void showRenameRadioCatalog(MediaSettingsSnapshot.Catalog catalog) {
+        EditText input = catalogNameInput(catalog.name);
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Переименовать каталог")
+                .setView(paddedDialogView(input))
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", (d, w) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty() || name.equals(catalog.name)) return;
+                    manageRadioCatalog(MediaBridgeContract.CATALOG_ACTION_RENAME, catalog, name,
+                            null, "Каталог переименован");
+                }));
+    }
+
+    private void confirmDeleteRadioCatalog(MediaSettingsSnapshot.Catalog catalog, boolean active) {
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Удалить каталог «" + catalog.name + "»?")
+                .setMessage("Станции и обложки этого каталога будут удалены."
+                        + (active ? " Активным станет встроенный набор." : ""))
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Удалить", (d, w) -> manageRadioCatalog(
+                        MediaBridgeContract.CATALOG_ACTION_DELETE, catalog, null, null,
+                        "Каталог «" + catalog.name + "» удалён")));
+    }
+
+    private void manageRadioCatalog(String action, MediaSettingsSnapshot.Catalog catalog,
+            String name, String cityKey, String successMessage) {
+        if (mediaBridgeClient == null || mediaSettingsBusy || radioCatalogBusy
+                || settingsTransferBusy || !mediaBridgeClient.isSettingsSupported()) return;
+        mediaSettingsBusy = true;
+        setMediaSettingsEnabled(false);
+        setSettingsTransferEnabled(false);
+        setRadioCatalogTransferEnabled(false);
+        mediaBridgeClient.manageRadioCatalog(action, catalog.id, name, cityKey,
+                new MediaBridgeClient.ManageCatalogCallback() {
+                    @Override public void onCatalogManaged(MediaSettingsSnapshot snapshot) {
+                        mediaSettingsBusy = false;
+                        if (isDestroyed()) return;
+                        currentMediaSettings = snapshot;
+                        updateMediaSettingsUi(snapshot);
+                        setSettingsTransferEnabled(true);
+                        Toast.makeText(MainActivity.this, successMessage,
+                                Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override public void onError(int code, String message) {
+                        mediaSettingsBusy = false;
+                        if (isDestroyed()) return;
+                        AppLog.warn("Radio catalog " + action + " failed: " + code + " "
+                                + message, null);
+                        setSettingsTransferEnabled(true);
+                        loadMediaSettings();
+                        Toast.makeText(MainActivity.this, message == null || message.isBlank()
+                                        ? "Не удалось изменить каталог" : message,
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    /** The share-sheet name of an exported catalog, before the date prefix. */
+    static String radioCatalogExportFileName(MediaSettingsSnapshot.Catalog catalog) {
+        if (catalog == null || catalog.isBuiltIn()) return RADIO_ZIP_FILE_NAME;
+        String safe = catalog.name.replaceAll("[^\\p{L}\\p{N}._-]+", "_")
+                .replaceAll("^[._]+|_+$", "");
+        if (safe.length() > MAX_CATALOG_NAME_LENGTH) {
+            safe = safe.substring(0, MAX_CATALOG_NAME_LENGTH);
+        }
+        return safe.isEmpty() ? RADIO_ZIP_FILE_NAME
+                : RADIO_ZIP_FILE_NAME.replace(".zip", "-" + safe + ".zip");
+    }
+
+    /** Suggests a catalog name from a picked file, dropping our own export decoration. */
+    static String catalogNameFromFileName(String displayName) {
+        if (displayName == null) return "";
+        String name = displayName.trim();
+        if (name.toLowerCase(Locale.ROOT).endsWith(".zip")) {
+            name = name.substring(0, name.length() - 4);
+        }
+        name = name.replaceFirst("^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}_", "");
+        String base = RADIO_ZIP_FILE_NAME.substring(0, RADIO_ZIP_FILE_NAME.length() - 4);
+        if (name.equals(base)) return "";
+        if (name.startsWith(base + "-")) name = name.substring(base.length() + 1);
+        name = name.replace('_', ' ').trim();
+        return name.length() > MAX_CATALOG_NAME_LENGTH
+                ? name.substring(0, MAX_CATALOG_NAME_LENGTH).trim() : name;
     }
 
     private LinearLayout createSourceTileRow(String[][] options) {
@@ -2638,6 +3310,9 @@ public final class MainActivity extends ScaledActivity {
                 currentMediaSettings = snapshot;
                 updateMediaSettingsUi(snapshot);
                 setSettingsTransferEnabled(true);
+                MediaSettingsSnapshot.Catalog pickerPack = catalogById(pendingCityPickerCatalogId);
+                pendingCityPickerCatalogId = null;
+                if (pickerPack != null && pickerPack.isPack()) openRadioCityPicker(pickerPack);
             }
             @Override public void onError(int code, String message) {
                 mediaSettingsBusy = false;
@@ -2678,6 +3353,20 @@ public final class MainActivity extends ScaledActivity {
             startupAutoplaySwitch.setChecked(snapshot.defaultAudioSourceAutoplayOnStartup);
             startupAutoplaySwitch.setEnabled(true);
             startupAutoplaySwitch.setAlpha(1f);
+        }
+        boolean autoplay = snapshot.defaultAudioSourceAutoplayOnStartup;
+        if (startupInternetSwitch != null) {
+            startupInternetSwitch.setChecked(snapshot.startupWaitForInternet);
+            startupInternetSwitch.setEnabled(autoplay);
+            startupInternetSwitch.setAlpha(autoplay ? 1f : 0.45f);
+        }
+        if (startupInternetTimeoutSeekBar != null) {
+            boolean waits = autoplay && snapshot.startupWaitForInternet;
+            setStartupInternetTimeoutLabel(snapshot.startupInternetTimeoutSec);
+            startupInternetTimeoutSeekBar.setProgress(snapshot.startupInternetTimeoutSec / 10);
+            startupInternetTimeoutSeekBar.setEnabled(waits);
+            startupInternetTimeoutSeekBar.setAlpha(waits ? 1f : 0.45f);
+            startupInternetTimeoutLabel.setAlpha(waits ? 1f : 0.45f);
         }
         if (sourceLostSwitch != null) {
             sourceLostSwitch.setChecked(snapshot.autoSwitchToDefaultOnSourceLost);
@@ -2722,14 +3411,17 @@ public final class MainActivity extends ScaledActivity {
             clusterReassertBurstSeekBar.setProgress((int) (snapshot.clusterReassertBurstIntervalMs / 10L));
         }
         if (radioCatalogInfoText != null) {
-            radioCatalogInfoText.setText("Тип каталога: " + snapshot.catalogType
-                    + " (" + snapshot.catalogStationCount + " станций)");
+            MediaSettingsSnapshot.Catalog active = snapshot.activeCatalog();
+            String activeName = active == null ? null : active.isPack()
+                    ? cityLabel(snapshot.catalogActiveCityName, snapshot.catalogActiveRegion)
+                            + " (" + active.name + ")"
+                    : active.name;
+            radioCatalogInfoText.setText(activeName != null
+                    ? "Активный каталог: «" + activeName + "», "
+                            + stationCountLabel(snapshot.catalogStationCount)
+                    : snapshot.catalogDescription);
         }
-        if (restoreDefaultRadioCatalogButton != null) {
-            boolean isCustom = "CUSTOM".equalsIgnoreCase(snapshot.catalogType);
-            restoreDefaultRadioCatalogButton.setEnabled(isCustom);
-            restoreDefaultRadioCatalogButton.setAlpha(isCustom ? 1f : 0.45f);
-        }
+        renderRadioCatalogs(snapshot);
     }
 
     private void updateOnlinePlayerUi(MediaSettingsSnapshot snapshot) {
@@ -2925,36 +3617,11 @@ public final class MainActivity extends ScaledActivity {
         });
     }
 
-    private void restoreDefaultRadioCatalog() {
-        if (mediaBridgeClient == null || mediaSettingsBusy || !mediaBridgeClient.isSettingsSupported()) return;
-        CompactDialog.show(new AlertDialog.Builder(this)
-                .setTitle("Восстановить стандартный каталог радио?")
-                .setMessage("Пользовательские названия и обложки радиостанций будут удалены.")
-                .setNegativeButton("Отмена", null)
-                .setPositiveButton("Восстановить", (d, w) -> applyDefaultRadioCatalog()));
-    }
-
-    private void applyDefaultRadioCatalog() {
-        mediaSettingsBusy = true;
-        setMediaSettingsEnabled(false);
-        setSettingsTransferEnabled(false);
-        mediaBridgeClient.restoreDefaultCatalog(new MediaBridgeClient.RestoreCatalogCallback() {
-            @Override public void onCatalogRestored(MediaSettingsSnapshot snapshot) {
-                mediaSettingsBusy = false;
-                if (isDestroyed()) return;
-                currentMediaSettings = snapshot;
-                updateMediaSettingsUi(snapshot);
-                setSettingsTransferEnabled(true);
-                Toast.makeText(MainActivity.this, "Стандартный каталог радио восстановлен", Toast.LENGTH_SHORT).show();
-            }
-            @Override public void onError(int code, String message) {
-                mediaSettingsBusy = false;
-                if (isDestroyed()) return;
-                setSettingsTransferEnabled(true);
-                loadMediaSettings();
-                Toast.makeText(MainActivity.this, "Ошибка восстановления каталога: " + message, Toast.LENGTH_SHORT).show();
-            }
-        });
+    private void setStartupInternetTimeoutLabel(int seconds) {
+        if (startupInternetTimeoutLabel == null) return;
+        startupInternetTimeoutLabel.setText(seconds < 60 ? "Ждать не дольше " + seconds + " сек"
+                : seconds % 60 == 0 ? "Ждать не дольше " + seconds / 60 + " мин"
+                : "Ждать не дольше " + seconds / 60 + " мин " + seconds % 60 + " сек");
     }
 
     private void commitDelaySetting(int seconds) {
@@ -3021,7 +3688,6 @@ public final class MainActivity extends ScaledActivity {
                 && !settingsTransferBusy && !radioCatalogBusy && !mediaSettingsBusy
                 && mediaBridgeClient != null && mediaBridgeClient.isSettingsSupported()
                 && ImportJournal.checkPendingRecovery(this) == null;
-        if (exportRadioCatalogButton != null) exportRadioCatalogButton.setEnabled(enabled);
         if (importRadioCatalogButton != null) importRadioCatalogButton.setEnabled(enabled);
     }
 
@@ -3319,6 +3985,158 @@ public final class MainActivity extends ScaledActivity {
         }
     }
 
+    /**
+     * The card's source chooser: head-unit sources and Android players in the user's order, up
+     * to {@link SourceTile#MAX_TILES}. A player tile switches Online to that app.
+     */
+    private LinearLayout createSourceTilesCard() {
+        LinearLayout card = card();
+        card.addView(text("Источники на карточке", 20, Ui.PRIMARY, Typeface.BOLD));
+        TextView hint = text("Плитки, которые открываются нажатием на название источника. "
+                        + "Можно убрать ненужные и добавить Android-плееры: плитка плеера "
+                        + "переключает Онлайн на это приложение и включает его. Плитка «Онлайн» "
+                        + "запускает плеер по умолчанию с вкладки «Медиа». Не больше "
+                        + SourceTile.MAX_TILES + " плиток.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams hintParams = fullWrap();
+        hintParams.topMargin = Ui.dp(this, 8);
+        card.addView(hint, hintParams);
+        sourceTilesList = new LinearLayout(this);
+        sourceTilesList.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams listParams = fullWrap();
+        listParams.topMargin = Ui.dp(this, 8);
+        card.addView(sourceTilesList, listParams);
+        sourceTilesAdd = actionButton("Добавить источник");
+        sourceTilesAdd.setOnClickListener(v -> showAddSourceTile());
+        card.addView(sourceTilesAdd, buttonParams());
+        sourceTilesReset = actionButton("Вернуть стандартный набор");
+        sourceTilesReset.setOnClickListener(v -> saveSourceTiles(SourceTile.DEFAULT));
+        card.addView(sourceTilesReset, buttonParams());
+        playerIconsMono = new Switch(this);
+        playerIconsMono.setText("Одноцветные иконки плееров");
+        playerIconsMono.setTextColor(Ui.PRIMARY);
+        playerIconsMono.setTextSize(15);
+        playerIconsMono.setChecked(prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false));
+        playerIconsMono.setOnCheckedChangeListener((button, checked) -> {
+            if (!button.isPressed()) return;
+            prefs.putBoolean(Prefs.KEY_PLAYER_ICONS_MONO, checked);
+            refreshOverlayIfRunning();
+        });
+        LinearLayout.LayoutParams monoParams = fullWrap();
+        monoParams.topMargin = Ui.dp(this, 14);
+        card.addView(playerIconsMono, monoParams);
+        TextView monoNote = text("Логотип плеера в цвете значков карточки. Для популярных плееров "
+                        + "— готовые значки, для остальных логотип берётся из иконки приложения.",
+                13, Ui.SECONDARY, Typeface.NORMAL);
+        LinearLayout.LayoutParams monoNoteParams = fullWrap();
+        monoNoteParams.topMargin = Ui.dp(this, 4);
+        card.addView(monoNote, monoNoteParams);
+        refreshSourceTiles();
+        return card;
+    }
+
+    private void refreshSourceTiles() {
+        if (sourceTilesList == null) return;
+        List<SourceTile> tiles = prefs.sourceTiles();
+        sourceTilesList.removeAllViews();
+        for (int position = 0; position < tiles.size(); position++) {
+            SourceTile tile = tiles.get(position);
+            OnlinePlayerOption option = sourceTileOption(tile);
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            View label = createOnlinePlayerRow(option, false);
+            row.addView(label, new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+            TextView remove = text("✕", 20, Ui.SECONDARY, Typeface.NORMAL);
+            remove.setGravity(Gravity.CENTER);
+            remove.setContentDescription("Убрать «" + option.label + "»");
+            int size = Ui.dp(this, 48);
+            boolean removable = tiles.size() > 1;
+            remove.setEnabled(removable);
+            remove.setAlpha(removable ? 1f : 0.25f);
+            final int index = position;
+            remove.setOnClickListener(v -> {
+                List<SourceTile> next = new ArrayList<>(prefs.sourceTiles());
+                if (next.size() <= 1 || index >= next.size()) return;
+                next.remove(index);
+                saveSourceTiles(next);
+            });
+            row.addView(remove, new LinearLayout.LayoutParams(size, size));
+            row.addView(playerActionDragHandle(sourceTilesList, row, option.label, index,
+                    tiles.size(), to -> {
+                        List<SourceTile> next = new ArrayList<>(prefs.sourceTiles());
+                        if (index >= next.size() || to >= next.size()) return;
+                        next.add(to, next.remove(index));
+                        saveSourceTiles(next);
+                    }));
+            row.setTag(index);
+            sourceTilesList.addView(row, fullWrap());
+        }
+        boolean full = tiles.size() >= SourceTile.MAX_TILES;
+        sourceTilesAdd.setEnabled(!full);
+        sourceTilesAdd.setAlpha(full ? 0.45f : 1f);
+        sourceTilesAdd.setText(full ? "Добавлено " + SourceTile.MAX_TILES + " из "
+                + SourceTile.MAX_TILES : "Добавить источник");
+        sourceTilesReset.setVisibility(tiles.equals(SourceTile.DEFAULT) ? View.GONE : View.VISIBLE);
+    }
+
+    private OnlinePlayerOption sourceTileOption(SourceTile tile) {
+        if (!tile.isPlayer()) return new OnlinePlayerOption(tile.wire(), tile.source.label());
+        PlayerApps.Info app = PlayerApps.get(this, tile.playerPackage);
+        return new OnlinePlayerOption(tile.wire(), app.installed() ? app.label()
+                : "Не установлено: " + tile.playerPackage, app.newIcon());
+    }
+
+    private void showAddSourceTile() {
+        List<SourceTile> tiles = prefs.sourceTiles();
+        if (tiles.size() >= SourceTile.MAX_TILES) return;
+        List<OnlinePlayerOption> options = new ArrayList<>();
+        List<SourceTile> choices = new ArrayList<>();
+        for (MediaSource.Id id : SourceTile.NATIVE_SOURCES) {
+            SourceTile tile = SourceTile.source(id);
+            if (tiles.contains(tile)) continue;
+            choices.add(tile);
+            options.add(sourceTileOption(tile));
+        }
+        for (OnlinePlayerOption player : queryOnlinePlayerOptions()) {
+            if (!SourceTile.isPackageName(player.packageName)) continue;
+            SourceTile tile = SourceTile.player(player.packageName);
+            if (tiles.contains(tile)) continue;
+            choices.add(tile);
+            options.add(player);
+        }
+        if (choices.isEmpty()) {
+            Toast.makeText(this, "Все источники и плееры уже на карточке",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ArrayAdapter<OnlinePlayerOption> adapter = new ArrayAdapter<OnlinePlayerOption>(
+                this, android.R.layout.simple_list_item_1, options) {
+            @Override public View getView(int position, View convertView, ViewGroup parent) {
+                View row = createOnlinePlayerRow(getItem(position), true);
+                row.setPadding(Ui.dp(MainActivity.this, 20), row.getPaddingTop(),
+                        Ui.dp(MainActivity.this, 20), row.getPaddingBottom());
+                return row;
+            }
+        };
+        CompactDialog.show(new AlertDialog.Builder(this)
+                .setTitle("Добавить источник")
+                .setAdapter(adapter, (dialog, which) -> {
+                    List<SourceTile> next = new ArrayList<>(prefs.sourceTiles());
+                    if (next.size() >= SourceTile.MAX_TILES
+                            || next.contains(choices.get(which))) return;
+                    next.add(choices.get(which));
+                    saveSourceTiles(next);
+                })
+                .setNegativeButton("Отмена", null));
+    }
+
+    private void saveSourceTiles(List<SourceTile> tiles) {
+        prefs.putSourceTiles(tiles);
+        refreshSourceTiles();
+        refreshOverlayIfRunning();
+    }
+
     private LinearLayout createPlayerActionsCard() {
         LinearLayout card = card();
         card.addView(text("Кнопки плеера", 20, Ui.PRIMARY, Typeface.BOLD));
@@ -3442,7 +4260,8 @@ public final class MainActivity extends ScaledActivity {
             row.addView(box, new LinearLayout.LayoutParams(0,
                     ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
             final int index = position;
-            row.addView(playerActionDragHandle(row, action.label(), index, arranged.size(),
+            row.addView(playerActionDragHandle(playerActionsList, row, action.label(), index,
+                    arranged.size(),
                     to -> movePlayerAction(owner, actions, hidden, arranged, index, to)));
             row.setTag(index);
             playerActionsList.addView(row, fullWrap());
@@ -3458,7 +4277,8 @@ public final class MainActivity extends ScaledActivity {
      * finger, the rows it passes slide aside, and the order is saved on release. TalkBack gets
      * «Выше» and «Ниже» actions instead of the gesture.
      */
-    private TextView playerActionDragHandle(LinearLayout row, String label, int index, int count,
+    private TextView playerActionDragHandle(LinearLayout list, LinearLayout row, String label,
+            int index, int count,
             java.util.function.IntConsumer moveTo) {
         TextView handle = text("≡", 24, Ui.SECONDARY, Typeface.NORMAL);
         handle.setGravity(Gravity.CENTER);
@@ -3518,7 +4338,7 @@ public final class MainActivity extends ScaledActivity {
                     if (next != target[0]) {
                         target[0] = next;
                         for (int other = 0; other < count; other++) {
-                            View sibling = playerActionRow(other);
+                            View sibling = playerActionRow(list, other);
                             if (sibling == null || sibling == row) continue;
                             sibling.animate().translationY(playerActionShift(other, index, next)
                                     * step).setDuration(120L).start();
@@ -3529,7 +4349,7 @@ public final class MainActivity extends ScaledActivity {
                 case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     view.getParent().requestDisallowInterceptTouchEvent(false);
                     for (int other = 0; other < count; other++) {
-                        View sibling = playerActionRow(other);
+                        View sibling = playerActionRow(list, other);
                         if (sibling == null) continue;
                         sibling.animate().cancel();
                         sibling.setTranslationY(0f);
@@ -3551,9 +4371,9 @@ public final class MainActivity extends ScaledActivity {
     }
 
     /** The row for list position {@code index}; rows carry their position as a tag. */
-    private View playerActionRow(int index) {
-        for (int child = 0; child < playerActionsList.getChildCount(); child++) {
-            View view = playerActionsList.getChildAt(child);
+    private View playerActionRow(LinearLayout list, int index) {
+        for (int child = 0; child < list.getChildCount(); child++) {
+            View view = list.getChildAt(child);
             if (Integer.valueOf(index).equals(view.getTag())) return view;
         }
         return null;

@@ -19,6 +19,7 @@ import android.widget.GridView;
 import android.widget.RemoteViews;
 
 import java.util.Arrays;
+import java.util.List;
 
 /** Lifecycle entry point only; the foreground service owns the bridge and live state. */
 public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
@@ -254,6 +255,8 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
                     width, height, style, appearance, prefs.getBoolean(Prefs.KEY_RADIO_SAVED_NAVIGATION, false),
                     false, prefs.radioFavoritesColumns(), prefs.radioFavoritesRows(), listener);
             card.setCustomActionPolicy(prefs.playerActionsCount(), prefs.playerActionRules());
+            card.setSourceTiles(prefs.sourceTiles(),
+                    prefs.getBoolean(Prefs.KEY_PLAYER_ICONS_MONO, false));
             if (snapshot == null || !connected) card.renderWidgetUnavailable(connected);
             else card.renderSnapshot(snapshot, true);
             boolean showSources = "sources".equals(chooser) && snapshot != null && connected;
@@ -309,12 +312,14 @@ public final class AtlasMediaWidgetProvider extends AppWidgetProvider {
             if (showSources) {
                 addTarget(context, id, "dismiss_sources", "Закрыть выбор источника",
                         new Rect(0, 0, width, height), true);
-                for (MediaSource.Id source : new MediaSource.Id[]{MediaSource.Id.RADIO,
-                        MediaSource.Id.BT, MediaSource.Id.USB, MediaSource.Id.ONLINE,
-                        MediaSource.Id.CPAA}) {
-                    View option = card.widgetSourceOption(source);
+                List<SourceTile> tiles = card.widgetSourceTiles();
+                for (int index = 0; index < tiles.size(); index++) {
+                    SourceTile tile = tiles.get(index);
+                    View option = card.widgetSourceOption(index);
                     if (option != null && option.isEnabled()) {
-                        addTarget(context, id, "source_" + source.name(), source.label(),
+                        addTarget(context, id, "source_" + tile.wire(), tile.isPlayer()
+                                        ? PlayerApps.get(context, tile.playerPackage).label()
+                                        : tile.source.label(),
                                 card.widgetBounds(option), true);
                     }
                 }

@@ -21,6 +21,8 @@ final class MediaBridgeContract {
     static final int RESTORE_DEFAULT_CATALOG = 13;
     static final int EXPORT_RADIO_CATALOG = 14;
     static final int IMPORT_RADIO_CATALOG = 15;
+    static final int MANAGE_RADIO_CATALOG = 16;
+    static final int GET_RADIO_PACK_CITIES = 17;
 
     static final int REGISTERED = 100;
     static final int SNAPSHOT = 101;
@@ -37,6 +39,8 @@ final class MediaBridgeContract {
     static final int DEFAULT_CATALOG_RESTORED = 112;
     static final int RADIO_CATALOG_EXPORTED = 114;
     static final int RADIO_CATALOG_IMPORTED = 115;
+    static final int RADIO_CATALOG_MANAGED = 116;
+    static final int RADIO_PACK_CITIES = 117;
 
     static final long CAP_PLAY = 0x01L;
     static final long CAP_PAUSE = 0x02L;
@@ -123,6 +127,7 @@ final class MediaBridgeContract {
     static final String K_COMMAND_APP_SOURCE = "appSource";
     static final String K_COMMAND_AUTOPLAY = "autoplay";
     static final String K_COMMAND_CUSTOM_ACTION = "customAction";
+    static final String K_COMMAND_PLAYER_PACKAGE = "playerPackage";
     static final String K_UI_SCALE_TENTHS = "uiScaleTenths";
 
     static final String K_SETTINGS_PROTOCOL_VERSION = "settingsProtocolVersion";
@@ -141,6 +146,8 @@ final class MediaBridgeContract {
     static final String K_AUTO_SWITCH_TO_DEFAULT_AUTOPLAY = "autoSwitchToDefaultAutoplay";
     static final String K_DEFAULT_MEDIA_PACKAGE = "defaultMediaPackage";
     static final String K_MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART = "minimizeOnlinePlayerAfterAutostart";
+    static final String K_STARTUP_WAIT_FOR_INTERNET = "startupWaitForInternet";
+    static final String K_STARTUP_INTERNET_TIMEOUT_SEC = "startupInternetTimeoutSec";
     static final String K_RADIO_WIDGET_BROADCAST_ENABLED = "radioWidgetBroadcastEnabled";
     static final String K_CLUSTER_COVERS_ENABLED = "clusterCoversEnabled";
     static final String K_CLUSTER_ONLINE_ENABLED = "clusterOnlineEnabled";
@@ -150,6 +157,26 @@ final class MediaBridgeContract {
     static final String K_CATALOG_TYPE = "catalogType";
     static final String K_CATALOG_STATION_COUNT = "catalogStationCount";
     static final String K_CATALOG_DESCRIPTION = "catalogDescription";
+    static final String K_CATALOG_ACTIVE_ID = "catalogActiveId";
+    static final String K_CATALOG_IDS = "catalogIds";
+    static final String K_CATALOG_NAMES = "catalogNames";
+    static final String K_CATALOG_STATION_COUNTS = "catalogStationCounts";
+    static final String K_CATALOG_PACK_IDS = "catalogPackIds";
+    static final String K_CATALOG_CITY_COUNTS = "catalogCityCounts";
+    static final String K_CATALOG_ACTIVE_CITY_KEY = "catalogActiveCityKey";
+    static final String K_CATALOG_ACTIVE_CITY_NAME = "catalogActiveCityName";
+    static final String K_CATALOG_ACTIVE_REGION = "catalogActiveRegion";
+    static final String K_CATALOG_CITY_KEY = "catalogCityKey";
+    static final String K_CATALOG_PACK_ID = "catalogPackId";
+    static final String K_CATALOG_PACK_NAME = "catalogPackName";
+    static final String K_CATALOG_COUNT = "catalogCount";
+    static final String K_CATALOG_ID = "catalogId";
+    static final String K_CATALOG_NAME = "catalogName";
+    static final String K_CATALOG_ACTION = "catalogAction";
+    static final String CATALOG_ACTION_ACTIVATE = "ACTIVATE";
+    static final String CATALOG_ACTION_RENAME = "RENAME";
+    static final String CATALOG_ACTION_DELETE = "DELETE";
+    static final String BUILT_IN_CATALOG_ID = "builtin";
 
     private MediaBridgeContract() {}
 }

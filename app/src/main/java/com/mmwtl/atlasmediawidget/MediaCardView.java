@@ -39,7 +39,7 @@ final class MediaCardView extends FrameLayout {
         boolean onDragTouch(View view, MotionEvent event);
         void onCommand(String command);
         void onSeek(long positionMs);
-        void onSource(MediaSource.Id source);
+        void onSource(SourceTile tile);
         void onOpenSource();
         void onRadioStationsRequested();
         void onRadioStation(RadioStation station);
@@ -52,10 +52,6 @@ final class MediaCardView extends FrameLayout {
     private static final int PROGRESS_MAX = 10_000;
     static final int MAX_CUSTOM_ACTIONS = Prefs.MAX_PLAYER_ACTIONS;
     private static final long CHOOSER_AUTO_HIDE_MS = 10_000L;
-    private static final MediaSource.Id[] WIDGET_SOURCES = {
-            MediaSource.Id.RADIO, MediaSource.Id.BT,
-            MediaSource.Id.USB, MediaSource.Id.ONLINE, MediaSource.Id.CPAA
-    };
 
     private final Listener listener;
     private final LiveListeningClock liveClock;
@@ -75,6 +71,9 @@ final class MediaCardView extends FrameLayout {
     private final ImageView placeholder;
     private final LinearLayout sourcePill;
     private final SourceGlyphView sourceGlyph;
+    /** The playing player's icon in place of the Online glyph. */
+    private final ImageView sourceAppIcon;
+    private String sourceAppIconKey = "";
     private final TextView sourceLabel;
     private final FrameLayout sourceChooser;
     private final LinearLayout sourceOptions;
@@ -108,7 +107,12 @@ final class MediaCardView extends FrameLayout {
     private final FavoriteStationAdapter favoritesAdapter;
     private int favoriteTileHeight;
     private int favoriteColumnWidth;
-    private final List<MediaSource> availableSources = new ArrayList<>();
+    private List<SourceTile> sourceTiles = SourceTile.DEFAULT;
+    private boolean playerIconsMono;
+    /** Tiles of the last rendered chooser, matching the option views by index. */
+    private final List<SourceTile> shownTiles = new ArrayList<>();
+    /** Rows of the last rendered chooser. */
+    private SourceGrid shownGrid = SourceGrid.plan(0, 1, 1, 1, 1);
     private final Map<String, Bitmap> radioArtwork = new HashMap<>();
     private final Set<String> failedRadioArtwork = new HashSet<>();
     private List<RadioStation> favoriteStations = List.of();
@@ -232,6 +236,11 @@ final class MediaCardView extends FrameLayout {
                 color(R.color.card_pill_stroke), d(19)));
         sourceGlyph = new SourceGlyphView(context);
         sourcePill.addView(sourceGlyph,
+                new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
+        sourceAppIcon = new ImageView(context);
+        sourceAppIcon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        sourceAppIcon.setVisibility(GONE);
+        sourcePill.addView(sourceAppIcon,
                 new LinearLayout.LayoutParams(d(topPillIconDp), d(topPillIconDp)));
         TextView sourceDot = text("●", 8, color(R.color.card_source_dot), Typeface.BOLD);
         LinearLayout.LayoutParams dotParams = wrap();
@@ -554,14 +563,65 @@ final class MediaCardView extends FrameLayout {
         };
     }
 
-    View widgetSourceOption(MediaSource.Id id) {
-        for (int index = 0; index < availableSources.size(); index++) {
-            if (availableSources.get(index).id.displayId() == id) {
-                LinearLayout row = (LinearLayout) sourceOptions.getChildAt(index < 2 ? 0 : 1);
-                return row.getChildAt(index < 2 ? index : index - 2);
-            }
+    /** Tiles the chooser shows, in the order of {@link #widgetSourceOption(int)}. */
+    List<SourceTile> widgetSourceTiles() { return List.copyOf(shownTiles); }
+
+    View widgetSourceOption(int index) {
+        if (index < 0 || index >= shownTiles.size()) return null;
+        int row = shownGrid.rowOf(index);
+        LinearLayout options = row < 0 ? null : (LinearLayout) sourceOptions.getChildAt(row);
+        return options == null ? null : options.getChildAt(shownGrid.columnOf(index));
+    }
+
+    void setSourceTiles(List<SourceTile> tiles, boolean monochromePlayerIcons) {
+        sourceTiles = tiles == null || tiles.isEmpty() ? SourceTile.DEFAULT : List.copyOf(tiles);
+        if (playerIconsMono != monochromePlayerIcons) sourceAppIconKey = "-";
+        playerIconsMono = monochromePlayerIcons;
+        if (snapshot != null) renderSources(snapshot);
+    }
+
+    /**
+     * The player tile's icon: the app's own colour icon, or in one-tone mode a drawn logo when
+     * the player has one and otherwise a logo reduced from its icon. Null leaves the source glyph.
+     */
+    private ImageView playerIcon(SourceTile tile, PlayerApps.Info app, int size) {
+        if (app == null) return null;
+        Drawable icon = playerIconDrawable(tile.playerPackage, app, size);
+        if (icon == null) return null;
+        ImageView view = new ImageView(getContext());
+        view.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        view.setImageDrawable(icon);
+        return view;
+    }
+
+    private Drawable playerIconDrawable(String packageName, PlayerApps.Info app, int size) {
+        if (!app.installed()) return null;
+        if (!playerIconsMono) return app.newIcon();
+        Integer curated = PlayerIconStyle.CURATED.get(packageName);
+        if (curated != null) {
+            Drawable logo = getContext().getDrawable(curated).mutate();
+            logo.setTint(color(R.color.card_text));
+            // Simple Icons fill their box; the card's glyphs keep a margin.
+            return new android.graphics.drawable.InsetDrawable(logo, 0.08f);
         }
-        return null;
+        Bitmap glyph = PlayerIconStyle.glyph(packageName, app, color(R.color.card_text), size);
+        return glyph == null ? null
+                : new android.graphics.drawable.BitmapDrawable(getResources(), glyph);
+    }
+
+    /** Online shows the playing player's own icon in the pill; other sources keep their glyph. */
+    private void setSourcePillIcon(MediaSource.Id source, String ownerPackage) {
+        String owner = source.displayId() == MediaSource.Id.ONLINE && ownerPackage != null
+                ? ownerPackage : "";
+        String key = owner.isEmpty() ? "" : owner + '|' + playerIconsMono;
+        if (key.equals(sourceAppIconKey)) return;
+        sourceAppIconKey = key;
+        Drawable icon = owner.isEmpty() ? null : playerIconDrawable(owner,
+                PlayerApps.get(getContext(), owner), sourceAppIcon.getLayoutParams().width);
+        sourceAppIcon.setImageDrawable(icon);
+        sourceAppIcon.setVisibility(icon == null ? GONE : VISIBLE);
+        sourceGlyph.setVisibility(icon == null ? VISIBLE : GONE);
+        if (icon == null) sourceAppIconKey = "";
     }
 
     android.graphics.Rect widgetBounds(View target) {
@@ -974,7 +1034,7 @@ final class MediaCardView extends FrameLayout {
         updateControlLayout(compact, panelHeight);
 
         LayoutParams chooserParams = new LayoutParams(LayoutParams.MATCH_PARENT,
-                Math.max(d(120), cardHeight - by(compact ? 63 : 68) - by(16)));
+                sourceChooserHeight());
         chooserParams.gravity = Gravity.TOP;
         chooserParams.leftMargin = bx(18);
         chooserParams.rightMargin = bx(18);
@@ -982,6 +1042,45 @@ final class MediaCardView extends FrameLayout {
         sourceChooser.setLayoutParams(chooserParams);
         favoritesChooser.setLayoutParams(new LayoutParams(chooserParams));
         updateFavoriteTileDimensions(chooserParams);
+    }
+
+    private int sourceChooserHeight() {
+        boolean compact = style == CardStyle.COMPACT;
+        return Math.max(d(120), cardHeight - by(compact ? 63 : 68) - by(16));
+    }
+
+    /**
+     * The chooser grid for the card's shape: one row on a flat wide card, pairs on a tall narrow
+     * one, whichever gives the tiles the most room.
+     */
+    private SourceGrid sourceGrid(int count) {
+        return SourceGrid.plan(count, sourceChooserWidth(), sourceChooserInnerHeight(),
+                d(64) + 2 * d(5), d(24) + sourceLabelHeight() + 2 * d(5));
+    }
+
+    private int sourceChooserWidth() {
+        return cardWidth - 2 * bx(18) - 2 * d(12);
+    }
+
+    private int sourceChooserInnerHeight() {
+        return sourceChooserHeight() - 2 * d(10);
+    }
+
+    /** Label line with its gap above and the tile padding. */
+    private int sourceLabelHeight() {
+        return Math.round(Ui.dp(getContext(), (style == CardStyle.COMPACT ? 14 : 16) * 1.4f)
+                * uiScale) + d(4) + 2 * d(7);
+    }
+
+    /**
+     * Icon size for the source tiles: 36 dp on a small card, growing with the tile so a large card
+     * does not show small icons in big empty tiles. The label keeps its room below the icon.
+     */
+    private int sourceIconSize(SourceGrid grid) {
+        int tileWidth = sourceChooserWidth() / Math.max(1, grid.columns) - 2 * d(5);
+        int tileHeight = sourceChooserInnerHeight() / Math.max(1, grid.rows()) - 2 * d(5);
+        int room = Math.min(Math.round(tileWidth * 0.5f), tileHeight - sourceLabelHeight());
+        return Math.max(d(36), Math.min(Math.round(room * 0.62f), d(96)));
     }
 
     private void updateFavoriteTileDimensions(LayoutParams chooserParams) {
@@ -1030,21 +1129,19 @@ final class MediaCardView extends FrameLayout {
     }
 
     private void renderSources(MediaSnapshot value) {
-        availableSources.clear();
         activeSource = selectedSource(value).displayId();
-        for (MediaSource.Id id : WIDGET_SOURCES) {
-            MediaSource match = null;
-            for (MediaSource source : value.sources) {
-                if (source.id.displayId() == id) {
-                    if (match == null || source.id == id) match = source;
-                }
-            }
-            if (match == null) match = new MediaSource(id, id == activeSource,
-                    id == activeSource, id == activeSource, 0L);
-            availableSources.add(match);
-        }
-        setSourcePill(activeSource, activeSource == MediaSource.Id.UNKNOWN ? "MEDIA" : activeSource.label());
-        rebuildSourceOptions();
+        shownTiles.clear();
+        shownTiles.addAll(sourceTiles);
+        int selected = SourceTile.selectedIndex(shownTiles, activeSource, value.ownerPackage);
+        // Online names the playing player app in the pill, as its icon does, not "Online".
+        PlayerApps.Info owner = activeSource == MediaSource.Id.ONLINE
+                && !value.ownerPackage.isBlank()
+                ? PlayerApps.get(getContext(), value.ownerPackage) : null;
+        String label = owner != null && owner.installed() ? owner.label()
+                : activeSource == MediaSource.Id.UNKNOWN ? "MEDIA" : activeSource.label();
+        setSourcePill(activeSource, label);
+        setSourcePillIcon(activeSource, value.ownerPackage);
+        rebuildSourceOptions(value, selected);
     }
 
     private static MediaSource.Id selectedSource(MediaSnapshot value) {
@@ -1052,8 +1149,9 @@ final class MediaCardView extends FrameLayout {
     }
 
     private void renderFallbackSource() {
-        availableSources.clear();
+        shownTiles.clear();
         setSourcePill(MediaSource.Id.UNKNOWN, "MEDIA");
+        setSourcePillIcon(MediaSource.Id.UNKNOWN, "");
         sourceChooser.setVisibility(GONE);
         sourceOptions.removeAllViews();
     }
@@ -1063,18 +1161,20 @@ final class MediaCardView extends FrameLayout {
         sourceLabel.setText(label.toUpperCase(Locale.ROOT));
     }
 
-    private void rebuildSourceOptions() {
+    private void rebuildSourceOptions(MediaSnapshot value, int selectedIndex) {
         sourceOptions.removeAllViews();
-        LinearLayout topRow = sourceRow();
-        LinearLayout bottomRow = sourceRow();
-        sourceOptions.addView(topRow, new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, 1f));
-        sourceOptions.addView(bottomRow, new LinearLayout.LayoutParams(
-                LayoutParams.MATCH_PARENT, 0, 1f));
-        for (int index = 0; index < availableSources.size(); index++) {
-            MediaSource source = availableSources.get(index);
-            MediaSource.Id id = source.id.displayId();
-            boolean selected = id == activeSource;
+        shownGrid = sourceGrid(shownTiles.size());
+        int iconSize = sourceIconSize(shownGrid);
+        for (int row = 0; row < shownGrid.rows(); row++) {
+            sourceOptions.addView(sourceRow(), new LinearLayout.LayoutParams(
+                    LayoutParams.MATCH_PARENT, 0, 1f));
+        }
+        for (int index = 0; index < shownTiles.size(); index++) {
+            SourceTile tile = shownTiles.get(index);
+            MediaSource source = SourceTile.sourceFor(tile, value.sources);
+            PlayerApps.Info app = tile.isPlayer()
+                    ? PlayerApps.get(getContext(), tile.playerPackage) : null;
+            boolean selected = index == selectedIndex;
             LinearLayout option = new LinearLayout(getContext());
             option.setOrientation(LinearLayout.VERTICAL);
             option.setGravity(Gravity.CENTER);
@@ -1083,27 +1183,41 @@ final class MediaCardView extends FrameLayout {
                     color(selected ? R.color.card_option_selected : R.color.card_option),
                     color(selected ? R.color.card_option_selected_stroke
                             : R.color.card_option_stroke), d(17)));
-            SourceGlyphView glyph = new SourceGlyphView(getContext());
-            glyph.setSource(id);
-            option.addView(glyph, new LinearLayout.LayoutParams(d(36), d(36)));
-            TextView label = text(id.label(), style == CardStyle.COMPACT ? 14 : 16,
+            ImageView appIcon = playerIcon(tile, app, iconSize);
+            if (appIcon != null) {
+                option.addView(appIcon, new LinearLayout.LayoutParams(iconSize, iconSize));
+            } else {
+                SourceGlyphView glyph = new SourceGlyphView(getContext());
+                glyph.setSource(tile.source);
+                option.addView(glyph, new LinearLayout.LayoutParams(iconSize, iconSize));
+            }
+            TextView label = text(app != null ? app.label() : tile.source.label(),
+                    style == CardStyle.COMPACT ? 14 : 16,
                     color(R.color.card_text), Typeface.BOLD);
             label.setGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams labelParams = wrap();
+            // Not setSingleLine: its horizontal scrolling draws a centred label outside the tile.
+            label.setMaxLines(1);
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            // The tile's full width: a label measured to its own text loses its last letter when
+            // the widget picture is drawn scaled down.
+            LinearLayout.LayoutParams labelParams = fullWrap();
             labelParams.topMargin = d(4);
             option.addView(label, labelParams);
-            boolean selectable = source.available
-                    && (source.capabilities & MediaBridgeContract.CAP_SET_SOURCE) != 0L;
-            option.setEnabled(selectable && !selected);
-            option.setAlpha(selected || source.available || source.connected ? 1f : 0.42f);
+            boolean selectable = SourceTile.selectable(shownTiles, index, value,
+                    app == null || app.installed());
+            option.setEnabled(selectable);
+            boolean present = app != null ? app.installed()
+                    : source != null && (source.available || source.connected);
+            option.setAlpha(selected || present ? 1f : 0.42f);
             option.setOnClickListener(v -> {
                 hideSourceChooser();
-                listener.onSource(id);
+                listener.onSource(tile);
             });
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LayoutParams.MATCH_PARENT, 1f);
             params.setMargins(d(5), d(5), d(5), d(5));
-            (index < 2 ? topRow : bottomRow).addView(option, params);
+            ((LinearLayout) sourceOptions.getChildAt(shownGrid.rowOf(index)))
+                    .addView(option, params);
         }
     }
 

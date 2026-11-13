@@ -40,6 +40,8 @@ interface MediaCommandHost {
         appSource: String?,
         autoplay: Boolean,
     ): Boolean
+    /** Switches ONLINE to [packageName] and, with [autoplay], starts and confirms it there. */
+    suspend fun selectPlayer(packageName: String, autoplay: Boolean): Boolean = false
     suspend fun tuneRadio(target: RadioStationTarget, autoplay: Boolean): Boolean = false
     /** Sends a player-defined action to the session that currently publishes it. */
     suspend fun sendCustomAction(action: String): Boolean = false
@@ -52,6 +54,14 @@ class MediaCommandRouter(private val host: MediaCommandHost) {
 
         if (request.command == MediaCommand.SET_SOURCE) {
             val source = request.source ?: return result(MediaBridgeContract.Status.INVALID_REQUEST)
+            val player = request.playerPackage
+            if (player != null) {
+                return if (host.selectPlayer(player, request.autoplay)) {
+                    result(MediaBridgeContract.Status.OK)
+                } else {
+                    result(MediaBridgeContract.Status.FAILED, "player switch failed")
+                }
+            }
             return if (host.setSource(source, request.appSource, request.autoplay)) {
                 result(MediaBridgeContract.Status.OK)
             } else {

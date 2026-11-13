@@ -1,0 +1,3270 @@
+{
+  "format": "atlas-radio-pack",
+  "version": 1,
+  "id": "atlas-radio-all",
+  "name": "Россия, Казахстан, Беларусь — 6+ станций",
+  "catalogs": [
+    {
+      "key": "altayskiy-barnaul-6299688069",
+      "name": "Барнаул",
+      "country": "Россия",
+      "region": "Алтайский край",
+      "file": "cities/altayskiy-barnaul-6299688069.csv"
+    },
+    {
+      "key": "altayskiy-biysk-623548b61a",
+      "name": "Бийск",
+      "country": "Россия",
+      "region": "Алтайский край",
+      "file": "cities/altayskiy-biysk-623548b61a.csv"
+    },
+    {
+      "key": "altayskiy-zarinsk-4e7627661f",
+      "name": "Заринск",
+      "country": "Россия",
+      "region": "Алтайский край",
+      "file": "cities/altayskiy-zarinsk-4e7627661f.csv"
+    },
+    {
+      "key": "altayskiy-kamen-na-obi-4b57558fa9",
+      "name": "Камень-на-Оби",
+      "country": "Россия",
+      "region": "Алтайский край",
+      "file": "cities/altayskiy-kamen-na-obi-4b57558fa9.csv"
+    },
+    {
+      "key": "altayskiy-rubtsovsk-48ff078cae",
+      "name": "Рубцовск",
+      "country": "Россия",
+      "region": "Алтайский край",
+      "file": "cities/altayskiy-rubtsovsk-48ff078cae.csv"
+    },
+    {
+      "key": "altayskiy-slavgorod-4762c0307d",
+      "name": "Славгород",
+      "country": "Россия",
+      "region": "Алтайский край",
+      "file": "cities/altayskiy-slavgorod-4762c0307d.csv"
+    },
+    {
+      "key": "amurskaya-belogorsk-72e3079efb",
+      "name": "Белогорск",
+      "country": "Россия",
+      "region": "Амурская область",
+      "file": "cities/amurskaya-belogorsk-72e3079efb.csv"
+    },
+    {
+      "key": "amurskaya-blagoveschensk-96588c01c3",
+      "name": "Благовещенск",
+      "country": "Россия",
+      "region": "Амурская область",
+      "file": "cities/amurskaya-blagoveschensk-96588c01c3.csv"
+    },
+    {
+      "key": "amurskaya-zeya-b54caf540f",
+      "name": "Зея",
+      "country": "Россия",
+      "region": "Амурская область",
+      "file": "cities/amurskaya-zeya-b54caf540f.csv"
+    },
+    {
+      "key": "amurskaya-svobodnyy-b527015ae6",
+      "name": "Свободный",
+      "country": "Россия",
+      "region": "Амурская область",
+      "file": "cities/amurskaya-svobodnyy-b527015ae6.csv"
+    },
+    {
+      "key": "amurskaya-tynda-5d4e170be5",
+      "name": "Тында",
+      "country": "Россия",
+      "region": "Амурская область",
+      "file": "cities/amurskaya-tynda-5d4e170be5.csv"
+    },
+    {
+      "key": "arkhangelskaya-arkhangelsk-b67739b25b",
+      "name": "Архангельск",
+      "country": "Россия",
+      "region": "Архангельская область",
+      "file": "cities/arkhangelskaya-arkhangelsk-b67739b25b.csv"
+    },
+    {
+      "key": "arkhangelskaya-velsk-3fb6eba3e7",
+      "name": "Вельск",
+      "country": "Россия",
+      "region": "Архангельская область",
+      "file": "cities/arkhangelskaya-velsk-3fb6eba3e7.csv"
+    },
+    {
+      "key": "arkhangelskaya-kotlas-822883ef3e",
+      "name": "Котлас",
+      "country": "Россия",
+      "region": "Архангельская область",
+      "file": "cities/arkhangelskaya-kotlas-822883ef3e.csv"
+    },
+    {
+      "key": "arkhangelskaya-severodvinsk-3377186550",
+      "name": "Северодвинск",
+      "country": "Россия",
+      "region": "Архангельская область",
+      "file": "cities/arkhangelskaya-severodvinsk-3377186550.csv"
+    },
+    {
+      "key": "astrakhanskaya-astrakhan-2529a17ba0",
+      "name": "Астрахань",
+      "country": "Россия",
+      "region": "Астраханская область",
+      "file": "cities/astrakhanskaya-astrakhan-2529a17ba0.csv"
+    },
+    {
+      "key": "belgorodskaya-alekseevka-816d55b382",
+      "name": "Алексеевка",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-alekseevka-816d55b382.csv"
+    },
+    {
+      "key": "belgorodskaya-belgorod-1b4ff6b422",
+      "name": "Белгород",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-belgorod-1b4ff6b422.csv"
+    },
+    {
+      "key": "belgorodskaya-valuyki-67e7c7b6a9",
+      "name": "Валуйки",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-valuyki-67e7c7b6a9.csv"
+    },
+    {
+      "key": "belgorodskaya-volokonovka-f45edd17cd",
+      "name": "Волоконовка",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-volokonovka-f45edd17cd.csv"
+    },
+    {
+      "key": "belgorodskaya-gubkin-ce5fbc1915",
+      "name": "Губкин",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-gubkin-ce5fbc1915.csv"
+    },
+    {
+      "key": "belgorodskaya-korocha-495bbce3b7",
+      "name": "Короча",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-korocha-495bbce3b7.csv"
+    },
+    {
+      "key": "belgorodskaya-novyy-oskol-7512c72b76",
+      "name": "Новый Оскол",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-novyy-oskol-7512c72b76.csv"
+    },
+    {
+      "key": "belgorodskaya-rakitnoe-afded63a99",
+      "name": "Ракитное",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-rakitnoe-afded63a99.csv"
+    },
+    {
+      "key": "belgorodskaya-staryy-oskol-fd672ee26e",
+      "name": "Старый Оскол",
+      "country": "Россия",
+      "region": "Белгородская область",
+      "file": "cities/belgorodskaya-staryy-oskol-fd672ee26e.csv"
+    },
+    {
+      "key": "bryanskaya-bryansk-6eb239dd9b",
+      "name": "Брянск",
+      "country": "Россия",
+      "region": "Брянская область",
+      "file": "cities/bryanskaya-bryansk-6eb239dd9b.csv"
+    },
+    {
+      "key": "bryanskaya-novozybkov-e8c2dd5107",
+      "name": "Новозыбков",
+      "country": "Россия",
+      "region": "Брянская область",
+      "file": "cities/bryanskaya-novozybkov-e8c2dd5107.csv"
+    },
+    {
+      "key": "bryanskaya-unecha-3ba7dd77f5",
+      "name": "Унеча",
+      "country": "Россия",
+      "region": "Брянская область",
+      "file": "cities/bryanskaya-unecha-3ba7dd77f5.csv"
+    },
+    {
+      "key": "vladimirskaya-aleksandrov-b59d873929",
+      "name": "Александров",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-aleksandrov-b59d873929.csv"
+    },
+    {
+      "key": "vladimirskaya-vladimir-e29c2b05f1",
+      "name": "Владимир",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-vladimir-e29c2b05f1.csv"
+    },
+    {
+      "key": "vladimirskaya-vyazniki-e8b0ca8cc2",
+      "name": "Вязники",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-vyazniki-e8b0ca8cc2.csv"
+    },
+    {
+      "key": "vladimirskaya-gus-khrustalnyy-80fc11deca",
+      "name": "Гусь-Хрустальный",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-gus-khrustalnyy-80fc11deca.csv"
+    },
+    {
+      "key": "vladimirskaya-kirzhach-707b3deeb6",
+      "name": "Киржач",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-kirzhach-707b3deeb6.csv"
+    },
+    {
+      "key": "vladimirskaya-kovrov-ee82caacf2",
+      "name": "Ковров",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-kovrov-ee82caacf2.csv"
+    },
+    {
+      "key": "vladimirskaya-kolchugino-690d3303b1",
+      "name": "Кольчугино",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-kolchugino-690d3303b1.csv"
+    },
+    {
+      "key": "vladimirskaya-murom-2410de1e53",
+      "name": "Муром",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-murom-2410de1e53.csv"
+    },
+    {
+      "key": "vladimirskaya-petushki-4f9bf91fd4",
+      "name": "Петушки",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-petushki-4f9bf91fd4.csv"
+    },
+    {
+      "key": "vladimirskaya-yurev-polskiy-6cfa01f13b",
+      "name": "Юрьев-Польский",
+      "country": "Россия",
+      "region": "Владимирская область",
+      "file": "cities/vladimirskaya-yurev-polskiy-6cfa01f13b.csv"
+    },
+    {
+      "key": "volgogradskaya-volgograd-7fefc5e7bd",
+      "name": "Волгоград",
+      "country": "Россия",
+      "region": "Волгоградская область",
+      "file": "cities/volgogradskaya-volgograd-7fefc5e7bd.csv"
+    },
+    {
+      "key": "volgogradskaya-zhirnovsk-0c8ddf32d9",
+      "name": "Жирновск",
+      "country": "Россия",
+      "region": "Волгоградская область",
+      "file": "cities/volgogradskaya-zhirnovsk-0c8ddf32d9.csv"
+    },
+    {
+      "key": "volgogradskaya-kamyshin-a8d3aa2169",
+      "name": "Камышин",
+      "country": "Россия",
+      "region": "Волгоградская область",
+      "file": "cities/volgogradskaya-kamyshin-a8d3aa2169.csv"
+    },
+    {
+      "key": "volgogradskaya-mikhaylovka-619762fa96",
+      "name": "Михайловка",
+      "country": "Россия",
+      "region": "Волгоградская область",
+      "file": "cities/volgogradskaya-mikhaylovka-619762fa96.csv"
+    },
+    {
+      "key": "volgogradskaya-novoanninskiy-422280d4bd",
+      "name": "Новоаннинский",
+      "country": "Россия",
+      "region": "Волгоградская область",
+      "file": "cities/volgogradskaya-novoanninskiy-422280d4bd.csv"
+    },
+    {
+      "key": "volgogradskaya-uryupinsk-4ab825ad90",
+      "name": "Урюпинск",
+      "country": "Россия",
+      "region": "Волгоградская область",
+      "file": "cities/volgogradskaya-uryupinsk-4ab825ad90.csv"
+    },
+    {
+      "key": "vologodskaya-babaevo-b9e7a3a6f0",
+      "name": "Бабаево",
+      "country": "Россия",
+      "region": "Вологодская область",
+      "file": "cities/vologodskaya-babaevo-b9e7a3a6f0.csv"
+    },
+    {
+      "key": "vologodskaya-velikiy-ustyug-37257e5911",
+      "name": "Великий Устюг",
+      "country": "Россия",
+      "region": "Вологодская область",
+      "file": "cities/vologodskaya-velikiy-ustyug-37257e5911.csv"
+    },
+    {
+      "key": "vologodskaya-vologda-82db770c77",
+      "name": "Вологда",
+      "country": "Россия",
+      "region": "Вологодская область",
+      "file": "cities/vologodskaya-vologda-82db770c77.csv"
+    },
+    {
+      "key": "vologodskaya-lipin-bor-56fd7a2cf8",
+      "name": "Липин Бор",
+      "country": "Россия",
+      "region": "Вологодская область",
+      "file": "cities/vologodskaya-lipin-bor-56fd7a2cf8.csv"
+    },
+    {
+      "key": "vologodskaya-cherepovets-d3706db3ee",
+      "name": "Череповец",
+      "country": "Россия",
+      "region": "Вологодская область",
+      "file": "cities/vologodskaya-cherepovets-d3706db3ee.csv"
+    },
+    {
+      "key": "voronezhskaya-bobrov-201bf96870",
+      "name": "Бобров",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-bobrov-201bf96870.csv"
+    },
+    {
+      "key": "voronezhskaya-boguchar-0a0c082713",
+      "name": "Богучар",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-boguchar-0a0c082713.csv"
+    },
+    {
+      "key": "voronezhskaya-borisoglebsk-7c4b15ceb6",
+      "name": "Борисоглебск",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-borisoglebsk-7c4b15ceb6.csv"
+    },
+    {
+      "key": "voronezhskaya-voronezh-a5ce9749f5",
+      "name": "Воронеж",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-voronezh-a5ce9749f5.csv"
+    },
+    {
+      "key": "voronezhskaya-kalach-7081e60436",
+      "name": "Калач",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-kalach-7081e60436.csv"
+    },
+    {
+      "key": "voronezhskaya-ostrogozhsk-1daddaf71a",
+      "name": "Острогожск",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-ostrogozhsk-1daddaf71a.csv"
+    },
+    {
+      "key": "voronezhskaya-rossosh-5cafc527f9",
+      "name": "Россошь",
+      "country": "Россия",
+      "region": "Воронежская область",
+      "file": "cities/voronezhskaya-rossosh-5cafc527f9.csv"
+    },
+    {
+      "key": "evreyskaya-birobidzhan-dbfbc90ff3",
+      "name": "Биробиджан",
+      "country": "Россия",
+      "region": "Еврейская автономная область",
+      "file": "cities/evreyskaya-birobidzhan-dbfbc90ff3.csv"
+    },
+    {
+      "key": "zabaykalskiy-chita-3ae0274561",
+      "name": "Чита",
+      "country": "Россия",
+      "region": "Забайкальский край",
+      "file": "cities/zabaykalskiy-chita-3ae0274561.csv"
+    },
+    {
+      "key": "ivanovskaya-ivanovo-5d022213a2",
+      "name": "Иваново",
+      "country": "Россия",
+      "region": "Ивановская область",
+      "file": "cities/ivanovskaya-ivanovo-5d022213a2.csv"
+    },
+    {
+      "key": "ivanovskaya-kineshma-3c3a8df633",
+      "name": "Кинешма",
+      "country": "Россия",
+      "region": "Ивановская область",
+      "file": "cities/ivanovskaya-kineshma-3c3a8df633.csv"
+    },
+    {
+      "key": "ivanovskaya-shuya-b345e3e4b4",
+      "name": "Шуя",
+      "country": "Россия",
+      "region": "Ивановская область",
+      "file": "cities/ivanovskaya-shuya-b345e3e4b4.csv"
+    },
+    {
+      "key": "irkutskaya-baykalsk-ae1cdde004",
+      "name": "Байкальск",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-baykalsk-ae1cdde004.csv"
+    },
+    {
+      "key": "irkutskaya-bratsk-a7365a8133",
+      "name": "Братск",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-bratsk-a7365a8133.csv"
+    },
+    {
+      "key": "irkutskaya-zheleznogorsk-ilim-9e4ec479ff",
+      "name": "Железногорск-Илимский",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-zheleznogorsk-ilim-9e4ec479ff.csv"
+    },
+    {
+      "key": "irkutskaya-irkutsk-61cdacaca5",
+      "name": "Иркутск",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-irkutsk-61cdacaca5.csv"
+    },
+    {
+      "key": "irkutskaya-nizhneudinsk-7da7af7340",
+      "name": "Нижнеудинск",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-nizhneudinsk-7da7af7340.csv"
+    },
+    {
+      "key": "irkutskaya-tayshet-50d99fa8bc",
+      "name": "Тайшет",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-tayshet-50d99fa8bc.csv"
+    },
+    {
+      "key": "irkutskaya-tulun-dd9d32b88f",
+      "name": "Тулун",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-tulun-dd9d32b88f.csv"
+    },
+    {
+      "key": "irkutskaya-usole-sibirskoe-bd27bd0603",
+      "name": "Усолье-Сибирское",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-usole-sibirskoe-bd27bd0603.csv"
+    },
+    {
+      "key": "irkutskaya-ust-ilimsk-1ca62a67e8",
+      "name": "Усть-Илимск",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-ust-ilimsk-1ca62a67e8.csv"
+    },
+    {
+      "key": "irkutskaya-ust-kut-ff00ca4f81",
+      "name": "Усть-Кут",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-ust-kut-ff00ca4f81.csv"
+    },
+    {
+      "key": "irkutskaya-cheremkhovo-49638d3b26",
+      "name": "Черемхово",
+      "country": "Россия",
+      "region": "Иркутская область",
+      "file": "cities/irkutskaya-cheremkhovo-49638d3b26.csv"
+    },
+    {
+      "key": "kabardino-balkariya-nalchik-a3f92f2751",
+      "name": "Нальчик",
+      "country": "Россия",
+      "region": "Кабардино-Балкарская Республика",
+      "file": "cities/kabardino-balkariya-nalchik-a3f92f2751.csv"
+    },
+    {
+      "key": "kaliningradskaya-kaliningrad-24d0c398c2",
+      "name": "Калининград",
+      "country": "Россия",
+      "region": "Калининградская область",
+      "file": "cities/kaliningradskaya-kaliningrad-24d0c398c2.csv"
+    },
+    {
+      "key": "kaliningradskaya-sovetsk-3d7b75a9b3",
+      "name": "Советск",
+      "country": "Россия",
+      "region": "Калининградская область",
+      "file": "cities/kaliningradskaya-sovetsk-3d7b75a9b3.csv"
+    },
+    {
+      "key": "kaliningradskaya-chernyakhovs-6d6b516087",
+      "name": "Черняховск",
+      "country": "Россия",
+      "region": "Калининградская область",
+      "file": "cities/kaliningradskaya-chernyakhovs-6d6b516087.csv"
+    },
+    {
+      "key": "kaluzhskaya-kaluga-e87d36b19e",
+      "name": "Калуга",
+      "country": "Россия",
+      "region": "Калужская область",
+      "file": "cities/kaluzhskaya-kaluga-e87d36b19e.csv"
+    },
+    {
+      "key": "kaluzhskaya-kirov-b7eff3e105",
+      "name": "Киров",
+      "country": "Россия",
+      "region": "Калужская область",
+      "file": "cities/kaluzhskaya-kirov-b7eff3e105.csv"
+    },
+    {
+      "key": "kaluzhskaya-lyudinovo-8ffa55499d",
+      "name": "Людиново",
+      "country": "Россия",
+      "region": "Калужская область",
+      "file": "cities/kaluzhskaya-lyudinovo-8ffa55499d.csv"
+    },
+    {
+      "key": "kaluzhskaya-obninsk-a4354519a6",
+      "name": "Обнинск",
+      "country": "Россия",
+      "region": "Калужская область",
+      "file": "cities/kaluzhskaya-obninsk-a4354519a6.csv"
+    },
+    {
+      "key": "kamchatskiy-petropavlovsk-kam-ccb425824e",
+      "name": "Петропавловск-Камчатский",
+      "country": "Россия",
+      "region": "Камчатский край",
+      "file": "cities/kamchatskiy-petropavlovsk-kam-ccb425824e.csv"
+    },
+    {
+      "key": "karachaevo-cherkesiya-karacha-3da449a2eb",
+      "name": "Карачаевск",
+      "country": "Россия",
+      "region": "Карачаево-Черкесская Республика",
+      "file": "cities/karachaevo-cherkesiya-karacha-3da449a2eb.csv"
+    },
+    {
+      "key": "karachaevo-cherkesiya-cherkes-d589c61a7b",
+      "name": "Черкесск",
+      "country": "Россия",
+      "region": "Карачаево-Черкесская Республика",
+      "file": "cities/karachaevo-cherkesiya-cherkes-d589c61a7b.csv"
+    },
+    {
+      "key": "kemerovskaya-anzhero-sudzhens-39a343e52e",
+      "name": "Анжеро-Судженск",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-anzhero-sudzhens-39a343e52e.csv"
+    },
+    {
+      "key": "kemerovskaya-belovo-c03f624f57",
+      "name": "Белово",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-belovo-c03f624f57.csv"
+    },
+    {
+      "key": "kemerovskaya-kemerovo-c9cc0f1530",
+      "name": "Кемерово",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-kemerovo-c9cc0f1530.csv"
+    },
+    {
+      "key": "kemerovskaya-kiselyovsk-82bed742dd",
+      "name": "Киселёвск",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-kiselyovsk-82bed742dd.csv"
+    },
+    {
+      "key": "kemerovskaya-leninsk-kuznetsk-5eccb40e5c",
+      "name": "Ленинск-Кузнецкий",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-leninsk-kuznetsk-5eccb40e5c.csv"
+    },
+    {
+      "key": "kemerovskaya-mezhdurechensk-eb6838168e",
+      "name": "Междуреченск",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-mezhdurechensk-eb6838168e.csv"
+    },
+    {
+      "key": "kemerovskaya-novokuznetsk-a476cf6225",
+      "name": "Новокузнецк",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-novokuznetsk-a476cf6225.csv"
+    },
+    {
+      "key": "kemerovskaya-sheregesh-5d208991a4",
+      "name": "Шерегеш",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-sheregesh-5d208991a4.csv"
+    },
+    {
+      "key": "kemerovskaya-yurga-bba4ffb240",
+      "name": "Юрга",
+      "country": "Россия",
+      "region": "Кемеровская область",
+      "file": "cities/kemerovskaya-yurga-bba4ffb240.csv"
+    },
+    {
+      "key": "kirovskaya-vyatskie-polyany-9bf68acab3",
+      "name": "Вятские Поляны",
+      "country": "Россия",
+      "region": "Кировская область",
+      "file": "cities/kirovskaya-vyatskie-polyany-9bf68acab3.csv"
+    },
+    {
+      "key": "kirovskaya-kirov-f580f5d7ac",
+      "name": "Киров",
+      "country": "Россия",
+      "region": "Кировская область",
+      "file": "cities/kirovskaya-kirov-f580f5d7ac.csv"
+    },
+    {
+      "key": "kostromskaya-kostroma-b0025657b8",
+      "name": "Кострома",
+      "country": "Россия",
+      "region": "Костромская область",
+      "file": "cities/kostromskaya-kostroma-b0025657b8.csv"
+    },
+    {
+      "key": "kostromskaya-sharya-b53a53c9d4",
+      "name": "Шарья",
+      "country": "Россия",
+      "region": "Костромская область",
+      "file": "cities/kostromskaya-sharya-b53a53c9d4.csv"
+    },
+    {
+      "key": "krasnodarskiy-adler-3d7bd62baf",
+      "name": "Адлер",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-adler-3d7bd62baf.csv"
+    },
+    {
+      "key": "krasnodarskiy-anapa-67821d1a6c",
+      "name": "Анапа",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-anapa-67821d1a6c.csv"
+    },
+    {
+      "key": "krasnodarskiy-apsheronsk-d43a6ed9c0",
+      "name": "Апшеронск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-apsheronsk-d43a6ed9c0.csv"
+    },
+    {
+      "key": "krasnodarskiy-armavir-11cac27d9e",
+      "name": "Армавир",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-armavir-11cac27d9e.csv"
+    },
+    {
+      "key": "krasnodarskiy-arkhipo-osipovk-c59c6fc8ce",
+      "name": "Архипо-Осиповка",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-arkhipo-osipovk-c59c6fc8ce.csv"
+    },
+    {
+      "key": "krasnodarskiy-belorechensk-aa8c3d2bcd",
+      "name": "Белореченск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-belorechensk-aa8c3d2bcd.csv"
+    },
+    {
+      "key": "krasnodarskiy-gelendzhik-d7d4dd9593",
+      "name": "Геленджик",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-gelendzhik-d7d4dd9593.csv"
+    },
+    {
+      "key": "krasnodarskiy-goryachiy-klyuc-e5c8a08db6",
+      "name": "Горячий Ключ",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-goryachiy-klyuc-e5c8a08db6.csv"
+    },
+    {
+      "key": "krasnodarskiy-eysk-8ccc734f71",
+      "name": "Ейск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-eysk-8ccc734f71.csv"
+    },
+    {
+      "key": "krasnodarskiy-kanevskaya-27fd5c557b",
+      "name": "Каневская",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-kanevskaya-27fd5c557b.csv"
+    },
+    {
+      "key": "krasnodarskiy-korenovsk-f0e2026e36",
+      "name": "Кореновск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-korenovsk-f0e2026e36.csv"
+    },
+    {
+      "key": "krasnodarskiy-krasnaya-polyan-1a9f0f1c04",
+      "name": "Красная Поляна",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-krasnaya-polyan-1a9f0f1c04.csv"
+    },
+    {
+      "key": "krasnodarskiy-krasnodar-e6ac7e510e",
+      "name": "Краснодар",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-krasnodar-e6ac7e510e.csv"
+    },
+    {
+      "key": "krasnodarskiy-kropotkin-24708a68b0",
+      "name": "Кропоткин",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-kropotkin-24708a68b0.csv"
+    },
+    {
+      "key": "krasnodarskiy-krymsk-38efa89dcb",
+      "name": "Крымск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-krymsk-38efa89dcb.csv"
+    },
+    {
+      "key": "krasnodarskiy-kurganinsk-5af2a7b7f1",
+      "name": "Курганинск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-kurganinsk-5af2a7b7f1.csv"
+    },
+    {
+      "key": "krasnodarskiy-kuschyovskaya-2859420c38",
+      "name": "Кущёвская",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-kuschyovskaya-2859420c38.csv"
+    },
+    {
+      "key": "krasnodarskiy-labinsk-ad6cac0bcf",
+      "name": "Лабинск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-labinsk-ad6cac0bcf.csv"
+    },
+    {
+      "key": "krasnodarskiy-novorossiysk-d9d78ed62b",
+      "name": "Новороссийск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-novorossiysk-d9d78ed62b.csv"
+    },
+    {
+      "key": "krasnodarskiy-otradnaya-7783a81fb2",
+      "name": "Отрадная",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-otradnaya-7783a81fb2.csv"
+    },
+    {
+      "key": "krasnodarskiy-pavlovskaya-67d504fa1e",
+      "name": "Павловская",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-pavlovskaya-67d504fa1e.csv"
+    },
+    {
+      "key": "krasnodarskiy-primorsko-akhta-2cb57f6f19",
+      "name": "Приморско-Ахтарск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-primorsko-akhta-2cb57f6f19.csv"
+    },
+    {
+      "key": "krasnodarskiy-slavyansk-na-ku-6ccee7ac4f",
+      "name": "Славянск-на-Кубани",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-slavyansk-na-ku-6ccee7ac4f.csv"
+    },
+    {
+      "key": "krasnodarskiy-sochi-d767568d31",
+      "name": "Сочи",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-sochi-d767568d31.csv"
+    },
+    {
+      "key": "krasnodarskiy-tbilisskaya-28a22a7554",
+      "name": "Тбилисская",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-tbilisskaya-28a22a7554.csv"
+    },
+    {
+      "key": "krasnodarskiy-temryuk-b87ae2bcad",
+      "name": "Темрюк",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-temryuk-b87ae2bcad.csv"
+    },
+    {
+      "key": "krasnodarskiy-timashevsk-4b89fe6724",
+      "name": "Тимашевск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-timashevsk-4b89fe6724.csv"
+    },
+    {
+      "key": "krasnodarskiy-tikhoretsk-c7b8c5898b",
+      "name": "Тихорецк",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-tikhoretsk-c7b8c5898b.csv"
+    },
+    {
+      "key": "krasnodarskiy-tuapse-c784190e8e",
+      "name": "Туапсе",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-tuapse-c784190e8e.csv"
+    },
+    {
+      "key": "krasnodarskiy-ust-labinsk-a452717b0f",
+      "name": "Усть-Лабинск",
+      "country": "Россия",
+      "region": "Краснодарский край",
+      "file": "cities/krasnodarskiy-ust-labinsk-a452717b0f.csv"
+    },
+    {
+      "key": "krasnoyarskiy-achinsk-5f8f5d47e8",
+      "name": "Ачинск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-achinsk-5f8f5d47e8.csv"
+    },
+    {
+      "key": "krasnoyarskiy-zelenogorsk-ef5b1eb370",
+      "name": "Зеленогорск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-zelenogorsk-ef5b1eb370.csv"
+    },
+    {
+      "key": "krasnoyarskiy-kansk-91e16893db",
+      "name": "Канск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-kansk-91e16893db.csv"
+    },
+    {
+      "key": "krasnoyarskiy-krasnoyarsk-cbbed53370",
+      "name": "Красноярск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-krasnoyarsk-cbbed53370.csv"
+    },
+    {
+      "key": "krasnoyarskiy-lesosibirsk-f9da6cab54",
+      "name": "Лесосибирск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-lesosibirsk-f9da6cab54.csv"
+    },
+    {
+      "key": "krasnoyarskiy-minusinsk-b1828c17ce",
+      "name": "Минусинск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-minusinsk-b1828c17ce.csv"
+    },
+    {
+      "key": "krasnoyarskiy-norilsk-e10630392c",
+      "name": "Норильск",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-norilsk-e10630392c.csv"
+    },
+    {
+      "key": "krasnoyarskiy-sharypovo-6d354071ea",
+      "name": "Шарыпово",
+      "country": "Россия",
+      "region": "Красноярский край",
+      "file": "cities/krasnoyarskiy-sharypovo-6d354071ea.csv"
+    },
+    {
+      "key": "kurganskaya-kurgan-192bf18d53",
+      "name": "Курган",
+      "country": "Россия",
+      "region": "Курганская область",
+      "file": "cities/kurganskaya-kurgan-192bf18d53.csv"
+    },
+    {
+      "key": "kurganskaya-shadrinsk-3010eebce5",
+      "name": "Шадринск",
+      "country": "Россия",
+      "region": "Курганская область",
+      "file": "cities/kurganskaya-shadrinsk-3010eebce5.csv"
+    },
+    {
+      "key": "kurskaya-zheleznogorsk-b7ba6c26a6",
+      "name": "Железногорск",
+      "country": "Россия",
+      "region": "Курская область",
+      "file": "cities/kurskaya-zheleznogorsk-b7ba6c26a6.csv"
+    },
+    {
+      "key": "kurskaya-kursk-4ee645bdb5",
+      "name": "Курск",
+      "country": "Россия",
+      "region": "Курская область",
+      "file": "cities/kurskaya-kursk-4ee645bdb5.csv"
+    },
+    {
+      "key": "leningradskaya-volkhov-753efd138a",
+      "name": "Волхов",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-volkhov-753efd138a.csv"
+    },
+    {
+      "key": "leningradskaya-vyborg-63c193a674",
+      "name": "Выборг",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-vyborg-63c193a674.csv"
+    },
+    {
+      "key": "leningradskaya-kingisepp-9d6c486445",
+      "name": "Кингисепп",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-kingisepp-9d6c486445.csv"
+    },
+    {
+      "key": "leningradskaya-kirishi-5de5d520dd",
+      "name": "Кириши",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-kirishi-5de5d520dd.csv"
+    },
+    {
+      "key": "leningradskaya-luga-a16bbd52b8",
+      "name": "Луга",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-luga-a16bbd52b8.csv"
+    },
+    {
+      "key": "leningradskaya-priozersk-89fba56810",
+      "name": "Приозерск",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-priozersk-89fba56810.csv"
+    },
+    {
+      "key": "leningradskaya-sosnovyy-bor-e824dc0608",
+      "name": "Сосновый Бор",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-sosnovyy-bor-e824dc0608.csv"
+    },
+    {
+      "key": "leningradskaya-tikhvin-5b4eaad5e8",
+      "name": "Тихвин",
+      "country": "Россия",
+      "region": "Ленинградская область",
+      "file": "cities/leningradskaya-tikhvin-5b4eaad5e8.csv"
+    },
+    {
+      "key": "lipetskaya-elets-dfcabc5022",
+      "name": "Елец",
+      "country": "Россия",
+      "region": "Липецкая область",
+      "file": "cities/lipetskaya-elets-dfcabc5022.csv"
+    },
+    {
+      "key": "lipetskaya-lipetsk-7d5286379a",
+      "name": "Липецк",
+      "country": "Россия",
+      "region": "Липецкая область",
+      "file": "cities/lipetskaya-lipetsk-7d5286379a.csv"
+    },
+    {
+      "key": "magadanskaya-magadan-03339101ab",
+      "name": "Магадан",
+      "country": "Россия",
+      "region": "Магаданская область",
+      "file": "cities/magadanskaya-magadan-03339101ab.csv"
+    },
+    {
+      "key": "magadanskaya-susuman-e6a0ea577e",
+      "name": "Сусуман",
+      "country": "Россия",
+      "region": "Магаданская область",
+      "file": "cities/magadanskaya-susuman-e6a0ea577e.csv"
+    },
+    {
+      "key": "moskva-moskva-208862d1e8",
+      "name": "Москва",
+      "country": "Россия",
+      "region": "Москва",
+      "file": "cities/moskva-moskva-208862d1e8.csv"
+    },
+    {
+      "key": "moskovskaya-volokolamsk-f7d12bdf7a",
+      "name": "Волоколамск",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-volokolamsk-f7d12bdf7a.csv"
+    },
+    {
+      "key": "moskovskaya-dubna-27eda82a3b",
+      "name": "Дубна",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-dubna-27eda82a3b.csv"
+    },
+    {
+      "key": "moskovskaya-egorevsk-3adb636b8a",
+      "name": "Егорьевск",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-egorevsk-3adb636b8a.csv"
+    },
+    {
+      "key": "moskovskaya-zaraysk-7ef4a2d868",
+      "name": "Зарайск",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-zaraysk-7ef4a2d868.csv"
+    },
+    {
+      "key": "moskovskaya-kashira-1720c7228f",
+      "name": "Кашира",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-kashira-1720c7228f.csv"
+    },
+    {
+      "key": "moskovskaya-klin-c4d3437adb",
+      "name": "Клин",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-klin-c4d3437adb.csv"
+    },
+    {
+      "key": "moskovskaya-kolomna-b075e115af",
+      "name": "Коломна",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-kolomna-b075e115af.csv"
+    },
+    {
+      "key": "moskovskaya-lukhovitsy-5b3123f068",
+      "name": "Луховицы",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-lukhovitsy-5b3123f068.csv"
+    },
+    {
+      "key": "moskovskaya-mozhaysk-85b69bf6ab",
+      "name": "Можайск",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-mozhaysk-85b69bf6ab.csv"
+    },
+    {
+      "key": "moskovskaya-orekhovo-zuevo-b5bac63d54",
+      "name": "Орехово-Зуево",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-orekhovo-zuevo-b5bac63d54.csv"
+    },
+    {
+      "key": "moskovskaya-serebryanye-prudy-264278990f",
+      "name": "Серебряные Пруды",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-serebryanye-prudy-264278990f.csv"
+    },
+    {
+      "key": "moskovskaya-serpukhov-6a7b13f68d",
+      "name": "Серпухов",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-serpukhov-6a7b13f68d.csv"
+    },
+    {
+      "key": "moskovskaya-stupino-32b3983be2",
+      "name": "Ступино",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-stupino-32b3983be2.csv"
+    },
+    {
+      "key": "moskovskaya-taldom-262596abee",
+      "name": "Талдом",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-taldom-262596abee.csv"
+    },
+    {
+      "key": "moskovskaya-shatura-11ea2a4663",
+      "name": "Шатура",
+      "country": "Россия",
+      "region": "Московская область",
+      "file": "cities/moskovskaya-shatura-11ea2a4663.csv"
+    },
+    {
+      "key": "murmanskaya-apatity-08184f6f03",
+      "name": "Апатиты",
+      "country": "Россия",
+      "region": "Мурманская область",
+      "file": "cities/murmanskaya-apatity-08184f6f03.csv"
+    },
+    {
+      "key": "murmanskaya-kandalaksha-8114577f4b",
+      "name": "Кандалакша",
+      "country": "Россия",
+      "region": "Мурманская область",
+      "file": "cities/murmanskaya-kandalaksha-8114577f4b.csv"
+    },
+    {
+      "key": "murmanskaya-monchegorsk-45ab4e730d",
+      "name": "Мончегорск",
+      "country": "Россия",
+      "region": "Мурманская область",
+      "file": "cities/murmanskaya-monchegorsk-45ab4e730d.csv"
+    },
+    {
+      "key": "murmanskaya-murmansk-7b7b9d41e3",
+      "name": "Мурманск",
+      "country": "Россия",
+      "region": "Мурманская область",
+      "file": "cities/murmanskaya-murmansk-7b7b9d41e3.csv"
+    },
+    {
+      "key": "nenetskiy-naryan-mar-257205ef74",
+      "name": "Нарьян-Мар",
+      "country": "Россия",
+      "region": "Ненецкий автономный округ",
+      "file": "cities/nenetskiy-naryan-mar-257205ef74.csv"
+    },
+    {
+      "key": "nizhegorodskaya-arzamas-e2b63b2ed7",
+      "name": "Арзамас",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-arzamas-e2b63b2ed7.csv"
+    },
+    {
+      "key": "nizhegorodskaya-vyksa-581dd5b32b",
+      "name": "Выкса",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-vyksa-581dd5b32b.csv"
+    },
+    {
+      "key": "nizhegorodskaya-nizhniy-novgo-430316c54b",
+      "name": "Нижний Новгород",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-nizhniy-novgo-430316c54b.csv"
+    },
+    {
+      "key": "nizhegorodskaya-pavlovo-cec76adfc8",
+      "name": "Павлово",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-pavlovo-cec76adfc8.csv"
+    },
+    {
+      "key": "nizhegorodskaya-sarov-35a9652d88",
+      "name": "Саров",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-sarov-35a9652d88.csv"
+    },
+    {
+      "key": "nizhegorodskaya-sergach-e483903c1a",
+      "name": "Сергач",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-sergach-e483903c1a.csv"
+    },
+    {
+      "key": "nizhegorodskaya-shakhunya-8f3009a37e",
+      "name": "Шахунья",
+      "country": "Россия",
+      "region": "Нижегородская область",
+      "file": "cities/nizhegorodskaya-shakhunya-8f3009a37e.csv"
+    },
+    {
+      "key": "novgorodskaya-borovichi-6397c6fd7a",
+      "name": "Боровичи",
+      "country": "Россия",
+      "region": "Новгородская область",
+      "file": "cities/novgorodskaya-borovichi-6397c6fd7a.csv"
+    },
+    {
+      "key": "novgorodskaya-valday-b7c3691117",
+      "name": "Валдай",
+      "country": "Россия",
+      "region": "Новгородская область",
+      "file": "cities/novgorodskaya-valday-b7c3691117.csv"
+    },
+    {
+      "key": "novgorodskaya-novgorod-9c9e8dbdba",
+      "name": "Новгород",
+      "country": "Россия",
+      "region": "Новгородская область",
+      "file": "cities/novgorodskaya-novgorod-9c9e8dbdba.csv"
+    },
+    {
+      "key": "novosibirskaya-novosibirsk-052c4a7330",
+      "name": "Новосибирск",
+      "country": "Россия",
+      "region": "Новосибирская область",
+      "file": "cities/novosibirskaya-novosibirsk-052c4a7330.csv"
+    },
+    {
+      "key": "novosibirskaya-suzun-7aa15e7a1b",
+      "name": "Сузун",
+      "country": "Россия",
+      "region": "Новосибирская область",
+      "file": "cities/novosibirskaya-suzun-7aa15e7a1b.csv"
+    },
+    {
+      "key": "omskaya-isilkul-242b29e1c4",
+      "name": "Исилькуль",
+      "country": "Россия",
+      "region": "Омская область",
+      "file": "cities/omskaya-isilkul-242b29e1c4.csv"
+    },
+    {
+      "key": "omskaya-nazyvaevsk-574256a8a4",
+      "name": "Называевск",
+      "country": "Россия",
+      "region": "Омская область",
+      "file": "cities/omskaya-nazyvaevsk-574256a8a4.csv"
+    },
+    {
+      "key": "omskaya-omsk-9773ca58cb",
+      "name": "Омск",
+      "country": "Россия",
+      "region": "Омская область",
+      "file": "cities/omskaya-omsk-9773ca58cb.csv"
+    },
+    {
+      "key": "omskaya-tara-7996dfd069",
+      "name": "Тара",
+      "country": "Россия",
+      "region": "Омская область",
+      "file": "cities/omskaya-tara-7996dfd069.csv"
+    },
+    {
+      "key": "orenburgskaya-buguruslan-2e3df75b17",
+      "name": "Бугуруслан",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-buguruslan-2e3df75b17.csv"
+    },
+    {
+      "key": "orenburgskaya-buzuluk-90634a0b1f",
+      "name": "Бузулук",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-buzuluk-90634a0b1f.csv"
+    },
+    {
+      "key": "orenburgskaya-kuvandyk-52093ad242",
+      "name": "Кувандык",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-kuvandyk-52093ad242.csv"
+    },
+    {
+      "key": "orenburgskaya-orenburg-a4c38a4c7f",
+      "name": "Оренбург",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-orenburg-a4c38a4c7f.csv"
+    },
+    {
+      "key": "orenburgskaya-orsk-203f2e4971",
+      "name": "Орск",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-orsk-203f2e4971.csv"
+    },
+    {
+      "key": "orenburgskaya-sol-iletsk-abd601de99",
+      "name": "Соль-Илецк",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-sol-iletsk-abd601de99.csv"
+    },
+    {
+      "key": "orenburgskaya-sorochinsk-aa8e940f87",
+      "name": "Сорочинск",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-sorochinsk-aa8e940f87.csv"
+    },
+    {
+      "key": "orenburgskaya-yasnyy-3e8922ebfe",
+      "name": "Ясный",
+      "country": "Россия",
+      "region": "Оренбургская область",
+      "file": "cities/orenburgskaya-yasnyy-3e8922ebfe.csv"
+    },
+    {
+      "key": "orlovskaya-livny-f62bdea0d8",
+      "name": "Ливны",
+      "country": "Россия",
+      "region": "Орловская область",
+      "file": "cities/orlovskaya-livny-f62bdea0d8.csv"
+    },
+    {
+      "key": "orlovskaya-oryol-fc8fc925bb",
+      "name": "Орёл",
+      "country": "Россия",
+      "region": "Орловская область",
+      "file": "cities/orlovskaya-oryol-fc8fc925bb.csv"
+    },
+    {
+      "key": "penzenskaya-kamenka-59f85f1974",
+      "name": "Каменка",
+      "country": "Россия",
+      "region": "Пензенская область",
+      "file": "cities/penzenskaya-kamenka-59f85f1974.csv"
+    },
+    {
+      "key": "penzenskaya-kuznetsk-abc8d6b3fa",
+      "name": "Кузнецк",
+      "country": "Россия",
+      "region": "Пензенская область",
+      "file": "cities/penzenskaya-kuznetsk-abc8d6b3fa.csv"
+    },
+    {
+      "key": "penzenskaya-nizhniy-lomov-8132fcf684",
+      "name": "Нижний Ломов",
+      "country": "Россия",
+      "region": "Пензенская область",
+      "file": "cities/penzenskaya-nizhniy-lomov-8132fcf684.csv"
+    },
+    {
+      "key": "penzenskaya-pachelma-751ea41f98",
+      "name": "Пачелма",
+      "country": "Россия",
+      "region": "Пензенская область",
+      "file": "cities/penzenskaya-pachelma-751ea41f98.csv"
+    },
+    {
+      "key": "penzenskaya-penza-9c0768c073",
+      "name": "Пенза",
+      "country": "Россия",
+      "region": "Пензенская область",
+      "file": "cities/penzenskaya-penza-9c0768c073.csv"
+    },
+    {
+      "key": "penzenskaya-serdobsk-c3d886b684",
+      "name": "Сердобск",
+      "country": "Россия",
+      "region": "Пензенская область",
+      "file": "cities/penzenskaya-serdobsk-c3d886b684.csv"
+    },
+    {
+      "key": "permskiy-barda-c57faa4c55",
+      "name": "Барда",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-barda-c57faa4c55.csv"
+    },
+    {
+      "key": "permskiy-berezniki-17ee41833b",
+      "name": "Березники",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-berezniki-17ee41833b.csv"
+    },
+    {
+      "key": "permskiy-gubakha-944d395541",
+      "name": "Губаха",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-gubakha-944d395541.csv"
+    },
+    {
+      "key": "permskiy-krasnovishersk-c03183ccc7",
+      "name": "Красновишерск",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-krasnovishersk-c03183ccc7.csv"
+    },
+    {
+      "key": "permskiy-kudymkar-8969ac32eb",
+      "name": "Кудымкар",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-kudymkar-8969ac32eb.csv"
+    },
+    {
+      "key": "permskiy-kungur-507cdbded8",
+      "name": "Кунгур",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-kungur-507cdbded8.csv"
+    },
+    {
+      "key": "permskiy-lysva-d93ee6ada0",
+      "name": "Лысьва",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-lysva-d93ee6ada0.csv"
+    },
+    {
+      "key": "permskiy-osa-325cc8feb9",
+      "name": "Оса",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-osa-325cc8feb9.csv"
+    },
+    {
+      "key": "permskiy-ochyor-a4ad61235d",
+      "name": "Очёр",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-ochyor-a4ad61235d.csv"
+    },
+    {
+      "key": "permskiy-perm-3298ed027a",
+      "name": "Пермь",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-perm-3298ed027a.csv"
+    },
+    {
+      "key": "permskiy-solikamsk-9171d86810",
+      "name": "Соликамск",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-solikamsk-9171d86810.csv"
+    },
+    {
+      "key": "permskiy-chaykovskiy-fa0490ffc1",
+      "name": "Чайковский",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-chaykovskiy-fa0490ffc1.csv"
+    },
+    {
+      "key": "permskiy-chernushka-bed33ec55a",
+      "name": "Чернушка",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-chernushka-bed33ec55a.csv"
+    },
+    {
+      "key": "permskiy-chusovoy-e15b6f2958",
+      "name": "Чусовой",
+      "country": "Россия",
+      "region": "Пермский край",
+      "file": "cities/permskiy-chusovoy-e15b6f2958.csv"
+    },
+    {
+      "key": "primorskiy-arsenev-57d14eb0c3",
+      "name": "Арсеньев",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-arsenev-57d14eb0c3.csv"
+    },
+    {
+      "key": "primorskiy-artyom-e06deb3b63",
+      "name": "Артём",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-artyom-e06deb3b63.csv"
+    },
+    {
+      "key": "primorskiy-vladivostok-948903002a",
+      "name": "Владивосток",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-vladivostok-948903002a.csv"
+    },
+    {
+      "key": "primorskiy-dalnegorsk-082bfd5ef9",
+      "name": "Дальнегорск",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-dalnegorsk-082bfd5ef9.csv"
+    },
+    {
+      "key": "primorskiy-dalnerechensk-e97d04869f",
+      "name": "Дальнереченск",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-dalnerechensk-e97d04869f.csv"
+    },
+    {
+      "key": "primorskiy-lesozavodsk-204ea50356",
+      "name": "Лесозаводск",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-lesozavodsk-204ea50356.csv"
+    },
+    {
+      "key": "primorskiy-nakhodka-5cc6064dcc",
+      "name": "Находка",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-nakhodka-5cc6064dcc.csv"
+    },
+    {
+      "key": "primorskiy-novozhatkovo-82b83658be",
+      "name": "Новожатково",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-novozhatkovo-82b83658be.csv"
+    },
+    {
+      "key": "primorskiy-partizansk-d7366bdbe6",
+      "name": "Партизанск",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-partizansk-d7366bdbe6.csv"
+    },
+    {
+      "key": "primorskiy-spassk-dalniy-734c9cc2f1",
+      "name": "Спасск-Дальний",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-spassk-dalniy-734c9cc2f1.csv"
+    },
+    {
+      "key": "primorskiy-ussuriysk-33c0f55d62",
+      "name": "Уссурийск",
+      "country": "Россия",
+      "region": "Приморский край",
+      "file": "cities/primorskiy-ussuriysk-33c0f55d62.csv"
+    },
+    {
+      "key": "pskovskaya-velikie-luki-2389b5e76b",
+      "name": "Великие Луки",
+      "country": "Россия",
+      "region": "Псковская область",
+      "file": "cities/pskovskaya-velikie-luki-2389b5e76b.csv"
+    },
+    {
+      "key": "pskovskaya-glubokoe-6344b92c9c",
+      "name": "Глубокое",
+      "country": "Россия",
+      "region": "Псковская область",
+      "file": "cities/pskovskaya-glubokoe-6344b92c9c.csv"
+    },
+    {
+      "key": "pskovskaya-dedovichi-265efada65",
+      "name": "Дедовичи",
+      "country": "Россия",
+      "region": "Псковская область",
+      "file": "cities/pskovskaya-dedovichi-265efada65.csv"
+    },
+    {
+      "key": "pskovskaya-pskov-46605553db",
+      "name": "Псков",
+      "country": "Россия",
+      "region": "Псковская область",
+      "file": "cities/pskovskaya-pskov-46605553db.csv"
+    },
+    {
+      "key": "adygeya-maykop-c0c2695190",
+      "name": "Майкоп",
+      "country": "Россия",
+      "region": "Республика Адыгея",
+      "file": "cities/adygeya-maykop-c0c2695190.csv"
+    },
+    {
+      "key": "altay-gorno-altaysk-fdd392c54f",
+      "name": "Горно-Алтайск",
+      "country": "Россия",
+      "region": "Республика Алтай",
+      "file": "cities/altay-gorno-altaysk-fdd392c54f.csv"
+    },
+    {
+      "key": "bashkiriya-baymak-d66c7de3b9",
+      "name": "Баймак",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-baymak-d66c7de3b9.csv"
+    },
+    {
+      "key": "bashkiriya-bakaly-dbb92cd134",
+      "name": "Бакалы",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-bakaly-dbb92cd134.csv"
+    },
+    {
+      "key": "bashkiriya-belebey-6f39d48cb5",
+      "name": "Белебей",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-belebey-6f39d48cb5.csv"
+    },
+    {
+      "key": "bashkiriya-beloretsk-5febabb7b2",
+      "name": "Белорецк",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-beloretsk-5febabb7b2.csv"
+    },
+    {
+      "key": "bashkiriya-birsk-c858e4bda0",
+      "name": "Бирск",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-birsk-c858e4bda0.csv"
+    },
+    {
+      "key": "bashkiriya-buraevo-f65be024ef",
+      "name": "Бураево",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-buraevo-f65be024ef.csv"
+    },
+    {
+      "key": "bashkiriya-davlekanovo-96dbcf808e",
+      "name": "Давлеканово",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-davlekanovo-96dbcf808e.csv"
+    },
+    {
+      "key": "bashkiriya-dyurtyuli-119e08b543",
+      "name": "Дюртюли",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-dyurtyuli-119e08b543.csv"
+    },
+    {
+      "key": "bashkiriya-kirgiz-miyaki-ec157f3052",
+      "name": "Киргиз-Мияки",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-kirgiz-miyaki-ec157f3052.csv"
+    },
+    {
+      "key": "bashkiriya-kumertau-018ab102cc",
+      "name": "Кумертау",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-kumertau-018ab102cc.csv"
+    },
+    {
+      "key": "bashkiriya-meleuz-39c7e34df0",
+      "name": "Мелеуз",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-meleuz-39c7e34df0.csv"
+    },
+    {
+      "key": "bashkiriya-mesyagutovo-35a369511b",
+      "name": "Месягутово",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-mesyagutovo-35a369511b.csv"
+    },
+    {
+      "key": "bashkiriya-neftekamsk-2d6cc3bc35",
+      "name": "Нефтекамск",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-neftekamsk-2d6cc3bc35.csv"
+    },
+    {
+      "key": "bashkiriya-oktyabrskiy-fb635f1357",
+      "name": "Октябрьский",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-oktyabrskiy-fb635f1357.csv"
+    },
+    {
+      "key": "bashkiriya-salavat-d7c28d33ff",
+      "name": "Салават",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-salavat-d7c28d33ff.csv"
+    },
+    {
+      "key": "bashkiriya-sibay-139e143473",
+      "name": "Сибай",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-sibay-139e143473.csv"
+    },
+    {
+      "key": "bashkiriya-sterlitamak-f0c5f44fec",
+      "name": "Стерлитамак",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-sterlitamak-f0c5f44fec.csv"
+    },
+    {
+      "key": "bashkiriya-tuymazy-f5978dc232",
+      "name": "Туймазы",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-tuymazy-f5978dc232.csv"
+    },
+    {
+      "key": "bashkiriya-ufa-c6194c5670",
+      "name": "Уфа",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-ufa-c6194c5670.csv"
+    },
+    {
+      "key": "bashkiriya-uchaly-a642ade96b",
+      "name": "Учалы",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-uchaly-a642ade96b.csv"
+    },
+    {
+      "key": "bashkiriya-fyodorovka-7ed90354ce",
+      "name": "Фёдоровка",
+      "country": "Россия",
+      "region": "Республика Башкортостан",
+      "file": "cities/bashkiriya-fyodorovka-7ed90354ce.csv"
+    },
+    {
+      "key": "buryatiya-severobaykalsk-3c0f71d358",
+      "name": "Северобайкальск",
+      "country": "Россия",
+      "region": "Республика Бурятия",
+      "file": "cities/buryatiya-severobaykalsk-3c0f71d358.csv"
+    },
+    {
+      "key": "buryatiya-taksimo-6b974a2d46",
+      "name": "Таксимо",
+      "country": "Россия",
+      "region": "Республика Бурятия",
+      "file": "cities/buryatiya-taksimo-6b974a2d46.csv"
+    },
+    {
+      "key": "buryatiya-ulan-ude-48cb13104f",
+      "name": "Улан-Удэ",
+      "country": "Россия",
+      "region": "Республика Бурятия",
+      "file": "cities/buryatiya-ulan-ude-48cb13104f.csv"
+    },
+    {
+      "key": "dagestan-buynaksk-97acf17afd",
+      "name": "Буйнакск",
+      "country": "Россия",
+      "region": "Республика Дагестан",
+      "file": "cities/dagestan-buynaksk-97acf17afd.csv"
+    },
+    {
+      "key": "dagestan-gergebil-f74f89def7",
+      "name": "Гергебиль",
+      "country": "Россия",
+      "region": "Республика Дагестан",
+      "file": "cities/dagestan-gergebil-f74f89def7.csv"
+    },
+    {
+      "key": "dagestan-derbent-b527f290a1",
+      "name": "Дербент",
+      "country": "Россия",
+      "region": "Республика Дагестан",
+      "file": "cities/dagestan-derbent-b527f290a1.csv"
+    },
+    {
+      "key": "dagestan-kizlyar-ffbea2904d",
+      "name": "Кизляр",
+      "country": "Россия",
+      "region": "Республика Дагестан",
+      "file": "cities/dagestan-kizlyar-ffbea2904d.csv"
+    },
+    {
+      "key": "dagestan-makhachkala-e3d45b0855",
+      "name": "Махачкала",
+      "country": "Россия",
+      "region": "Республика Дагестан",
+      "file": "cities/dagestan-makhachkala-e3d45b0855.csv"
+    },
+    {
+      "key": "ingushetiya-nazran-3a5fe781a7",
+      "name": "Назрань",
+      "country": "Россия",
+      "region": "Республика Ингушетия",
+      "file": "cities/ingushetiya-nazran-3a5fe781a7.csv"
+    },
+    {
+      "key": "kalmykiya-elista-8a1be22eba",
+      "name": "Элиста",
+      "country": "Россия",
+      "region": "Республика Калмыкия",
+      "file": "cities/kalmykiya-elista-8a1be22eba.csv"
+    },
+    {
+      "key": "kareliya-kostomuksha-de70164484",
+      "name": "Костомукша",
+      "country": "Россия",
+      "region": "Республика Карелия",
+      "file": "cities/kareliya-kostomuksha-de70164484.csv"
+    },
+    {
+      "key": "kareliya-petrozavodsk-96c2332ff9",
+      "name": "Петрозаводск",
+      "country": "Россия",
+      "region": "Республика Карелия",
+      "file": "cities/kareliya-petrozavodsk-96c2332ff9.csv"
+    },
+    {
+      "key": "kareliya-segezha-c0806ca3ee",
+      "name": "Сегежа",
+      "country": "Россия",
+      "region": "Республика Карелия",
+      "file": "cities/kareliya-segezha-c0806ca3ee.csv"
+    },
+    {
+      "key": "kareliya-sortavala-6b20eef636",
+      "name": "Сортавала",
+      "country": "Россия",
+      "region": "Республика Карелия",
+      "file": "cities/kareliya-sortavala-6b20eef636.csv"
+    },
+    {
+      "key": "komi-vorkuta-ddff20664b",
+      "name": "Воркута",
+      "country": "Россия",
+      "region": "Республика Коми",
+      "file": "cities/komi-vorkuta-ddff20664b.csv"
+    },
+    {
+      "key": "komi-pechora-176deb9c8f",
+      "name": "Печора",
+      "country": "Россия",
+      "region": "Республика Коми",
+      "file": "cities/komi-pechora-176deb9c8f.csv"
+    },
+    {
+      "key": "komi-syktyvkar-ab862ea03a",
+      "name": "Сыктывкар",
+      "country": "Россия",
+      "region": "Республика Коми",
+      "file": "cities/komi-syktyvkar-ab862ea03a.csv"
+    },
+    {
+      "key": "komi-usinsk-9f9190d24c",
+      "name": "Усинск",
+      "country": "Россия",
+      "region": "Республика Коми",
+      "file": "cities/komi-usinsk-9f9190d24c.csv"
+    },
+    {
+      "key": "komi-ukhta-6120243965",
+      "name": "Ухта",
+      "country": "Россия",
+      "region": "Республика Коми",
+      "file": "cities/komi-ukhta-6120243965.csv"
+    },
+    {
+      "key": "krym-alushta-9347275d7b",
+      "name": "Алушта",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-alushta-9347275d7b.csv"
+    },
+    {
+      "key": "krym-belogorsk-a93cde2445",
+      "name": "Белогорск",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-belogorsk-a93cde2445.csv"
+    },
+    {
+      "key": "krym-dzhankoy-67dbbcfef9",
+      "name": "Джанкой",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-dzhankoy-67dbbcfef9.csv"
+    },
+    {
+      "key": "krym-evpatoriya-62a673978b",
+      "name": "Евпатория",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-evpatoriya-62a673978b.csv"
+    },
+    {
+      "key": "krym-kerch-e4d6310846",
+      "name": "Керчь",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-kerch-e4d6310846.csv"
+    },
+    {
+      "key": "krym-leninskoe-0b2682ab5f",
+      "name": "Ленинское",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-leninskoe-0b2682ab5f.csv"
+    },
+    {
+      "key": "krym-partenit-9d42171aeb",
+      "name": "Партенит",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-partenit-9d42171aeb.csv"
+    },
+    {
+      "key": "krym-simferopol-ea778d21a6",
+      "name": "Симферополь",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-simferopol-ea778d21a6.csv"
+    },
+    {
+      "key": "krym-sudak-68d7393eb5",
+      "name": "Судак",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-sudak-68d7393eb5.csv"
+    },
+    {
+      "key": "krym-feodosiya-c2534bd256",
+      "name": "Феодосия",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-feodosiya-c2534bd256.csv"
+    },
+    {
+      "key": "krym-chernomorskoe-f1d1c79c9e",
+      "name": "Черноморское",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-chernomorskoe-f1d1c79c9e.csv"
+    },
+    {
+      "key": "krym-yalta-55d5130de1",
+      "name": "Ялта",
+      "country": "Россия",
+      "region": "Республика Крым",
+      "file": "cities/krym-yalta-55d5130de1.csv"
+    },
+    {
+      "key": "mariy-el-yoshkar-ola-e15578dd75",
+      "name": "Йошкар-Ола",
+      "country": "Россия",
+      "region": "Республика Марий Эл",
+      "file": "cities/mariy-el-yoshkar-ola-e15578dd75.csv"
+    },
+    {
+      "key": "mariy-el-kozmodemyansk-36efee0b66",
+      "name": "Козьмодемьянск",
+      "country": "Россия",
+      "region": "Республика Марий Эл",
+      "file": "cities/mariy-el-kozmodemyansk-36efee0b66.csv"
+    },
+    {
+      "key": "mordoviya-saransk-80354ac486",
+      "name": "Саранск",
+      "country": "Россия",
+      "region": "Республика Мордовия",
+      "file": "cities/mordoviya-saransk-80354ac486.csv"
+    },
+    {
+      "key": "yakutiya-aldan-8c6d6209a9",
+      "name": "Алдан",
+      "country": "Россия",
+      "region": "Республика Саха (Якутия)",
+      "file": "cities/yakutiya-aldan-8c6d6209a9.csv"
+    },
+    {
+      "key": "yakutiya-lensk-489c22a39a",
+      "name": "Ленск",
+      "country": "Россия",
+      "region": "Республика Саха (Якутия)",
+      "file": "cities/yakutiya-lensk-489c22a39a.csv"
+    },
+    {
+      "key": "yakutiya-neryungri-a6ebb3a962",
+      "name": "Нерюнгри",
+      "country": "Россия",
+      "region": "Республика Саха (Якутия)",
+      "file": "cities/yakutiya-neryungri-a6ebb3a962.csv"
+    },
+    {
+      "key": "yakutiya-yakutsk-a955c93ed9",
+      "name": "Якутск",
+      "country": "Россия",
+      "region": "Республика Саха (Якутия)",
+      "file": "cities/yakutiya-yakutsk-a955c93ed9.csv"
+    },
+    {
+      "key": "severnaya-osetiya-vladikavkaz-c5eee2890c",
+      "name": "Владикавказ",
+      "country": "Россия",
+      "region": "Республика Северная Осетия — Алания",
+      "file": "cities/severnaya-osetiya-vladikavkaz-c5eee2890c.csv"
+    },
+    {
+      "key": "severnaya-osetiya-mozdok-93eaa1cf6f",
+      "name": "Моздок",
+      "country": "Россия",
+      "region": "Республика Северная Осетия — Алания",
+      "file": "cities/severnaya-osetiya-mozdok-93eaa1cf6f.csv"
+    },
+    {
+      "key": "tatarstan-aznakaevo-e4eadf6b50",
+      "name": "Азнакаево",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-aznakaevo-e4eadf6b50.csv"
+    },
+    {
+      "key": "tatarstan-almetevsk-65c73c9876",
+      "name": "Альметьевск",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-almetevsk-65c73c9876.csv"
+    },
+    {
+      "key": "tatarstan-bavly-e4c10d1faa",
+      "name": "Бавлы",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-bavly-e4c10d1faa.csv"
+    },
+    {
+      "key": "tatarstan-bugulma-f2913cdc36",
+      "name": "Бугульма",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-bugulma-f2913cdc36.csv"
+    },
+    {
+      "key": "tatarstan-buinsk-bf79371163",
+      "name": "Буинск",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-buinsk-bf79371163.csv"
+    },
+    {
+      "key": "tatarstan-kazan-0c3cf2ba0d",
+      "name": "Казань",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-kazan-0c3cf2ba0d.csv"
+    },
+    {
+      "key": "tatarstan-naberezhnye-chelny-d9eca79495",
+      "name": "Набережные Челны",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-naberezhnye-chelny-d9eca79495.csv"
+    },
+    {
+      "key": "tatarstan-nizhnekamsk-e36f0ce059",
+      "name": "Нижнекамск",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-nizhnekamsk-e36f0ce059.csv"
+    },
+    {
+      "key": "tatarstan-nurlat-b71dd0c02c",
+      "name": "Нурлат",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-nurlat-b71dd0c02c.csv"
+    },
+    {
+      "key": "tatarstan-chistopol-6a9e041903",
+      "name": "Чистополь",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-chistopol-6a9e041903.csv"
+    },
+    {
+      "key": "tatarstan-shemordan-4f3e067096",
+      "name": "Шемордан",
+      "country": "Россия",
+      "region": "Республика Татарстан",
+      "file": "cities/tatarstan-shemordan-4f3e067096.csv"
+    },
+    {
+      "key": "tuva-kyzyl-6fffcb8edb",
+      "name": "Кызыл",
+      "country": "Россия",
+      "region": "Республика Тыва",
+      "file": "cities/tuva-kyzyl-6fffcb8edb.csv"
+    },
+    {
+      "key": "khakasiya-abakan-dbe3d8cae0",
+      "name": "Абакан",
+      "country": "Россия",
+      "region": "Республика Хакасия",
+      "file": "cities/khakasiya-abakan-dbe3d8cae0.csv"
+    },
+    {
+      "key": "khakasiya-sayanogorsk-d8eee3899c",
+      "name": "Саяногорск",
+      "country": "Россия",
+      "region": "Республика Хакасия",
+      "file": "cities/khakasiya-sayanogorsk-d8eee3899c.csv"
+    },
+    {
+      "key": "rostovskaya-belaya-kalitva-ff4f7b2024",
+      "name": "Белая Калитва",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-belaya-kalitva-ff4f7b2024.csv"
+    },
+    {
+      "key": "rostovskaya-volgodonsk-b2fce7be0a",
+      "name": "Волгодонск",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-volgodonsk-b2fce7be0a.csv"
+    },
+    {
+      "key": "rostovskaya-kamensk-shakhtins-f504ddc2b9",
+      "name": "Каменск-Шахтинский",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-kamensk-shakhtins-f504ddc2b9.csv"
+    },
+    {
+      "key": "rostovskaya-morozovsk-b034c6e91b",
+      "name": "Морозовск",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-morozovsk-b034c6e91b.csv"
+    },
+    {
+      "key": "rostovskaya-novocherkassk-ad23d38997",
+      "name": "Новочеркасск",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-novocherkassk-ad23d38997.csv"
+    },
+    {
+      "key": "rostovskaya-rostov-na-donu-b301263096",
+      "name": "Ростов-на-Дону",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-rostov-na-donu-b301263096.csv"
+    },
+    {
+      "key": "rostovskaya-salsk-25a2d17c96",
+      "name": "Сальск",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-salsk-25a2d17c96.csv"
+    },
+    {
+      "key": "rostovskaya-taganrog-1e5d6df101",
+      "name": "Таганрог",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-taganrog-1e5d6df101.csv"
+    },
+    {
+      "key": "rostovskaya-shakhty-7051cc8691",
+      "name": "Шахты",
+      "country": "Россия",
+      "region": "Ростовская область",
+      "file": "cities/rostovskaya-shakhty-7051cc8691.csv"
+    },
+    {
+      "key": "ryazanskaya-kasimov-0a098f38ba",
+      "name": "Касимов",
+      "country": "Россия",
+      "region": "Рязанская область",
+      "file": "cities/ryazanskaya-kasimov-0a098f38ba.csv"
+    },
+    {
+      "key": "ryazanskaya-mikhaylov-c3eaa3976f",
+      "name": "Михайлов",
+      "country": "Россия",
+      "region": "Рязанская область",
+      "file": "cities/ryazanskaya-mikhaylov-c3eaa3976f.csv"
+    },
+    {
+      "key": "ryazanskaya-ryazhsk-30a65a9f03",
+      "name": "Ряжск",
+      "country": "Россия",
+      "region": "Рязанская область",
+      "file": "cities/ryazanskaya-ryazhsk-30a65a9f03.csv"
+    },
+    {
+      "key": "ryazanskaya-ryazan-e2cd017acf",
+      "name": "Рязань",
+      "country": "Россия",
+      "region": "Рязанская область",
+      "file": "cities/ryazanskaya-ryazan-e2cd017acf.csv"
+    },
+    {
+      "key": "ryazanskaya-sasovo-9fa15718b8",
+      "name": "Сасово",
+      "country": "Россия",
+      "region": "Рязанская область",
+      "file": "cities/ryazanskaya-sasovo-9fa15718b8.csv"
+    },
+    {
+      "key": "ryazanskaya-skopin-58cdab9e9a",
+      "name": "Скопин",
+      "country": "Россия",
+      "region": "Рязанская область",
+      "file": "cities/ryazanskaya-skopin-58cdab9e9a.csv"
+    },
+    {
+      "key": "samarskaya-samara-330f1efee2",
+      "name": "Самара",
+      "country": "Россия",
+      "region": "Самарская область",
+      "file": "cities/samarskaya-samara-330f1efee2.csv"
+    },
+    {
+      "key": "samarskaya-sergievsk-fbd5b25c61",
+      "name": "Сергиевск",
+      "country": "Россия",
+      "region": "Самарская область",
+      "file": "cities/samarskaya-sergievsk-fbd5b25c61.csv"
+    },
+    {
+      "key": "samarskaya-syzran-938a527193",
+      "name": "Сызрань",
+      "country": "Россия",
+      "region": "Самарская область",
+      "file": "cities/samarskaya-syzran-938a527193.csv"
+    },
+    {
+      "key": "samarskaya-tolyatti-37a09c3740",
+      "name": "Тольятти",
+      "country": "Россия",
+      "region": "Самарская область",
+      "file": "cities/samarskaya-tolyatti-37a09c3740.csv"
+    },
+    {
+      "key": "sankt-peterburg-spb-2fbcc1c324",
+      "name": "Санкт-Петербург",
+      "country": "Россия",
+      "region": "Санкт-Петербург",
+      "file": "cities/sankt-peterburg-spb-2fbcc1c324.csv"
+    },
+    {
+      "key": "saratovskaya-balakovo-112c27be5a",
+      "name": "Балаково",
+      "country": "Россия",
+      "region": "Саратовская область",
+      "file": "cities/saratovskaya-balakovo-112c27be5a.csv"
+    },
+    {
+      "key": "saratovskaya-balashov-eb8288d409",
+      "name": "Балашов",
+      "country": "Россия",
+      "region": "Саратовская область",
+      "file": "cities/saratovskaya-balashov-eb8288d409.csv"
+    },
+    {
+      "key": "saratovskaya-pugachyov-5914f5fd9b",
+      "name": "Пугачёв",
+      "country": "Россия",
+      "region": "Саратовская область",
+      "file": "cities/saratovskaya-pugachyov-5914f5fd9b.csv"
+    },
+    {
+      "key": "saratovskaya-saratov-b0b99715fb",
+      "name": "Саратов",
+      "country": "Россия",
+      "region": "Саратовская область",
+      "file": "cities/saratovskaya-saratov-b0b99715fb.csv"
+    },
+    {
+      "key": "sakhalinskaya-korsakov-f280156d28",
+      "name": "Корсаков",
+      "country": "Россия",
+      "region": "Сахалинская область",
+      "file": "cities/sakhalinskaya-korsakov-f280156d28.csv"
+    },
+    {
+      "key": "sakhalinskaya-nevelsk-6e42d3d379",
+      "name": "Невельск",
+      "country": "Россия",
+      "region": "Сахалинская область",
+      "file": "cities/sakhalinskaya-nevelsk-6e42d3d379.csv"
+    },
+    {
+      "key": "sakhalinskaya-yuzhno-sakhalin-37320df7ce",
+      "name": "Южно-Сахалинск",
+      "country": "Россия",
+      "region": "Сахалинская область",
+      "file": "cities/sakhalinskaya-yuzhno-sakhalin-37320df7ce.csv"
+    },
+    {
+      "key": "sverdlovskaya-alapaevsk-1845de4d56",
+      "name": "Алапаевск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-alapaevsk-1845de4d56.csv"
+    },
+    {
+      "key": "sverdlovskaya-arti-7a984bbe66",
+      "name": "Арти",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-arti-7a984bbe66.csv"
+    },
+    {
+      "key": "sverdlovskaya-artyomovskiy-59e750551b",
+      "name": "Артёмовский",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-artyomovskiy-59e750551b.csv"
+    },
+    {
+      "key": "sverdlovskaya-asbest-03b5eaabd2",
+      "name": "Асбест",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-asbest-03b5eaabd2.csv"
+    },
+    {
+      "key": "sverdlovskaya-verkhnyaya-sald-0bbf93f2f8",
+      "name": "Верхняя Салда",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-verkhnyaya-sald-0bbf93f2f8.csv"
+    },
+    {
+      "key": "sverdlovskaya-ekaterinburg-cd6eaf3839",
+      "name": "Екатеринбург",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-ekaterinburg-cd6eaf3839.csv"
+    },
+    {
+      "key": "sverdlovskaya-ivdel-afff25b32b",
+      "name": "Ивдель",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-ivdel-afff25b32b.csv"
+    },
+    {
+      "key": "sverdlovskaya-irbit-d761f3db9b",
+      "name": "Ирбит",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-irbit-d761f3db9b.csv"
+    },
+    {
+      "key": "sverdlovskaya-kamensk-uralski-c98a6f6147",
+      "name": "Каменск-Уральский",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-kamensk-uralski-c98a6f6147.csv"
+    },
+    {
+      "key": "sverdlovskaya-kamyshlov-6c0e33868c",
+      "name": "Камышлов",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-kamyshlov-6c0e33868c.csv"
+    },
+    {
+      "key": "sverdlovskaya-karpinsk-fe95a47dad",
+      "name": "Карпинск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-karpinsk-fe95a47dad.csv"
+    },
+    {
+      "key": "sverdlovskaya-kachkanar-f673b28999",
+      "name": "Качканар",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-kachkanar-f673b28999.csv"
+    },
+    {
+      "key": "sverdlovskaya-krasnoturinsk-cc4d10a77c",
+      "name": "Краснотурьинск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-krasnoturinsk-cc4d10a77c.csv"
+    },
+    {
+      "key": "sverdlovskaya-krasnoufimsk-c1e13d5e78",
+      "name": "Красноуфимск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-krasnoufimsk-c1e13d5e78.csv"
+    },
+    {
+      "key": "sverdlovskaya-lesnoy-2b4e7dc776",
+      "name": "Лесной",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-lesnoy-2b4e7dc776.csv"
+    },
+    {
+      "key": "sverdlovskaya-nizhnie-sergi-3e14c98449",
+      "name": "Нижние Серги",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-nizhnie-sergi-3e14c98449.csv"
+    },
+    {
+      "key": "sverdlovskaya-nizhniy-tagil-bb64d022df",
+      "name": "Нижний Тагил",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-nizhniy-tagil-bb64d022df.csv"
+    },
+    {
+      "key": "sverdlovskaya-nizhnyaya-salda-42d79fe4ba",
+      "name": "Нижняя Салда",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-nizhnyaya-salda-42d79fe4ba.csv"
+    },
+    {
+      "key": "sverdlovskaya-novaya-lyalya-6a2dde783e",
+      "name": "Новая Ляля",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-novaya-lyalya-6a2dde783e.csv"
+    },
+    {
+      "key": "sverdlovskaya-novouralsk-2213d9ba2b",
+      "name": "Новоуральск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-novouralsk-2213d9ba2b.csv"
+    },
+    {
+      "key": "sverdlovskaya-pervouralsk-394eba37a7",
+      "name": "Первоуральск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-pervouralsk-394eba37a7.csv"
+    },
+    {
+      "key": "sverdlovskaya-polevskoy-0855e8fb11",
+      "name": "Полевской",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-polevskoy-0855e8fb11.csv"
+    },
+    {
+      "key": "sverdlovskaya-rezh-98ea770c9b",
+      "name": "Реж",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-rezh-98ea770c9b.csv"
+    },
+    {
+      "key": "sverdlovskaya-severouralsk-f175cb7978",
+      "name": "Североуральск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-severouralsk-f175cb7978.csv"
+    },
+    {
+      "key": "sverdlovskaya-serov-aa36a2ff93",
+      "name": "Серов",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-serov-aa36a2ff93.csv"
+    },
+    {
+      "key": "sverdlovskaya-sukhoy-log-0f68545c20",
+      "name": "Сухой Лог",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-sukhoy-log-0f68545c20.csv"
+    },
+    {
+      "key": "sverdlovskaya-tavda-5c68a4b827",
+      "name": "Тавда",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-tavda-5c68a4b827.csv"
+    },
+    {
+      "key": "sverdlovskaya-talitsa-48599584da",
+      "name": "Талица",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-talitsa-48599584da.csv"
+    },
+    {
+      "key": "sverdlovskaya-turinsk-8403f6aebf",
+      "name": "Туринск",
+      "country": "Россия",
+      "region": "Свердловская область",
+      "file": "cities/sverdlovskaya-turinsk-8403f6aebf.csv"
+    },
+    {
+      "key": "sevastopol-sevastopol-20039fc010",
+      "name": "Севастополь",
+      "country": "Россия",
+      "region": "Севастополь",
+      "file": "cities/sevastopol-sevastopol-20039fc010.csv"
+    },
+    {
+      "key": "smolenskaya-vyazma-c980fdd830",
+      "name": "Вязьма",
+      "country": "Россия",
+      "region": "Смоленская область",
+      "file": "cities/smolenskaya-vyazma-c980fdd830.csv"
+    },
+    {
+      "key": "smolenskaya-gagarin-63c0316e3d",
+      "name": "Гагарин",
+      "country": "Россия",
+      "region": "Смоленская область",
+      "file": "cities/smolenskaya-gagarin-63c0316e3d.csv"
+    },
+    {
+      "key": "smolenskaya-roslavl-2999d262cc",
+      "name": "Рославль",
+      "country": "Россия",
+      "region": "Смоленская область",
+      "file": "cities/smolenskaya-roslavl-2999d262cc.csv"
+    },
+    {
+      "key": "smolenskaya-safonovo-9c055ddcc2",
+      "name": "Сафоново",
+      "country": "Россия",
+      "region": "Смоленская область",
+      "file": "cities/smolenskaya-safonovo-9c055ddcc2.csv"
+    },
+    {
+      "key": "smolenskaya-smolensk-bedc37ffb7",
+      "name": "Смоленск",
+      "country": "Россия",
+      "region": "Смоленская область",
+      "file": "cities/smolenskaya-smolensk-bedc37ffb7.csv"
+    },
+    {
+      "key": "stavropolskiy-aleksandrovskoe-961b2b773f",
+      "name": "Александровское",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-aleksandrovskoe-961b2b773f.csv"
+    },
+    {
+      "key": "stavropolskiy-blagodarnyy-04a2ba32b7",
+      "name": "Благодарный",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-blagodarnyy-04a2ba32b7.csv"
+    },
+    {
+      "key": "stavropolskiy-budyonnovsk-a8e14ea61e",
+      "name": "Будённовск",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-budyonnovsk-a8e14ea61e.csv"
+    },
+    {
+      "key": "stavropolskiy-izobilnyy-72ca765971",
+      "name": "Изобильный",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-izobilnyy-72ca765971.csv"
+    },
+    {
+      "key": "stavropolskiy-ipatovo-9477a9133e",
+      "name": "Ипатово",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-ipatovo-9477a9133e.csv"
+    },
+    {
+      "key": "stavropolskiy-kislovodsk-6ba11b2419",
+      "name": "Кисловодск",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-kislovodsk-6ba11b2419.csv"
+    },
+    {
+      "key": "stavropolskiy-mineralnye-vody-a9c40e8716",
+      "name": "Минеральные Воды",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-mineralnye-vody-a9c40e8716.csv"
+    },
+    {
+      "key": "stavropolskiy-nevinnomyssk-880f337c80",
+      "name": "Невинномысск",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-nevinnomyssk-880f337c80.csv"
+    },
+    {
+      "key": "stavropolskiy-neftekumsk-dbe4e89ee6",
+      "name": "Нефтекумск",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-neftekumsk-dbe4e89ee6.csv"
+    },
+    {
+      "key": "stavropolskiy-pyatigorsk-cc8ea161e6",
+      "name": "Пятигорск",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-pyatigorsk-cc8ea161e6.csv"
+    },
+    {
+      "key": "stavropolskiy-svetlograd-0bb0cbe4c1",
+      "name": "Светлоград",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-svetlograd-0bb0cbe4c1.csv"
+    },
+    {
+      "key": "stavropolskiy-stavropol-25dc1ea464",
+      "name": "Ставрополь",
+      "country": "Россия",
+      "region": "Ставропольский край",
+      "file": "cities/stavropolskiy-stavropol-25dc1ea464.csv"
+    },
+    {
+      "key": "tambovskaya-michurinsk-264e33ca74",
+      "name": "Мичуринск",
+      "country": "Россия",
+      "region": "Тамбовская область",
+      "file": "cities/tambovskaya-michurinsk-264e33ca74.csv"
+    },
+    {
+      "key": "tambovskaya-tambov-22b07fc5fa",
+      "name": "Тамбов",
+      "country": "Россия",
+      "region": "Тамбовская область",
+      "file": "cities/tambovskaya-tambov-22b07fc5fa.csv"
+    },
+    {
+      "key": "tverskaya-bezhetsk-56252623b5",
+      "name": "Бежецк",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-bezhetsk-56252623b5.csv"
+    },
+    {
+      "key": "tverskaya-vyshniy-volochyok-49e097e75f",
+      "name": "Вышний Волочёк",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-vyshniy-volochyok-49e097e75f.csv"
+    },
+    {
+      "key": "tverskaya-kashin-1fa1ae38a2",
+      "name": "Кашин",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-kashin-1fa1ae38a2.csv"
+    },
+    {
+      "key": "tverskaya-konakovo-4b7a40ecf3",
+      "name": "Конаково",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-konakovo-4b7a40ecf3.csv"
+    },
+    {
+      "key": "tverskaya-nelidovo-d0cda21956",
+      "name": "Нелидово",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-nelidovo-d0cda21956.csv"
+    },
+    {
+      "key": "tverskaya-ostashkov-5490014122",
+      "name": "Осташков",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-ostashkov-5490014122.csv"
+    },
+    {
+      "key": "tverskaya-rzhev-b775d5b910",
+      "name": "Ржев",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-rzhev-b775d5b910.csv"
+    },
+    {
+      "key": "tverskaya-tver-91d7a22fea",
+      "name": "Тверь",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-tver-91d7a22fea.csv"
+    },
+    {
+      "key": "tverskaya-torzhok-b0b388a756",
+      "name": "Торжок",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-torzhok-b0b388a756.csv"
+    },
+    {
+      "key": "tverskaya-udomlya-b1bd5c6baa",
+      "name": "Удомля",
+      "country": "Россия",
+      "region": "Тверская область",
+      "file": "cities/tverskaya-udomlya-b1bd5c6baa.csv"
+    },
+    {
+      "key": "tomskaya-asino-30cc0d5aa7",
+      "name": "Асино",
+      "country": "Россия",
+      "region": "Томская область",
+      "file": "cities/tomskaya-asino-30cc0d5aa7.csv"
+    },
+    {
+      "key": "tomskaya-strezhevoy-5b1909f039",
+      "name": "Стрежевой",
+      "country": "Россия",
+      "region": "Томская область",
+      "file": "cities/tomskaya-strezhevoy-5b1909f039.csv"
+    },
+    {
+      "key": "tomskaya-tomsk-ec45d9879b",
+      "name": "Томск",
+      "country": "Россия",
+      "region": "Томская область",
+      "file": "cities/tomskaya-tomsk-ec45d9879b.csv"
+    },
+    {
+      "key": "tulskaya-aleksin-83c1645cfd",
+      "name": "Алексин",
+      "country": "Россия",
+      "region": "Тульская область",
+      "file": "cities/tulskaya-aleksin-83c1645cfd.csv"
+    },
+    {
+      "key": "tulskaya-efremov-5cc3980f75",
+      "name": "Ефремов",
+      "country": "Россия",
+      "region": "Тульская область",
+      "file": "cities/tulskaya-efremov-5cc3980f75.csv"
+    },
+    {
+      "key": "tulskaya-novomoskovsk-8503176d53",
+      "name": "Новомосковск",
+      "country": "Россия",
+      "region": "Тульская область",
+      "file": "cities/tulskaya-novomoskovsk-8503176d53.csv"
+    },
+    {
+      "key": "tulskaya-tula-95819cd964",
+      "name": "Тула",
+      "country": "Россия",
+      "region": "Тульская область",
+      "file": "cities/tulskaya-tula-95819cd964.csv"
+    },
+    {
+      "key": "tyumenskaya-zavodoukovsk-c99fdbda82",
+      "name": "Заводоуковск",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-zavodoukovsk-c99fdbda82.csv"
+    },
+    {
+      "key": "tyumenskaya-isetskoe-c365071621",
+      "name": "Исетское",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-isetskoe-c365071621.csv"
+    },
+    {
+      "key": "tyumenskaya-ishim-2b13e67bf5",
+      "name": "Ишим",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-ishim-2b13e67bf5.csv"
+    },
+    {
+      "key": "tyumenskaya-omutinskoe-2fdaa67836",
+      "name": "Омутинское",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-omutinskoe-2fdaa67836.csv"
+    },
+    {
+      "key": "tyumenskaya-tobolsk-10620ac059",
+      "name": "Тобольск",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-tobolsk-10620ac059.csv"
+    },
+    {
+      "key": "tyumenskaya-tyumen-6b8857e7a1",
+      "name": "Тюмень",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-tyumen-6b8857e7a1.csv"
+    },
+    {
+      "key": "tyumenskaya-uvat-6a288259bd",
+      "name": "Уват",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-uvat-6a288259bd.csv"
+    },
+    {
+      "key": "tyumenskaya-yalutorovsk-abed547464",
+      "name": "Ялуторовск",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-yalutorovsk-abed547464.csv"
+    },
+    {
+      "key": "tyumenskaya-yarkovo-a915111bf2",
+      "name": "Ярково",
+      "country": "Россия",
+      "region": "Тюменская область",
+      "file": "cities/tyumenskaya-yarkovo-a915111bf2.csv"
+    },
+    {
+      "key": "udmurtiya-balezino-55d0636feb",
+      "name": "Балезино",
+      "country": "Россия",
+      "region": "Удмуртская Республика",
+      "file": "cities/udmurtiya-balezino-55d0636feb.csv"
+    },
+    {
+      "key": "udmurtiya-votkinsk-b45b2c48be",
+      "name": "Воткинск",
+      "country": "Россия",
+      "region": "Удмуртская Республика",
+      "file": "cities/udmurtiya-votkinsk-b45b2c48be.csv"
+    },
+    {
+      "key": "udmurtiya-glazov-152f5cef3c",
+      "name": "Глазов",
+      "country": "Россия",
+      "region": "Удмуртская Республика",
+      "file": "cities/udmurtiya-glazov-152f5cef3c.csv"
+    },
+    {
+      "key": "udmurtiya-izhevsk-0447c11ef0",
+      "name": "Ижевск",
+      "country": "Россия",
+      "region": "Удмуртская Республика",
+      "file": "cities/udmurtiya-izhevsk-0447c11ef0.csv"
+    },
+    {
+      "key": "udmurtiya-mozhga-f4ede7e14d",
+      "name": "Можга",
+      "country": "Россия",
+      "region": "Удмуртская Республика",
+      "file": "cities/udmurtiya-mozhga-f4ede7e14d.csv"
+    },
+    {
+      "key": "udmurtiya-sarapul-4bb40b4c33",
+      "name": "Сарапул",
+      "country": "Россия",
+      "region": "Удмуртская Республика",
+      "file": "cities/udmurtiya-sarapul-4bb40b4c33.csv"
+    },
+    {
+      "key": "ulyanovskaya-dimitrovgrad-37a1bd3549",
+      "name": "Димитровград",
+      "country": "Россия",
+      "region": "Ульяновская область",
+      "file": "cities/ulyanovskaya-dimitrovgrad-37a1bd3549.csv"
+    },
+    {
+      "key": "ulyanovskaya-inza-a9f1b02176",
+      "name": "Инза",
+      "country": "Россия",
+      "region": "Ульяновская область",
+      "file": "cities/ulyanovskaya-inza-a9f1b02176.csv"
+    },
+    {
+      "key": "ulyanovskaya-ulyanovsk-787c1919ba",
+      "name": "Ульяновск",
+      "country": "Россия",
+      "region": "Ульяновская область",
+      "file": "cities/ulyanovskaya-ulyanovsk-787c1919ba.csv"
+    },
+    {
+      "key": "khabarovskiy-amursk-acc2fcf280",
+      "name": "Амурск",
+      "country": "Россия",
+      "region": "Хабаровский край",
+      "file": "cities/khabarovskiy-amursk-acc2fcf280.csv"
+    },
+    {
+      "key": "khabarovskiy-komsomolsk-na-am-5e16a5fc63",
+      "name": "Комсомольск-на-Амуре",
+      "country": "Россия",
+      "region": "Хабаровский край",
+      "file": "cities/khabarovskiy-komsomolsk-na-am-5e16a5fc63.csv"
+    },
+    {
+      "key": "khabarovskiy-sovetskaya-gavan-1b167b92b7",
+      "name": "Советская Гавань",
+      "country": "Россия",
+      "region": "Хабаровский край",
+      "file": "cities/khabarovskiy-sovetskaya-gavan-1b167b92b7.csv"
+    },
+    {
+      "key": "khabarovskiy-khabarovsk-c3ca00c9ce",
+      "name": "Хабаровск",
+      "country": "Россия",
+      "region": "Хабаровский край",
+      "file": "cities/khabarovskiy-khabarovsk-c3ca00c9ce.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-kogalym-4d2918c4f1",
+      "name": "Когалым",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-kogalym-4d2918c4f1.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-langepas-508dc82688",
+      "name": "Лангепас",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-langepas-508dc82688.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-megion-409553d812",
+      "name": "Мегион",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-megion-409553d812.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-nefteyugans-6ce776699c",
+      "name": "Нефтеюганск",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-nefteyugans-6ce776699c.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-nizhnevarto-e2c49cc347",
+      "name": "Нижневартовск",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-nizhnevarto-e2c49cc347.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-nyagan-8d2e671f0f",
+      "name": "Нягань",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-nyagan-8d2e671f0f.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-pyt-yakh-83f0605033",
+      "name": "Пыть-Ях",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-pyt-yakh-83f0605033.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-raduzhnyy-9a9fe417e0",
+      "name": "Радужный",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-raduzhnyy-9a9fe417e0.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-surgut-e89c13c70d",
+      "name": "Сургут",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-surgut-e89c13c70d.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-uray-d0c55bf37b",
+      "name": "Урай",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-uray-d0c55bf37b.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-khanty-mans-2733cc3405",
+      "name": "Ханты-Мансийск",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-khanty-mans-2733cc3405.csv"
+    },
+    {
+      "key": "khanty-mansiyskiy-yugorsk-e8fbf110d4",
+      "name": "Югорск",
+      "country": "Россия",
+      "region": "Ханты-Мансийский АО — Югра",
+      "file": "cities/khanty-mansiyskiy-yugorsk-e8fbf110d4.csv"
+    },
+    {
+      "key": "chelyabinskaya-zlatoust-219f10670a",
+      "name": "Златоуст",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-zlatoust-219f10670a.csv"
+    },
+    {
+      "key": "chelyabinskaya-kartaly-73d3801a18",
+      "name": "Карталы",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-kartaly-73d3801a18.csv"
+    },
+    {
+      "key": "chelyabinskaya-magnitogorsk-b102d396f9",
+      "name": "Магнитогорск",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-magnitogorsk-b102d396f9.csv"
+    },
+    {
+      "key": "chelyabinskaya-miass-f3599001f2",
+      "name": "Миасс",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-miass-f3599001f2.csv"
+    },
+    {
+      "key": "chelyabinskaya-ozyorsk-1053e10e97",
+      "name": "Озёрск",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-ozyorsk-1053e10e97.csv"
+    },
+    {
+      "key": "chelyabinskaya-satka-df50f1317b",
+      "name": "Сатка",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-satka-df50f1317b.csv"
+    },
+    {
+      "key": "chelyabinskaya-troitsk-215e4a9ae7",
+      "name": "Троицк",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-troitsk-215e4a9ae7.csv"
+    },
+    {
+      "key": "chelyabinskaya-tryokhgornyy-c1c4d80a70",
+      "name": "Трёхгорный",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-tryokhgornyy-c1c4d80a70.csv"
+    },
+    {
+      "key": "chelyabinskaya-chelyabinsk-d67a25d648",
+      "name": "Челябинск",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-chelyabinsk-d67a25d648.csv"
+    },
+    {
+      "key": "chelyabinskaya-yuzhnouralsk-9b20fc7c80",
+      "name": "Южноуральск",
+      "country": "Россия",
+      "region": "Челябинская область",
+      "file": "cities/chelyabinskaya-yuzhnouralsk-9b20fc7c80.csv"
+    },
+    {
+      "key": "chechnya-groznyy-13831445ae",
+      "name": "Грозный",
+      "country": "Россия",
+      "region": "Чеченская Республика",
+      "file": "cities/chechnya-groznyy-13831445ae.csv"
+    },
+    {
+      "key": "chuvashiya-alatyr-ee1b5fa145",
+      "name": "Алатырь",
+      "country": "Россия",
+      "region": "Чувашская Республика",
+      "file": "cities/chuvashiya-alatyr-ee1b5fa145.csv"
+    },
+    {
+      "key": "chuvashiya-cheboksary-c4688ee948",
+      "name": "Чебоксары",
+      "country": "Россия",
+      "region": "Чувашская Республика",
+      "file": "cities/chuvashiya-cheboksary-c4688ee948.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-gubkinskiy-78ecf9207c",
+      "name": "Губкинский",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-gubkinskiy-78ecf9207c.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-muravlenko-94fd7668dd",
+      "name": "Муравленко",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-muravlenko-94fd7668dd.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-nadym-67550f5a7e",
+      "name": "Надым",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-nadym-67550f5a7e.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-novyy-urengo-aa9c343264",
+      "name": "Новый Уренгой",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-novyy-urengo-aa9c343264.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-noyabrsk-789d6b4b84",
+      "name": "Ноябрьск",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-noyabrsk-789d6b4b84.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-salekhard-7c9e7fa101",
+      "name": "Салехард",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-salekhard-7c9e7fa101.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-tarko-sale-47e18727ff",
+      "name": "Тарко-Сале",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-tarko-sale-47e18727ff.csv"
+    },
+    {
+      "key": "yamalo-nenetskiy-yar-sale-fd35322118",
+      "name": "Яр-Сале",
+      "country": "Россия",
+      "region": "Ямало-Ненецкий автономный округ",
+      "file": "cities/yamalo-nenetskiy-yar-sale-fd35322118.csv"
+    },
+    {
+      "key": "yaroslavskaya-pereslavl-zales-9a04c0696f",
+      "name": "Переславль-Залесский",
+      "country": "Россия",
+      "region": "Ярославская область",
+      "file": "cities/yaroslavskaya-pereslavl-zales-9a04c0696f.csv"
+    },
+    {
+      "key": "yaroslavskaya-rybinsk-5ab41f3a8c",
+      "name": "Рыбинск",
+      "country": "Россия",
+      "region": "Ярославская область",
+      "file": "cities/yaroslavskaya-rybinsk-5ab41f3a8c.csv"
+    },
+    {
+      "key": "yaroslavskaya-uglich-e43dfd4b37",
+      "name": "Углич",
+      "country": "Россия",
+      "region": "Ярославская область",
+      "file": "cities/yaroslavskaya-uglich-e43dfd4b37.csv"
+    },
+    {
+      "key": "yaroslavskaya-yaroslavl-fe609a5949",
+      "name": "Ярославль",
+      "country": "Россия",
+      "region": "Ярославская область",
+      "file": "cities/yaroslavskaya-yaroslavl-fe609a5949.csv"
+    },
+    {
+      "key": "kazakhstan-kokshetau-3b76257416",
+      "name": "Кокшетау",
+      "country": "Казахстан",
+      "region": "Акмолинская область",
+      "file": "cities/kazakhstan-kokshetau-3b76257416.csv"
+    },
+    {
+      "key": "kazakhstan-astana-624f0adeaf",
+      "name": "Астана",
+      "country": "Казахстан",
+      "region": "Астана",
+      "file": "cities/kazakhstan-astana-624f0adeaf.csv"
+    },
+    {
+      "key": "kazakhstan-kostanay-7372a66754",
+      "name": "Костанай",
+      "country": "Казахстан",
+      "region": "Костанайская область",
+      "file": "cities/kazakhstan-kostanay-7372a66754.csv"
+    },
+    {
+      "key": "kazakhstan-pavlodar-f9d978a571",
+      "name": "Павлодар",
+      "country": "Казахстан",
+      "region": "Павлодарская область",
+      "file": "cities/kazakhstan-pavlodar-f9d978a571.csv"
+    },
+    {
+      "key": "belarus-minsk-57e8660ca2",
+      "name": "Минск",
+      "country": "Беларусь",
+      "region": "Минск",
+      "file": "cities/belarus-minsk-57e8660ca2.csv"
+    }
+  ]
+}

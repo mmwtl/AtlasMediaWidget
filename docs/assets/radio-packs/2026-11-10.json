@@ -1,0 +1,442 @@
+{
+  "snapshot_date": "2026-11-10",
+  "previous_snapshot": "2026-11-09.json",
+  "primary_pack": "atlas-radio-6plus.zip",
+  "selection": {
+    "minimum_frequency_rows_per_city": 6,
+    "count_unique_station_brands": false,
+    "include_oirt_65_8_to_74_mhz": true,
+    "pack_id": "atlas-radio-all",
+    "city_keys_preserved": true,
+    "cover_priority": [
+      "penza_builtin",
+      "separate_city_archives",
+      "national_pack"
+    ],
+    "numbered_Radio_images_used": false,
+    "cover_identity_scope": "Shared across city/country source IDs by normalized station name and explicit aliases"
+  },
+  "full_pack": {
+    "catalogs": 3181,
+    "regions": 87,
+    "station_rows": 12024,
+    "station_brands": 505,
+    "covers": 490,
+    "entries": 3672,
+    "uncompressed_bytes": 7851819,
+    "zip_bytes": 7541141,
+    "sha256": "9cb69af08c6f188c76203e947f8f92c9d5678d31246023f78325c1723259714b",
+    "max_stations_per_city": 54,
+    "oirt_rows": 2099,
+    "uncertain_rows": 9,
+    "text_placeholder_brands": 150,
+    "radio_logo_brands": 0,
+    "cover_source_tiers": {
+      "national": 392,
+      "city_archive": 77,
+      "penza": 33
+    },
+    "unique_cover_source_tiers": {
+      "penza": 25,
+      "city_archive": 75,
+      "national": 390
+    },
+    "curated_rows_not_merged": 15,
+    "source_national_rows": 11984,
+    "source_city_region_pairs": 3183,
+    "catalogs_with_only_oirt": 440,
+    "filename": "atlas-radio-all.zip",
+    "repository_path": "docs/assets/radio-packs/atlas-radio-all.zip"
+  },
+  "selected_pack": {
+    "minimum_stations": 6,
+    "catalogs": 463,
+    "station_rows": 6700,
+    "regions": 86,
+    "covers": 405,
+    "entries": 869,
+    "zip_bytes": 6141775,
+    "uncompressed_bytes": 6323616,
+    "min_stations_per_city": 6,
+    "max_stations_per_city": 54,
+    "oirt_rows": 584,
+    "uncertain_rows": 1,
+    "text_placeholder_brands": 92,
+    "cover_source_tiers": {
+      "national": 307,
+      "city_archive": 77,
+      "penza": 33
+    },
+    "unique_cover_source_tiers": {
+      "penza": 25,
+      "city_archive": 75,
+      "national": 305
+    },
+    "pack_id": "atlas-radio-all",
+    "sha256": "aebad76d642139e9168b71396b7c0a52ec5dd0b5eeaf295892f5de9f7cf618a6",
+    "source_sha256": "9cb69af08c6f188c76203e947f8f92c9d5678d31246023f78325c1723259714b",
+    "filename": "atlas-radio-6plus.zip",
+    "repository_path": "docs/assets/radio-packs/atlas-radio-6plus.zip"
+  },
+  "previous_archives": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "2f02e985adf0f7c187342e35ddb680001a9cb86795b72fb4b789dadc9bacc02f",
+      "catalogs": 3180,
+      "station_rows": 12010
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "530014604af824292f990208d073c8bee3a92547f514996475d739ba1e8dc5ab",
+      "catalogs": 462,
+      "station_rows": 6686
+    }
+  ],
+  "addition": {
+    "city": {
+      "key": "kazakhstan-kostanay-7372a66754",
+      "name": "Костанай",
+      "region": "Казахстан",
+      "file": "cities/kazakhstan-kostanay-7372a66754.csv"
+    },
+    "station_count": 14,
+    "new_unique_covers": 9,
+    "reused_penza_covers": 5,
+    "source_catalog": "docs/assets/radio-packs/stations_kostanay.zip",
+    "source_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+    "source_details": "docs/assets/radio-packs/kostanay-2026-11-10.json",
+    "all_existing_keys_csv_and_covers_byte_exact": true
+  },
+  "cover_provenance_delta": {
+    "kz_avtoradio_kazakhstan": {
+      "name": "Авторадио Казахстан",
+      "cover": "avtoradio.webp",
+      "cover_identity": "avtoradio",
+      "source": "media-runtime/src/main/assets/radio/covers/102300_avtoradio.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
+      "available_priorities": [
+        100,
+        60,
+        30
+      ],
+      "source_sha256": "1c0c646b8f2b9bb4206d77c2e300738117a8974fbd696f8495779d7512eccc2f",
+      "output_sha256": "1c0c646b8f2b9bb4206d77c2e300738117a8974fbd696f8495779d7512eccc2f"
+    },
+    "kz_evropa_plyus": {
+      "name": "Европа Плюс",
+      "cover": "evropa.webp",
+      "cover_identity": "evropa",
+      "source": "media-runtime/src/main/assets/radio/covers/103800_europa_plus.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
+      "available_priorities": [
+        100,
+        60,
+        30
+      ],
+      "source_sha256": "335e3666375d425ee5a5c6b425327711c85dca8129bcea0b34c03e547205f42e",
+      "output_sha256": "335e3666375d425ee5a5c6b425327711c85dca8129bcea0b34c03e547205f42e"
+    },
+    "kz_kazakhskoe_radio": {
+      "name": "Казахское радио",
+      "cover": "kz_kazakhskoe_radio.webp",
+      "cover_identity": "kz_kazakhskoe_radio",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/qazaq_radio.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "2e21b0a741b53b7acb3e1c0322ae27438aee1ff7b3d0f1b64598b69aaa4a3045",
+      "output_sha256": "2e21b0a741b53b7acb3e1c0322ae27438aee1ff7b3d0f1b64598b69aaa4a3045"
+    },
+    "kz_love_radio": {
+      "name": "Love Radio",
+      "cover": "love_radio.webp",
+      "cover_identity": "love_radio",
+      "source": "media-runtime/src/main/assets/radio/covers/096400_love_radio.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
+      "available_priorities": [
+        100,
+        60,
+        30
+      ],
+      "source_sha256": "554811edecc3175c48da9310fc8f09960a24602706762daa0a7426e72f2ae914",
+      "output_sha256": "554811edecc3175c48da9310fc8f09960a24602706762daa0a7426e72f2ae914"
+    },
+    "kz_lux_fm": {
+      "name": "LUX FM",
+      "cover": "kz_lux_fm.webp",
+      "cover_identity": "kz_lux_fm",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/lux_fm.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "eede8064791b60a62b4d98e46a9e35914119d79d5c8f24491aa68714e67d01b7",
+      "output_sha256": "eede8064791b60a62b4d98e46a9e35914119d79d5c8f24491aa68714e67d01b7"
+    },
+    "kz_narodnoe_radio": {
+      "name": "Народное радио",
+      "cover": "kz_narodnoe_radio.webp",
+      "cover_identity": "kz_narodnoe_radio",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/narodnoe_radio.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "257e18357941fc723f3bce636c7a17bd93aec70dab020c86a4ad037972ed8ccd",
+      "output_sha256": "257e18357941fc723f3bce636c7a17bd93aec70dab020c86a4ad037972ed8ccd"
+    },
+    "kz_radio_alau": {
+      "name": "Радио Алау",
+      "cover": "kz_radio_alau.webp",
+      "cover_identity": "kz_radio_alau",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/alau.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "6c7790018d8990c111cf96bf0e7138328443de0a40a249518be8fc0ce361713b",
+      "output_sha256": "6c7790018d8990c111cf96bf0e7138328443de0a40a249518be8fc0ce361713b"
+    },
+    "kz_radio_kn": {
+      "name": "Радио КН",
+      "cover": "kz_radio_kn.webp",
+      "cover_identity": "kz_radio_kn",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/radio_kn.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "8dea6eb29924f9b6a0a7e0abea87c63cefee7a11cbd0916eaaab8bd2ad2d2847",
+      "output_sha256": "8dea6eb29924f9b6a0a7e0abea87c63cefee7a11cbd0916eaaab8bd2ad2d2847"
+    },
+    "kz_radio_ns": {
+      "name": "Радио NS",
+      "cover": "kz_radio_ns.webp",
+      "cover_identity": "kz_radio_ns",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/radio_ns.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "f6c0d97546c43e8ae738b95245d217e1a1ae65083b8fdca7d410d74d0c7d6772",
+      "output_sha256": "f6c0d97546c43e8ae738b95245d217e1a1ae65083b8fdca7d410d74d0c7d6772"
+    },
+    "kz_retro_fm_kazakhstan": {
+      "name": "Ретро FM Казахстан",
+      "cover": "retro_fm.webp",
+      "cover_identity": "retro_fm",
+      "source": "media-runtime/src/main/assets/radio/covers/095600_retro_fm.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
+      "available_priorities": [
+        100,
+        60,
+        30
+      ],
+      "source_sha256": "330eceb3344d21977e32cb7ab25476c1ae96a7338b62609e8153ea705d45ac8d",
+      "output_sha256": "330eceb3344d21977e32cb7ab25476c1ae96a7338b62609e8153ea705d45ac8d"
+    },
+    "kz_russkoe_radio": {
+      "name": "Русское Радио",
+      "cover": "russkoe_radio.webp",
+      "cover_identity": "russkoe_radio",
+      "source": "media-runtime/src/main/assets/radio/covers/104800_russkoe_radio.webp",
+      "source_tier": "penza",
+      "source_kind": "penza:built-in",
+      "chosen_priority": 100,
+      "available_priorities": [
+        100,
+        60,
+        30
+      ],
+      "source_sha256": "490d2cdf0f9d1f06018372cb1f76d99cd750db2dcb3e4bfd06388c454ef6df7b",
+      "output_sha256": "490d2cdf0f9d1f06018372cb1f76d99cd750db2dcb3e4bfd06388c454ef6df7b"
+    },
+    "kz_shalkar_radio": {
+      "name": "Шалкар радио",
+      "cover": "kz_shalkar_radio.webp",
+      "cover_identity": "kz_shalkar_radio",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/shalqar.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "11e0af46c3bdd2b551b7d509bb7f3f6378cd25d068eee0360e941e7bd2d1dd0c",
+      "output_sha256": "11e0af46c3bdd2b551b7d509bb7f3f6378cd25d068eee0360e941e7bd2d1dd0c"
+    },
+    "kz_zhana_fm": {
+      "name": "Жана FM",
+      "cover": "kz_zhana_fm.webp",
+      "cover_identity": "kz_zhana_fm",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/zhana_fm.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "becb9a61ef62e2c61bc5b8bd869e28235f2e1285dd29af298d79876f6abefd56",
+      "output_sha256": "becb9a61ef62e2c61bc5b8bd869e28235f2e1285dd29af298d79876f6abefd56"
+    },
+    "kz_zhuldyz_fm": {
+      "name": "Жулдыз FM",
+      "cover": "kz_zhuldyz_fm.webp",
+      "cover_identity": "kz_zhuldyz_fm",
+      "source": "docs/assets/radio-packs/stations_kostanay.zip!/covers/zhuldyz_fm.webp",
+      "source_tier": "city_archive",
+      "archive_sha256": "92d8926e1b8ebcccd7578d8f292ddb97b330c6595a6fdb75db9da477067b1cc5",
+      "source_kind": "city_archive:stations_kostanay.zip",
+      "chosen_priority": 60,
+      "available_priorities": [
+        60
+      ],
+      "source_sha256": "e1d2bd2f8ce1066204f4e1faf9d928d22b3287f5f5ee33ae261e91fcaaebb324",
+      "output_sha256": "e1d2bd2f8ce1066204f4e1faf9d928d22b3287f5f5ee33ae261e91fcaaebb324"
+    }
+  },
+  "station_identity_exceptions": [
+    {
+      "name": "Народное радио",
+      "reason": "Distinct station brands in Belarus and Kazakhstan; preserve each approved logo",
+      "regions": [
+        "Беларусь",
+        "Казахстан"
+      ],
+      "sources": [
+        "https://narodnoeradio.by/",
+        "https://narodnoeradio.kz/"
+      ]
+    }
+  ],
+  "archive_validation": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "9cb69af08c6f188c76203e947f8f92c9d5678d31246023f78325c1723259714b",
+      "zip_bytes": 7541141,
+      "cities": 3181,
+      "station_rows": 12024,
+      "cover_reads": 12015,
+      "covers": 490,
+      "added_city": {
+        "key": "kazakhstan-kostanay-7372a66754",
+        "name": "Костанай",
+        "region": "Казахстан",
+        "file": "cities/kazakhstan-kostanay-7372a66754.csv"
+      },
+      "added_stations": 14,
+      "added_unique_covers": 9,
+      "all_existing_city_keys_csv_and_covers_unchanged": true,
+      "kostanay_covers_match_approved_catalog": true,
+      "zip_validation": "PASS"
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "aebad76d642139e9168b71396b7c0a52ec5dd0b5eeaf295892f5de9f7cf618a6",
+      "zip_bytes": 6141775,
+      "cities": 463,
+      "station_rows": 6700,
+      "cover_reads": 6699,
+      "covers": 405,
+      "added_city": {
+        "key": "kazakhstan-kostanay-7372a66754",
+        "name": "Костанай",
+        "region": "Казахстан",
+        "file": "cities/kazakhstan-kostanay-7372a66754.csv"
+      },
+      "added_stations": 14,
+      "added_unique_covers": 9,
+      "all_existing_city_keys_csv_and_covers_unchanged": true,
+      "kostanay_covers_match_approved_catalog": true,
+      "zip_validation": "PASS"
+    }
+  ],
+  "station_identity_audit": [
+    {
+      "filename": "atlas-radio-all.zip",
+      "sha256": "9cb69af08c6f188c76203e947f8f92c9d5678d31246023f78325c1723259714b",
+      "checked_rows": 12015,
+      "uncertain_rows_without_cover": 9,
+      "expected_tier_rows": {
+        "3": 7927,
+        "2": 1723,
+        "1": 2365
+      },
+      "wrong_priority": {},
+      "same_station_multiple_covers": {},
+      "unmatched_names": []
+    },
+    {
+      "filename": "atlas-radio-6plus.zip",
+      "sha256": "aebad76d642139e9168b71396b7c0a52ec5dd0b5eeaf295892f5de9f7cf618a6",
+      "checked_rows": 6699,
+      "uncertain_rows_without_cover": 1,
+      "expected_tier_rows": {
+        "3": 4343,
+        "2": 1451,
+        "1": 905
+      },
+      "wrong_priority": {},
+      "same_station_multiple_covers": {},
+      "unmatched_names": []
+    }
+  ],
+  "whole_pack_import_verification": {
+    "sdk": 30,
+    "packs": [
+      {
+        "archive": "atlas-radio-all.zip",
+        "sha256": "9cb69af08c6f188c76203e947f8f92c9d5678d31246023f78325c1723259714b",
+        "cities": 3181,
+        "station_rows": 12024,
+        "whole_pack_import": "PASS",
+        "all_city_activation_and_artwork": "PASS",
+        "export_and_reimport": "PASS"
+      },
+      {
+        "archive": "six-plus/atlas-radio-6plus.zip",
+        "sha256": "aebad76d642139e9168b71396b7c0a52ec5dd0b5eeaf295892f5de9f7cf618a6",
+        "cities": 463,
+        "station_rows": 6700,
+        "whole_pack_import": "PASS",
+        "all_city_activation_and_artwork": "PASS",
+        "export_and_reimport": "PASS"
+      }
+    ],
+    "checked_station_rows": 18724,
+    "checked_cover_reads": 18714,
+    "full_to_filtered_update_keeps_minsk": true
+  },
+  "all_25_penza_covers_preserved": true,
+  "physical_head_unit_verified": false,
+  "application_sources_changed": false
+}

@@ -1,0 +1,12 @@
+frequency_khz,name,band,cover
+87900,Волна FM,FM,volna_fm.webp
+90000,Радио Си,FM,si.webp
+91100,Радио России,FM,rossii.webp
+92500,Авторадио,FM,avtoradio.webp
+92900,Джем FM,FM,dzhem_fm.webp
+95000,Радио Пилот,FM,pilot.webp
+97100,Канал Воскресение,FM,kanal_voskresenie.webp
+97500,Интерра FM,FM,interra_fm.webp
+99700,DFM,FM,dfm.webp
+101700,Маруся FM,FM,marusya_fm.webp
+106500,Русское Радио,FM,russkoe_radio.webp

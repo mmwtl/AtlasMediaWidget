@@ -1,0 +1,512 @@
+{
+  "checked_at": "2026-11-10",
+  "cities": {
+    "Астана": 18,
+    "Кокшетау": 9,
+    "Павлодар": 13
+  },
+  "station_rows": [
+    {
+      "city": "Астана",
+      "frequency_khz": 100000,
+      "name": "BEU FM",
+      "cover": "beu_fm.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/astana",
+        "https://top-radio.ru/astana",
+        "https://topradio.me/astana/beu-fm"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 100400,
+      "name": "Шалкар радио",
+      "cover": "shalqar.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/shalqarfm/kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 100800,
+      "name": "Жулдыз FM",
+      "cover": "zhuldyz_fm.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://www.zhuldyzfm.kz/ru",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 101400,
+      "name": "Радио Jibek Joly",
+      "cover": "jibek_joly.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://jjfm.kz/ru/projects/zhenshinal-geographic/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 101800,
+      "name": "Народное радио",
+      "cover": "narodnoe_radio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/astana",
+        "https://top-radio.ru/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 102300,
+      "name": "Love Radio",
+      "cover": "love_radio.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://loveradio.kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 102700,
+      "name": "Classic",
+      "cover": "classic.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/classicfm/kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 103200,
+      "name": "Orda FM",
+      "cover": "orda_fm.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://orda.fm/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 103700,
+      "name": "Той Думан",
+      "cover": "toi_duman.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://toiduman.kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 104100,
+      "name": "Русское Радио",
+      "cover": "russkoe_radio.webp",
+      "evidence": "official_station_price_list_2025",
+      "sources": [
+        "https://rusradio.kz/assets/template/pdf/Price%20LOCAL%20RusRadioAsia%202025.pdf",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 104500,
+      "name": "Ретро FM Казахстан",
+      "cover": "retro_fm.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/astana",
+        "https://top-radio.ru/astana",
+        "https://radiohub.kz/radio/retro-fm/"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 105000,
+      "name": "Европа Плюс",
+      "cover": "europa_plus.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/astana",
+        "https://top-radio.ru/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 105400,
+      "name": "Business FM",
+      "cover": "business_fm.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://businessfm.kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 105900,
+      "name": "Радио NS",
+      "cover": "radio_ns.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://ns.kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 106400,
+      "name": "Авторадио Казахстан",
+      "cover": "avtoradio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/astana",
+        "https://top-radio.ru/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 106800,
+      "name": "Казахское радио",
+      "cover": "qazaq_radio.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 107300,
+      "name": "Радио Дача",
+      "cover": "radio_dacha.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://dachafm.kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 107700,
+      "name": "LUX FM",
+      "cover": "lux_fm.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://luxfm.kz/",
+        "https://radiomap.eu/kz/astana"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 101000,
+      "name": "Казахское радио",
+      "cover": "qazaq_radio.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/",
+        "https://radiomap.eu/kz/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 102000,
+      "name": "Русское Радио",
+      "cover": "russkoe_radio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/kokshetau",
+        "https://top-radio.ru/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 102500,
+      "name": "Авторадио Казахстан",
+      "cover": "avtoradio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/kokshetau",
+        "https://top-radio.ru/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 103700,
+      "name": "Шалкар радио",
+      "cover": "shalqar.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/shalqarfm/kz/",
+        "https://radiomap.eu/kz/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 104200,
+      "name": "Европа Плюс",
+      "cover": "europa_plus.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/kokshetau",
+        "https://top-radio.ru/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 105700,
+      "name": "Радио NS",
+      "cover": "radio_ns.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://ns.kz/",
+        "https://radiomap.eu/kz/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 106500,
+      "name": "Радио Дача",
+      "cover": "radio_dacha.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://dachafm.kz/",
+        "https://radiomap.eu/kz/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 107000,
+      "name": "Народное радио",
+      "cover": "narodnoe_radio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/kokshetau",
+        "https://top-radio.ru/kokshetau"
+      ]
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 107600,
+      "name": "Ретро FM Казахстан",
+      "cover": "retro_fm.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/kokshetau",
+        "https://top-radio.ru/kokshetau",
+        "https://radiohub.kz/radio/retro-fm/",
+        "https://radiopedia.fandom.com/ru/wiki/Частотные_планы_радиостанций_в_городах_Казахстана/Кокшетау"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 99800,
+      "name": "LUX FM",
+      "cover": "lux_fm.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://luxfm.kz/",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 100500,
+      "name": "Радио Халык",
+      "cover": "halyq_radio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/pavlodar",
+        "https://top-radio.ru/pavlodar",
+        "https://assembly.kz/ru/news/vot-uzhe-27-let-ukraiinska-rodina-veshchaet-na-volne-100-5-fm/"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 101000,
+      "name": "Казахское радио",
+      "cover": "qazaq_radio.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 101400,
+      "name": "Европа Плюс",
+      "cover": "europa_plus.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/pavlodar",
+        "https://top-radio.ru/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 101800,
+      "name": "Ретро FM Казахстан",
+      "cover": "retro_fm.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/pavlodar",
+        "https://top-radio.ru/pavlodar",
+        "https://radiohub.kz/radio/retro-fm/"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 102900,
+      "name": "Радио Дача",
+      "cover": "radio_dacha.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://dachafm.kz/",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 103800,
+      "name": "Love Radio",
+      "cover": "love_radio.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://loveradio.kz/",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 104600,
+      "name": "Радио NS",
+      "cover": "radio_ns.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://ns.kz/",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 105000,
+      "name": "Народное радио",
+      "cover": "narodnoe_radio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/pavlodar",
+        "https://top-radio.ru/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 105600,
+      "name": "Авторадио Казахстан",
+      "cover": "avtoradio.webp",
+      "evidence": "corroborated_radio_directories",
+      "sources": [
+        "https://radiomap.eu/kz/pavlodar",
+        "https://top-radio.ru/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 106200,
+      "name": "Русское Радио",
+      "cover": "russkoe_radio.webp",
+      "evidence": "official_station_price_list_2025",
+      "sources": [
+        "https://rusradio.kz/assets/template/pdf/Price%20LOCAL%20RusRadioAsia%202025.pdf",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 106700,
+      "name": "Шалкар радио",
+      "cover": "shalqar.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://qazradio.fm/shalqarfm/kz/",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    },
+    {
+      "city": "Павлодар",
+      "frequency_khz": 107100,
+      "name": "Жулдыз FM",
+      "cover": "zhuldyz_fm.webp",
+      "evidence": "official_frequency_list",
+      "sources": [
+        "https://www.zhuldyzfm.kz/ru",
+        "https://radiomap.eu/kz/pavlodar"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "city": "Астана",
+      "frequency_khz": 101400,
+      "chosen": "Радио Jibek Joly",
+      "replaces": "Астана радиосы",
+      "since": "2025-05-01",
+      "sources": [
+        "https://jjfm.kz/ru/",
+        "https://www.inform.kz/ru/novoe-radio-jibek-joly-nachalo-svoe-veshanie-v-kazahstane-401cc9"
+      ]
+    },
+    {
+      "city": "Астана",
+      "frequency_khz": 103700,
+      "chosen": "Той Думан",
+      "excluded_frequency_khz": 91500,
+      "reason": "Use the frequency published by the broadcaster; some directory lists conflict",
+      "source": "https://toiduman.kz/"
+    },
+    {
+      "city": "Кокшетау",
+      "frequency_khz": 101400,
+      "excluded": "LUX FM",
+      "reason": "Listed as coming soon, not as an active city on the official site",
+      "source": "https://luxfm.kz/"
+    },
+    {
+      "city": "Кокшетау",
+      "excluded_candidates": [
+        {
+          "frequency_khz": 104800,
+          "name": "Energy FM"
+        },
+        {
+          "frequency_khz": 106100,
+          "name": "Жулдыз FM"
+        }
+      ],
+      "reason": "Appear in frequency plans; no current broadcaster confirmation found, not included as active stations"
+    },
+    {
+      "station": "Ретро FM Казахстан",
+      "frequencies_khz": {
+        "Астана": 104500,
+        "Кокшетау": 107600,
+        "Павлодар": 101800
+      },
+      "reason": "Current directory names; older lists still say Tengri FM. No current official frequency page available; retrofm.kz now serves unrelated content."
+    }
+  ],
+  "limitations": [
+    "No on-site FM reception test",
+    "Rows marked corroborated_radio_directories are supported by directories rather than a current broadcaster frequency page",
+    "Catalog reflects reviewed sources, not a guarantee of every transmitter currently on air"
+  ]
+}

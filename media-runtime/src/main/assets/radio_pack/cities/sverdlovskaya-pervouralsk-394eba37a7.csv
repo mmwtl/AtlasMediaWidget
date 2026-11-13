@@ -1,0 +1,9 @@
+frequency_khz,name,band,cover
+88000,Вести FM,FM,vesti_fm.webp
+89900,Радио России,FM,rossii.webp
+90500,Радио Record,FM,rekord.webp
+93000,Ретро FM,FM,retro_fm.webp
+95100,Милицейская волна,FM,militseyskaya_volna.webp
+97200,Радио Маяк,FM,mayak.webp
+97600,Интерра FM,FM,interra_fm.webp
+98100,Gold FM,FM,gold_fm.webp

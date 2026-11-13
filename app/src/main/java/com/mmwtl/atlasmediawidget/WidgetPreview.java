@@ -18,7 +18,7 @@ final class WidgetPreview {
         @Override public boolean onDragTouch(View view, MotionEvent event) { return true; }
         @Override public void onCommand(String command) {}
         @Override public void onSeek(long positionMs) {}
-        @Override public void onSource(MediaSource.Id source) {}
+        @Override public void onSource(SourceTile tile) {}
         @Override public void onOpenSource() {}
         @Override public void onRadioStationsRequested() {}
         @Override public void onRadioStation(RadioStation station) {}

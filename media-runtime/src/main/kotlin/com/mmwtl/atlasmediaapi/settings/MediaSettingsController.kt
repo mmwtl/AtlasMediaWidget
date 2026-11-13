@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.AtomicFile
 import com.mmwtl.atlasmediaapi.media.bridge.MediaBridgeContract
+import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsCatalog
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSettingsSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogRepository
 import com.mmwtl.atlasmediaapi.media.bridge.RadioCatalogType
@@ -45,6 +46,8 @@ class MediaSettingsController(
         const val MAX_ZIP_ENTRIES = 305
 
         val ALLOWED_AUDIO_SOURCES = setOf("", "RADIO", "BT", "USB", "ONLINE", "CPAA")
+        val STARTUP_INTERNET_TIMEOUT_RANGE = AtlasPreferences.MIN_STARTUP_INTERNET_TIMEOUT_SEC..
+            AtlasPreferences.MAX_STARTUP_INTERNET_TIMEOUT_SEC
     }
 
     private val metaPrefs: SharedPreferences =
@@ -115,6 +118,8 @@ class MediaSettingsController(
             autoSwitchToDefaultAutoplayOnSourceLost = preferences.autoSwitchToDefaultAutoplayOnSourceLost,
             defaultMediaPackage = preferences.defaultMediaPackage,
             minimizeOnlinePlayerAfterAutostart = preferences.minimizeOnlinePlayerAfterAutostart,
+            startupWaitForInternet = preferences.startupWaitForInternet,
+            startupInternetTimeoutSec = preferences.startupInternetTimeoutSec,
             radioWidgetBroadcastEnabled = radioCatalogRepository.isWidgetBroadcastEnabled,
             clusterCoversEnabled = clusterMediaBridge.isClusterCoversEnabled,
             clusterOnlineEnabled = clusterMediaBridge.isClusterOnlineEnabled,
@@ -125,6 +130,13 @@ class MediaSettingsController(
             catalogStationCount = catalogInfo.stationCount,
             catalogDescription = catalogInfo.description,
             uiScaleTenths = preferences.uiScaleTenths,
+            catalogActiveId = catalogInfo.activeId,
+            catalogs = catalogInfo.catalogs.map {
+                MediaSettingsCatalog(it.id, it.name, it.stationCount, it.packId, it.cityCount)
+            },
+            catalogActiveCityKey = catalogInfo.activeCityKey,
+            catalogActiveCityName = catalogInfo.activeCityName,
+            catalogActiveRegion = catalogInfo.activeRegion,
         )
     }
 
@@ -158,6 +170,18 @@ class MediaSettingsController(
                     snapshot = null,
                     status = MediaBridgeContract.Status.VALIDATION_ERROR,
                     errorMessage = "Задержка источника должна быть от 0 до 30 секунд: $delay",
+                )
+            }
+        }
+        if (update.containsKey(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC)) {
+            val timeout = update.getInt(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC)
+            if (timeout !in STARTUP_INTERNET_TIMEOUT_RANGE) {
+                return UpdateResult(
+                    snapshot = null,
+                    status = MediaBridgeContract.Status.VALIDATION_ERROR,
+                    errorMessage = "Ожидание интернета должно быть от " +
+                        "${STARTUP_INTERNET_TIMEOUT_RANGE.first} до " +
+                        "${STARTUP_INTERNET_TIMEOUT_RANGE.last} секунд: $timeout",
                 )
             }
         }
@@ -226,6 +250,14 @@ class MediaSettingsController(
                 MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART,
             )
         }
+        if (update.containsKey(MediaBridgeContract.Key.STARTUP_WAIT_FOR_INTERNET)) {
+            preferences.startupWaitForInternet =
+                update.getBoolean(MediaBridgeContract.Key.STARTUP_WAIT_FOR_INTERNET)
+        }
+        if (update.containsKey(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC)) {
+            preferences.startupInternetTimeoutSec =
+                update.getInt(MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC)
+        }
         if (update.containsKey(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED)) {
             radioCatalogRepository.setWidgetBroadcastEnabled(update.getBoolean(MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED))
         }
@@ -272,6 +304,29 @@ class MediaSettingsController(
         return getSnapshot()
     }
 
+    /** Activates, renames or deletes one radio catalog; throws IllegalArgumentException if invalid. */
+    fun manageRadioCatalog(
+        action: String,
+        catalogId: String,
+        name: String?,
+        cityKey: String? = null,
+    ): MediaSettingsSnapshot =
+        synchronized(importLock) {
+            require(RadioCatalogRepository.isValidCatalogId(catalogId)) { "Недопустимый идентификатор каталога" }
+            require(cityKey.isNullOrEmpty() || RadioCatalogRepository.isValidCityKey(cityKey)) {
+                "Недопустимый ключ города"
+            }
+            when (action) {
+                MediaBridgeContract.CatalogAction.ACTIVATE -> radioCatalogRepository.activateCatalog(catalogId, cityKey)
+                MediaBridgeContract.CatalogAction.RENAME -> radioCatalogRepository.renameCatalog(catalogId, name.orEmpty())
+                MediaBridgeContract.CatalogAction.DELETE -> radioCatalogRepository.deleteCatalog(catalogId)
+                else -> throw IllegalArgumentException("Неизвестное действие с каталогом: $action")
+            }
+            nextRevision()
+            onSettingsChanged?.invoke()
+            return getSnapshot()
+        }
+
     /** Publishes a radio catalog mutation to the coordinator and settings clients. */
     fun onRadioCatalogChanged(): MediaSettingsSnapshot = synchronized(importLock) {
         nextRevision()
@@ -292,6 +347,8 @@ class MediaSettingsController(
             put("autoSwitchToDefaultAutoplayOnSourceLost", snapshot.autoSwitchToDefaultAutoplayOnSourceLost)
             put("defaultMediaPackage", snapshot.defaultMediaPackage)
             put("minimizeOnlinePlayerAfterAutostart", snapshot.minimizeOnlinePlayerAfterAutostart)
+            put("startupWaitForInternet", snapshot.startupWaitForInternet)
+            put("startupInternetTimeoutSec", snapshot.startupInternetTimeoutSec)
             put("radioWidgetBroadcastEnabled", snapshot.radioWidgetBroadcastEnabled)
             put("clusterCoversEnabled", snapshot.clusterCoversEnabled)
             put("clusterOnlineEnabled", snapshot.clusterOnlineEnabled)
@@ -589,6 +646,10 @@ class MediaSettingsController(
             "minimizeOnlinePlayerAfterAutostart",
             false,
         )
+        preferences.startupWaitForInternet = mediaJson.optBoolean("startupWaitForInternet", false)
+        preferences.startupInternetTimeoutSec = if (mediaJson.has("startupInternetTimeoutSec")) {
+            mediaJson.getInt("startupInternetTimeoutSec")
+        } else AtlasPreferences.DEFAULT_STARTUP_INTERNET_TIMEOUT_SEC
         radioCatalogRepository.setWidgetBroadcastEnabled(
             mediaJson.optBoolean("radioWidgetBroadcastEnabled", true),
         )
@@ -639,6 +700,8 @@ class MediaSettingsController(
             MediaBridgeContract.Key.AUTO_SWITCH_TO_DEFAULT_AUTOPLAY to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.DEFAULT_MEDIA_PACKAGE to String::class.java,
             MediaBridgeContract.Key.MINIMIZE_ONLINE_PLAYER_AFTER_AUTOSTART to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.STARTUP_WAIT_FOR_INTERNET to java.lang.Boolean::class.java,
+            MediaBridgeContract.Key.STARTUP_INTERNET_TIMEOUT_SEC to Integer::class.java,
             MediaBridgeContract.Key.RADIO_WIDGET_BROADCAST_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_COVERS_ENABLED to java.lang.Boolean::class.java,
             MediaBridgeContract.Key.CLUSTER_ONLINE_ENABLED to java.lang.Boolean::class.java,
@@ -674,6 +737,7 @@ class MediaSettingsController(
             "defaultAudioSourceAutoplayOnStartup", "autoSwitchToDefaultOnSourceLost",
             "autoSwitchToDefaultAutoplayOnSourceLost",
             "minimizeOnlinePlayerAfterAutostart",
+            "startupWaitForInternet",
             "radioWidgetBroadcastEnabled", "clusterCoversEnabled", "clusterRadioFacadeEnabled",
             "clusterOnlineEnabled",
             "clusterOnlineProgressEnabled",
@@ -687,6 +751,12 @@ class MediaSettingsController(
         if (mediaJson.has("defaultAudioSourceDelaySec")) {
             val value = jsonInt(mediaJson, "defaultAudioSourceDelaySec")
             if (value !in 0..30) throw IllegalArgumentException("Задержка источника должна быть от 0 до 30 секунд: $value")
+        }
+        if (mediaJson.has("startupInternetTimeoutSec")) {
+            val value = jsonInt(mediaJson, "startupInternetTimeoutSec")
+            if (value !in STARTUP_INTERNET_TIMEOUT_RANGE) {
+                throw IllegalArgumentException("Недопустимое ожидание интернета: $value")
+            }
         }
         if (mediaJson.has("clusterWatchdogIntervalMs")) {
             val value = jsonLong(mediaJson, "clusterWatchdogIntervalMs")

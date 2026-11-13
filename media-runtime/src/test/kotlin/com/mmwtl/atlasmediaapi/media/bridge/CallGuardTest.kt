@@ -1,6 +1,7 @@
 package com.mmwtl.atlasmediaapi.media.bridge
 
 import android.media.AudioManager
+import android.telephony.TelephonyManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -21,6 +22,13 @@ class CallGuardTest {
         assertTrue(CallGuard.isCallAudioMode(AudioManager.MODE_RINGTONE))
         assertTrue(CallGuard.isCallAudioMode(AudioManager.MODE_CALL_SCREENING))
         assertFalse(CallGuard.isCallAudioMode(AudioManager.MODE_NORMAL))
+    }
+
+    @Test
+    fun `ringing and off-hook call states are recognised`() {
+        assertTrue(CallGuard.isCallState(TelephonyManager.CALL_STATE_RINGING))
+        assertTrue(CallGuard.isCallState(TelephonyManager.CALL_STATE_OFFHOOK))
+        assertFalse(CallGuard.isCallState(TelephonyManager.CALL_STATE_IDLE))
     }
 
     @Test

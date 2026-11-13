@@ -41,6 +41,7 @@ class MediaCommandRouterTest {
         var tuneAutoplay: Boolean? = null
         var customActions = mutableListOf<String>()
         var customActionResult = true
+        var selectedPlayer: Pair<String, Boolean>? = null
 
         override fun backendAvailable(): Boolean = available
         override fun blocksMediaCommands(): Boolean = blocked
@@ -77,6 +78,11 @@ class MediaCommandRouterTest {
             return sourceResult
         }
 
+        override suspend fun selectPlayer(packageName: String, autoplay: Boolean): Boolean {
+            selectedPlayer = packageName to autoplay
+            return sourceResult
+        }
+
         override suspend fun tuneRadio(target: RadioStationTarget, autoplay: Boolean): Boolean {
             tunedStation = target
             tuneAutoplay = autoplay
@@ -90,6 +96,34 @@ class MediaCommandRouterTest {
     }
 
     private fun request(command: MediaCommand) = MediaCommandRequest("test-req", command)
+
+    @Test
+    fun `set source with a player package switches to that player instead of plain online`() = runBlocking {
+        val host = FakeHost()
+        val result = MediaCommandRouter(host).execute(
+            MediaCommandRequest(
+                "test-req",
+                MediaCommand.SET_SOURCE,
+                source = BridgeAudioSource.ONLINE,
+                playerPackage = "ru.yandex.music",
+            ),
+        )
+
+        assertTrue(result.succeeded)
+        assertEquals("ru.yandex.music" to true, host.selectedPlayer)
+        assertEquals(null, host.selectedSource)
+
+        host.sourceResult = false
+        val failed = MediaCommandRouter(host).execute(
+            MediaCommandRequest(
+                "test-req",
+                MediaCommand.SET_SOURCE,
+                source = BridgeAudioSource.ONLINE,
+                playerPackage = "ru.yandex.music",
+            ),
+        )
+        assertEquals(MediaBridgeContract.Status.FAILED, failed.status)
+    }
 
     @Test
     fun `native source routing wins before media sessions`() = runBlocking {
