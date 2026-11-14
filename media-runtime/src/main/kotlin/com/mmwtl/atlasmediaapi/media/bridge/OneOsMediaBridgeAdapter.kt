@@ -11,6 +11,7 @@ import com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant
 import com.geely.lib.oneosapi.mediacenter.listener.DeviceStateListener
 import com.geely.lib.oneosapi.mediacenter.listener.IRadioStateListener
 import com.geely.lib.oneosapi.mediacenter.listener.MusicStateListener
+import com.geely.lib.oneosapi.mediacenter.manager.RadioManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -281,10 +282,9 @@ class OneOsMediaBridgeAdapter(
             if (expectedSource != null && source != expectedSource) return@runCatching
             if (source == MediaCenterConstant.AudioSource.AUDIO_SOURCE_RADIO) {
                 val radio = currentManager.radioManager
-                val frequency = radio.getCurrentFrequency(radio.band)
                 publishRadioIfActive(
                     owner = currentManager,
-                    frequency = frequency,
+                    frequency = currentRadioFrequency(radio),
                     playing = isRadioPlaying(radio.radioStatus),
                 )
                 return@runCatching
@@ -332,7 +332,27 @@ class OneOsMediaBridgeAdapter(
         playing: Boolean,
     ) {
         if (manager !== owner) return
-        hub.onOneOsRadioState(frequency, playing)
+        hub.onOneOsRadioState(frequency?.withResolvedBand(owner.radioManager), playing)
+    }
+
+    /**
+     * The tuned station. G636 answers getCurrentFrequency(band) with the full station; the 2026
+     * MediaCenterService no longer has that transaction (its IRadioManager ends at
+     * openPsdRadioAsync = 23), so the call comes back null and the plain frequency and band, which
+     * both firmwares serve, are used instead.
+     */
+    private fun currentRadioFrequency(radio: RadioManager): Frequency? {
+        val band = radio.band
+        radio.getCurrentFrequency(band)?.let { return it }
+        val value = radio.frequency
+        return if (value > 0) Frequency.bareValue(value).apply { this.band = band } else null
+    }
+
+    /** A bare 2026 callback frequency names no band; the service's current band is its band. */
+    private fun Frequency.withResolvedBand(radio: RadioManager): Frequency {
+        if (band != Frequency.BAND_UNKNOWN) return this
+        band = radio.band
+        return this
     }
 
     private fun queryAvailability(

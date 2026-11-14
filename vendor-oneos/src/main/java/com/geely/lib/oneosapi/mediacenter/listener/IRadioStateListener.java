@@ -182,6 +182,21 @@ public interface IRadioStateListener extends IInterface {
             return new Proxy(obj);
         }
 
+        /**
+         * Reads the frequency argument of onCurrentFrequency/onStationFrequency in either firmware
+         * layout. G636 MediaCenterService sends a nullable {@link Frequency} parcelable (presence
+         * flag, then its fields); the 2026 (g426, 1.0.202604101104G) service declares these
+         * callbacks with a plain {@code int} frequency, so nothing follows the first int. A bare
+         * value carries no band ({@link Frequency#BAND_UNKNOWN}) or names.
+         */
+        public static Frequency readFrequencyArgument(Parcel data) {
+            int first = data.readInt();
+            if (data.dataAvail() == 0) {
+                return first > 0 ? Frequency.bareValue(first) : null;
+            }
+            return first != 0 ? Frequency.CREATOR.createFromParcel(data) : null;
+        }
+
         @Override // android.os.Binder
         public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
             Frequency createFromParcel;
@@ -207,10 +222,10 @@ public interface IRadioStateListener extends IInterface {
                     return true;
                 case 4:
                     data.enforceInterface(DESCRIPTOR);
-                    createFromParcel = data.readInt() != 0 ? Frequency.CREATOR.createFromParcel(data) : null;
+                    createFromParcel = readFrequencyArgument(data);
                     onCurrentFrequency(createFromParcel);
                     reply.writeNoException();
-                    if (createFromParcel != null) {
+                    if (createFromParcel != null && !createFromParcel.isBareValue()) {
                         reply.writeInt(1);
                         createFromParcel.writeToParcel(reply, 1);
                     } else {
@@ -219,10 +234,10 @@ public interface IRadioStateListener extends IInterface {
                     return true;
                 case 5:
                     data.enforceInterface(DESCRIPTOR);
-                    createFromParcel = data.readInt() != 0 ? Frequency.CREATOR.createFromParcel(data) : null;
+                    createFromParcel = readFrequencyArgument(data);
                     onStationFrequency(createFromParcel);
                     reply.writeNoException();
-                    if (createFromParcel != null) {
+                    if (createFromParcel != null && !createFromParcel.isBareValue()) {
                         reply.writeInt(1);
                         createFromParcel.writeToParcel(reply, 1);
                     } else {

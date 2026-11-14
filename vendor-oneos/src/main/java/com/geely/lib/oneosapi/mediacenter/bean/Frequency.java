@@ -18,7 +18,10 @@ public class Frequency implements Parcelable, Comparable<Frequency> {
             return new Frequency[size];
         }
     };
+    /** Band of a {@link #bareValue} frequency: the callback that delivered it named none. */
+    public static final int BAND_UNKNOWN = -1;
     private int band;
+    private boolean bareValue;
     private boolean collection;
     private String ensembleName;
     private String ensembleRdsPty;
@@ -34,6 +37,19 @@ public class Frequency implements Parcelable, Comparable<Frequency> {
     }
 
     public Frequency() {
+    }
+
+    /** A frequency received as a plain int (2026 MediaCenterService callbacks); not parcelled back. */
+    public static Frequency bareValue(int frequency) {
+        Frequency value = new Frequency();
+        value.frequency = frequency;
+        value.band = BAND_UNKNOWN;
+        value.bareValue = true;
+        return value;
+    }
+
+    public boolean isBareValue() {
+        return this.bareValue;
     }
 
     public Frequency(int frequency, int band, String ensembleName, String serviceName, String ensembleRdsPty, int iconId, int signalQuality, String selector) {
