@@ -142,4 +142,13 @@ class RadioMetadataTest {
         assertEquals("", after.artworkUri)
         assertEquals(5L, after.artworkRevision)
     }
+
+    @Test
+    fun catalogKeyOfHundredthsMhzFmIsKhz() {
+        assertEquals(101_500, radioCatalogFrequencyKHz(10_150))
+        assertEquals(87_500, radioCatalogFrequencyKHz(8_750))
+        assertEquals(101_500, radioCatalogFrequencyKHz(101_500))
+        assertEquals(1_098, radioCatalogFrequencyKHz(1_098))
+        assertEquals(227_360, radioCatalogFrequencyKHz(227_360))
+    }
 }

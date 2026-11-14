@@ -18,6 +18,26 @@ public class Frequency implements Parcelable, Comparable<Frequency> {
             return new Frequency[size];
         }
     };
+    /**
+     * The 2026 (g426) MediaCenterService layout: frequency, band, name, collection. Its name is
+     * the station name, kept as the service name.
+     */
+    public static final Parcelable.Creator<Frequency> COMPACT_CREATOR = new Parcelable.Creator<Frequency>() {
+        @Override
+        public Frequency createFromParcel(Parcel source) {
+            Frequency value = new Frequency();
+            value.frequency = source.readInt();
+            value.band = source.readInt();
+            value.serviceName = source.readString();
+            value.collection = source.readInt() == 1;
+            return value;
+        }
+
+        @Override
+        public Frequency[] newArray(int size) {
+            return new Frequency[size];
+        }
+    };
     /** Band of a {@link #bareValue} frequency: the callback that delivered it named none. */
     public static final int BAND_UNKNOWN = -1;
     private int band;

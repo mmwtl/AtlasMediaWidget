@@ -4,6 +4,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.os.IInterface;
 import android.os.Parcel;
+import android.os.Parcelable;
 import android.os.RemoteException;
 import com.geely.lib.oneosapi.mediacenter.bean.Frequency;
 import com.geely.lib.oneosapi.mediacenter.listener.IRadioDiagCallback;
@@ -579,8 +580,36 @@ public interface IRadioManager extends IInterface {
                 return Stub.DESCRIPTOR;
             }
 
+            /** Null until probed; see {@link #frequencyCreator()}. */
+            private volatile Boolean compactFrequency;
+
             Proxy(IBinder remote) {
                 this.mRemote = remote;
+            }
+
+            /**
+             * The Frequency layout of this service. G636 writes nine fields; the 2026 (g426,
+             * 1.0.202604101104G) MediaCenterService writes four (frequency, band, name, collection)
+             * and its IRadioManager ends at openPsdRadioAsync = 23. The service is classified by
+             * whether it serves getCurrentFrequency = 30: Binder reports an unknown transaction
+             * as a false transact() result.
+             */
+            private Parcelable.Creator<Frequency> frequencyCreator() throws RemoteException {
+                Boolean compact = this.compactFrequency;
+                if (compact == null) {
+                    Parcel obtain = Parcel.obtain();
+                    Parcel obtain2 = Parcel.obtain();
+                    try {
+                        obtain.writeInterfaceToken(Stub.DESCRIPTOR);
+                        obtain.writeInt(0);
+                        compact = !this.mRemote.transact(30, obtain, obtain2, 0);
+                    } finally {
+                        obtain2.recycle();
+                        obtain.recycle();
+                    }
+                    this.compactFrequency = compact;
+                }
+                return compact ? Frequency.COMPACT_CREATOR : Frequency.CREATOR;
             }
 
             @Override // android.os.IInterface
@@ -827,7 +856,7 @@ public interface IRadioManager extends IInterface {
                         return Stub.getDefaultImpl().getScanStationsList();
                     }
                     obtain2.readException();
-                    return obtain2.createTypedArrayList(Frequency.CREATOR);
+                    return obtain2.createTypedArrayList(frequencyCreator());
                 } finally {
                     obtain2.recycle();
                     obtain.recycle();
@@ -861,7 +890,7 @@ public interface IRadioManager extends IInterface {
                         return Stub.getDefaultImpl().getCollectionStationsList();
                     }
                     obtain2.readException();
-                    return obtain2.createTypedArrayList(Frequency.CREATOR);
+                    return obtain2.createTypedArrayList(frequencyCreator());
                 } finally {
                     obtain2.recycle();
                     obtain.recycle();
@@ -878,7 +907,7 @@ public interface IRadioManager extends IInterface {
                         return Stub.getDefaultImpl().getRadioStationsNameList();
                     }
                     obtain2.readException();
-                    return obtain2.createTypedArrayList(Frequency.CREATOR);
+                    return obtain2.createTypedArrayList(frequencyCreator());
                 } finally {
                     obtain2.recycle();
                     obtain.recycle();
@@ -1118,8 +1147,12 @@ public interface IRadioManager extends IInterface {
                 try {
                     obtain.writeInterfaceToken(Stub.DESCRIPTOR);
                     obtain.writeInt(band);
-                    if (!this.mRemote.transact(30, obtain, obtain2, 0) && Stub.getDefaultImpl() != null) {
-                        return Stub.getDefaultImpl().getCurrentFrequency(band);
+                    if (!this.mRemote.transact(30, obtain, obtain2, 0)) {
+                        this.compactFrequency = true;
+                        if (Stub.getDefaultImpl() != null) {
+                            return Stub.getDefaultImpl().getCurrentFrequency(band);
+                        }
+                        return null;
                     }
                     obtain2.readException();
                     return obtain2.readInt() != 0 ? Frequency.CREATOR.createFromParcel(obtain2) : null;

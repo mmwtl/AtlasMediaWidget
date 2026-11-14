@@ -32,6 +32,17 @@ private fun radioFrequencyKind(frequency: Int): RadioFrequencyKind? = when (freq
 
 fun isSupportedRadioFrequency(frequency: Int): Boolean = radioFrequencyKind(frequency) != null
 
+/**
+ * The kHz key of a OneOS frequency in a radio catalog. The 2026 (g426) MediaCenterService reports FM
+ * in hundredths of a MHz (its RadioUtil: FM 8750..10800), catalogs store kHz.
+ */
+fun radioCatalogFrequencyKHz(frequency: Int): Int =
+    if (radioFrequencyKind(frequency) == RadioFrequencyKind.FM_LEGACY_HUNDREDTHS_MHZ) {
+        frequency * 10
+    } else {
+        frequency
+    }
+
 fun isSupportedRadioFrequency(frequency: Int, oneOsBand: Int): Boolean =
     radioFrequencyKind(frequency)?.oneOsBand == oneOsBand
 

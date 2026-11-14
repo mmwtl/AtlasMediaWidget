@@ -298,7 +298,9 @@ class RadioCatalogRepository(
         _catalogInfoFlow.value = buildCatalogInfo()
     }
 
-    fun lookup(frequencyKHz: Int): RadioStation? = active.stations[frequencyKHz]
+    fun lookup(frequency: Int): RadioStation? = active.stations.let { stations ->
+        stations[frequency] ?: stations[radioCatalogFrequencyKHz(frequency)]
+    }
 
     /** Immutable active catalog for clients that need to present every imported station. */
     fun stations(): List<RadioStation> = active.stations.values.sortedBy(RadioStation::frequencyKHz)
