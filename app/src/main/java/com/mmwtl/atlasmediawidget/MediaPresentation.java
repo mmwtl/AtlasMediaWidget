@@ -24,7 +24,8 @@ final class MediaPresentation {
         if (backendConnected) return true;
         if (source.displayId() == MediaSource.Id.ONLINE) return true;
         return hasMedia && (source.displayId() == MediaSource.Id.UNKNOWN
-                || source.displayId() == MediaSource.Id.OTHER);
+                || source.displayId() == MediaSource.Id.OTHER
+                || source.displayId() == MediaSource.Id.CPAA);
     }
 
     static String title(MediaSource.Id source, String value) {

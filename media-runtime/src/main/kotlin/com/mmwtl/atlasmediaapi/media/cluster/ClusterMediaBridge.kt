@@ -9,6 +9,7 @@ import android.net.Uri
 import android.media.session.PlaybackState
 import com.mmwtl.atlasmediaapi.media.bridge.MediaSnapshot
 import com.mmwtl.atlasmediaapi.media.bridge.BridgeAudioSource
+import com.mmwtl.atlasmediaapi.media.bridge.isOpenHeadunitPackage
 import com.ecarx.xui.adaptapi.diminteraction.DimInteraction
 import com.ecarx.xui.adaptapi.diminteraction.IMediaInteraction
 import kotlinx.coroutines.CoroutineScope
@@ -627,11 +628,13 @@ class ClusterMediaBridge(
         if (enabled) ensureOnlineProgress()
     }
 
-    /** Sends only resolved ONLINE snapshots; synthetic UNKNOWN/OTHER sessions are excluded. */
+    /** Sends only resolved ONLINE (or Open Headunit CPAA) snapshots; synthetic UNKNOWN/OTHER sessions are excluded. */
     @Synchronized
     fun updateOnlinePlayback(snapshot: MediaSnapshot, coverFile: File?) {
+        val isOnlineOrOpenHeadunit = snapshot.audioSource == BridgeAudioSource.ONLINE.name ||
+            (snapshot.audioSource == BridgeAudioSource.CPAA.name && isOpenHeadunitPackage(snapshot.ownerPackage))
         if (!isClusterOnlineEnabled || !confirmedOnlineActive || !snapshot.backendConnected ||
-            snapshot.audioSource != BridgeAudioSource.ONLINE.name || snapshot.ownerPackage.isBlank() ||
+            !isOnlineOrOpenHeadunit || snapshot.ownerPackage.isBlank() ||
             snapshot.mediaId.isBlank()
         ) {
             lastOnlinePayload = null

@@ -51,10 +51,12 @@ class MediaStateHub(
     private data class PendingSourceTransition(
         val generation: Long,
         val target: BridgeAudioSource,
+        val displayTarget: BridgeAudioSource = target,
     )
 
     private var nextSourceTransitionGeneration = 0L
     private var pendingSourceTransition: PendingSourceTransition? = null
+    private var oneOsCpaaAvailability: Pair<Boolean, Boolean> = false to false
     private val reportedLostSources = mutableSetOf<BridgeAudioSource>()
     private var lastPlayingRealtimeMs: Long = 0L
     private var lastRadioFrequency: Frequency? = null
@@ -95,13 +97,19 @@ class MediaStateHub(
         availability: Map<BridgeAudioSource, Pair<Boolean, Boolean>>,
     ) {
         val selected = audioSource.toBridgeSource()
+        availability[BridgeAudioSource.CPAA]?.let { oneOsCpaaAvailability = it }
         reportedLostSources.remove(selected)
         clusterMediaBridge?.setActiveSource(selected)
         onlineSourcePolicy.onAudioSource(selected)
         val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
-        val sourceChanged = repository.snapshot().audioSource != selected.name
+        val snapshotBefore = repository.snapshot()
+        val sourceChanged = snapshotBefore.effectiveOneOsSourceName() != selected.name
         if (sourceChanged) latestArtworkRequest.incrementAndGet()
         repository.update { before ->
+            val keepOpenHeadunit = !sourceChanged &&
+                selected == BridgeAudioSource.ONLINE &&
+                isOpenHeadunitPackage(before.ownerPackage)
+            val displaySelected = if (keepOpenHeadunit) BridgeAudioSource.CPAA else selected
             val newArtworkUri = when {
                 cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
                 sourceChanged -> ""
@@ -112,19 +120,20 @@ class MediaStateHub(
                 backendConnected = true,
                 backendErrorCode = MediaBridgeContract.BackendError.NONE,
                 backendErrorMessage = "",
-                audioSource = selected.name,
+                audioSource = displaySelected.name,
                 appSource = appSource.name,
                 ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
                 ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
-                capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
+                capabilities = if (sourceChanged) displaySelected.defaultCapabilities() else before.capabilities,
                 sources = before.sources.map { source ->
                     val state = availability[runCatching {
                         BridgeAudioSource.valueOf(source.id)
                     }.getOrDefault(BridgeAudioSource.UNKNOWN)]
+                    val isOpenHeadunitCpaa = keepOpenHeadunit && source.id == BridgeAudioSource.CPAA.name
                     source.copy(
-                        connected = state?.first ?: source.connected,
-                        available = state?.second ?: source.available,
-                        selected = source.id == selected.name,
+                        connected = if (isOpenHeadunitCpaa) true else (state?.first ?: source.connected),
+                        available = if (isOpenHeadunitCpaa) true else (state?.second ?: source.available),
+                        selected = source.id == displaySelected.name,
                     )
                 },
                 artworkUri = newArtworkUri,
@@ -138,8 +147,9 @@ class MediaStateHub(
     fun onBackendDisconnected(message: String) {
         synchronized(mediaCallbackLock) {
             clusterMediaBridge?.setActiveSource(null)
+            oneOsCpaaAvailability = false to false
             val before = repository.snapshot()
-            val preserveAndroidOnline = before.audioSource == BridgeAudioSource.ONLINE.name &&
+            val preserveAndroidOnline = before.effectiveOneOsSourceName() == BridgeAudioSource.ONLINE.name &&
                 before.ownerPackage.isNotBlank() &&
                 !onlineSourcePolicy.acceptOneOs(BridgeAudioSource.ONLINE, meaningful = true)
             if (!preserveAndroidOnline) {
@@ -174,7 +184,7 @@ class MediaStateHub(
                         source.copy(
                             connected = false,
                             available = false,
-                            selected = preserveAndroidOnline && source.id == BridgeAudioSource.ONLINE.name,
+                            selected = preserveAndroidOnline && source.id == base.audioSource,
                         )
                     },
                 )
@@ -193,25 +203,40 @@ class MediaStateHub(
             if (pending != null && pending.target != selected) return
             if (pending?.target == selected) pendingSourceTransition = null
             reportedLostSources.remove(selected)
+            if (pending?.displayTarget == BridgeAudioSource.CPAA) {
+                reportedLostSources.remove(BridgeAudioSource.CPAA)
+            }
             clusterMediaBridge?.setActiveSource(selected)
             onlineSourcePolicy.onAudioSource(selected)
             val cachedCarPlay = if (selected == BridgeAudioSource.CPAA) carPlayArtworkProvider() else null
             repository.update { before ->
-                val sourceChanged = before.audioSource != selected.name
+                val keepOpenHeadunit = selected == BridgeAudioSource.ONLINE &&
+                    pending?.displayTarget != BridgeAudioSource.ONLINE &&
+                    (pending?.displayTarget == BridgeAudioSource.CPAA || isOpenHeadunitPackage(before.ownerPackage))
+                val displaySelected = if (keepOpenHeadunit) BridgeAudioSource.CPAA else selected
+                val sourceChanged = before.effectiveOneOsSourceName() != selected.name ||
+                    before.audioSource != displaySelected.name
                 val newArtworkUri = when {
                     cachedCarPlay != null && cachedCarPlay.uri.isNotBlank() -> cachedCarPlay.uri
                     sourceChanged -> ""
                     else -> before.artworkUri
                 }
                 (if (sourceChanged) before.withoutMedia() else before).copy(
-                    audioSource = selected.name,
+                    audioSource = displaySelected.name,
                     appSource = appSource.name,
                     sources = before.sources.map { source ->
-                        source.copy(selected = source.id == selected.name)
+                        when (source.id) {
+                            BridgeAudioSource.CPAA.name -> source.copy(
+                                connected = if (keepOpenHeadunit) true else oneOsCpaaAvailability.first,
+                                available = if (keepOpenHeadunit) true else oneOsCpaaAvailability.second,
+                                selected = displaySelected == BridgeAudioSource.CPAA,
+                            )
+                            else -> source.copy(selected = source.id == displaySelected.name)
+                        }
                     },
                     ownerPackage = if (sourceChanged) ownerPackageFor(selected) else before.ownerPackage,
                     ownerApp = if (sourceChanged) ownerLabelFor(selected) else before.ownerApp,
-                    capabilities = if (sourceChanged) selected.defaultCapabilities() else before.capabilities,
+                    capabilities = if (sourceChanged) displaySelected.defaultCapabilities() else before.capabilities,
                     artworkUri = newArtworkUri,
                     artworkRevision = if (
                         newArtworkUri != before.artworkUri && (sourceChanged || newArtworkUri.isNotBlank())
@@ -228,11 +253,14 @@ class MediaStateHub(
         }
     }
 
-    internal fun beginSourceTransition(target: BridgeAudioSource): Long =
+    internal fun beginSourceTransition(
+        target: BridgeAudioSource,
+        displayTarget: BridgeAudioSource = target,
+    ): Long =
         synchronized(mediaCallbackLock) {
             nextSourceTransitionGeneration++
             val generation = nextSourceTransitionGeneration
-            pendingSourceTransition = PendingSourceTransition(generation, target)
+            pendingSourceTransition = PendingSourceTransition(generation, target, displayTarget)
             generation
         }
 
@@ -250,8 +278,15 @@ class MediaStateHub(
         available: Boolean,
     ) {
         val bridgeSource = source.toBridgeSource()
+        if (bridgeSource == BridgeAudioSource.CPAA) {
+            synchronized(mediaCallbackLock) {
+                oneOsCpaaAvailability = connected to available
+            }
+        }
         val snapshot = repository.snapshot()
-        val wasActive = snapshot.audioSource == bridgeSource.name
+        val openHeadunitActive = bridgeSource == BridgeAudioSource.CPAA &&
+            isOpenHeadunitPackage(snapshot.ownerPackage)
+        val wasActive = snapshot.audioSource == bridgeSource.name && !openHeadunitActive
         val now = android.os.SystemClock.elapsedRealtime()
         val wasRecentlyPlaying = (now - lastPlayingRealtimeMs) in 0..2500L
         val wasPlaying = (snapshot.playbackState == PlaybackState.STATE_PLAYING) || wasRecentlyPlaying
@@ -262,10 +297,15 @@ class MediaStateHub(
         }
 
         repository.update {
+            val keepOpenHeadunitCpaa = bridgeSource == BridgeAudioSource.CPAA &&
+                isOpenHeadunitPackage(it.ownerPackage)
             it.copy(
                 sources = it.sources.map { item ->
                     if (item.id == bridgeSource.name) {
-                        item.copy(connected = connected, available = available)
+                        item.copy(
+                            connected = if (keepOpenHeadunitCpaa) true else connected,
+                            available = if (keepOpenHeadunitCpaa) true else available,
+                        )
                     } else item
                 },
             )
@@ -299,7 +339,7 @@ class MediaStateHub(
         }
     }
 
-    fun selectedSourceName(): String = repository.snapshot().audioSource
+    fun selectedSourceName(): String = repository.snapshot().effectiveOneOsSourceName()
 
     /** Package of the player the card shows; session selection keeps it ahead of other players. */
     fun displayedOwnerPackage(): String = repository.snapshot().ownerPackage
@@ -312,7 +352,7 @@ class MediaStateHub(
         synchronized(mediaCallbackLock) {
             if (pendingSourceTransition?.target?.let { it != BridgeAudioSource.ONLINE } == true) return
             val snapshot = repository.snapshot()
-            if (snapshot.backendConnected && snapshot.audioSource !in setOf(
+            if (snapshot.backendConnected && snapshot.effectiveOneOsSourceName() !in setOf(
                     BridgeAudioSource.ONLINE.name,
                     BridgeAudioSource.UNKNOWN.name,
                     BridgeAudioSource.OTHER.name,
@@ -333,7 +373,9 @@ class MediaStateHub(
         synchronized(mediaCallbackLock) {
             onlineSourcePolicy.onSessionGone()
             val snapshot = repository.snapshot()
-            if (snapshot.audioSource == BridgeAudioSource.ONLINE.name && snapshot.ownerPackage.isNotBlank()) {
+            if (snapshot.effectiveOneOsSourceName() == BridgeAudioSource.ONLINE.name &&
+                snapshot.ownerPackage.isNotBlank()
+            ) {
                 clearPlayback()
             }
         }
@@ -346,9 +388,15 @@ class MediaStateHub(
     ): BridgeAudioSource? {
         if (controller == null) {
             val snapshot = repository.snapshot()
-            val fallback = onlineSourcePolicy.onSessionGone(snapshot.audioSource.asBridgeAudioSource())
-            val wasActiveOnline = snapshot.audioSource == BridgeAudioSource.ONLINE.name
+            val effectiveSource = snapshot.effectiveOneOsSourceName()
+            val fallback = onlineSourcePolicy.onSessionGone(effectiveSource.asBridgeAudioSource())
+            val wasActiveOnline = effectiveSource == BridgeAudioSource.ONLINE.name
             val hadOwner = snapshot.ownerPackage.isNotBlank()
+            val lostSource = if (isOpenHeadunitPackage(snapshot.ownerPackage)) {
+                BridgeAudioSource.CPAA
+            } else {
+                BridgeAudioSource.ONLINE
+            }
             val now = android.os.SystemClock.elapsedRealtime()
             val wasRecentlyPlaying = (now - lastPlayingRealtimeMs) in 0..2500L
             val wasPlaying = (snapshot.playbackState == PlaybackState.STATE_PLAYING) || wasRecentlyPlaying
@@ -356,9 +404,9 @@ class MediaStateHub(
             if (wasActiveOnline) {
                 clearPlayback()
                 if (hadOwner) {
-                    val shouldReportLoss = reportedLostSources.add(BridgeAudioSource.ONLINE)
+                    val shouldReportLoss = reportedLostSources.add(lostSource)
                     if (shouldReportLoss) {
-                        onActiveSourceLost(BridgeAudioSource.ONLINE, wasPlaying)
+                        onActiveSourceLost(lostSource, wasPlaying)
                     }
                 }
             }
@@ -367,15 +415,20 @@ class MediaStateHub(
         if (pendingSourceTransition?.target?.let { it != BridgeAudioSource.ONLINE } == true) {
             return null
         }
+        val ownerPackage = controller.packageName.orEmpty()
+        if (pendingSourceTransition?.displayTarget == BridgeAudioSource.ONLINE &&
+            isOpenHeadunitPackage(ownerPackage)
+        ) {
+            return null
+        }
         val bridgeState = repository.snapshot()
-        if (bridgeState.backendConnected && bridgeState.audioSource !in setOf(
+        if (bridgeState.backendConnected && bridgeState.effectiveOneOsSourceName() !in setOf(
                 BridgeAudioSource.ONLINE.name,
                 BridgeAudioSource.UNKNOWN.name,
                 BridgeAudioSource.OTHER.name,
             )
         ) return null
 
-        val ownerPackage = controller.packageName.orEmpty()
         val title = metadata.text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
             .ifBlank { metadata.text(MediaMetadata.METADATA_KEY_TITLE) }
         val artist = metadata.text(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE)
@@ -383,8 +436,13 @@ class MediaStateHub(
         val mediaId = metadata.text(MediaMetadata.METADATA_KEY_MEDIA_ID)
             .ifBlank { stableMediaId(title, artist) }
         val actions = state?.actions ?: 0L
-        val meaningful = ownerPackage.isNotBlank() && metadata.hasPlayerContent()
+        val meaningful = ownerPackage.isNotBlank() && metadata.hasPlayerContent(ownerPackage, state)
         if (!meaningful && ownerPackage.isNotBlank() && ownerPackage == bridgeState.ownerPackage) {
+            if (metadata.isOpenHeadunitPlaceholder(ownerPackage, state)) {
+                onlineSourcePolicy.onSessionGone()
+                clearPlayback()
+                return null
+            }
             // Players clear metadata between tracks or after stopping; the shown track stays,
             // but its playback state must not keep running.
             repository.update { before ->
@@ -407,20 +465,32 @@ class MediaStateHub(
         }
         if (!onlineSourcePolicy.onSession(ownerPackage, meaningful)) return null
 
+        val isOpenHeadunit = isOpenHeadunitPackage(ownerPackage)
+        if (isOpenHeadunit) {
+            reportedLostSources.remove(BridgeAudioSource.CPAA)
+        }
         repository.update { before ->
             val sameMedia = before.mediaId == mediaId && before.ownerPackage == ownerPackage
-            val targetSource = if (!bridgeState.backendConnected || before.audioSource == BridgeAudioSource.UNKNOWN.name
-                || before.audioSource == BridgeAudioSource.OTHER.name
-            ) {
-                BridgeAudioSource.ONLINE.name
-            } else before.audioSource
+            val targetSource = when {
+                isOpenHeadunit -> BridgeAudioSource.CPAA.name
+                !bridgeState.backendConnected ||
+                    before.effectiveOneOsSourceName() == BridgeAudioSource.UNKNOWN.name ||
+                    before.effectiveOneOsSourceName() == BridgeAudioSource.OTHER.name ||
+                    before.audioSource == BridgeAudioSource.CPAA.name -> BridgeAudioSource.ONLINE.name
+                else -> before.audioSource
+            }
             before.copy(
                 audioSource = targetSource,
-                sources = if (targetSource != before.audioSource) {
-                    before.sources.map { source ->
-                        source.copy(selected = source.id == targetSource)
+                sources = before.sources.map { source ->
+                    when (source.id) {
+                        BridgeAudioSource.CPAA.name -> source.copy(
+                            connected = if (isOpenHeadunit) true else oneOsCpaaAvailability.first,
+                            available = if (isOpenHeadunit) true else oneOsCpaaAvailability.second,
+                            selected = targetSource == BridgeAudioSource.CPAA.name,
+                        )
+                        else -> source.copy(selected = source.id == targetSource)
                     }
-                } else before.sources,
+                },
                 ownerPackage = ownerPackage,
                 ownerApp = appLabel(ownerPackage),
                 mediaId = mediaId,
@@ -484,7 +554,9 @@ class MediaStateHub(
     fun onCarPlayNowPlaying(info: NowPlayingInfo) {
         synchronized(mediaCallbackLock) {
             val snapshot = repository.snapshot()
-            if (snapshot.audioSource != BridgeAudioSource.CPAA.name) return
+            if (snapshot.audioSource != BridgeAudioSource.CPAA.name ||
+                isOpenHeadunitPackage(snapshot.ownerPackage)
+            ) return
             val title = info.mediaItemTitle.orEmpty()
             val artist = info.mediaItemArtist.orEmpty()
             val mediaId = stableMediaId(title, artist)
@@ -517,7 +589,10 @@ class MediaStateHub(
     fun onCarPlayNativeArtwork(artwork: NormalizedArtwork, nowPlaying: NowPlayingInfo?) {
         synchronized(mediaCallbackLock) {
             val snapshot = repository.snapshot()
-            if (snapshot.audioSource == BridgeAudioSource.CPAA.name && artwork.uri.isNotBlank()) {
+            if (snapshot.audioSource == BridgeAudioSource.CPAA.name &&
+                !isOpenHeadunitPackage(snapshot.ownerPackage) &&
+                artwork.uri.isNotBlank()
+            ) {
                 repository.update { before ->
                     val updatedTitle = if (before.title.isBlank() && nowPlaying != null && !nowPlaying.mediaItemTitle.isNullOrBlank()) {
                         nowPlaying.mediaItemTitle.orEmpty()
@@ -860,8 +935,33 @@ class MediaStateHub(
         } else {
             MediaCapabilities.SET_SOURCE
         }
+        val cpaaStatus = oneOsCpaaAvailability
         repository.update { before ->
+            val wasOpenHeadunitCpaa =
+                before.audioSource == BridgeAudioSource.CPAA.name &&
+                    isOpenHeadunitPackage(before.ownerPackage)
+            val fallbackSource = if (wasOpenHeadunitCpaa) {
+                if (before.backendConnected) BridgeAudioSource.ONLINE.name else BridgeAudioSource.UNKNOWN.name
+            } else {
+                before.audioSource
+            }
+            val updatedSources = if (wasOpenHeadunitCpaa) {
+                before.sources.map { source ->
+                    when (source.id) {
+                        BridgeAudioSource.CPAA.name -> source.copy(
+                            connected = cpaaStatus.first,
+                            available = cpaaStatus.second,
+                            selected = false,
+                        )
+                        BridgeAudioSource.ONLINE.name -> source.copy(selected = before.backendConnected)
+                        else -> source.copy(selected = source.id == fallbackSource)
+                    }
+                }
+            } else {
+                before.sources
+            }
             before.copy(
+                audioSource = fallbackSource,
                 ownerPackage = "",
                 ownerApp = "",
                 mediaId = "",
@@ -881,6 +981,7 @@ class MediaStateHub(
                 artworkRevision = if (before.artworkUri.isNotBlank()) {
                     before.artworkRevision + 1L
                 } else before.artworkRevision,
+                sources = updatedSources,
             )
         }
     }
@@ -995,8 +1096,40 @@ class MediaStateHub(
         if (ownerPackageFor(source).isBlank()) "" else source.name
 }
 
+private const val OPEN_HEADUNIT_PLACEHOLDER_TITLE = "Android Auto"
+
+internal fun MediaMetadata?.isOpenHeadunitPlaceholder(
+    packageName: String?,
+    state: PlaybackState?,
+): Boolean {
+    if (!isOpenHeadunitPackage(packageName)) return false
+    if (PlayerSessionSelector.isPlaying(state?.state)) return false
+    fun text(key: String) = this?.getString(key).orEmpty()
+    val title = text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+        .ifBlank { text(MediaMetadata.METADATA_KEY_TITLE) }
+    val mediaId = text(MediaMetadata.METADATA_KEY_MEDIA_ID)
+    val album = text(MediaMetadata.METADATA_KEY_ALBUM)
+    val duration = this?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
+    val hasBitmap = this?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) != null ||
+        this?.getBitmap(MediaMetadata.METADATA_KEY_ART) != null ||
+        this?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON) != null
+    val hasArtUri = text(MediaMetadata.METADATA_KEY_ALBUM_ART_URI).isNotBlank() ||
+        text(MediaMetadata.METADATA_KEY_ART_URI).isNotBlank() ||
+        text(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI).isNotBlank()
+    return title.equals(OPEN_HEADUNIT_PLACEHOLDER_TITLE, ignoreCase = true) &&
+        mediaId.isBlank() &&
+        album.isBlank() &&
+        duration <= 0L &&
+        !hasBitmap &&
+        !hasArtUri
+}
+
 /** A session without a title, artist or media ID has nothing the card could show. */
-internal fun MediaMetadata?.hasPlayerContent(): Boolean {
+internal fun MediaMetadata?.hasPlayerContent(
+    packageName: String? = null,
+    state: PlaybackState? = null,
+): Boolean {
+    if (isOpenHeadunitPlaceholder(packageName, state)) return false
     fun text(key: String) = this?.getString(key).orEmpty()
     return text(MediaMetadata.METADATA_KEY_DISPLAY_TITLE).isNotBlank() ||
         text(MediaMetadata.METADATA_KEY_TITLE).isNotBlank() ||
@@ -1011,7 +1144,7 @@ internal fun MediaController.playerSessionFacts(
 ): PlayerSessionFacts = PlayerSessionFacts(
     packageName = packageName.orEmpty(),
     playing = PlayerSessionSelector.isPlaying(state?.state),
-    hasContent = metadata.hasPlayerContent(),
+    hasContent = metadata.hasPlayerContent(packageName, state),
     lastPositionUpdateTime = state?.lastPositionUpdateTime ?: 0L,
 )
 
@@ -1046,6 +1179,13 @@ internal fun isAudioFilePath(path: String?): Boolean {
 
 private fun String.asBridgeAudioSource(): BridgeAudioSource? =
     runCatching { BridgeAudioSource.valueOf(this) }.getOrNull()
+
+private fun MediaSnapshot.effectiveOneOsSourceName(): String =
+    if (audioSource == BridgeAudioSource.CPAA.name && isOpenHeadunitPackage(ownerPackage)) {
+        BridgeAudioSource.ONLINE.name
+    } else {
+        audioSource
+    }
 
 fun MediaCenterConstant.AudioSource.toBridgeSource(): BridgeAudioSource = when (this) {
     MediaCenterConstant.AudioSource.AUDIO_SOURCE_USB -> BridgeAudioSource.USB

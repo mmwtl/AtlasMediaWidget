@@ -579,6 +579,175 @@ class AndroidMediaCommandHostTest {
         fixture.release()
     }
 
+    @Test
+    fun `open headunit placeholder metadata is ignored while real track presents as CPAA and survives ONLINE resync`() {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val packageName = "com.geely.headunitrevived"
+        val stoppedState = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_STOPPED, 0L, 0f)
+            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT)
+            .build()
+        val placeholderMetadata = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, "Android Auto")
+            .putString(MediaMetadata.METADATA_KEY_ARTIST, "Подключено")
+            .build()
+
+        assertFalse(placeholderMetadata.hasPlayerContent(packageName, stoppedState))
+
+        val session = MediaSession(context, "ghur-session").apply {
+            isActive = true
+            setMetadata(placeholderMetadata)
+            setPlaybackState(stoppedState)
+        }
+        val controller = controller(context, session, packageName)
+        shadowOf(controller).setMetadata(placeholderMetadata)
+        shadowOf(controller).setPlaybackState(stoppedState)
+
+        hub.onBackendConnected(
+            audioSource = com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            appSource = com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant.AppSource.UNKNOWN,
+            availability = mapOf(
+                BridgeAudioSource.ONLINE to (true to true),
+                BridgeAudioSource.CPAA to (false to false),
+            ),
+        )
+        hub.onMediaController(controller, placeholderMetadata, stoppedState)
+        assertEquals(BridgeAudioSource.ONLINE.name, repository.snapshot().audioSource)
+        assertEquals("", repository.snapshot().title)
+
+        val playingState = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PLAYING, 12_000L, 1f)
+            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT)
+            .build()
+        val trackMetadata = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, "Highway Star")
+            .putString(MediaMetadata.METADATA_KEY_ARTIST, "Deep Purple")
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, 365_000L)
+            .build()
+        shadowOf(controller).setMetadata(trackMetadata)
+        shadowOf(controller).setPlaybackState(playingState)
+
+        hub.onMediaController(controller, trackMetadata, playingState)
+        val playingSnapshot = repository.snapshot()
+        assertEquals(BridgeAudioSource.CPAA.name, playingSnapshot.audioSource)
+        assertEquals(packageName, playingSnapshot.ownerPackage)
+        assertEquals("Highway Star", playingSnapshot.title)
+        val cpaaStatus = playingSnapshot.sources.first { it.id == BridgeAudioSource.CPAA.name }
+        val onlineStatus = playingSnapshot.sources.first { it.id == BridgeAudioSource.ONLINE.name }
+        assertTrue(cpaaStatus.connected && cpaaStatus.available && cpaaStatus.selected)
+        assertFalse(onlineStatus.selected)
+
+        // OneOS ONLINE source callbacks and periodic resync must not reset Open Headunit CPAA card
+        hub.onSourceChanged(
+            com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant.AppSource.UNKNOWN,
+        )
+        hub.onBackendConnected(
+            audioSource = com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
+            appSource = com.geely.lib.oneosapi.mediacenter.constant.MediaCenterConstant.AppSource.UNKNOWN,
+            availability = mapOf(
+                BridgeAudioSource.ONLINE to (true to true),
+                BridgeAudioSource.CPAA to (false to false),
+            ),
+        )
+        assertEquals(BridgeAudioSource.CPAA.name, repository.snapshot().audioSource)
+        assertEquals("Highway Star", repository.snapshot().title)
+        assertEquals(packageName, repository.snapshot().ownerPackage)
+
+        // Open Headunit reports STATE_STOPPED on pause while keeping real track metadata
+        shadowOf(controller).setPlaybackState(stoppedState)
+        hub.onMediaController(controller, trackMetadata, stoppedState)
+        assertEquals(BridgeAudioSource.CPAA.name, repository.snapshot().audioSource)
+        assertEquals("Highway Star", repository.snapshot().title)
+
+        // Phone disconnect reverts metadata to placeholder -> content gone -> reverts to ONLINE
+        hub.onPlayerContentGone()
+        val afterDisconnect = repository.snapshot()
+        assertEquals(BridgeAudioSource.ONLINE.name, afterDisconnect.audioSource)
+        assertEquals("", afterDisconnect.ownerPackage)
+        assertEquals("", afterDisconnect.title)
+        val cpaaAfterDisconnect = afterDisconnect.sources.first { it.id == BridgeAudioSource.CPAA.name }
+        assertFalse(cpaaAfterDisconnect.selected)
+        assertFalse(cpaaAfterDisconnect.connected)
+
+        session.release()
+    }
+
+    @Test
+    fun `open headunit session is not remembered as online player and SET_SOURCE switches between CPAA and ONLINE`() = runBlocking {
+        val context = RuntimeEnvironment.getApplication()
+        val repository = MediaStateRepository()
+        val hub = hub(context, repository)
+        val observer = MediaSessionObserver(context, hub)
+
+        val onlinePlaying = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_PAUSED, 0L, 0f)
+            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE)
+            .build()
+        val onlineMetadata = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, "Online Song")
+            .build()
+        val onlineSession = MediaSession(context, "online-session").apply {
+            isActive = true
+            setMetadata(onlineMetadata)
+            setPlaybackState(onlinePlaying)
+        }
+        val onlineController = controller(context, onlineSession, "com.example.online")
+        shadowOf(onlineController).setMetadata(onlineMetadata)
+        shadowOf(onlineController).setPlaybackState(onlinePlaying)
+
+        val ghurState = PlaybackState.Builder()
+            .setState(PlaybackState.STATE_STOPPED, 10_000L, 0f)
+            .setActions(PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE)
+            .build()
+        val ghurMetadata = MediaMetadata.Builder()
+            .putString(MediaMetadata.METADATA_KEY_TITLE, "AA Song")
+            .putString(MediaMetadata.METADATA_KEY_ARTIST, "AA Artist")
+            .putLong(MediaMetadata.METADATA_KEY_DURATION, 180_000L)
+            .build()
+        val ghurSession = MediaSession(context, "ghur-session").apply {
+            isActive = true
+            setMetadata(ghurMetadata)
+            setPlaybackState(ghurState)
+        }
+        val ghurController = controller(context, ghurSession, "com.geely.headunitrevived")
+        shadowOf(ghurController).setMetadata(ghurMetadata)
+        shadowOf(ghurController).setPlaybackState(ghurState)
+
+        activeControllers(observer) += onlineController
+        activeControllers(observer) += ghurController
+
+        val host = host(
+            context = context,
+            observer = observer,
+            preferences = AtlasPreferences(context).apply {
+                defaultMediaPackage = "com.example.online"
+            },
+            hub = hub,
+            launchPackage = null,
+            sessionWaitTimeoutMs = 20L,
+            sessionPollDelaysMs = listOf(1L),
+            displayedMediaPackage = "com.geely.headunitrevived",
+        )
+
+        assertTrue(host.setSource(BridgeAudioSource.CPAA, appSource = null, autoplay = false))
+        assertEquals(BridgeAudioSource.CPAA.name, repository.snapshot().audioSource)
+        assertEquals("com.geely.headunitrevived", repository.snapshot().ownerPackage)
+        assertEquals("AA Song", repository.snapshot().title)
+        assertEquals("com.geely.headunitrevived", host.preferredSession()?.packageName)
+        assertEquals("com.example.online", host.preferredOnlineSession()?.packageName)
+
+        assertTrue(host.setSource(BridgeAudioSource.ONLINE, appSource = null, autoplay = false))
+        assertEquals(BridgeAudioSource.ONLINE.name, repository.snapshot().audioSource)
+        assertEquals("com.example.online", repository.snapshot().ownerPackage)
+        assertEquals("Online Song", repository.snapshot().title)
+
+        onlineSession.release()
+        ghurSession.release()
+    }
+
     private class PrepareFixture(
         val context: android.app.Application,
         val repository: MediaStateRepository,

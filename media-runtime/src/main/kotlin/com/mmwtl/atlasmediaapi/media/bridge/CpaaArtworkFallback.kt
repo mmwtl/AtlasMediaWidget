@@ -21,6 +21,16 @@ val CARPLAY_MEDIA_SESSION_PACKAGES = setOf(
 )
 const val CARPLAY_MEDIA_SESSION_PACKAGE = "com.autolink.carplay"
 
+val OPEN_HEADUNIT_MEDIA_SESSION_PACKAGES = setOf(
+    "com.geely.headunitrevived",
+    "com.andrerinas.headunitrevived.geely",
+    "com.andrerinas.headunitrevived",
+    "com.andrerinas.openheadunit",
+)
+
+fun isOpenHeadunitPackage(packageName: String?): Boolean =
+    packageName != null && packageName in OPEN_HEADUNIT_MEDIA_SESSION_PACKAGES
+
 data class ArtworkTrackIdentity(
     val mediaId: String,
     val title: String,
@@ -93,13 +103,17 @@ class CpaaArtworkFallback(
     fun onBridgeStateChanged() {
         val shouldClear = synchronized(lock) {
             val snapshot = repository.snapshot()
-            if (snapshot.backendConnected && snapshot.audioSource == BridgeAudioSource.CPAA.name) {
+            if (snapshot.backendConnected &&
+                snapshot.audioSource == BridgeAudioSource.CPAA.name &&
+                !isOpenHeadunitPackage(snapshot.ownerPackage)
+            ) {
                 false
             } else {
                 sequence++
                 currentTrack = null
                 oneOsArtworkAvailable = false
-                val clear = fallbackApplied || snapshot.artworkUri.isNotBlank()
+                val clear = fallbackApplied ||
+                    (!isOpenHeadunitPackage(snapshot.ownerPackage) && snapshot.artworkUri.isNotBlank())
                 fallbackApplied = false
                 clear
             }
