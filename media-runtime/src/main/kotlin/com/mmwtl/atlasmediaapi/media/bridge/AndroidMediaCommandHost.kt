@@ -135,6 +135,9 @@ class AndroidMediaCommandHost(
     }
 
     override fun preferredSession(): MediaSessionCommandTarget? {
+        if (isOpenHeadunitPackage(displayedMediaPackage())) {
+            selectPlayerSession()?.let { return sessionTarget(it) }
+        }
         if (mediaCenter()?.currentAudioSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_CPAA) {
             val session = sessionObserver.getActiveControllers()
                 .firstOrNull { it.packageName in CARPLAY_MEDIA_SESSION_PACKAGES }
@@ -294,7 +297,7 @@ class AndroidMediaCommandHost(
         rememberOnlineMediaPackage(packageName)
         currentMediaPackageRef.set(packageName)
         sessionObserver.addPreparedSession(prepared.session)
-        return if (prepared.session.metadata().hasPlayerContent() || hasTrack(packageName)) {
+        return if (prepared.session.metadata().hasPlayerContent(packageName) || hasTrack(packageName)) {
             QuietPrepare.TRACK
         } else {
             QuietPrepare.NO_TRACK
@@ -302,8 +305,12 @@ class AndroidMediaCommandHost(
     }
 
     private fun hasTrack(packageName: String): Boolean =
-        configuredController(packageName)
-            ?.let { sessionObserver.metadataOf(it).hasPlayerContent() } == true
+        configuredController(packageName)?.let { controller ->
+            sessionObserver.metadataOf(controller).hasPlayerContent(
+                controller.packageName,
+                sessionObserver.playbackStateOf(controller),
+            )
+        } == true
 
     private suspend fun launchPackageAndMaybePlay(
         packageName: String,
@@ -494,8 +501,9 @@ class AndroidMediaCommandHost(
         rememberOnlineMediaPackage(packageName)
         currentMediaPackageRef.set(packageName)
         val center = mediaCenter()
-        val onlineSelected = center == null || runCatching { center.currentAudioSource }
-            .getOrNull() == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE
+        val onlineSelected = (center == null || runCatching { center.currentAudioSource }
+            .getOrNull() == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE) &&
+            !isOpenHeadunitPackage(displayedMediaPackage())
         if (!onlineSelected) {
             // The OneOS ONLINE request without autoplay; the player itself starts below.
             if (!setSource(BridgeAudioSource.ONLINE, appSource = null, autoplay = false)) return false
@@ -508,7 +516,11 @@ class AndroidMediaCommandHost(
         val controller = configuredController(packageName)
         if (!autoplay) {
             // A tile does not open the player's activity: without a track the card stays empty.
-            if (controller != null && sessionObserver.metadataOf(controller).hasPlayerContent()) {
+            if (controller != null && sessionObserver.metadataOf(controller).hasPlayerContent(
+                    controller.packageName,
+                    sessionObserver.playbackStateOf(controller),
+                )
+            ) {
                 publish(controller)
             } else if (prepareQuietly(packageName) != QuietPrepare.TRACK) {
                 controller?.let(::publish)
@@ -541,6 +553,35 @@ class AndroidMediaCommandHost(
             }
     }
 
+    private fun openHeadunitController(): MediaController? {
+        val controllers = sessionObserver.getActiveControllers()
+            .filter { isOpenHeadunitPackage(it.packageName) }
+        return controllers.firstOrNull { controller ->
+            val state = sessionObserver.playbackStateOf(controller)
+            PlayerSessionSelector.isPlaying(state?.state)
+        } ?: controllers.firstOrNull { controller ->
+            val state = sessionObserver.playbackStateOf(controller)
+            sessionObserver.metadataOf(controller).hasPlayerContent(controller.packageName, state)
+        }
+    }
+
+    private fun pauseOpenHeadunitSessions() {
+        sessionObserver.getActiveControllers()
+            .filter {
+                isOpenHeadunitPackage(it.packageName) &&
+                    PlayerSessionSelector.isPlaying(sessionObserver.playbackStateOf(it)?.state)
+            }
+            .forEach { controller ->
+                Timber.i("Pausing Open Headunit session %s after switching to ONLINE", controller.packageName)
+                runCatching { controller.transportControls.pause() }.onFailure(Timber::w)
+            }
+        if (isOpenHeadunitPackage(currentMediaPackageRef.get())) {
+            currentMediaPackageRef.set(
+                lastOnlineMediaPackageRef.get().ifBlank { defaultMediaPackage() },
+            )
+        }
+    }
+
     private fun isInstalled(packageName: String): Boolean =
         runCatching { context.packageManager.getApplicationInfo(packageName, 0) }.isSuccess
 
@@ -551,10 +592,28 @@ class AndroidMediaCommandHost(
         launchConfiguredOnlinePackage: Boolean,
     ): Boolean {
         onUserAction?.invoke()
+        val openHeadunitForCpaa = if (source == BridgeAudioSource.CPAA) openHeadunitController() else null
+        if (source == BridgeAudioSource.ONLINE) {
+            pauseOpenHeadunitSessions()
+        }
         val center = mediaCenter()
         if (center == null) {
+            if (openHeadunitForCpaa != null) {
+                setCurrentMediaPackage(openHeadunitForCpaa.packageName)
+                publish(openHeadunitForCpaa)
+                pauseOtherPlayers(openHeadunitForCpaa.packageName)
+                return if (autoplay) {
+                    playAndConfirm(openHeadunitForCpaa.packageName, openHeadunitForCpaa)
+                } else {
+                    true
+                }
+            }
             if (source != BridgeAudioSource.ONLINE) return false
             Timber.i("OneOS MediaCenter unavailable; applying Android ONLINE source path")
+            stateHub?.beginSourceTransition(
+                target = BridgeAudioSource.ONLINE,
+                displayTarget = BridgeAudioSource.ONLINE,
+            )
             stateHub?.onSourceChanged(
                 MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE,
                 MediaCenterConstant.AppSource.UNKNOWN,
@@ -567,7 +626,11 @@ class AndroidMediaCommandHost(
                     returnHomeAfterLaunch = preferences.minimizeOnlinePlayerAfterAutostart,
                 )
             }
-            if (!autoplay) return true
+            if (!autoplay) {
+                val sessionPackage = preferredOnlineSession()?.packageName
+                sessionPackage?.let(::configuredController)?.let(::publish)
+                return true
+            }
 
             val sessionPackage = preferredOnlineSession()?.packageName
             val controller = sessionPackage?.let(::configuredController)
@@ -584,7 +647,8 @@ class AndroidMediaCommandHost(
                 true
             }
         }
-        val oneOsSource = source.toOneOsSource()
+        val effectiveBridgeTarget = if (openHeadunitForCpaa != null) BridgeAudioSource.ONLINE else source
+        val oneOsSource = effectiveBridgeTarget.toOneOsSource()
         val oneOsApp = appSource?.let { runCatching { MediaCenterConstant.AppSource.valueOf(it) }.getOrNull() }
             ?: MediaCenterConstant.AppSource.UNKNOWN
         val sourceSwitch = ConfirmedSourceSwitch(
@@ -595,12 +659,15 @@ class AndroidMediaCommandHost(
             sourcePollDelaysMs = sourcePollDelaysMs,
             autoplayConfirmDelaysMs = autoplayConfirmDelaysMs,
         )
-        val transitionGeneration = stateHub?.beginSourceTransition(source)
+        val transitionGeneration = stateHub?.beginSourceTransition(
+            target = effectiveBridgeTarget,
+            displayTarget = source,
+        )
 
         return runCatching {
             rememberOnlineSessionBeforeLeaving(center, oneOsSource)
             val sourceConfirmed = sourceSwitch.requestAndConfirm(
-                target = source,
+                target = effectiveBridgeTarget,
                 requestTarget = {
                     if (oneOsSource == MediaCenterConstant.AudioSource.AUDIO_SOURCE_ONLINE &&
                         oneOsApp == MediaCenterConstant.AppSource.UNKNOWN
@@ -614,13 +681,24 @@ class AndroidMediaCommandHost(
                 },
             )
             if (!sourceConfirmed) {
-                Timber.w("OneOS did not confirm source %s within timeout", source.name)
+                Timber.w("OneOS did not confirm source %s within timeout", effectiveBridgeTarget.name)
                 return@runCatching false
             }
 
             // Publish only the confirmed target. Intermediate source callbacks are filtered by
             // MediaStateHub while this transition generation is active.
             stateHub?.onSourceChanged(oneOsSource, oneOsApp)
+
+            if (openHeadunitForCpaa != null) {
+                setCurrentMediaPackage(openHeadunitForCpaa.packageName)
+                publish(openHeadunitForCpaa)
+                pauseOtherPlayers(openHeadunitForCpaa.packageName)
+                return@runCatching if (autoplay) {
+                    playAndConfirm(openHeadunitForCpaa.packageName, openHeadunitForCpaa)
+                } else {
+                    true
+                }
+            }
 
             val configuredOnlinePackage = if (
                 launchConfiguredOnlinePackage &&
@@ -733,6 +811,7 @@ class AndroidMediaCommandHost(
 
     internal fun preferredOnlineSession(): MediaSessionCommandTarget? {
         val controllers = sessionObserver.getActiveControllers()
+            .filterNot { isOpenHeadunitPackage(it.packageName) }
         val rememberedPackage = lastOnlineMediaPackageRef.get()
         if (rememberedPackage.isNotBlank()) {
             controllers
@@ -749,7 +828,9 @@ class AndroidMediaCommandHost(
     }
 
     private fun rememberOnlineMediaPackage(packageName: String) {
-        if (packageName.isNotBlank()) lastOnlineMediaPackageRef.set(packageName)
+        if (packageName.isNotBlank() && !isOpenHeadunitPackage(packageName)) {
+            lastOnlineMediaPackageRef.set(packageName)
+        }
     }
 
     override suspend fun sendCustomAction(action: String): Boolean {
@@ -1036,7 +1117,7 @@ class AndroidMediaSessionTarget(
         }
 
     override fun play(): Boolean = runCatching {
-        if (isIdle(state()?.state)) {
+        if (isIdle(state()?.state) && !isOpenHeadunitPackage(controller.packageName)) {
             // An idle player may have nothing loaded: Media3 ignores play() with an empty playlist
             // but resumes its last queue from a MEDIA_PLAY key, as after a cold start.
             val eventTime = android.os.SystemClock.uptimeMillis()
